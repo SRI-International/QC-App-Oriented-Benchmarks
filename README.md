@@ -1,4 +1,4 @@
-# Quantum Computing - Prototype Benchmarks Project
+# Application-Oriented Performance Benchmarks for Quantum Computing
 This repository contains a collection of prototypical application- or algorithm-centric benchmark programs designed for the purpose of characterizing the end-user perception of the performance of current-generation Quantum Computers.
 
 The repository is maintained by members of the Quantum Economic Development Consortium (QED-C) Technical Advisory Committee on Standards and Performance Metrics (Standards TAC).

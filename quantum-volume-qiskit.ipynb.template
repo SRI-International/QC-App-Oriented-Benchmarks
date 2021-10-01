@@ -1,0 +1,245 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "source": [
+    "### Quantum Volume - Qiskit Version (Adapted from IBM QV Tutorial and Paper)\n"
+   ],
+   "metadata": {}
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "source": [
+    "min_qubits=2\n",
+    "max_qubits=6\n",
+    "max_circuits=1000\n",
+    "num_shots=10000\n",
+    "\n",
+    "backend_id=\"qasm_simulator\"\n",
+    "hub=\"ibm-q\"; group=\"open\"; project=\"main\"\n",
+    "provider_backend = None\n",
+    "\n",
+    "# # *** If using IBMQ hardware, run this once to authenticate\n",
+    "# from qiskit import IBMQ\n",
+    "# IBMQ.save_account('YOUR_API_TOKEN_HERE')\n",
+    "\n",
+    "# # *** If you are part of an IBMQ group, set hub, group, and project name here\n",
+    "# hub=\"YOUR_HUB_NAME\"\n",
+    "# group=\"YOUR_GROUP_NAME\"\n",
+    "# project=\"YOUR_PROJECT_NAME\"\n",
+    "\n",
+    "# # *** This example shows how to specify the backend using a known \"backend_id\"\n",
+    "# backend_id=\"ibmq_belem\"\n",
+    "\n",
+    "# # *** Here's an example of using a typical custom provider backend (e.g. AQT simulator)\n",
+    "# import os\n",
+    "# from qiskit_aqt_provider import AQTProvider\n",
+    "# provider = AQTProvider(os.environ.get('AQT_ACCESS_KEY'))    # get your key from environment\n",
+    "# provider_backend = provider.backends.aqt_qasm_simulator_noise_1\n",
+    "# backend_id=\"aqt_qasm_simulator_noise_1\"\n",
+    "\n",
+    "# # An example using IonQ provider\n",
+    "# from qiskit_ionq import IonQProvider\n",
+    "# provider = IonQProvider()   # Be sure to set the QISKIT_IONQ_API_TOKEN environment variable\n",
+    "# provider_backend = provider.get_backend(\"ionq_qpu\")\n",
+    "# backend_id=\"ionq_qpu\"\n",
+    "\n",
+    "# # *** Use these lines when running on hardware backend, to limit use of resources\n",
+    "# min_qubits=2\n",
+    "# max_qubits=5\n",
+    "# max_circuits=1\n",
+    "# num_shots=100\n",
+    "\n",
+    "#Import general libraries (needed for functions)\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "#Import Qiskit classes classes\n",
+    "import qiskit\n",
+    "from qiskit.providers.aer.noise import NoiseModel\n",
+    "from qiskit.providers.aer.noise.errors.standard_errors import depolarizing_error\n",
+    "\n",
+    "#Import the qv function.\n",
+    "import qiskit.ignis.verification.quantum_volume as qv"
+   ],
+   "outputs": [],
+   "metadata": {}
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "source": [
+    "# qv_circuits call requires connectivitiy to build circuits, will return QV circuits\n",
+    "# between min_qubits and max_qubits\n",
+    "qubit_lists = [list(range(i)) for i in range(min_qubits ,max_qubits+1)]\n",
+    "qv_circs, qv_circs_nomeas = qv.qv_circuits(qubit_lists, max_circuits)"
+   ],
+   "outputs": [],
+   "metadata": {
+    "scrolled": false
+   }
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "source": [
+    "# Add the results for perfect simulation to compare against\n",
+    "sim_backend = qiskit.Aer.get_backend('statevector_simulator')\n",
+    "ideal_results = []\n",
+    "for trial in range(max_circuits):\n",
+    "    # print('Simulating trial %d'%trial)\n",
+    "    ideal_results.append(qiskit.execute(qv_circs_nomeas[trial], backend=sim_backend, optimization_level=0).result())\n",
+    "\n",
+    "qv_fitter = qv.QVFitter(qubit_lists=qubit_lists)\n",
+    "qv_fitter.add_statevectors(ideal_results)\n",
+    "    "
+   ],
+   "outputs": [],
+   "metadata": {
+    "scrolled": false
+   }
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "source": [
+    "## Running QV with our execute module\n",
+    "\n",
+    "import sys\n",
+    "sys.path[1:1] = [ \"_common\", \"_common/qiskit\" ]\n",
+    "sys.path[1:1] = [ \"../../_common\", \"../../_common/qiskit\" ]\n",
+    "import execute as ex\n",
+    "\n",
+    "exp_results = []\n",
+    "\n",
+    "# Define custom result handler\n",
+    "def execution_handler(qc, result, num_qubits, s_int, num_shots):  \n",
+    "     \n",
+    "    exp_results.append(result)\n",
+    "\n",
+    "def do_nothing_on_groups(group):\n",
+    "    pass\n",
+    "\n",
+    "ex.init_execution(execution_handler)\n",
+    "ex.set_execution_target(backend_id, provider_backend=provider_backend,\n",
+    "            hub=hub, group=group, project=project)\n",
+    "ex.do_transpile_metrics = False # reduce runtime by not doing transpile metrics\n",
+    "\n",
+    "if backend_id == 'qasm_simulator':\n",
+    "    # default noise model, can be overridden using set_noise_model\n",
+    "    noise = NoiseModel()\n",
+    "    # Add depolarizing error to all single qubit gates with error rate 0.3%\n",
+    "    one_qb_error = 0.003\n",
+    "    noise.add_all_qubit_quantum_error(depolarizing_error(one_qb_error, 1), ['rx', 'ry', 'rz'])\n",
+    "\n",
+    "    # Add depolarizing error to all two qubit gates with error rate 3.0%\n",
+    "    two_qb_error = 0.03\n",
+    "    noise.add_all_qubit_quantum_error(depolarizing_error(two_qb_error, 2), ['cx'])\n",
+    "\n",
+    "    ex.set_noise_model(noise)\n",
+    "\n",
+    "for num_qubits in range(max_qubits - min_qubits + 1):\n",
+    "    for trial in range(max_circuits):\n",
+    "        # print('Running trial %d'%trial)\n",
+    "        ex.submit_circuit(qv_circs[trial][num_qubits], num_qubits, trial, shots=num_shots)\n",
+    "    ex.throttle_execution(do_nothing_on_groups)",
+    "ex.finalize_execution(do_nothing_on_groups)"
+   ],
+   "outputs": [],
+   "metadata": {}
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "source": [
+    "# add results to qv_fitter object\n",
+    "qv_fitter.add_data(exp_results)"
+   ],
+   "outputs": [],
+   "metadata": {}
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "source": [
+    "plt.figure(figsize=(10, 6))\n",
+    "ax = plt.gca()\n",
+    "\n",
+    "# Plot the essence by calling plot_rb_data\n",
+    "qv_fitter.plot_qv_data(ax=ax, show_plt=False)\n",
+    "\n",
+    "# Add title and label\n",
+    "ax.set_title('Quantum Volume for up to %d Qubits \\n and %d Trials'%(len(qubit_lists[-1]), max_circuits), fontsize=18)\n",
+    "\n",
+    "plt.show()"
+   ],
+   "outputs": [],
+   "metadata": {}
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "source": [
+    "qv_success_list = qv_fitter.qv_success()\n",
+    "qv_list = qv_fitter.ydata\n",
+    "for qidx, qubit_list in enumerate(qubit_lists):\n",
+    "    if qv_list[0][qidx]>2/3:\n",
+    "        if qv_success_list[qidx][0]:\n",
+    "            print(\"Width/depth %d greater than 2/3 (%f) with confidence %f (successful). Quantum volume %d\"%\n",
+    "                  (len(qubit_list),qv_list[0][qidx],qv_success_list[qidx][1],qv_fitter.quantum_volume()[qidx]))\n",
+    "        else:\n",
+    "            print(\"Width/depth %d greater than 2/3 (%f) with confidence %f (unsuccessful).\"%\n",
+    "                  (len(qubit_list),qv_list[0][qidx],qv_success_list[qidx][1]))\n",
+    "    else:\n",
+    "        print(\"Width/depth %d less than 2/3 (unsuccessful).\"%len(qubit_list))\n",
+    "        "
+   ],
+   "outputs": [],
+   "metadata": {}
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "source": [
+    "# get ratios between QV depth and our transpiled depth, QV_transpile_factor\n",
+    "\n",
+    "ratios = []\n",
+    "for i in range(len(qv_circs_nomeas)):\n",
+    "    for j in range(len(qv_circs_nomeas[i])):\n",
+    "        qc_depth = qv_circs_nomeas[i][j].decompose().depth()\n",
+    "        our_depth = qiskit.compiler.transpile(qv_circs_nomeas[i][j], basis_gates=['rx', 'ry', 'rz', 'cx']).depth()\n",
+    "        ratio = our_depth/qc_depth\n",
+    "        ratios.append(ratio)\n",
+    "\n",
+    "QV_transpile_factor = np.mean(ratios)\n",
+    "print(f\"Factor to increase QV depth by due to our transpilation target: {QV_transpile_factor}\")"
+   ],
+   "outputs": [],
+   "metadata": {}
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "name": "python3",
+   "display_name": "Python 3.9.6 64-bit ('qiskit-new': conda)"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.9.6"
+  },
+  "interpreter": {
+   "hash": "fdb5546fdc72dbf78890cf20227dead1d661971ec833c0d3e1f9420ef925f7d5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
