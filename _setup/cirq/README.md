@@ -7,6 +7,14 @@ In particular, this document explains how to set up the tools needed to run the 
 
 Note: the instructions contained here describe configuring a Windows environment to run the benchmark programs. Similar procedures will be used in a Linux environment using appropriate syntax of course.
 
+## Tested Versions
+
+The repository has been validated on Linux using the following minimum package versions:
+
+    Miniconda version: 4.10.3
+    Python Version: 3.9.7
+    Cirq Version: 0.12.0
+
 ## Configure a Python Environment
 
 The Cirq version of the prototype benchmark programs require that you have available Python version 3.6 or later, and have installed the necessary Python packages.
@@ -23,13 +31,15 @@ Once you have installed the Miniconda package, from the Windows Start menu launc
 
     conda activate cirq
 
-The conda environment is now ready for you to install the cirq package.
+The conda environment is now ready for you to install the Cirq package.
 
 ## Install Cirq
 
-Enter the following commands to install the latest version of cirq with additional visualization tools.
+Enter the following commands to install the latest version of Cirq and other required packages.
 
-    pip install cirq
+    conda install scipy
+
+    pip install cirq notebook
 
 You are now ready to run the benchmark programs.
 
