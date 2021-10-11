@@ -37,8 +37,10 @@ is a unitary operator <img align="center" src="https://latex.codecogs.com/svg.la
 <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n"> data qubits and 1 ancilla qubit such that
 
 <p align="center">
-<img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U_f|x\rangle|y\rangle=|x\rangle|y\oplus{f}(x)\rangle">.
+<img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U_f|x\rangle|y\rangle=|x\rangle|y\oplus{f}(x)\rangle">,
 </p>
+
+where <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\oplus"> is addition modulo 2.
 
 ### General Quantum Circuit
 The following circuit is the general quantum circuit for the Deutsch-Jozsa algorithm with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n"> data qubits
