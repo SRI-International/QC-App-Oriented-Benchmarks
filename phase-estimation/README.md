@@ -163,3 +163,9 @@ This is because the benchmark uses this repository's internal inverse quantum Fo
 [5] Abraham Asfaw, Antonio Córcoles, Luciano Bello, Yael Ben-Haim, Mehdi Bozzo-Rey, Sergey Bravyi, Nicholas Bronn, Lauren Capelluto, Almudena Carrera Vazquez, Jack Ceroni, Richard Chen, Albert Frisch, Jay Gambetta, Shelly Garion, Leron Gil, Salvador De La Puente Gonzalez, Francis Harkins, Takashi Imamichi, Hwajung Kang, Amir h. Karamlou, Robert Loredo, David McKay, Antonio Mezzacapo, Zlatko Minev, Ramis Movassagh, Giacomo Nannicini, Paul Nation, Anna Phan, Marco Pistoia, Arthur Rattew, Joachim Schaefer, Javad Shabani, John Smolin, John Stenger, Kristan Temme, Madeleine Tod, Stephen Wood, and James Wootton. (2020).
     [`Quantum Phase Estimation`](https://qiskit.org/textbook/ch-algorithms/quantum-phase-estimation.html#1.) 
 
+## Contributors
+
+The following users contributed to writing this README:
+
+    jeremiahdc23 (Jeremiah Coleman)
+    probvar (Paul Varosy)

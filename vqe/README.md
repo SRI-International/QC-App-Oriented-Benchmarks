@@ -220,3 +220,11 @@ The method may be passed to the run() function, using the `method=method` parame
 [7] Panagiotis Kl. Barkoutsos, Jerome F. Gonthier, Igor Sokolov, Nikolaj Moll, Gian Salis, Andreas Fuhrer, Marc Ganzhorn, Daniel J. Egger, Matthias Troyer, Antonio Mezzacapo, Stefan Filipp, Ivano Tavernelli. (2018).
     Quantum Algorithms for Electronic Structure Calculations: Particle-Hole Hamiltonian and Optimized Wave-Function Expansions
     [`arXiv:1805.04340`](https://arxiv.org/abs/1805.04340)
+
+## Contributors
+
+The following users contributed to writing this README:
+
+    jeremiahdc23 (Jeremiah Coleman)
+    probvar (Paul Varosy)
+    chrislzhao (Luning Zhao)

@@ -116,5 +116,8 @@ The data model for the group_metrics is designed to support both of these functi
 
 ![Metrics Module - 2](./images/metrics_module_2.png)
 
+## Contributors
 
+The following users contributed to writing this README:
 
+    rtvuser1 (Tom Lubinski)

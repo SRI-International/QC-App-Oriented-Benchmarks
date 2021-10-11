@@ -120,3 +120,12 @@ The following is the quantum circuit for the Diffuser for 4 qubits. As implement
 [3] Michael A. Nielsen and Isaac L. Chuang. (2011).
     Quantum Computation and Quantum Information: 10th Anniversary Edition (10th ed.). 
     Cambridge University Press, New York, NY, USA.
+
+## Contributors
+
+The following users contributed to writing this README:
+
+    jeremiahdc23 (Jeremiah Coleman)
+    rtvuser1 (Tom Lubinski)
+    necaisej (Jason Necaise)
+    probvar (Paul Varosy)

@@ -82,3 +82,10 @@ which guarantees that a fidelity equal to one is unchanged and the uniform distr
 <p align="center">
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\begin{align*}\widetilde{F_H}(P(|\psi\rangle),\hat{Q})&=s\left[F_H(P(|\psi\rangle),\hat{Q})-1\right]&plus;1\\[10pt]s&=\frac{1}{1-F_H(P(|\psi\rangle),U)}\end{align*}" />
 </p>
+
+## Contributors
+
+The following users contributed to writing this README:
+
+    necaisej (Jason Necaise)
+    probvar (Paul Varosy)

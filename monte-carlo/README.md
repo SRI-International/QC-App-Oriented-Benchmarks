@@ -178,3 +178,11 @@ For our <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagec
 [3] Lov Grover, Terry Rudolph. (2002)
     Creating superpositions that correspond to efficiently integrable probability distributions.
     [`arXiv:quant-ph/0208112`](https://arxiv.org/abs/quant-ph/0208112)
+
+## Contributors
+
+The following users contributed to writing this README:
+
+    jeremiahdc23 (Jeremiah Coleman)
+    necaisej (Jason Necaise)
+    probvar (Paul Varosy)

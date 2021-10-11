@@ -131,6 +131,13 @@ While we have already coded this benchmark, we are not using it as a benchmark b
     Probing many-body localization on a noisy quantum computer.
     [`arXiv:2006.12355`](https://arxiv.org/abs/2006.12355)
 
+## Contributors
+
+The following users contributed to writing this README:
+
+    rtvuser1 (Tom Lubinski)
+    probvar (Paul Varosy)
+
 [//]: # (Below are some thoughts that went into the choice of the type of hamiltonian simulation to be used for this benchmark.)
 
 [//]: # (Nearest-neighbor 1D, 2D and 3D cases are all physically motivated, corresponding to say, a nanowire, a thin film, and a cubic crystal. In this case, 1D is a suitable benchmark for current quantum computers since it has the least number of gates. As quantum computers improve, the simulation benchmarks could be designed to include higher dimensions.)

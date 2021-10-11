@@ -146,3 +146,13 @@ as <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolo
 [5] Martin R̈otteler. (2019).
     Quantum Computing Stack Exchange Answer.
     [`Hidden shift problem as a benchmarking function`](https://quantumcomputing.stackexchange.com/a/5873)
+
+## Contributors
+
+The following users contributed to writing this README:
+
+    jeremiahdc23 (Jeremiah Coleman)
+    rtvuser1 (Tom Lubinski)
+    necaisej (Jason Necaise)
+    probvar (Paul Varosy)
+    karl-mayer (Karl Mayer)

@@ -110,3 +110,11 @@ In our default implementation of A, we set <img align=center src="https://latex.
 [3] Grinko, D., Gacon, J., Zoufal, C., & Woerner, S. (2019).
     Iterative Quantum Amplitude Estimation.
     [`arXiv:1912.05559`](https://arxiv.org/abs/1912.05559)
+
+## Contributors
+
+The following users contributed to writing this README:
+
+    necaisej (Jason Necaise)
+    probvar (Paul Varosy)
+    

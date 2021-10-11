@@ -171,3 +171,15 @@ two qubit circuit used with mid circuit measurements to represent the quantum ci
 [4] Paul Nation and Blake Johnson. (2021).
     How to measure and reset a qubit in the middle of circuit execution.
     [`Qiskit Blog: Mid Circuit Measurements`](https://www.ibm.com/blogs/research/2021/02/quantum-mid-circuit-measurement/)
+
+## Contributors
+
+The following users contributed to writing this README:
+
+    jeremiahdc23 (Jeremiah Coleman)
+    rtvuser1 (Tom Lubinski)
+    necaisej (Jason Necaise)
+    probvar (Paul Varosy)
+    karl-mayer (Karl Mayer)
+    chbaldwin1 (Charlie Baldwin)
+    

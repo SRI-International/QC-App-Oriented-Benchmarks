@@ -131,3 +131,11 @@ Often, executing the following lines will address this problem:
     conda install notebook ipykernel
     ipython kernel install --user
 
+
+## Contributors
+
+The following users contributed to writing this README:
+
+    rtvuser1 (Tom Lubinski)
+    probvar (Paul Varosy)
+    

@@ -70,3 +70,11 @@ Once installed, you should be able to successfully start your Jupyter notebook.
     
 
 
+
+## Contributors
+
+The following users contributed to writing this README:
+
+    rtvuser1 (Tom Lubinski)
+    probvar (Paul Varosy)
+    
