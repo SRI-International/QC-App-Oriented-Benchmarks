@@ -106,4 +106,19 @@ Below is a table showing the degree to which the benchmarks have been implemente
 
 ![Prototype Benchmarks - Implementation Status](./_doc/images/proto_benchmarks_status.png)
 
+## Acknowledgements
 
+The following users have contributed this repository, in alphabetical order:
+
+    chbaldwin1 (Charlie Baldwin)
+    jeremiahdc23 (Jeremiah Coleman)
+    sonikaj (Sonika Johri)
+    rtvuser1 (Tom Lubinski)
+    necaisej (Jason Necaise)
+    npdeep (Pradeep Niroula)
+    probvar (Paul Varosy)
+    chrislzhao (Luning Zhao)
+    karl-mayer (Karl Mayer)
+    jms90h5 (Jim Sharpe)
+
+Additionally, the many members of the QED-C Standards TAC who weren't GitHub collaborators were instrumental in helping direct the project. 
