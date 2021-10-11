@@ -146,7 +146,7 @@ is an example of the circuit benchmarked for this method:
    <img align=center src="../_doc/images/bernstein-vazirani/bv2_qiskit_circ.png"  width="800" />
    </p>
 
-Note for this method, the following histogram plots (which are generated with each benchmark)
+Note for this method, the following plots (which are generated with each benchmark)
 plots some metric versus the circuit width (number of qubits). For method 2, this circuit width is a virtual circuit width since the 
 physical circuit width is two. For example, for the virtual circuit width = 4, this represents the corresponding
 two qubit circuit used with mid circuit measurements to represent the quantum circuit with 4 qubits.
