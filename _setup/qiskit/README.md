@@ -31,7 +31,7 @@ Enter the following commands to install the latest version of Qiskit and the oth
 
     conda install numpy matplotlib
 
-    pip install qiskit notebook
+    pip install qiskit "qiskit[visualization]" notebook
 
 You are now ready to run the benchmark programs.
 
