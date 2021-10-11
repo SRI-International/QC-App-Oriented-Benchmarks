@@ -28,7 +28,7 @@ We finally get an estimation of <img align=center src="https://latex.codecogs.co
 
 ### Quantum Amplitude Amplfication (QAA)
 
-QAA is a process by which the amplitude of good states can be increased, in such a way that only roughly <img align=center src="https://latex.codecogs.com/svg.latex?\tiny\pagecolor{white}\,\frac{1}{\sqrt{a}}\"> applications of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}\"> is required to achieve a constant probability of measuring the good state for known values of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a">. [Grover's search algorithm](../grovers/) is based on a special case of QAA where <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a"> is known to be <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}1/N">, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_1\rangle\equiv|w\rangle"> is a single marked basis state, and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_0\rangle\equiv|s'\rangle"> is a uniform superposition of all basis states not including <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|w\rangle">.
+QAA is a process by which the amplitude of good states can be increased, in such a way that only roughly <img align=center src="https://latex.codecogs.com/svg.latex?\tiny\pagecolor{white}\,\frac{1}{\sqrt{a}}\"> applications of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}\"> is required to achieve a constant probability of measuring the good state for known values of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a">. [Grover's search algorithm](../grovers/) is based on a special case of QAA where <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a"> is known to be <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}1/N">, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_1\rangle\equiv|w\rangle"> is a single marked basis state, and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_0\rangle\equiv|s'\rangle"> is a uniform superposition of all basis states not including <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|w\rangle">. The visualization provided in the Grover's algorithm README can provide some intuition for the amplification operator. 
 
 The amplification operator in QAE looks quite similar to Grover's algorithm. The idea here is to increase the amplitude of good states by reflecting amplitudes according to the objective qubit state, then performing a reflection about the full original <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n">+1 qubit state. In alignment with [[1]](#references), we call a reflection about objective qubit state <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle"> the operator <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}S_{\chi}\"> and call a reflection around our initial state <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi\rangle"> the operator <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}S_{|\psi\rangle}\">:
 
@@ -60,6 +60,8 @@ So, all together the QAA operator is given as:
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\mathcal{Q}=-\mathcal{A}S_{|0\rangle_{n+1}}\mathcal{A}^{-1}S_{\chi}">
 </p>
 
+With some investigation, we can see the corresponence with Grover's algorithm. This is made more clear in [Gate Implementation](#gate-implementation) section.
+
 ### General Quantum Circuit 
 <p align="center">
 <img src="../_doc/images/amplitude-estimation/qae_circuit.png"  width="800" />
@@ -88,6 +90,18 @@ To implement this algorithm, all that is necessary is explicit definitions for t
 <p align="center">
 <img src="../_doc/images/amplitude-estimation/ae_circuit.png" />
 </p>
+
+If we then copy the circuits for the oracle and diffuser from Grover's algorithm:
+
+<p align="center">
+<img align="center" src="../_doc/images/grovers/oracle.png"  width="400" />
+</p>
+
+<p align="center">
+<img align="center" src="../_doc/images/grovers/diffuser.png"  width="400" />
+</p>
+
+We can see the correspondence that <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}S_{\chi}=U_{f}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\mathcal{A}S_{|0\rangle_{n+1}}\mathcal{A}^{-1}=U_s">. The circuit used for QAA (<img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}S_{\chi}">) is simpler than the Grover oracle (<img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}U_{f}">) as the "correct" state we are marking is only dependent on the objective qubit. The second statement can be explicitely seen by taking <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}^{-1}"> to be Hadamards on all qubits. Additionally, we note that while the negative sign in Grover's algorithm didn't matter as it was global, because <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{Q}"> is not applied on all qubits, the negative sign matters.
 
 ### Default implementation of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\mathcal{A}">
 
