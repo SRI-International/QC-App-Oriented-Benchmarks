@@ -106,7 +106,7 @@ The steps in the Deutsch-Josza algorithm are the following:
 5. Measure the data qubits. Note the probability of measuring <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle^{\otimes{n}}:P(|0\rangle^{\otimes{n}})=|\frac{1}{\sqrt{2^n}}\sum_{x=0}^{2^n-1}(-1)^{f(x)}|^2"/>
    Thus if the measurement result is the all zero bitstring 00...0, then <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}f"> is constant. Otherwise, f is balanced.
 
-## Gate implementation
+## Gate Implementation
 
 ### Constant Oracle
 
