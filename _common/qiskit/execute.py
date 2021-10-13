@@ -33,7 +33,7 @@ from qiskit import IBMQ
 from qiskit.providers.jobstatus import JobStatus
 
 # Noise
-from qiskit.providers.aer.noise import NoiseModel
+from qiskit.providers.aer.noise import NoiseModel, ReadoutError
 from qiskit.providers.aer.noise import depolarizing_error, reset_error
 
 # Use Aer qasm_simulator by default
@@ -59,6 +59,12 @@ noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_two_qb_error, 2), 
 reset_to_zero_error = 0.005
 reset_to_one_error = 0.005
 noise.add_all_qubit_quantum_error(reset_error(reset_to_zero_error, reset_to_one_error),["reset"])
+
+# Add readout error
+p0given1_error = 0.000
+p1given0_error = 0.000
+error_meas = ReadoutError([[1 - p1given0_error, p1given0_error], [p0given1_error, 1 - p0given1_error]])
+noise.add_all_qubit_readout_error(error_meas)
 
 # Create array of batched circuits and a dict of active circuits
 batched_circuits = []
