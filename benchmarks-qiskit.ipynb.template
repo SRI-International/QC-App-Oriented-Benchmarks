@@ -227,7 +227,7 @@
     "sys.path.insert(1, \"monte-carlo/qiskit\")\n",
     "import mc_benchmark\n",
     "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
-    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                method=2, backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project)"
    ]
   },
