@@ -29,9 +29,7 @@ The conda environment is now ready for you to install the Cirq package.
 
 Enter the following commands to install the latest version of Cirq and other required packages.
 
-    conda install scipy
-
-    pip install cirq notebook
+    pip install scipy cirq notebook
 
 You are now ready to run the benchmark programs.
 

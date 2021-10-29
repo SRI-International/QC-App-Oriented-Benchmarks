@@ -29,9 +29,7 @@ The conda environment is now ready for you to install the Braket package.
 
 Enter the following commands to install the latest version of Amazon Braket SDK and the other required packages.
 
-    conda install matplotlib
-
-    pip install boto3 amazon-braket-sdk notebook
+    pip install matplotlib boto3 amazon-braket-sdk notebook
 
 You are now ready to run the benchmark programs.
 By default, all benchmark programs are configured to run on a simulator that is provided within the target environment.
