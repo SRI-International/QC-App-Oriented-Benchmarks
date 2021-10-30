@@ -60,7 +60,7 @@ Once these variables are set, you may proceed to execution the benchmark program
 The easiest way to configure and run the Application Benchmark programs is to use a Jupyter Notebook that is provided at the top level of the Proto-Benchmarks repository.
 Support for Jupyter notebooks is automatically available with your Anaconda installation.
 
-Frist, prepare the Amazon Braket notebook by copying the delivered 'template' file with the following command:
+First, prepare the Amazon Braket notebook by copying the delivered 'template' file with the following command:
 
     copy benchmarks-braket.ipynb.template benchmarks-braket.ipynb
     
