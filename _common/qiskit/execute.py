@@ -296,8 +296,13 @@ def execute_circuit(circuit):
             job = execute(circuit["qc"], backend, shots=shots,
                     noise_model=noise, basis_gates=noise.basis_gates)
         else: 
-            job = execute(circuit["qc"], backend, shots=shots)
+            # use 'sabre' layout for all IBM backends
+            if backend.name().startswith("ibmq_") or backend.name().startswith("ibm_"):
+                job = execute(circuit["qc"], backend, shots=shots, optimization_level=3, layout_method='sabre', routing_method='sabre')
+            else:
+                job = execute(circuit["qc"], backend, shots=shots)
             
+            # there appears to be no reason to do transpile, as it is done automatically
             #qc = transpile(circuit["qc"], backend)
             #job = execute(qc, backend, shots=shots)
             
