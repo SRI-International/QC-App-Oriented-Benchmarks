@@ -69,10 +69,10 @@ Once installed, you should be able to successfully start your Jupyter notebook.
 
 ## Tested Versions
 
-The repository has been validated on Linux using the following minimum versions:
+The repository has been validated on Linux using the following versions as minimums:
 
-    Miniconda version: 4.10.3
-    Python Version: 3.9.7
+    Miniconda Version: 4.10.3
+    Python Versions: 3.8.5 and 3.9.7
     Qiskit-Terra Version: 0.18.3
 
 Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.
