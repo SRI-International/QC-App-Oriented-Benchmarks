@@ -23,13 +23,13 @@ Once you have installed the Miniconda package, from the Windows Start menu launc
 
     conda activate cirq
 
-The conda environment is now ready for you to install the cirq package.
+The conda environment is now ready for you to install the Cirq package.
 
 ## Install Cirq
 
-Enter the following commands to install the latest version of cirq with additional visualization tools.
+Enter the following commands to install the latest version of Cirq and other required packages.
 
-    pip install cirq
+    pip install scipy cirq notebook
 
 You are now ready to run the benchmark programs.
 
@@ -66,7 +66,12 @@ Note; In some Windows environments, it is necessary to install one additional pa
 
 Once installed, you should be able to successfully start your Jupyter notebook.
 
+## Tested Versions
 
-    
+The repository has been validated on Linux using the following versions as minimums:
 
+    Miniconda Version: 4.10.3
+    Python Versions: 3.8.5 and 3.9.7
+    Cirq Version: 0.12.0
 
+Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.
