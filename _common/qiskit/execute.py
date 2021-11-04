@@ -430,6 +430,26 @@ def job_complete(job):
             print(f'ERROR: failed to execute result_handler for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
             print(f"... exception = {e}")
 
+
+# Process a job, whose status cannot be obtained
+def job_status_failed(job):
+    active_circuit = active_circuits[job]
+    
+    if verbose:
+        print(f'\n... job status failed - group={active_circuit["group"]} id={active_circuit["circuit"]} shots={active_circuit["shots"]}')
+    
+    # compute elapsed time for circuit; assume exec is same, unless obtained from result
+    elapsed_time = time.time() - active_circuit["launch_time"]
+    
+    # report exec time as 0 unless valid measure returned
+    exec_time = 0.0
+           
+    # remove from list of active circuits
+    del active_circuits[job]
+
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'elapsed_time', elapsed_time)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
+
         
 ######################################################################
 # JOB MANAGEMENT METHODS
@@ -529,6 +549,10 @@ def check_jobs(completion_handler=None):
         except Exception as e:
             print(f'ERROR: Unable to retrieve job status for circuit {circuit["group"]} {circuit["circuit"]}')
             print(f"... job = {job.job_id()}  exception = {e}")
+            
+            # finish the job by removing from active list
+            job_status_failed(job)
+            
             break
 
         circuit["pollcount"] += 1
