@@ -326,6 +326,12 @@ def execute_circuit(circuit):
                     optimization_level=optimization_level,
                     layout_method=layout_method,
                     routing_method=routing_method)
+                
+                # apply transformer pass if provided
+                if "transformer" in backend_exec_options: 
+                    trans_qc2 = backend_exec_options["transformer"](trans_qc, backend)
+                    trans_qc = trans_qc2
+                    #print("... applying transformer!")
                     
                 job = backend.run(trans_qc, shots=shots)
                 
