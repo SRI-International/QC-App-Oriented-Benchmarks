@@ -301,7 +301,7 @@ def analyze_and_print_result(qc, result, num_qubits, references, num_shots):
 # Execute program with default parameters
 def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
         backend_id="qasm_simulator", provider_backend=None,
-        hub="ibm-q", group="open", project="main"):
+        hub="ibm-q", group="open", project="main", exec_options=None):
 
     print("Variational Quantum Eigensolver Benchmark Program - Qiskit")
     print(f"... using circuit method {method}")
@@ -349,7 +349,7 @@ def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project)
+            hub=hub, group=group, project=project, exec_options=exec_options)
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete

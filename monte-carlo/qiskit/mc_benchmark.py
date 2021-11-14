@@ -331,7 +331,7 @@ MAX_QUBITS=10
 def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
         epsilon=0.05, degree=2, num_state_qubits=MIN_STATE_QUBITS, method = 2, # default, not exposed to users
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main"):
+        hub="ibm-q", group="open", project="main", exec_options=None):
 
     print("Monte Carlo Sampling Benchmark Program - Qiskit")
     print(f"... using circuit method {method}")
@@ -376,7 +376,7 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project)
+            hub=hub, group=group, project=project, exec_options=exec_options)
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
