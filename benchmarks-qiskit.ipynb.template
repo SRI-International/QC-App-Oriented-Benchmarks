@@ -26,6 +26,7 @@
     "backend_id=\"qasm_simulator\"\n",
     "hub=\"ibm-q\"; group=\"open\"; project=\"main\"\n",
     "provider_backend = None\n",
+    "exec_options = None\n",
     "\n",
     "# # *** If using IBMQ hardware, run this once to authenticate\n",
     "# from qiskit import IBMQ\n",
