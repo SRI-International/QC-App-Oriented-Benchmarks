@@ -39,6 +39,9 @@ from qiskit.providers.aer.noise import depolarizing_error, reset_error
 # Use Aer qasm_simulator by default
 backend = Aer.get_backend("qasm_simulator")  
 
+# Execution options, passed to transpile method
+backend_exec_options = None
+
 # default noise model, can be overridden using set_noise_model
 noise = NoiseModel()
 # Add depolarizing error to all single qubit gates with error rate 0.3%
@@ -108,7 +111,7 @@ def init_execution(handler):
 # Set the backend for execution
 def set_execution_target(backend_id='qasm_simulator',
                 provider_module_name=None, provider_name=None, provider_backend=None,
-                hub=None, group=None, project=None):
+                hub=None, group=None, project=None, exec_options=None):
     """
     Used to run jobs on a real hardware
     :param backend_id:  device name. List of available devices depends on the provider
@@ -162,6 +165,11 @@ def set_execution_target(backend_id='qasm_simulator',
     device_name = backend_id
     metrics.set_plot_subtitle(f"Device = {device_name}")
     #metrics.set_properties( { "api":"qiskit", "backend_id":backend_id } )
+    
+    # save execute options with backend
+    global backend_exec_options
+    backend_exec_options = exec_options
+
 
 def set_noise_model(noise_model = None):
     """
@@ -296,9 +304,31 @@ def execute_circuit(circuit):
             job = execute(circuit["qc"], backend, shots=shots,
                     noise_model=noise, basis_gates=noise.basis_gates)
         else: 
-            # use 'sabre' layout for all IBM backends
-            if backend.name().startswith("ibmq_") or backend.name().startswith("ibm_"):
-                job = execute(circuit["qc"], backend, shots=shots, optimization_level=3, layout_method='sabre', routing_method='sabre')
+            # use execution options if set with backend
+            if backend_exec_options != None:
+                        
+                optimization_level = 1
+                if "optimization_level" in backend_exec_options: 
+                    optimization_level = backend_exec_options["optimization_level"]
+                
+                layout_method = None
+                if "layout_method" in backend_exec_options: 
+                    layout_method = backend_exec_options["layout_method"]
+                
+                routing_method = None
+                if "routing_method" in backend_exec_options: 
+                    routing_method = backend_exec_options["routing_method"]
+                
+                #job = execute(circuit["qc"], backend, shots=shots,
+                
+                # the 'execute' method is not in favor, use transpile + run instead (per IBM)
+                trans_qc = transpile(circuit["qc"], backend, 
+                    optimization_level=optimization_level,
+                    layout_method=layout_method,
+                    routing_method=routing_method)
+                    
+                job = backend.run(trans_qc, shots=shots)
+                
             else:
                 job = execute(circuit["qc"], backend, shots=shots)
             

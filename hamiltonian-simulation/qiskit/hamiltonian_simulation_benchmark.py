@@ -201,7 +201,7 @@ def analyze_and_print_result(qc, result, num_qubits, type, num_shots):
 def run(min_qubits=2, max_qubits=8, max_circuits=3, num_shots=100,
         use_XX_YY_ZZ_gates = False,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main"):
+        hub="ibm-q", group="open", project="main", exec_options=None):
 
     print("Hamiltonian-Simulation Benchmark Program - Qiskit")
     
@@ -230,7 +230,7 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, num_shots=100,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project)
+            hub=hub, group=group, project=project, exec_options=exec_options)
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
