@@ -65,6 +65,32 @@
   {
    "cell_type": "code",
    "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# # Additional options can be specified in this cell (below is an example)\n",
+    "\n",
+    "# # Some circuits can be sparse or have long idle periods.\n",
+    "# # Dynamical decoupling can echo away static ZZ errors during those idling periods.\n",
+    "# # Set up a pass manager to add the decoupling pulses to the circuit before executing\n",
+    "\n",
+    "# from qiskit.transpiler import PassManager, InstructionDurations\n",
+    "# from qiskit.transpiler.passes import ALAPSchedule, DynamicalDecoupling\n",
+    "# from qiskit.circuit.library import XGate\n",
+    "# def do_transform(circuit, backend):\n",
+    "#     durations = InstructionDurations.from_backend(backend)\n",
+    "#     dd_sequence = [XGate(), XGate()]\n",
+    "#     pm = PassManager([ALAPSchedule(durations),\n",
+    "#                       DynamicalDecoupling(durations, dd_sequence)])\n",
+    "#     return pm.run(circuit)\n",
+    "\n",
+    "# # Add this pass manager as a 'transformer' method\n",
+    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": do_transform }"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
    "metadata": {
     "scrolled": false
    },
