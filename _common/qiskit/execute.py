@@ -298,10 +298,18 @@ def execute_circuit(circuit):
                     else: n1q += value
                 qc_tr_xi = n2q / (n1q + n2q)    
             #print(f"... qc_tr_xi = {qc_tr_xi} {n1q} {n2q}")
+        
+            if backend_exec_options != None and "randomly_compile" in backend_exec_options:
+                circuits_for_execution = backend_exec_options["randomly_compile"](
+                    circuit["qc"]
+                )
+                shots = shots / len(circuits_for_execution)
+            else:
+                circuits_for_execution = circuit["qc"]
             
         # Initiate execution (with noise if specified and this is a simulator backend)
         if noise is not None and backend.name().endswith("qasm_simulator"):
-            job = execute(circuit["qc"], backend, shots=shots,
+            job = execute(circuits_for_execution, backend, shots=shots,
                     noise_model=noise, basis_gates=noise.basis_gates)
         else: 
             # use execution options if set with backend
@@ -322,7 +330,7 @@ def execute_circuit(circuit):
                 #job = execute(circuit["qc"], backend, shots=shots,
                 
                 # the 'execute' method is not in favor, use transpile + run instead (per IBM)
-                trans_qc = transpile(circuit["qc"], backend, 
+                trans_qc = transpile(circuits_for_execution, backend, 
                     optimization_level=optimization_level,
                     layout_method=layout_method,
                     routing_method=routing_method)
@@ -336,7 +344,7 @@ def execute_circuit(circuit):
                 job = backend.run(trans_qc, shots=shots)
                 
             else:
-                job = execute(circuit["qc"], backend, shots=shots)
+                job = execute(circuits_for_execution, backend, shots=shots)
             
             # there appears to be no reason to do transpile, as it is done automatically
             #qc = transpile(circuit["qc"], backend)
@@ -432,7 +440,10 @@ def job_complete(job):
         #print(f'shots = {results_obj["shots"]}')
         
         # get the actual shots and convert to int if it is a string
-        actual_shots = results_obj["shots"]
+        actual_shots = 0
+        for experiment in result_obj["results"]:
+            actual_shots += experiment["shots"]
+            
         if type(actual_shots) is str:
             actual_shots = int(actual_shots)
         

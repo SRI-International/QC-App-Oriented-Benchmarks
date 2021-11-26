@@ -8,6 +8,7 @@ import time
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+from collections import Counter
 
 sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
@@ -150,8 +151,17 @@ def Ctrl_Q(num_state_qubits, A_circ):
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
 def analyze_and_print_result(qc, result, num_counting_qubits, s_int, num_shots):
-    
-    counts = bitstring_to_a(result.get_counts(qc), num_counting_qubits)
+    # The following computes the counts, allowing for the case where
+    # <result> contains results from multiple circuits
+    if type(result.get_counts()) == list:
+        total_counts = dict()
+        for count in result.get_counts():
+            total_counts = dict(Counter(total_counts) + Counter(count))
+    # otherwise proceed normally
+    else:
+        total_counts = result.get_counts()
+        
+    counts = bitstring_to_a(total_counts, num_counting_qubits)
     a = a_from_s_int(s_int, num_counting_qubits)    
     
     if verbose: print(f"For amplitude {a} measured: {counts}")
