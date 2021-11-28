@@ -82,7 +82,25 @@ This approach scales in a more optimal fashion than any known classical algorith
 To understand the intuition more, check out [[5]](#references) and [[6]](#references).
 
 ### Algorithm Steps
-The steps for Shor's order finding are the following. Note that we use the notation that within a single register we can represent a state two ways, say the encoding the integer 1 in <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}m"> qubits: <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle^{\otimes{m-1}}|1\rangle"/> or as <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|1\rangle"/>.
+The steps for Shor's order finding are the following. Note that we use the notation that within a single register we can represent a state two ways. For example, we can write the integer 1 in <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}m"> qubits as <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle^{\otimes{m-1}}|1\rangle"/> or as <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|1\rangle"/>.
+
+Additionally, note that this process is the same as applying [Quantum Phase Estimation](../phase-estimation/README.md) to estimate the eigenvalues of the operator <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U">. Because of the periodicity of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U">, all of the eigenvalues have a phase proportional to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r">. This can be seen by looking at the eigenvectors. Our first eigenvector is:
+<p align="center">
+<img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\varphi_0\rangle=\sum_{j=0}^{r-1}|a^j\mod{N}\rangle=|1\mod{N}\rangle+|a\mod{N}\rangle+\cdots+|a^{r-1}\mod{N}\rangle"/>
+</p>
+We can check this is an eigenvector by showing that <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U|\varphi_0\rangle=|\varphi_0\rangle">, using that <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a^r\mod{N}=1">:
+<p align="center">
+<img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U|\varphi_0\rangle=\sum_{j=0}^{r-1}|a^{j+1}\mod{N}\rangle=|a\mod{N}\rangle+|a^2\mod{N}\rangle+\cdots+|a^{r}\mod{N}\rangle"/>
+</p>
+<p align="center">
+<img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}=|1\mod{N}\rangle+|a\mod{N}\rangle+\cdots+|a^{r-1}\mod{N}\rangle=\sum_{j=0}^{r-1}|a^{j}\mod{N}\rangle=|\varphi_0\rangle"/>
+</p>
+Now, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U"> just applies a shift, so our general eigenvector is:
+<p align="center">
+<img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\varphi_n\rangle=\sum_{j=0}^{r-1}e^{2\pi{i}nj/r}|a^j\mod{N}\rangle"/>
+</p>
+which you can convince yourself have eigenvalues <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}e^{-2\pi{i}n/r}"/>. This provides some motivation for why we are able to use phase estimation.
+
 
 1. Initialize all three registers. *2n* qubits initialized to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle"/> represent the first register known as the counting register. This register
    will store values proportional to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r"> by the end of the algorithm. The second register contains the state <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|1\rangle"/> with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n"> quibts. The third register
@@ -107,7 +125,7 @@ The steps for Shor's order finding are the following. Note that we use the notat
    where <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}j"> denotes the integer representation of *2n*-bit binary numbers.
 
 3. Next, the *2n* controlled unitary operators are applied on the second and third register as shown in the circuit above.
-   Recall since <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U"> performs the following transformation: <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U|x\rangle|0\rangle=|ax\mod{N}\rangle|0\rangle"/>:
+   Recall that since <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U"> performs <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U|x\rangle|0\rangle=|ax\mod{N}\rangle|0\rangle"/>,
    
    <p align="center">
    <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_2\rangle=\frac{1}{2^{n}}\sum_{j=0}^{2^{2n}-1}|j\rangle{U}^j|1\rangle|0\rangle^{\otimes{n+2}}"/>
@@ -117,8 +135,7 @@ The steps for Shor's order finding are the following. Note that we use the notat
    </p>
    
 4. Applying the inverse QFT to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_2\rangle"> retrieves 
-   values proportional to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r"> in the counting register. 
-   Review the [Quantum Fourier Transform](../quantum-fourier-transform/README.md) benchmark for the full derivation.
+   values proportional to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r"> in the counting register, exactly encoding the phase of the eigenvalues.
   
    <p align="center">
    <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_3\rangle=QFT^{-1}|\psi_2\rangle">   
@@ -128,7 +145,7 @@ The steps for Shor's order finding are the following. Note that we use the notat
    </p>
    
 5. Finally, measure the counting register in the computational basis. As seen by the above distribution, a value proportional to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r"> will be measured 
-   with a probability of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|1-\frac{1}{\sqrt{r}}|^2">. From this measured
+   with a probability of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}1-\frac{1}{r}">, as the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}j=0"> case gives us no information. From this measured
    value the continued fractions algorithm can be used to determine <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r">.
    
 ### Gate Implementation
