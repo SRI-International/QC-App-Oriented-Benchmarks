@@ -153,10 +153,10 @@ The following section will show how the <img align=center src="https://latex.cod
 
 |Gate Name| Circuit Image |
 | --- | ---| 
-|Controlled Ua Operator|<img align=center src="../_doc/images/shors/CUA_gate.png" height="400"/>
-|Controlled Multiplier Operator |<img align=center src="../_doc/images/shors/cMULTamodN_gate.png" height="400"/>|
-|Controlled Modular Adder Operator|<img align=center src="../_doc/images/shors/ccphiamodN_gate.png" height="400"/>|  <!---upload accurate image--->
-|Phi Adder Operator|<img align=center src="../_doc/images/shors/phiADD_gate.png" height="200"/>|
+|Controlled Ua Operator|<img align=center src="../_doc/images/shors/CUA_gate.png" width="600"/>
+|Controlled Multiplier Operator |<img align=center src="../_doc/images/shors/cMULTamodN_gate.png" width="600" />|
+|Controlled Modular Adder Operator|<img align=center src="../_doc/images/shors/ccphiamodN_gate.png" width="1200"/>|  <!---upload accurate image--->
+|Phi Adder Operator|<img align=center src="../_doc/images/shors/phiADD_gate.png" width="300"/>|
 
 ### Circuit Methods
 This benchmark has two circuit implementations of Shor's Period Finding algorithm that will be described below:
