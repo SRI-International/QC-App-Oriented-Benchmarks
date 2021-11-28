@@ -149,7 +149,7 @@ which you can convince yourself have eigenvalues <img align=center src="https://
    value the continued fractions algorithm can be used to determine <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r">.
    
 ### Gate Implementation
-The following section will show how the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U"> operator is generated but a deeper explanation is described by Stephane Bearuegard [[4]](#references).
+The following section depicts how the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U"> operator is generated, but for a deeper explanation, view this reference [[4]](#references).
 
 |Gate Name| Circuit Image |
 | --- | ---| 
