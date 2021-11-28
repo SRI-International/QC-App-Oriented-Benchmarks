@@ -34,8 +34,8 @@ which applies onto a state as <img align="center" src="https://latex.codecogs.co
 The algorithm also requires the ability to implement the dual bent function of 
 <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}f(x)">, 
 <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\tilde{f}(x)">.
-We specifically choose a self-dual bent function of the Maiorana McFarland class [[4]](#references), 
-such that <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\tilde{f}(x)=f(x)">.
+**We specifically choose a self-dual bent function of the Maiorana McFarland class [[4]](#references), 
+such that** <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\tilde{f}(x)=f(x)">.
 
 The function we choose is
 
