@@ -33,11 +33,14 @@ from qiskit import IBMQ
 from qiskit.providers.jobstatus import JobStatus
 
 # Noise
-from qiskit.providers.aer.noise import NoiseModel
+from qiskit.providers.aer.noise import NoiseModel, ReadoutError
 from qiskit.providers.aer.noise import depolarizing_error, reset_error
 
 # Use Aer qasm_simulator by default
 backend = Aer.get_backend("qasm_simulator")  
+
+# Execution options, passed to transpile method
+backend_exec_options = None
 
 # default noise model, can be overridden using set_noise_model
 noise = NoiseModel()
@@ -59,6 +62,12 @@ noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_two_qb_error, 2), 
 reset_to_zero_error = 0.005
 reset_to_one_error = 0.005
 noise.add_all_qubit_quantum_error(reset_error(reset_to_zero_error, reset_to_one_error),["reset"])
+
+# Add readout error
+p0given1_error = 0.000
+p1given0_error = 0.000
+error_meas = ReadoutError([[1 - p1given0_error, p1given0_error], [p0given1_error, 1 - p0given1_error]])
+noise.add_all_qubit_readout_error(error_meas)
 
 # Create array of batched circuits and a dict of active circuits
 batched_circuits = []
@@ -102,7 +111,7 @@ def init_execution(handler):
 # Set the backend for execution
 def set_execution_target(backend_id='qasm_simulator',
                 provider_module_name=None, provider_name=None, provider_backend=None,
-                hub=None, group=None, project=None):
+                hub=None, group=None, project=None, exec_options=None):
     """
     Used to run jobs on a real hardware
     :param backend_id:  device name. List of available devices depends on the provider
@@ -156,6 +165,11 @@ def set_execution_target(backend_id='qasm_simulator',
     device_name = backend_id
     metrics.set_plot_subtitle(f"Device = {device_name}")
     #metrics.set_properties( { "api":"qiskit", "backend_id":backend_id } )
+    
+    # save execute options with backend
+    global backend_exec_options
+    backend_exec_options = exec_options
+
 
 def set_noise_model(noise_model = None):
     """
@@ -290,8 +304,41 @@ def execute_circuit(circuit):
             job = execute(circuit["qc"], backend, shots=shots,
                     noise_model=noise, basis_gates=noise.basis_gates)
         else: 
-            job = execute(circuit["qc"], backend, shots=shots)
+            # use execution options if set with backend
+            if backend_exec_options != None:
+                        
+                optimization_level = 1
+                if "optimization_level" in backend_exec_options: 
+                    optimization_level = backend_exec_options["optimization_level"]
+                
+                layout_method = None
+                if "layout_method" in backend_exec_options: 
+                    layout_method = backend_exec_options["layout_method"]
+                
+                routing_method = None
+                if "routing_method" in backend_exec_options: 
+                    routing_method = backend_exec_options["routing_method"]
+                
+                #job = execute(circuit["qc"], backend, shots=shots,
+                
+                # the 'execute' method is not in favor, use transpile + run instead (per IBM)
+                trans_qc = transpile(circuit["qc"], backend, 
+                    optimization_level=optimization_level,
+                    layout_method=layout_method,
+                    routing_method=routing_method)
+                
+                # apply transformer pass if provided
+                if "transformer" in backend_exec_options: 
+                    trans_qc2 = backend_exec_options["transformer"](trans_qc, backend)
+                    trans_qc = trans_qc2
+                    #print("... applying transformer!")
+                    
+                job = backend.run(trans_qc, shots=shots)
+                
+            else:
+                job = execute(circuit["qc"], backend, shots=shots)
             
+            # there appears to be no reason to do transpile, as it is done automatically
             #qc = transpile(circuit["qc"], backend)
             #job = execute(qc, backend, shots=shots)
             
@@ -419,6 +466,26 @@ def job_complete(job):
             print(f'ERROR: failed to execute result_handler for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
             print(f"... exception = {e}")
 
+
+# Process a job, whose status cannot be obtained
+def job_status_failed(job):
+    active_circuit = active_circuits[job]
+    
+    if verbose:
+        print(f'\n... job status failed - group={active_circuit["group"]} id={active_circuit["circuit"]} shots={active_circuit["shots"]}')
+    
+    # compute elapsed time for circuit; assume exec is same, unless obtained from result
+    elapsed_time = time.time() - active_circuit["launch_time"]
+    
+    # report exec time as 0 unless valid measure returned
+    exec_time = 0.0
+           
+    # remove from list of active circuits
+    del active_circuits[job]
+
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'elapsed_time', elapsed_time)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
+
         
 ######################################################################
 # JOB MANAGEMENT METHODS
@@ -518,6 +585,10 @@ def check_jobs(completion_handler=None):
         except Exception as e:
             print(f'ERROR: Unable to retrieve job status for circuit {circuit["group"]} {circuit["circuit"]}')
             print(f"... job = {job.job_id()}  exception = {e}")
+            
+            # finish the job by removing from active list
+            job_status_failed(job)
+            
             break
 
         circuit["pollcount"] += 1

@@ -26,6 +26,7 @@
     "backend_id=\"qasm_simulator\"\n",
     "hub=\"ibm-q\"; group=\"open\"; project=\"main\"\n",
     "provider_backend = None\n",
+    "exec_options = None\n",
     "\n",
     "# # *** If using IBMQ hardware, run this once to authenticate\n",
     "# from qiskit import IBMQ\n",
@@ -37,6 +38,8 @@
     "# project=\"YOUR_PROJECT_NAME\"\n",
     "\n",
     "# # *** This example shows how to specify the backend using a known \"backend_id\"\n",
+    "# # Use 'sabre' layout for IBM backends\n",
+    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre' }\n",
     "# backend_id=\"ibmq_belem\"\n",
     "\n",
     "# # *** Here's an example of using a typical custom provider backend (e.g. AQT simulator)\n",
@@ -62,6 +65,32 @@
   {
    "cell_type": "code",
    "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# # Additional options can be specified in this cell (below is an example)\n",
+    "\n",
+    "# # Some circuits can be sparse or have long idle periods.\n",
+    "# # Dynamical decoupling can echo away static ZZ errors during those idling periods.\n",
+    "# # Set up a pass manager to add the decoupling pulses to the circuit before executing\n",
+    "\n",
+    "# from qiskit.transpiler import PassManager, InstructionDurations\n",
+    "# from qiskit.transpiler.passes import ALAPSchedule, DynamicalDecoupling\n",
+    "# from qiskit.circuit.library import XGate\n",
+    "# def do_transform(circuit, backend):\n",
+    "#     durations = InstructionDurations.from_backend(backend)\n",
+    "#     dd_sequence = [XGate(), XGate()]\n",
+    "#     pm = PassManager([ALAPSchedule(durations),\n",
+    "#                       DynamicalDecoupling(durations, dd_sequence)])\n",
+    "#     return pm.run(circuit)\n",
+    "\n",
+    "# # Add this pass manager as a 'transformer' method\n",
+    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": do_transform }"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
    "metadata": {
     "scrolled": false
    },
@@ -73,7 +102,7 @@
     "import dj_benchmark\n",
     "dj_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -89,8 +118,9 @@
     "sys.path.insert(1, \"bernstein-vazirani/qiskit\")\n",
     "import bv_benchmark\n",
     "bv_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
-    "                method = 1, backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                method=1,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
     {
@@ -106,8 +136,9 @@
     "sys.path.insert(1, \"bernstein-vazirani/qiskit\")\n",
     "import bv_benchmark\n",
     "bv_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
-    "                method =2, backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                method=2,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -124,7 +155,7 @@
     "import hs_benchmark\n",
     "hs_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -142,7 +173,7 @@
     "qft_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                method=1,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -160,7 +191,7 @@
     "qft_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                method=2,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -177,7 +208,7 @@
     "import grovers_benchmark\n",
     "grovers_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
     {
@@ -194,7 +225,7 @@
     "import pe_benchmark\n",
     "pe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -211,7 +242,7 @@
     "import ae_benchmark\n",
     "ae_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -228,7 +259,7 @@
     "import mc_benchmark\n",
     "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -246,7 +277,7 @@
     "hamiltonian_simulation_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits,\n",
     "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -263,8 +294,9 @@
     "import vqe_benchmark\n",
     "vqe_num_shots=4098\n",
     "vqe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=vqe_num_shots,\n",
-    "                method = 1, backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                method=1,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -280,8 +312,9 @@
     "sys.path.insert(1, \"shors/qiskit\")\n",
     "import shors_benchmark\n",
     "shors_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=1, num_shots=num_shots,\n",
-    "                method = 1, backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                method=1,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {
@@ -297,8 +330,9 @@
     "sys.path.insert(1, \"shors/qiskit\")\n",
     "import shors_benchmark\n",
     "shors_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=1, num_shots=num_shots,\n",
-    "                method = 2, backend_id=backend_id, provider_backend=provider_backend,\n",
-    "                hub=hub, group=group, project=project)"
+    "                method=2,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
   {

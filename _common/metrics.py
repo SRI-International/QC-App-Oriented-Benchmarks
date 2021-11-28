@@ -1218,9 +1218,13 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     if suptitle == None:
         suptitle = f"Volumetric Positioning\nCircuit Dimensions and Fidelity Overlaid on Quantum Volume = {QV}"
 
+    QV0 = QV
     qv_estimate = False
     est_str = ""
-    if QV < 0:
+    if QV == 0:                 # QV = 0 indicates "do not draw QV background or label"
+        QV = 8192
+        
+    elif QV < 0:                # QV < 0 indicates "add est. to label"
         QV = -QV
         qv_estimate = True
         est_str = " (est.)"
@@ -1228,7 +1232,8 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     max_width = 13
     if max_qubits > 11: max_width = 18
     if max_qubits > 14: max_width = 20
-    #print(f"... {max_qubits} {max_width}")
+    if max_qubits > 16: max_width = 24
+    #print(f"... {avail_qubits} {max_qubits} {max_width}")
     
     plot_width = 6.8
     plot_height = 0.5 + plot_width * (max_width / max_depth_log)
@@ -1270,7 +1275,8 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     QV_depth = log2QV * QV_transpile_factor
     
     # show a quantum volume rectangle of QV = 64 e.g. (6 x 6)
-    ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.87, depth_base))
+    if QV0 != 0:
+        ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.87, depth_base))
     
     # the untranspiled version is commented out - we do not show this by default
     # also show a quantum volume rectangle un-transpiled
@@ -1306,7 +1312,12 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
 
             # draw a box at this width and depth
             id = depth_index(d, depth_base) 
-            ax.add_patch(bkg_box_at(id, w, 0.5))
+            
+            # show vb rectangles; if not showing QV, make all hollow
+            if QV0 == 0:
+                ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+            else:
+                ax.add_patch(bkg_box_at(id, w, 0.5))
             
             # save index of last successful depth
             i_success += 1
@@ -1318,10 +1329,11 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
         
     
     # Add annotation showing quantum volume
-    t = ax.text(max_depth_log - 2.0, 1.5, f"QV{est_str}={QV}", size=12,
-            horizontalalignment='right', verticalalignment='center', color=(0.2,0.2,0.2),
-            bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
-            
+    if QV0 != 0:
+        t = ax.text(max_depth_log - 2.0, 1.5, f"QV{est_str}={QV}", size=12,
+                horizontalalignment='right', verticalalignment='center', color=(0.2,0.2,0.2),
+                bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
+                
     # add colorbar to right of plot
     plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label="Avg Result Fidelity", panchor=(0.0, 0.7))
             

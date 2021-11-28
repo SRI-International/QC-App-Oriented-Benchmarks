@@ -118,7 +118,7 @@ def bitstring_to_theta(counts, num_counting_qubits):
 # Execute program with default parameters
 def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main"):
+        hub="ibm-q", group="open", project="main", exec_options=None):
 
     print("Phase Estimation Benchmark Program - Qiskit")
 
@@ -146,7 +146,7 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project)
+            hub=hub, group=group, project=project, exec_options=exec_options)
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
