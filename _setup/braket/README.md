@@ -23,15 +23,13 @@ Once you have installed the Miniconda package, from the Windows Start menu launc
 
     conda activate braket
 
-The conda environment is now ready for you to install the braket package.
+The conda environment is now ready for you to install the Braket package.
 
 ## Install Braket
 
-Enter the following commands to install the latest version of Amazon Braket SDK with additional visualization tools.
+Enter the following commands to install the latest version of Amazon Braket SDK and the other required packages.
 
-    pip install boto3
-
-    pip install amazon-braket-sdk
+    pip install matplotlib boto3 amazon-braket-sdk notebook
 
 You are now ready to run the benchmark programs.
 By default, all benchmark programs are configured to run on a simulator that is provided within the target environment.
@@ -60,7 +58,7 @@ Once these variables are set, you may proceed to execution the benchmark program
 The easiest way to configure and run the Application Benchmark programs is to use a Jupyter Notebook that is provided at the top level of the Proto-Benchmarks repository.
 Support for Jupyter notebooks is automatically available with your Anaconda installation.
 
-Frist, prepare the Amazon Braket notebook by copying the delivered 'template' file with the following command:
+First, prepare the Amazon Braket notebook by copying the delivered 'template' file with the following command:
 
     copy benchmarks-braket.ipynb.template benchmarks-braket.ipynb
     
@@ -131,3 +129,13 @@ Often, executing the following lines will address this problem:
     conda install notebook ipykernel
     ipython kernel install --user
 
+
+## Tested Versions
+
+The repository has been validated on Linux using the following versions as minimums:
+
+    Miniconda Version: 4.10.3
+    Python Versions: 3.8.5 and 3.9.7
+    Braket-SDK Version: 1.9.5
+
+Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.

@@ -23,15 +23,13 @@ Once you have installed the Miniconda package, from the Windows Start menu launc
 
     conda activate qiskit
 
-The conda environment is now ready for you to install the qiskit package.
+The conda environment is now ready for you to install the Qiskit package.
 
 ## Install Qiskit
 
-Enter the following commands to install the latest version of qiskit with additional visualization tools.
+Enter the following commands to install the latest version of Qiskit and the other required packages.
 
-    pip install qiskit
-
-    pip install qiskit[visualization]
+    pip install numpy matplotlib qiskit "qiskit[visualization]" notebook
 
 You are now ready to run the benchmark programs.
 
@@ -69,7 +67,12 @@ Note; In some Windows environments, it is necessary to install one additional pa
 
 Once installed, you should be able to successfully start your Jupyter notebook.
 
+## Tested Versions
 
-    
+The repository has been validated on Linux using the following versions as minimums:
 
+    Miniconda Version: 4.10.3
+    Python Versions: 3.8.5 and 3.9.7
+    Qiskit-Terra Version: 0.18.3
 
+Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.

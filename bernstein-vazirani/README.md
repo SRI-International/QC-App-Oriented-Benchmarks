@@ -63,7 +63,7 @@ with IBM's Quantum Composer and can be analyzed
 
 ### Algorithm Steps
 
-The steps for the BV algorithm are the following:
+The steps for the BV algorithm are the following, with the state after each step, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_n\rangle">:
 
 1. Initialize two quantum registers. The first register has <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n"> data qubits  initialized to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle"/> and the 
    second register has one ancilla qubit initialized to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|1\rangle"/>.
@@ -72,7 +72,7 @@ The steps for the BV algorithm are the following:
    <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_0\rangle=|0\rangle^{\otimes{n}}|1\rangle"/>
    </p>
    
-2. Apply the Hadamard gate to all qubits, creating an equal superposition state in the first register and
+2. Apply the Hadamard gate to all qubits, creating an equal superposition state <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\frac{1}{\sqrt{2^{n}}}\sum_{x=0}^{2^n-1}|x\rangle"/> in the first register and
    <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|-\rangle=\frac{1}{\sqrt{2}}\big(|0\rangle-1\rangle\big)"> in the second.
    
    <p align="center">
@@ -146,7 +146,7 @@ is an example of the circuit benchmarked for this method:
    <img align=center src="../_doc/images/bernstein-vazirani/bv2_qiskit_circ.png"  width="800" />
    </p>
 
-Note for this method, the following histogram plots (which are generated with each benchmark)
+Note for this method, the following plots (which are generated with each benchmark)
 plots some metric versus the circuit width (number of qubits). For method 2, this circuit width is a virtual circuit width since the 
 physical circuit width is two. For example, for the virtual circuit width = 4, this represents the corresponding
 two qubit circuit used with mid circuit measurements to represent the quantum circuit with 4 qubits.

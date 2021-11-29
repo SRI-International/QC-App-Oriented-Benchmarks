@@ -1,8 +1,8 @@
 # Variational Quantum Eigensolver - Prototype Benchmark Program
 
 Solving the electronic structure problem is one of the most promising near-term applications for quantum computers, with 
-potential contributions to drug discovery, searching for new materials, understanding superconductivity, and other 
-important use cases. In the NISQ era, one of the most promising approach is the variational quantum eigensolver (VQE) [[1]](#references) [[2]](#references). In the current version of this benchmark, we compare the quantum simulation against a classical simultion of the same circuit in order to report our fidelity. This works well for small circuit sizes, but is not scalable past a certain number of qubits.
+potential contributions to drug discovery [[1]](#references), developing new materials
+and catalysts for more efficient light-harvesting and CO2 reduction [[2]](#references), understanding high-temperature super conductivity [[1]](#references), and other important use cases [[3]](#references). In the NISQ era, one of the most promising approach is the variational quantum eigensolver (VQE) [[4]](#references) [[5]](#references). In the current version of this benchmark, we compare the quantum simulation against a classical simultion of the same circuit in order to report our fidelity. This works well for small circuit sizes, but is not scalable past a certain number of qubits.
 
 ## Problem outline
 
@@ -13,7 +13,7 @@ depths, which makes it particularly suitable for near-term quantum computers.
 
 The center of the VQE algorithm is the choice of the wave function ansatz. Many choices exist, and in this benchmark
 we choose to use the unitary Coupled Cluster with singles and doubles ansatz (unitary-CCSD). This ansatz is 
-defined as [[3]](#references)
+defined as [[6]](#references)
 
 <p align="center">
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}|\Psi\rangle=e^{T-T^\dagger}|\Phi\rangle"/>
@@ -76,7 +76,7 @@ to 10 qubits in the `precalculated_data.json` data file. The python code then im
 
 There is no known classical algorithm that is capable of computing the energy for the unitary-CCSD ansatz with 
 polynomial scaling cost. However, the unitary-CCSD ansatz has attracted a great deal of interests in quantum 
-chemistry [[4]](#references) since it is known to be a highly accurate approximation to strongly correlated systems. Being capable 
+chemistry [[7]](#references) since it is known to be a highly accurate approximation to strongly correlated systems. Being capable 
 to accurately predict strongly correlated has the potential to benefit numerous fields of great importance, 
 such as high-temperature superconductivity, catalyst with transition metals, and light-harvesting materials. 
 
@@ -87,7 +87,7 @@ As the number of terms in the unitary-CCSD ansatz is polynomial in system size, 
 ### Mapping from Fermions to Qubits
 
 The unitary-CCSD ansatz and the Hamiltonian are defined with Fermonic operators. We use the Jordan-Wigner transformation
-(JWT) to convert them to the qubit space. The JWT is defined as [[5]](#references)
+(JWT) to convert them to the qubit space. The JWT is defined as [[8]](#references)
 
 <p align="center">
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}a_p\rightarrow\frac{1}{2}\left(X_p+iY_p\right)Z_1\cdots{Z}_{p-1}"/>,
@@ -108,7 +108,7 @@ Pauli matrices. Similarly, the Hamiltonian becomes
 
 Although we do know how to implement <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{t_iP_i}"/>
 on the quantum computer, there is no simple way to implement <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{\sum_i{t_iP_i}}"/>.
-Therefore, we apply the first-order Trotter approximation [[6]](#references), 
+Therefore, we apply the first-order Trotter approximation [[9]](#references), 
 
 <p align="center">
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{\sum_i{t_iP_i}}|\Phi\rangle\approx\prod_i{e^{t_iP_i}}|\Phi\rangle"/>.
@@ -169,7 +169,7 @@ Therefore VQE requires a larger number of measurements than the other benchmarks
 ## Gate Implementation
 
 As an example, the term <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta{Y}XXX}"/>
-could be implemented with the following circuit. [[7]](#references)
+could be implemented with the following circuit. [[10]](#references)
 
 <p align="center">
 <img align=center src="../_doc/images/vqe/circuit_XXXY.png"  width="700" />
@@ -194,29 +194,41 @@ The method may be passed to the run() function, using the `method=method` parame
  
 ## References
 
-[1] Alberto Peruzzo, Jarrod McClean, Peter Shadbolt, Man-Hong Yung, Xiao-Qi Zhou, Peter J. Love, Alán Aspuru-Guzik, Jeremy L. O'Brien. (2013). 
+[1] Sam McArdle, Suguru Endo, Alan Aspuru-Guzik, Simon Benjamin, Xiao Yuan. (2020).
+    Quantum computational chemistry.
+    [`arXiv:1808.10402`](https://arxiv.org/abs/1808.10402)
+
+[2] Vera von Burg, Guang Hao Low, Thomas Häner, Damian S. Steiger, Markus Reiher, Martin Roetteler, Matthias Troyer. (2021).
+    Quantum computing enhanced computational catalysis.
+    [`arXiv:2007.14460`](https://arxiv.org/abs/2007.14460)
+
+[3] Markus Reiher, Nathan Wiebe, Krysta M Svore, Dave Wecker, Matthias Troyer
+    Elucidating Reaction Mechanisms on Quantum Computers
+    [`arXiv:1605.03590`](https://arxiv.org/abs/1605.03590)
+
+[4] Alberto Peruzzo, Jarrod McClean, Peter Shadbolt, Man-Hong Yung, Xiao-Qi Zhou, Peter J. Love, Alán Aspuru-Guzik, Jeremy L. O'Brien. (2013). 
     A variational eigenvalue solver on a quantum processor.
     [`arXiv:1304.3061`](https://arxiv.org/abs/1304.3061v1)
 
-[2] Jarrod R. McClean, Jonathan Romero, Ryan Babbush, Alán Aspuru-Guzik. (2016).
+[5] Jarrod R. McClean, Jonathan Romero, Ryan Babbush, Alán Aspuru-Guzik. (2016).
     The theory of variational hybrid quantum-classical algorithms.
     [`arXiv:1509.04279`](https://arxiv.org/abs/1509.04279)
 
-[3] Yudong Cao, Jonathan Romero, Jonathan P. Olson, Matthias Degroote, Peter D. Johnson, Mária Kieferová, Ian D. Kivlichan, Tim Menke, Borja Peropadre, Nicolas P. D. Sawaya, Sukin Sim, Libor Veis, Alán Aspuru-Guzik. (2018).
+[6] Yudong Cao, Jonathan Romero, Jonathan P. Olson, Matthias Degroote, Peter D. Johnson, Mária Kieferová, Ian D. Kivlichan, Tim Menke, Borja Peropadre, Nicolas P. D. Sawaya, Sukin Sim, Libor Veis, Alán Aspuru-Guzik. (2018).
     Quantum Chemistry in the Age of Quantum Computing.
     [`arXiv:1812.09976`](https://arxiv.org/abs/1812.09976)
     
-[4] Bridgette Cooper and Peter J. Knowles.
+[7] Bridgette Cooper and Peter J. Knowles.
     Benchmark Studies of Variational, Unitary and Extended Coupled Cluster Methods.
     J. Chem. Phys. 133, 234102 (2010); [`10.1063/1.3520564`](https://doi.org/10.1063/1.3520564)
 
-[5] Google Open Fermion Documentation Team. (2021). 
+[8] Google Open Fermion Documentation Team. (2021). 
     [`The Jordan-Wigner and Bravyi-Kitaev Transforms`](https://quantumai.google/openfermion/tutorials/jordan_wigner_and_bravyi_kitaev_transforms)
 
-[6] Naomichi Hatano, Masuo Suzuki. (2005).
+[9] Naomichi Hatano, Masuo Suzuki. (2005).
     Finding Exponential Product Formulas of Higher Orders
     [`arXiv:math-ph/0506007`](https://arxiv.org/abs/math-ph/0506007v1)
 
-[7] Panagiotis Kl. Barkoutsos, Jerome F. Gonthier, Igor Sokolov, Nikolaj Moll, Gian Salis, Andreas Fuhrer, Marc Ganzhorn, Daniel J. Egger, Matthias Troyer, Antonio Mezzacapo, Stefan Filipp, Ivano Tavernelli. (2018).
+[10] Panagiotis Kl. Barkoutsos, Jerome F. Gonthier, Igor Sokolov, Nikolaj Moll, Gian Salis, Andreas Fuhrer, Marc Ganzhorn, Daniel J. Egger, Matthias Troyer, Antonio Mezzacapo, Stefan Filipp, Ivano Tavernelli. (2018).
     Quantum Algorithms for Electronic Structure Calculations: Particle-Hole Hamiltonian and Optimized Wave-Function Expansions
     [`arXiv:1805.04340`](https://arxiv.org/abs/1805.04340)

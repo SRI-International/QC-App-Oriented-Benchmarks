@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Lubinski
+    given-names: Thomas
+  - family-names: Johri
+    given-names: Sonika
+  - family-names: Varosy
+    given-names: Paul
+  - family-names: Coleman
+    given-names: Jeremiah
+  - family-names: Zhao
+    given-names: Luning
+  - family-names: Necaise
+    given-names: Jason
+  - family-names: Baldwin
+    given-names: Charles
+  - family-names: Mayer
+    given-names: Karl
+  - family-names: Proctor
+    given-names: Timothy
+title: "Application-Oriented Performance Benchmarks for Quantum Computing"
+date-released: 2021-10-7
+url: "https://arxiv.org/abs/2110.03137"
