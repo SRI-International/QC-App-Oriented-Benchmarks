@@ -19,7 +19,7 @@
    "outputs": [],
    "source": [
     "min_qubits=2\n",
-    "max_qubits=3\n",
+    "max_qubits=5\n",
     "max_circuits=3\n",
     "num_shots=1000\n",
     "\n",

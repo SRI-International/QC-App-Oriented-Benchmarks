@@ -27,6 +27,7 @@ import time
 import copy
 import metrics
 import importlib
+from collections import Counter
 
 from qiskit import execute, Aer, transpile
 from qiskit import IBMQ
@@ -465,6 +466,27 @@ def job_complete(job):
     # If a result handler has been established, invoke it here with result object
     if result != None and result_handler:
     
+        # The following computes the counts by summing them up, allowing for the case where
+        # <result> contains results from multiple circuits
+        # DEVNOTE: This will need to change; currently the only case where we have multiple result counts
+        # is when using randomly_compile; later, there will be other cases
+        if type(result.get_counts()) == list:
+            total_counts = dict()
+            for count in result.get_counts():
+                total_counts = dict(Counter(total_counts) + Counter(count))
+                
+            # make a copy of the result object so we can return a modified version
+            orig_result = result
+            result = copy.copy(result) 
+
+            # replace the results array with an array containing only the first results object
+            # then populate other required fields
+            results = copy.copy(result.results[0])
+            results.header.name = 'main'            # needed to identify the original circuit
+            results.shots = actual_shots
+            results.data.counts = total_counts
+            result.results = [ results ]
+            
         try:
             result_handler(active_circuit["qc"],
                             result,
