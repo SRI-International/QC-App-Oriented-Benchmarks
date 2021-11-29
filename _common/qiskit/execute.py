@@ -482,7 +482,7 @@ def job_complete(job):
             # replace the results array with an array containing only the first results object
             # then populate other required fields
             results = copy.copy(result.results[0])
-            results.header.name = 'main'            # needed to identify the original circuit
+            results.header.name = active_circuit["qc"].name     # needed to identify the original circuit
             results.shots = actual_shots
             results.data.counts = total_counts
             result.results = [ results ]
