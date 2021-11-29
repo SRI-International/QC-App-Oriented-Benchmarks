@@ -304,7 +304,7 @@ def execute_circuit(circuit):
                 circuits_for_execution = backend_exec_options["randomly_compile"](
                     circuit["qc"]
                 )
-                shots = shots / len(circuits_for_execution)
+                shots = int(shots / len(circuits_for_execution))
             else:
                 circuits_for_execution = circuit["qc"]
             
@@ -341,7 +341,7 @@ def execute_circuit(circuit):
                     trans_qc2 = backend_exec_options["transformer"](trans_qc, backend)
                     trans_qc = trans_qc2
                     #print("... applying transformer!")
-                    
+
                 job = backend.run(trans_qc, shots=shots)
                 
             else:
