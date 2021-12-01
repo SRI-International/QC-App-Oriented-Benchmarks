@@ -300,18 +300,25 @@ def execute_circuit(circuit):
                 qc_tr_xi = n2q / (n1q + n2q)    
             #print(f"... qc_tr_xi = {qc_tr_xi} {n1q} {n2q}")
         
-            if backend_exec_options != None and "randomly_compile" in backend_exec_options:
-                circuits_for_execution = backend_exec_options["randomly_compile"](
-                    circuit["qc"]
-                )
-                shots = int(shots / len(circuits_for_execution))
-            else:
-                circuits_for_execution = circuit["qc"]
+            #if backend_exec_options != None and "randomly_compile" in backend_exec_options:
+            #    circuits_for_execution = backend_exec_options["randomly_compile"](
+            #        circuit["qc"]
+            #    )
+            #    shots = int(shots / len(circuits_for_execution))
+            #else:
+            #    circuits_for_execution = circuit["qc"]
             
         # Initiate execution (with noise if specified and this is a simulator backend)
         if noise is not None and backend.name().endswith("qasm_simulator"):
-            job = execute(circuits_for_execution, backend, shots=shots,
-                    noise_model=noise, basis_gates=noise.basis_gates)
+            if "randomly_compile" in backend_exec_options:
+                trans_qc = transpile(circuit["qc"], backend)
+                simulation_circuits = backend_exec_options["randomly_compile"](trans_qc)
+                shots = int(shots / len(simulation_circuits))
+            else:
+                simulation_circuits = circuit["qc"]
+                
+            job = execute(simulation_circuits, backend, shots=shots,
+                noise_model=noise, basis_gates=noise.basis_gates)
         else: 
             # use execution options if set with backend
             if backend_exec_options != None:
@@ -331,7 +338,7 @@ def execute_circuit(circuit):
                 #job = execute(circuit["qc"], backend, shots=shots,
                 
                 # the 'execute' method is not in favor, use transpile + run instead (per IBM)
-                trans_qc = transpile(circuits_for_execution, backend, 
+                trans_qc = transpile(circuit["qc"], backend, 
                     optimization_level=optimization_level,
                     layout_method=layout_method,
                     routing_method=routing_method)
@@ -341,11 +348,17 @@ def execute_circuit(circuit):
                     trans_qc2 = backend_exec_options["transformer"](trans_qc, backend)
                     trans_qc = trans_qc2
                     #print("... applying transformer!")
-
+                                # apply RC pass if provided
+                        
+                if "randomly_compile" in backend_exec_options:
+                    trans_qc2 = backend_exec_options["randomly_compile"](trans_qc)
+                    trans_qc = trans_qc2
+                    shots = int(shots / len(trans_qc))
+                    
                 job = backend.run(trans_qc, shots=shots)
                 
             else:
-                job = execute(circuits_for_execution, backend, shots=shots)
+                job = execute(circuit["qc"], backend, shots=shots)
             
             # there appears to be no reason to do transpile, as it is done automatically
             #qc = transpile(circuit["qc"], backend)

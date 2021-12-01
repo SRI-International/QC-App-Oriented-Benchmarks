@@ -94,7 +94,7 @@
     "\n",
     "def do_rc(circuit, n_compilations=20):\n",
     "    rc_compressed_compiler = tq.Compiler.basic(\n",
-    "        entangler=tq.Gate.rp(\"XX\", 90), # Must choose a Clifford entangler for RC\n",
+    "        entangler=tq.Gate.cnot, # Must choose a Clifford entangler for RC\n",
     "        passes=(tqc.Native2Q,\n",
     "                tqc.MarkCycles,\n",
     "                tqc.RCLocal,\n",
@@ -118,7 +118,9 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "tags": []
+   },
    "outputs": [],
    "source": [
     "#%run deutsch-jozsa/qiskit/dj_benchmark.py\n",
@@ -149,7 +151,9 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {},
+   "metadata": {
+    "tags": []
+   },
    "outputs": [],
    "source": [
     "#%run bernstein-vazirani/qiskit/bv_benchmark.py\n",
