@@ -312,7 +312,7 @@ def execute_circuit(circuit):
         if noise is not None and backend.name().endswith("qasm_simulator"):
             if "randomly_compile" in backend_exec_options:
                 trans_qc = transpile(circuit["qc"], backend)
-                simulation_circuits = backend_exec_options["randomly_compile"](trans_qc)
+                simulation_circuits = backend_exec_options["randomly_compile"](trans_qc, backend=backend)
                 shots = int(shots / len(simulation_circuits))
             else:
                 simulation_circuits = circuit["qc"]
@@ -351,7 +351,7 @@ def execute_circuit(circuit):
                                 # apply RC pass if provided
                         
                 if "randomly_compile" in backend_exec_options:
-                    trans_qc2 = backend_exec_options["randomly_compile"](trans_qc)
+                    trans_qc2 = backend_exec_options["randomly_compile"](trans_qc, backend=backend)
                     trans_qc = trans_qc2
                     shots = int(shots / len(trans_qc))
                     
