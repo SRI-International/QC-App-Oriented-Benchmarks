@@ -27,6 +27,7 @@ import time
 import copy
 import metrics
 import importlib
+from collections import Counter
 
 from qiskit import execute, Aer, transpile
 from qiskit import IBMQ
@@ -298,11 +299,26 @@ def execute_circuit(circuit):
                     else: n1q += value
                 qc_tr_xi = n2q / (n1q + n2q)    
             #print(f"... qc_tr_xi = {qc_tr_xi} {n1q} {n2q}")
+        
+            #if backend_exec_options != None and "randomly_compile" in backend_exec_options:
+            #    circuits_for_execution = backend_exec_options["randomly_compile"](
+            #        circuit["qc"]
+            #    )
+            #    shots = int(shots / len(circuits_for_execution))
+            #else:
+            #    circuits_for_execution = circuit["qc"]
             
         # Initiate execution (with noise if specified and this is a simulator backend)
         if noise is not None and backend.name().endswith("qasm_simulator"):
-            job = execute(circuit["qc"], backend, shots=shots,
-                    noise_model=noise, basis_gates=noise.basis_gates)
+            if "randomly_compile" in backend_exec_options:
+                trans_qc = transpile(circuit["qc"], backend)
+                simulation_circuits = backend_exec_options["randomly_compile"](trans_qc, backend=backend)
+                shots = int(shots / len(simulation_circuits))
+            else:
+                simulation_circuits = circuit["qc"]
+                
+            job = execute(simulation_circuits, backend, shots=shots,
+                noise_model=noise, basis_gates=noise.basis_gates)
         else: 
             # use execution options if set with backend
             if backend_exec_options != None:
@@ -332,6 +348,12 @@ def execute_circuit(circuit):
                     trans_qc2 = backend_exec_options["transformer"](trans_qc, backend)
                     trans_qc = trans_qc2
                     #print("... applying transformer!")
+                                # apply RC pass if provided
+                        
+                if "randomly_compile" in backend_exec_options:
+                    trans_qc2 = backend_exec_options["randomly_compile"](trans_qc, backend=backend)
+                    trans_qc = trans_qc2
+                    shots = int(shots / len(trans_qc))
                     
                 job = backend.run(trans_qc, shots=shots)
                 
@@ -432,7 +454,10 @@ def job_complete(job):
         #print(f'shots = {results_obj["shots"]}')
         
         # get the actual shots and convert to int if it is a string
-        actual_shots = results_obj["shots"]
+        actual_shots = 0
+        for experiment in result_obj["results"]:
+            actual_shots += experiment["shots"]
+            
         if type(actual_shots) is str:
             actual_shots = int(actual_shots)
         
@@ -454,6 +479,27 @@ def job_complete(job):
     # If a result handler has been established, invoke it here with result object
     if result != None and result_handler:
     
+        # The following computes the counts by summing them up, allowing for the case where
+        # <result> contains results from multiple circuits
+        # DEVNOTE: This will need to change; currently the only case where we have multiple result counts
+        # is when using randomly_compile; later, there will be other cases
+        if type(result.get_counts()) == list:
+            total_counts = dict()
+            for count in result.get_counts():
+                total_counts = dict(Counter(total_counts) + Counter(count))
+                
+            # make a copy of the result object so we can return a modified version
+            orig_result = result
+            result = copy.copy(result) 
+
+            # replace the results array with an array containing only the first results object
+            # then populate other required fields
+            results = copy.copy(result.results[0])
+            results.header.name = active_circuit["qc"].name     # needed to identify the original circuit
+            results.shots = actual_shots
+            results.data.counts = total_counts
+            result.results = [ results ]
+            
         try:
             result_handler(active_circuit["qc"],
                             result,
