@@ -27,6 +27,7 @@ import time
 import copy
 import metrics
 import importlib
+from collections import Counter
 
 from qiskit import execute, Aer, transpile
 from qiskit import IBMQ
@@ -83,7 +84,11 @@ result_handler = None
 # job mode: False = wait, True = submit multiple jobs
 job_mode = False
 
+# Print progress of execution
 verbose = False;
+
+# Print additional time metrics for each stage of execution
+verbose_time = False;
 
 # Option to perform explicit transpile to collect depth metrics
 do_transpile_metrics = True
@@ -272,6 +277,7 @@ def execute_circuit(circuit):
         
             #print("*** Before transpile ...")
             #print(circuit["qc"])
+            st = time.time()
             
             # use either the backend or one of the basis gate sets
             if basis_selector == 0:
@@ -280,7 +286,8 @@ def execute_circuit(circuit):
                 basis_gates = basis_gates_array[basis_selector]
                 qc = transpile(circuit["qc"], basis_gates=basis_gates)
             
-            #print("*** After transpile ...")
+            if verbose_time:
+                print(f"*** normalization qiskit.transpile() time = {time.time() - st}")
             #print(qc)
                 
             qc_tr_depth = qc.depth()
@@ -301,10 +308,43 @@ def execute_circuit(circuit):
             
         # Initiate execution (with noise if specified and this is a simulator backend)
         if noise is not None and backend.name().endswith("qasm_simulator"):
-            job = execute(circuit["qc"], backend, shots=shots,
-                    noise_model=noise, basis_gates=noise.basis_gates)
-        else: 
-            # use execution options if set with backend
+            #print("... performing simulation")
+            
+            simulation_circuits = circuit["qc"]
+            
+            # use execution options if set for simulator
+            if backend_exec_options != None:
+            
+                # apply transformer pass if provided
+                if "transformer" in backend_exec_options:
+                    #print("... applying transformer to sim!")
+                    st = time.time()
+                    trans_qc = transpile(circuit["qc"], backend)
+                    simulation_circuits = backend_exec_options["transformer"](trans_qc, backend=backend)
+                    
+                    # if transformer results in multiple circuits, divide shot count
+                    # results will be accumulated in job_complete
+                    # NOTE: this will need to set a flag to distinguish from multiple circuit execution 
+                    if len(simulation_circuits) > 1:
+                        shots = int(shots / len(simulation_circuits))
+                    
+                    if verbose_time:
+                        print(f"  *** transformer() time = {time.time() - st}")
+       
+            # for noisy simulator, use execute() which works; it is unclear from docs
+            # whether noise_model should be passed to transpile() or run() 
+            st = time.time()
+            job = execute(simulation_circuits, backend, shots=shots,
+                noise_model=noise, basis_gates=noise.basis_gates)
+                
+            if verbose_time:
+                    print(f"  *** qiskit.execute() time = {time.time() - st}")
+                
+        # Initiate excution for all other backends and noiseless simulator
+        else:
+            #print(f"... executing on backend: {backend.name()}")
+            
+            # use execution options if set for backend
             if backend_exec_options != None:
                         
                 optimization_level = 1
@@ -321,24 +361,49 @@ def execute_circuit(circuit):
                 
                 #job = execute(circuit["qc"], backend, shots=shots,
                 
-                # the 'execute' method is not in favor, use transpile + run instead (per IBM)
+                # the 'execute' method includes transpile, use transpile + run instead (to enable time metrics)
+                st = time.time()
                 trans_qc = transpile(circuit["qc"], backend, 
                     optimization_level=optimization_level,
                     layout_method=layout_method,
                     routing_method=routing_method)
+                    
+                if verbose_time:
+                    print(f"  *** qiskit.transpile() time = {time.time() - st}")
                 
                 # apply transformer pass if provided
-                if "transformer" in backend_exec_options: 
+                if "transformer" in backend_exec_options:
+                    st = time.time()
+                    #print("... applying transformer!")
                     trans_qc2 = backend_exec_options["transformer"](trans_qc, backend)
                     trans_qc = trans_qc2
-                    #print("... applying transformer!")
+                
+                    # if transformer results in multiple circuits, divide shot count
+                    # results will be accumulated in job_complete
+                    # NOTE: this will need to set a flag to distinguish from multiple circuit execution 
+                    if len(trans_qc) > 1:
+                        shots = int(shots / len(trans_qc))
                     
+                    if verbose_time:
+                        print(f"  *** transformer() time = {time.time() - st}")
+                
+                st = time.time()                
                 job = backend.run(trans_qc, shots=shots)
                 
+                if verbose_time:
+                    print(f"  *** qiskit.run() time = {time.time() - st}")
+                    
+            # execute with no options set
             else:
+                st = time.time()
                 job = execute(circuit["qc"], backend, shots=shots)
-            
+                
+                if verbose_time:
+                    print(f"  *** qiskit.execute() time = {time.time() - st}")
+                
             # there appears to be no reason to do transpile, as it is done automatically
+            # DEVNOTE: this prevents us from measuring transpile time
+            # If we use this method, we'd need to validate on all backends again, so leave for now
             #qc = transpile(circuit["qc"], backend)
             #job = execute(qc, backend, shots=shots)
             
@@ -432,7 +497,10 @@ def job_complete(job):
         #print(f'shots = {results_obj["shots"]}')
         
         # get the actual shots and convert to int if it is a string
-        actual_shots = results_obj["shots"]
+        actual_shots = 0
+        for experiment in result_obj["results"]:
+            actual_shots += experiment["shots"]
+            
         if type(actual_shots) is str:
             actual_shots = int(actual_shots)
         
@@ -454,6 +522,27 @@ def job_complete(job):
     # If a result handler has been established, invoke it here with result object
     if result != None and result_handler:
     
+        # The following computes the counts by summing them up, allowing for the case where
+        # <result> contains results from multiple circuits
+        # DEVNOTE: This will need to change; currently the only case where we have multiple result counts
+        # is when using randomly_compile; later, there will be other cases
+        if type(result.get_counts()) == list:
+            total_counts = dict()
+            for count in result.get_counts():
+                total_counts = dict(Counter(total_counts) + Counter(count))
+                
+            # make a copy of the result object so we can return a modified version
+            orig_result = result
+            result = copy.copy(result) 
+
+            # replace the results array with an array containing only the first results object
+            # then populate other required fields
+            results = copy.copy(result.results[0])
+            results.header.name = active_circuit["qc"].name     # needed to identify the original circuit
+            results.shots = actual_shots
+            results.data.counts = total_counts
+            result.results = [ results ]
+            
         try:
             result_handler(active_circuit["qc"],
                             result,
