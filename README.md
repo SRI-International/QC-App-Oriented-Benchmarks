@@ -86,6 +86,12 @@ There is one template file provided for each of the API environments supported.
 In the top level of this repo, start your **jupyter-notebook** process. When the browser listing appears, select the desired notebook `.ipynb` file to launch the notebook.
 There you will have access to a cell for each of the benchmarks in the repository, and may "Run" any one of them independently and see the results presented there.
 
+## Enabling Compiler Optimizations
+
+There is support provided within the Jupyter Notebook for the Qiskit versions of the benchmarks to enable certain compiler optimizations. In the first cell of the notebook there is a variable called `exec_options` where several of the built-in Qiskit compiler optimizations may be specified.
+
+The second cell of the Jupyter notebook contains commented code with references to custom coded Qiskit compiler optimizations as well as some third-party optimization tools. Simply uncomment the desired optimizations and rerun the notebook to enable the optimization method. The custom code for these optimizations is located in the `_common/transformers` directory. Users may define their own custom optimizations within this directory and reference them from the notebook.
+
 ## Container Deployment of the Application Benchmark Programs
 
 Applications are often deployed into Container Management Frameworks such as Docker, Kubernetes, and the like. 
