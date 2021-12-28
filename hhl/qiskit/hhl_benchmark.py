@@ -60,11 +60,15 @@ def qpe(qc, clock, target):
     qc.barrier()
 
     # e^{i*A*t}
-    qc.cu(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, clock[0], target, label='U');
+    #qc.cu(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, clock[0], target, label='U');
+    # The CU gate is equivalent to a CU1 on the control bit followed by a CU3
+    qc.u1(3*np.pi/4, clock[0]);
+    qc.cu3(np.pi/2, -np.pi/2, np.pi/2, clock[0], target);
     
     # e^{i*A*t*2}
-    qc.cu(np.pi, np.pi, 0, 0, clock[1], target, label='U2');
-
+    #qc.cu(np.pi, np.pi, 0, 0, clock[1], target, label='U2');
+    qc.cu3(np.pi, np.pi, 0, clock[1], target);
+    
     qc.barrier();
     
     # Perform an inverse QFT on the register holding the eigenvalues
@@ -78,10 +82,14 @@ def inv_qpe(qc, clock, target):
     qc.barrier()
 
     # e^{i*A*t*2}
-    qc.cu(np.pi, np.pi, 0, 0, clock[1], target, label='U2');
+    #qc.cu(np.pi, np.pi, 0, 0, clock[1], target, label='U2');
+    qc.cu3(np.pi, np.pi, 0, clock[1], target);
 
     # e^{i*A*t}
-    qc.cu(np.pi/2, np.pi/2, -np.pi/2, -3*np.pi/4, clock[0], target, label='U');
+    #qc.cu(np.pi/2, np.pi/2, -np.pi/2, -3*np.pi/4, clock[0], target, label='U');
+    # The CU gate is equivalent to a CU1 on the control bit followed by a CU3
+    qc.u1(-3*np.pi/4, clock[0]);
+    qc.cu3(np.pi/2, np.pi/2, -np.pi/2, clock[0], target);
 
     qc.barrier()
 
