@@ -46,10 +46,8 @@ def qft_dagger(qc, clock, n):
       for k in reversed(range(j+1,n)):
         qc.cu1(-np.pi/float(2**(k-j)), clock[k], clock[j]);
     qc.h(clock[0]);
-    qc.swap(clock[0], clock[1]);
 
 def qft(qc, clock, n):
-    qc.swap(clock[0], clock[1]);
     qc.h(clock[0]);
     for j in reversed(range(n)):
       for k in reversed(range(j+1,n)):
@@ -99,16 +97,16 @@ def hhl_routine(qc, ancilla, clock, input, measurement):
 
     qc.barrier()
     
-    # This section is to test and implement C = 1
-    qc.cry(np.pi, clock[0], ancilla)
-    qc.cry(np.pi/3, clock[1], ancilla)
+    # This section is to test and implement C = 1   
+    # since we are not swapping after the QFT, reverse order of qubits from what is in papers
+    qc.cry(np.pi, clock[1], ancilla)
+    qc.cry(np.pi/3, clock[0], ancilla)
 
     qc.barrier()
     
     qc.measure(ancilla, measurement[0])
     qc.barrier()
     inv_qpe(qc, clock, input)
-    
 
 
 def HHL (num_qubits, secret_int, beta, method = 1):
@@ -271,8 +269,13 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     expected_dist = compute_expectation(beta, num_shots)
     #print(f"... expected = {expected_dist}")
     
-    ratio_exp = expected_dist['01'] / expected_dist['11']
-    ratio_counts = counts['01'] / counts['11']
+    try:
+        ratio_exp = expected_dist['01'] / expected_dist['11']
+        ratio_counts = counts['01'] / counts['11']
+    except Exception as e:
+        ratio_exp = 0
+        ratio_counts = 0
+    
     print(f"  ... ratio_exp={ratio_exp}  ratio_counts={ratio_counts}")
     
     # (NOTE: we should use this fidelity calculation, but cannot since we don't know actual expected)
@@ -280,7 +283,9 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     ##fidelity = metrics.polarization_fidelity(counts, expected_dist)
     
     # instead, approximate fidelity by comparing ratios
-    if ratio_exp > ratio_counts:
+    if ratio_exp == 0 or ratio_counts == 0:
+        fidelity = 0
+    elif ratio_exp > ratio_counts:
         fidelity = ratio_counts / ratio_exp
     else:
         fidelity = ratio_exp / ratio_counts
