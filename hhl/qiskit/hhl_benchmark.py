@@ -27,24 +27,12 @@ num_resets = 1
 
 # saved circuits for display
 QC_ = None
-Uf_ = None
+U_ = None
+UI_ = None
 QFT_ = None
 QFTI_ = None
 
-############### Circuit Definition
-'''
-def create_oracle(num_qubits, input_size, secret_int):
-    # Initialize first n qubits and single ancilla qubit
-    qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name=f"Uf")
-
-    # perform CX for each qubit that matches a bit in secret string
-    s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
-    for i_qubit in range(input_size):
-        if s[input_size - 1 - i_qubit] == '1':
-            qc.cx(qr[i_qubit], qr[input_size])
-    return qc
-'''   
+############### Circuit Definitions 
 
 ''' replaced with code below ... 
 def qft_dagger(qc, clock, n):      
@@ -135,13 +123,52 @@ def qft_gate(input_size):
         #if input_size < 9: QFTI_= qc
         
     return qc
+ 
+############# Controlled U Gate
+
+#Construct the U gates for A
+def ctrl_u(exponent):
+
+    qc = QuantumCircuit(1, name=f"U^{exponent}")
     
+    for i in range(exponent):
+        #qc.u(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, target);
+        #qc.cu(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, control, target);
+        qc.u(np.pi/2, -np.pi/2, np.pi/2, 0);
     
+    cu_gate = qc.to_gate().control(1)
+
+    return cu_gate, qc
+
+#Construct the U^-1 gates for reversing A
+def ctrl_ui(exponent):
+
+    qc = QuantumCircuit(1, name=f"U^-{exponent}")
+    
+    for i in range(exponent):
+        #qc.u(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, target);
+        #qc.cu(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, control, target);
+        qc.u(np.pi/2, np.pi/2, -np.pi/2, 0);
+    
+    cu_gate = qc.to_gate().control(1)
+
+    return cu_gate, qc
+
+
+############# Quantum Phase Estimation
+   
+# DEVNOTE: The QPE and IQPE methods below mirror the mechanism in Hector_Wong
+# Need to investigate whether the clock qubits are in the correct, as this implementation
+# seems to require the QFT be implemented in reverse also.  TODO
+
+# Append a series of Quantum Phase Estimation gates to the circuit   
 def qpe(qc, clock, target):
     qc.barrier()
 
+    ''' original code from Hector_Wong 
     # e^{i*A*t}
     #qc.cu(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, clock[0], target, label='U');
+    
     # The CU gate is equivalent to a CU1 on the control bit followed by a CU3
     qc.u1(3*np.pi/4, clock[0]);
     qc.cu3(np.pi/2, -np.pi/2, np.pi/2, clock[0], target);
@@ -151,11 +178,42 @@ def qpe(qc, clock, target):
     qc.cu3(np.pi, np.pi, 0, clock[1], target);
     
     qc.barrier();
+    '''
+
+    # apply series of controlled U operations to the state |1>
+    # does nothing to state |0> 
+    # DEVNOTE: have not found a way to create a controlled operation that contains a U gate 
+    # with the global phase; instead do it piecemeal for now
+    
+    repeat = 1
+    #for j in reversed(range(len(clock))):
+    for j in (range(len(clock))):
+
+        # create U with exponent of 1, but in a loop repeating N times
+        for k in range(repeat):
+        
+            # this global phase is applied to clock qubit
+            qc.u1(3*np.pi/4, clock[j]);
+            
+            # apply the rest of U controlled by clock qubit
+            #cp, _ = ctrl_u(repeat)
+            cp, _ = ctrl_u(1)
+            qc.append(cp, [clock[j], target])  
+        
+        repeat *= 2
+        
+        qc.barrier();
+
+    #Define global U operator as the phase operator (for printing later)
+    _, U_ = ctrl_u(1)
+    
+    #qc.barrier();
     
     # Perform an inverse QFT on the register holding the eigenvalues
     #qft_dagger(qc, clock, 2)
     qc.append(inv_qft_gate(len(clock)), clock)
-    
+
+# Append a series of Inverse Quantum Phase Estimation gates to the circuit    
 def inv_qpe(qc, clock, target):
     
     # Perform a QFT on the register holding the eigenvalues
@@ -164,6 +222,7 @@ def inv_qpe(qc, clock, target):
 
     qc.barrier()
 
+    ''' original code from Hector_Wong 
     # e^{i*A*t*2}
     #qc.cu(np.pi, np.pi, 0, 0, clock[1], target, label='U2');
     qc.cu3(np.pi, np.pi, 0, clock[1], target);
@@ -175,7 +234,35 @@ def inv_qpe(qc, clock, target):
     qc.cu3(np.pi/2, np.pi/2, -np.pi/2, clock[0], target);
 
     qc.barrier()
+    '''
+    
+    # apply inverse series of controlled U operations to the state |1>
+    # does nothing to state |0> 
+    # DEVNOTE: have not found a way to create a controlled operation that contains a U gate 
+    # with the global phase; instead do it piecemeal for now
+    
+    repeat = 2 ** (len(clock) - 1)
+    for j in reversed(range(len(clock))):
+    #for j in (range(len(clock))):
 
+        # create U with exponent of 1, but in a loop repeating N times
+        for k in range(repeat):
+
+            # this global phase is applied to clock qubit
+            qc.u1(-3*np.pi/4, clock[j]);
+            
+            # apply the rest of U controlled by clock qubit
+            #cp, _ = ctrl_u(repeat)
+            cp, _ = ctrl_ui(1)
+            qc.append(cp, [clock[j], target])  
+        
+        repeat = int(repeat / 2)
+        
+        qc.barrier();
+
+    #Define global U operator as the phase operator (for printing later)
+    _, UI_ = ctrl_ui(1)
+    
 
 def hhl_routine(qc, ancilla, clock, input, measurement):
     
@@ -210,98 +297,46 @@ def HHL (num_qubits, secret_int, beta, method = 1):
     input_size = num_qubits - 1
 
     if method == 1:
-        # allocate qubits
-        '''
-        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size); qc = QuantumCircuit(qr, cr, name="main")
-
-        # put ancilla in |1> state
-        qc.x(qr[input_size])
-
-        # start with Hadamard on all qubits, including ancilla
-        for i_qubit in range(num_qubits):
-             qc.h(qr[i_qubit])
-
-        qc.barrier()
-
-        #generate Uf oracle
-        Uf = create_oracle(num_qubits, input_size, secret_int)
-        qc.append(Uf,qr)
-
-        qc.barrier()
-
-        # start with Hadamard on all qubits, including ancilla
-        for i_qubit in range(num_qubits):
-             qc.h(qr[i_qubit])
-
-        # uncompute ancilla qubit, not necessary for algorithm
-        qc.x(qr[input_size])
-
-        qc.barrier()
-
-        # measure all data qubits
-        for i in range(input_size):
-            qc.measure(i, i)
-
-        global Uf_
-        if Uf_ == None or num_qubits <= 6:
-            if num_qubits < 9: Uf_ = Uf
-        '''
-        qc.barrier()
         
-        # State preparation. (various initial values)
+        # State preparation. (various initial values, done with initialize method)
         # intial_state = [0,1]
         # intial_state = [1,0]
         # intial_state = [1/np.sqrt(2),1/np.sqrt(2)]
         # intial_state = [np.sqrt(0.9),np.sqrt(0.1)]
-        
         ##intial_state = [np.sqrt(1 - beta), np.sqrt(beta)]
         ##qc.initialize(intial_state, 3)
         
         # use an RY rotation to initialize the input state between 0 and 1
         qc.ry(2 * np.arcsin(np.sqrt(beta)), input)
 
-        ##qc.barrier()
-
         # Put clock qubits into uniform superposition
         qc.h(clock)
 
+        # Perform the HHL routine
         hhl_routine(qc, ancilla, clock, input, measurement)
 
-        # Perform a Hadamard Transform
+        # Perform a Hadamard Transform on the clock qubits
         qc.h(clock)
 
         qc.barrier()
 
+        # measure the input, which now contains the answer
         qc.measure(input, measurement[1])
 
-
-    elif method == 2:
-        # allocate qubits
-        qr = QuantumRegister(2); cr = ClassicalRegister(input_size);
-        qc = QuantumCircuit(qr, cr, name="main")
-
-        # put ancilla in |-> state
-        qc.x(qr[1])
-        qc.h(qr[1])
-
-        qc.barrier()
-
-        # perform CX for each qubit that matches a bit in secret string
-        s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
-        for i in range(input_size):
-            if s[input_size - 1 - i] == '1':
-                qc.h(qr[0])
-                qc.cx(qr[0], qr[1])
-                qc.h(qr[0])
-            qc.measure(qr[0], cr[i])
-
-            # Perform num_resets reset operations
-            qc.reset([0]*num_resets)
-
+    
     # save smaller circuit example for display
-    global QC_, QFT_, QFTI_
+    global QC_, U_, UI_, QFT_, QFTI_
     if QC_ == None or num_qubits <= 6:
         if num_qubits < 9: QC_ = qc
+    
+    if U_ == None or num_qubits <= 6:    
+        _, U_ = ctrl_u(1)
+        #U_ = ctrl_u(np.pi/2, 2, 0, 1)
+        
+    if UI_ == None or num_qubits <= 6:    
+        _, UI_ = ctrl_ui(1)
+        #UI_ = ctrl_ui(np.pi/2, 2, 0, 1)
+        
     if QFT_ == None or num_qubits <= 5:
         if num_qubits < 9: QFT_ = qft_gate(len(clock))
     if QFTI_ == None or num_qubits <= 5:
@@ -474,6 +509,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
+    print("\nU Circuit ="); print(U_ if U_ != None else "  ... too large!")
+    print("\nU^-1 Circuit ="); print(UI_ if UI_ != None else "  ... too large!")
     print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
     print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
 
