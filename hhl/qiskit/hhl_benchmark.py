@@ -1,5 +1,18 @@
 """
 HHL Benchmark Program - Qiskit
+
+Issues:
+    - The QPE U gates are not implemented as exponentiated sub-circuit
+        since the current hard-coded U uses a CU gate which takes a global phase parameter.
+        Have not found a way to create a controlled version of a subcircuit that contains a U gate
+        with 4 parameters, like the CU gate.  The U gate only has 3, theta, phi, lambda. CU adds gamma.
+    - The clock qubits may be implemented in reverse of how QPE is normally done. The QPE and QFT code 
+        is written to assume a reverse order for the clock qubits.  Needs investigation to be like other BMs.
+TODO:
+    - Implement a way to create U from A
+    - Find proper way to calculate fidelity; currently compares number of correct answers, not expectation
+    - Find way to make input larger and initialize properly for larger input vectors; currently increase 
+         in num_qubits increases the clock qubits; should make input size larger too
 """
 
 import sys
@@ -11,12 +24,14 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 # include QFT in this list, so we can refer to the QFT sub-circuit definition
 #sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
 #sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
-# cannot use the QFT common yet
+
+# cannot use the QFT common yet, as HHL seems to use reverse bit order
 sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+#from qft_benchmark import qft_gate, inv_qft_gate
+
 import execute as ex
 import metrics as metrics
-#from qft_benchmark import qft_gate, inv_qft_gate
 
 np.random.seed(0)
 
@@ -282,11 +297,11 @@ def hhl_routine(qc, ancilla, clock, input, measurement):
     inv_qpe(qc, clock, input)
 
 
-def HHL (num_qubits, secret_int, beta, method = 1):
+def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, method = 1):
     
     # Create the various registers needed
-    clock = QuantumRegister(2, name='clock')
-    input = QuantumRegister(1, name='b')
+    clock = QuantumRegister(num_clock_qubits, name='clock')
+    input = QuantumRegister(num_input_qubits, name='b')
     ancilla = QuantumRegister(1, name='ancilla')
     measurement = ClassicalRegister(2, name='c')
 
@@ -422,13 +437,14 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        backend_id='qasm_simulator', method = 1, provider_backend=None,
+        method = 1, 
+        backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
 
     print("HHL Benchmark Program - Qiskit")
 
-    # validate parameters (smallest circuit is 4 qubits)
-    max_qubits = max(4, max_qubits)
+    # validate parameters (smallest circuit is 4 qubits, largest 6)
+    max_qubits = max(6, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
 
@@ -460,7 +476,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1):
-            
+        
+        # based on num_qubits, determine input and clock sizes
+        num_input_qubits = 1
+        num_clock_qubits = num_qubits - num_input_qubits - 1  # need 1 for ancilla also 
+    
         # determine number of circuits to execute for this group
         num_circuits = min(2**(num_qubits), max_circuits)
         
@@ -491,11 +511,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = HHL(num_qubits, s_int, beta, method)
+            qc = HHL(num_qubits, num_input_qubits, num_clock_qubits, s_int, beta, method)
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
             # collapse the sub-circuit levels used in this benchmark (for qiskit)
-            qc2 = qc.decompose()
+            qc2 = qc.decompose().decompose()
 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
