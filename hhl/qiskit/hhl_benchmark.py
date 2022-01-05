@@ -8,10 +8,15 @@ import time
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
+# include QFT in this list, so we can refer to the QFT sub-circuit definition
+#sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
+#sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+# cannot use the QFT common yet
+sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
 import execute as ex
 import metrics as metrics
+#from qft_benchmark import qft_gate, inv_qft_gate
 
 np.random.seed(0)
 
@@ -23,6 +28,8 @@ num_resets = 1
 # saved circuits for display
 QC_ = None
 Uf_ = None
+QFT_ = None
+QFTI_ = None
 
 ############### Circuit Definition
 '''
@@ -39,7 +46,7 @@ def create_oracle(num_qubits, input_size, secret_int):
     return qc
 '''   
 
-   
+''' replaced with code below ... 
 def qft_dagger(qc, clock, n):      
     qc.h(clock[1]);
     for j in reversed(range(n)):
@@ -53,7 +60,83 @@ def qft(qc, clock, n):
       for k in reversed(range(j+1,n)):
         qc.cu1(np.pi/float(2**(k-j)), clock[k], clock[j]);
     qc.h(clock[1]);
- 
+'''
+
+'''
+DEVNOTE: the QFT and IQFT are defined here as they are in the QFT benchmark - almost;
+Here, the sign of the angles is reversed and the QFT is actually used as the inverse QFT.
+This is an inconsistency that needs to be resolved later. 
+The QPE part of the algorithm should be using the inverse QFT, but the qubit order is not correct.
+The QFT as defined in the QFT benchmark operates on qubits in the opposite order from the HHL pattern.
+'''
+
+def inv_qft_gate(input_size):
+#def qft_gate(input_size):
+    #global QFT_
+    qr = QuantumRegister(input_size);
+    #qc = QuantumCircuit(qr, name="qft")
+    qc = QuantumCircuit(qr, name="QFT†")
+    
+    # Generate multiple groups of diminishing angle CRZs and H gate
+    for i_qubit in range(0, input_size):
+    
+        # start laying out gates from highest order qubit (the hidx)
+        hidx = input_size - i_qubit - 1
+        
+        # if not the highest order qubit, add multiple controlled RZs of decreasing angle
+        if hidx < input_size - 1:   
+            num_crzs = i_qubit
+            for j in range(0, num_crzs):
+                divisor = 2 ** (num_crzs - j)
+                #qc.crz( math.pi / divisor , qr[hidx], qr[input_size - j - 1])
+                ##qc.crz( -np.pi / divisor , qr[hidx], qr[input_size - j - 1])
+                qc.cu1(-np.pi / divisor, qr[hidx], qr[input_size - j - 1]);
+            
+        # followed by an H gate (applied to all qubits)
+        qc.h(qr[hidx])
+        
+        qc.barrier()
+    
+    #if QFT_ == None or input_size <= 5:
+        #if input_size < 9: QFT_ = qc
+        
+    return qc
+
+############### Inverse QFT Circuit
+
+def qft_gate(input_size):
+#def inv_qft_gate(input_size):
+    #global QFTI_
+    qr = QuantumRegister(input_size);
+    #qc = QuantumCircuit(qr, name="inv_qft")
+    qc = QuantumCircuit(qr, name="QFT")
+    
+    # Generate multiple groups of diminishing angle CRZs and H gate
+    for i_qubit in reversed(range(0, input_size)):
+    
+        # start laying out gates from highest order qubit (the hidx)
+        hidx = input_size - i_qubit - 1
+        
+        # precede with an H gate (applied to all qubits)
+        qc.h(qr[hidx])
+        
+        # if not the highest order qubit, add multiple controlled RZs of decreasing angle
+        if hidx < input_size - 1:   
+            num_crzs = i_qubit
+            for j in reversed(range(0, num_crzs)):
+                divisor = 2 ** (num_crzs - j)
+                #qc.crz( -math.pi / divisor , qr[hidx], qr[input_size - j - 1])
+                ##qc.crz( np.pi / divisor , qr[hidx], qr[input_size - j - 1])
+                qc.cu1( np.pi / divisor , qr[hidx], qr[input_size - j - 1])
+            
+        qc.barrier()  
+    
+    #if QFTI_ == None or input_size <= 5:
+        #if input_size < 9: QFTI_= qc
+        
+    return qc
+    
+    
 def qpe(qc, clock, target):
     qc.barrier()
 
@@ -70,12 +153,14 @@ def qpe(qc, clock, target):
     qc.barrier();
     
     # Perform an inverse QFT on the register holding the eigenvalues
-    qft_dagger(qc, clock, 2)
+    #qft_dagger(qc, clock, 2)
+    qc.append(inv_qft_gate(len(clock)), clock)
     
 def inv_qpe(qc, clock, target):
     
     # Perform a QFT on the register holding the eigenvalues
-    qft(qc, clock, 2)
+    #qft(qc, clock, 2)
+    qc.append(qft_gate(len(clock)), clock)
 
     qc.barrier()
 
@@ -90,6 +175,7 @@ def inv_qpe(qc, clock, target):
     qc.cu3(np.pi/2, np.pi/2, -np.pi/2, clock[0], target);
 
     qc.barrier()
+
 
 def hhl_routine(qc, ancilla, clock, input, measurement):
     
@@ -213,9 +299,13 @@ def HHL (num_qubits, secret_int, beta, method = 1):
             qc.reset([0]*num_resets)
 
     # save smaller circuit example for display
-    global QC_
+    global QC_, QFT_, QFTI_
     if QC_ == None or num_qubits <= 6:
         if num_qubits < 9: QC_ = qc
+    if QFT_ == None or num_qubits <= 5:
+        if num_qubits < 9: QFT_ = qft_gate(len(clock))
+    if QFTI_ == None or num_qubits <= 5:
+        if num_qubits < 9: QFTI_ = inv_qft_gate(len(clock))
 
     # return a handle on the circuit
     return qc
@@ -384,6 +474,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
+    print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
+    print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - HHL ({method}) - Qiskit",
