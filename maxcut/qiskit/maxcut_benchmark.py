@@ -8,6 +8,7 @@ from collections import namedtuple
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+from qiskit import Aer, execute # for computing expectation tables
 
 sys.path[1:1] = [ "_common", "_common/qiskit" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
@@ -34,6 +35,7 @@ QAOA_Parameter  = namedtuple('QAOA_Parameter', ['beta', 'gamma'])
 ############### Circuit Definition
   
 # Create ansatz specific to this problem, defined by G = nodes, edges, and the given parameters
+# Do not include the measure operation, so we can pre-compute statevector
 def create_qaoa_circ(nqubits, edges, parameters):
 
     qc = QuantumCircuit(nqubits)
@@ -43,6 +45,8 @@ def create_qaoa_circ(nqubits, edges, parameters):
         qc.h(i)
 
     for par in parameters:
+        #print(f"... gamma, beta = {par.gamma} {par.beta}")
+        
         # problem unitary
         for i,j in edges:
             qc.rzz(2 * par.gamma, i, j)
@@ -53,20 +57,17 @@ def create_qaoa_circ(nqubits, edges, parameters):
         for i in range(0, nqubits):
             qc.rx(2 * par.beta, i)
 
-    qc.measure_all()
-
     return qc
     
 # Create the benchmark program 
-def MaxCut (num_qubits, secret_int, edges, method = 1):
+def MaxCut (num_qubits, secret_int, edges, method = 1, rounds = 1):
     
     # Method 1 - execute one instance of ansatz and determine fidelity
     if method == 1:
     
         # create ansatz circuit
         
-        ROUNDS = 2
-        theta = 2*ROUNDS*[0.7]
+        theta = 2*rounds*[1.0]
         
         # put parameters into the form expected by the ansatz generator
         p = len(theta)//2  # number of qaoa rounds
@@ -74,8 +75,16 @@ def MaxCut (num_qubits, secret_int, edges, method = 1):
         gamma = theta[p:]
         parameters = [QAOA_Parameter(*t) for t in zip(beta,gamma)]
         
+        # and create the circuit, without measurements
         qc = create_qaoa_circ(num_qubits, edges, parameters)   
 
+        # pre-compute and save an array of expected measurements
+        compute_expectation(qc, num_qubits, secret_int)
+        
+        # add the measure here
+        qc.measure_all()
+        
+       
     # Method 2 - execute multiple instances of ansatz, primarily to measure execution time average
     # DEVNOTE: unclear if this is the desired approach yet
     elif method == 2:
@@ -94,88 +103,92 @@ def MaxCut (num_qubits, secret_int, edges, method = 1):
     # return a handle on the circuit
     return qc
 
- 
+
+############### Expectation Tables
+
+# DEVNOTE: We are building these tables on-demand for now, but for larger circuits
+# this will need to be pre-computed ahead of time and stored in a data file to avoid run-time delays.
+
+# dictionary used to store pre-computed expectations, keyed by num_qubits and secret_string
+# these are created at the time the circuit is created, then deleted when results are processed
+expectations = {}
+
+# Compute array of expectation values in range 0.0 to 1.0
+# Use statevector_simulator to obtain exact expectation
+def compute_expectation(qc, num_qubits, secret_int):
+    
+    #execute statevector simulation
+    sv_backend = Aer.get_backend('statevector_simulator')
+    sv_result = execute(qc, sv_backend).result()
+
+    # get the probability distribution
+    counts = sv_result.get_counts()
+
+    #print(f"... statevector expectation = {counts}")
+    
+    # store in table until circuit execution is complete
+    id = f"_{num_qubits}_{secret_int}"
+    expectations[id] = counts
+
+
+# Return expected measurement array scaled to number of shots executed
+def get_expectation(num_qubits, secret_int, num_shots):
+
+    # find expectation counts for the given circuit 
+    id = f"_{num_qubits}_{secret_int}"
+    if id in expectations:
+        counts = expectations[id]
+        
+        # scale to number of shots
+        for k, v in counts.items():
+            counts[k] = round(v * num_shots)
+        
+        # delete from the dictionary
+        del expectations[id]
+        
+        return counts
+        
+    else:
+        return None
+    
+    
 ############### Result Data Analysis
 
-# DEVNOTE:
-# The section below on Result Data Analysis needs work, it is just pulled from HHL
-# Need to implement this by pre-calculating the expectation values using noiseless simulator
-
-saved_result = None
-
-# Analyze and print measured results
-# Expected result is always the secret_int, so fidelity calc is simple
-
-# NOTE: for the hard-coded matrix A:  [ 1, -1/3, -1/3, 1 ]
-#       x - y/3 = 1 - beta
-#       -x/3 + y = beta
-#  ==
-#       x = 9/8 - 3*beta/4
-#       y = 3/8 + 3*beta/4
-#
-#   and beta is stored as secret_int / 10000
-#   This allows us to calculate the expected distribution
-#
-#   NOTE: we are not actually calculating the distribution, since it would have to include the ancilla
-#   For now, we just return a distribution of only the 01 and 11 counts
-#   Then we compare the ratios obtained with expected ratio to determine fidelity (incorrectly)
-
-def compute_expectation(beta, num_shots):
-    x = 9/8 - (3 * beta)/4
-    y = 3/8 + (3 * beta)/4
-    ratio = x / y
-    ratio_sq = ratio * ratio
-    #print(f"  ... x,y = {x, y} ratio={ratio} ratio_sq={ratio_sq}")
-    
-    iy = int(num_shots / (1 + ratio_sq))
-    ix = num_shots - iy
-    #print(f"    ... ix,iy = {ix, iy}")
-
-    return { '01':ix, '11': iy }
-
+# Compare the measurement results obtained with the expected measurements to determine fidelity
 def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
-    global saved_result
-    saved_result = result
-    
+
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    if verbose: print(f"For secret int {secret_int} measured: {counts}")
     
-    # compute beta from secret_int, and get expected distribution
-    # compute ratio of 01 to 11 measurements for both expected and obtained
-    beta = secret_int / 10000
-    expected_dist = compute_expectation(beta, num_shots)
-    #print(f"... expected = {expected_dist}")
+    # retrieve pre-computed expectation values for the circuit that just completed
+    expected_dist = get_expectation(num_qubits, secret_int, num_shots)
     
-    ratio_exp = expected_dist['01'] / expected_dist['11']
-    ratio_counts = counts['01'] / counts['11']
-    print(f"  ... ratio_exp={ratio_exp}  ratio_counts={ratio_counts}")
-    
-    # (NOTE: we should use this fidelity calculation, but cannot since we don't know actual expected)
+    if verbose: print(f"For width {num_qubits} problem {secret_int}\n  measured: {counts}\n  expected: {expected_dist}")
+
     # use our polarization fidelity rescaling
-    ##fidelity = metrics.polarization_fidelity(counts, expected_dist)
-    
-    # instead, approximate fidelity by comparing ratios
-    if ratio_exp > ratio_counts:
-        fidelity = ratio_counts / ratio_exp
-    else:
-        fidelity = ratio_exp / ratio_counts
-    if verbose: print(f"  ... fidelity = {fidelity}")
+    fidelity = metrics.polarization_fidelity(counts, expected_dist)
+
+    if verbose: print(f"For secret int {secret_int} fidelity: {fidelity}")
     
     return counts, fidelity
 
 
 ################ Benchmark Loop
 
+# Problem definitions only available for up to 10 qubits currently
+MAX_QUBITS = 10
+
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        backend_id='qasm_simulator', method = 1, provider_backend=None,
+        method=1, rounds=1,
+        backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
 
     print("MaxCut Benchmark Program - Qiskit")
 
     # validate parameters (smallest circuit is 4 qubits)
     max_qubits = max(4, max_qubits)
+    #max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
     max_circuits = min(10, max_circuits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
@@ -217,7 +230,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             
             # create integer that represents the problem instance; use s_int as circuit id
             s_int = i
-            print(f"  ... i={i} s_int={s_int}")
+            #print(f"  ... i={i} s_int={s_int}")
             
             # create filename from num_qubits and circuit_id (s_int), then load the problem file
             instance_filename = f"instance/mc_{str(num_qubits).zfill(3)}_{str(i).zfill(3)}_000.txt"
@@ -228,14 +241,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             
             # if the file does not exist, we are done with this number of qubits
             if nodes == None:
-                print(f"  ... problem {str(i).zfill(3)} not found, limiting to {circuits_done} circuit(s).")
+                if verbose: print(f"  ... problem {str(i).zfill(3)} not found, limiting to {circuits_done} circuit(s).")
                 break;
             
             circuits_done += 1
             
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = MaxCut(num_qubits, s_int, edges, method)
+            qc = MaxCut(num_qubits, s_int, edges, method, rounds)
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
             # collapse the sub-circuit levels used in this benchmark (for qiskit)
