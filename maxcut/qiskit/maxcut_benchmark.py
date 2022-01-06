@@ -117,6 +117,8 @@ expectations = {}
 # Use statevector_simulator to obtain exact expectation
 def compute_expectation(qc, num_qubits, secret_int):
     
+    #ts = time.time()
+    
     #execute statevector simulation
     sv_backend = Aer.get_backend('statevector_simulator')
     sv_result = execute(qc, sv_backend).result()
@@ -130,7 +132,8 @@ def compute_expectation(qc, num_qubits, secret_int):
     id = f"_{num_qubits}_{secret_int}"
     expectations[id] = counts
 
-
+    #print(f"  ... time to execute statevector simulator: {time.time() - ts}")
+    
 # Return expected measurement array scaled to number of shots executed
 def get_expectation(num_qubits, secret_int, num_shots):
 
