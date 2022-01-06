@@ -179,7 +179,7 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 MAX_QUBITS = 10
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
+def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10000,
         method=1, rounds=1,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
@@ -188,7 +188,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
     # validate parameters (smallest circuit is 4 qubits)
     max_qubits = max(4, max_qubits)
-    #max_qubits = min(MAX_QUBITS, max_qubits)
+    max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
     max_circuits = min(10, max_circuits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
@@ -241,7 +241,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             
             # if the file does not exist, we are done with this number of qubits
             if nodes == None:
-                if verbose: print(f"  ... problem {str(i).zfill(3)} not found, limiting to {circuits_done} circuit(s).")
+                print(f"  ... problem {str(i).zfill(3)} not found, limiting to {circuits_done} circuit(s).")
                 break;
             
             circuits_done += 1
