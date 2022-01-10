@@ -279,7 +279,7 @@ def inv_qpe(qc, clock, target):
     _, UI_ = ctrl_ui(1)
     
 
-def hhl_routine(qc, ancilla, clock, input, measurement):
+def hhl_routine(qc, ancilla, clock, input, measurement, A=None):
     
     qpe(qc, clock, input)
 
@@ -297,7 +297,7 @@ def hhl_routine(qc, ancilla, clock, input, measurement):
     inv_qpe(qc, clock, input)
 
 
-def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, method = 1):
+def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, A=None, method=1):
     
     # Create the various registers needed
     clock = QuantumRegister(num_clock_qubits, name='clock')
@@ -329,6 +329,26 @@ def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, metho
 
         # Perform the HHL routine
         hhl_routine(qc, ancilla, clock, input, measurement)
+
+        # Perform a Hadamard Transform on the clock qubits
+        qc.h(clock)
+
+        qc.barrier()
+
+        # measure the input, which now contains the answer
+        qc.measure(input, measurement[1])
+    
+    # sparse Hamiltonian simulation by quantum random walk
+    if method == 2:
+        
+        # use an RY rotation to initialize the input state between 0 and 1
+        qc.ry(2 * np.arcsin(np.sqrt(beta)), input)
+
+        # Put clock qubits into uniform superposition
+        qc.h(clock)
+
+        # Perform the HHL routine
+        hhl_routine(qc, ancilla, clock, input, measurement, A)
 
         # Perform a Hadamard Transform on the clock qubits
         qc.h(clock)
