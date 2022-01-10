@@ -47,6 +47,52 @@ UI_ = None
 QFT_ = None
 QFTI_ = None
 
+############### Generate random problem instance
+
+def generate_sparse_A(n, k, sparsity=2):
+    """
+        n (int) : number of qubits. A will be 2^n by 2^n
+        
+        k (int) : between 1,...,2^n-1. determines which H will
+                  be generated in class of matrices
+        
+        sparsity (int) : max non-zero elemtns per row
+        
+        generates 2-sparse symmetric A with 1.5 on diagonal and 0.5 on
+        off diagonal
+
+    """
+    
+    N = 2**n
+    k_bin = np.binary_repr(k, width=n)
+    
+    # initialize A
+    A = np.diag(1.5*np.ones(N))
+    
+    pairs = []
+    tot_indices = []
+    for i in range(N):
+        i_bin = np.binary_repr(i, width=n)
+        j_bin = ''
+        for q in range(n):
+            if i_bin[q] == k_bin[q]:
+                j_bin += '0'
+            else:
+                j_bin += '1'
+        j = int(j_bin,2)
+        if i not in tot_indices and j not in tot_indices:
+            pairs.append([i,j])
+            tot_indices.append(i)
+            tot_indices.append(j)
+    
+    # fill in A
+    for pair in pairs:
+        i, j = pair[0], pair[1]
+        A[i,j] = 0.5
+        A[j,i] = 0.5
+    
+    return A
+
 ############### Circuit Definitions 
 
 ''' replaced with code below ... 
