@@ -216,6 +216,81 @@ def ctrl_ui(exponent):
     return cu_gate, qc
 
 
+############# sub-circuits for sparse Hamilonian simulation
+
+def W_gate():
+    """
+    W : |00> -> |00>
+        |01> -> |01> + |10>
+        |10> -> |01> - |10>
+        |11> -> |11>
+        
+    """
+    
+    qc = QuantumCircuit(2, name='W')
+    
+    qc.rz(-np.pi,1)
+    qc.rz(-3*np.pi/2,0)
+    qc.ry(-np.pi/2,1)
+    qc.ry(-np.pi/2,0)
+    qc.rz(-np.pi,1)
+    qc.rz(-3*np.pi/2,0)
+    
+    qc.cx(0,1)
+    
+    qc.rz(-7*np.pi/4,1)
+    qc.rx(-np.pi/2,0)
+    qc.rx(-np.pi,1)
+    qc.rz(-3*np.pi/2,0)
+    
+    qc.cx(0,1)
+    
+    qc.ry(-np.pi/2,1)
+    qc.rx(-np.pi/4,1)
+    
+    qc.cx(1,0)
+    
+    qc.rz(-3*np.pi/2,0)
+    
+    w_gate = qc.to_gate()
+
+    return w_gate
+
+
+def V_gate(A):
+    """
+        Hamiltonian oracle V|a,b> = |a,b+v(a)>
+    
+    """
+    
+    N = len(A)
+    n = int(np.log2(N))        
+    
+    qreg_a = QuantumRegister(n, name='a')
+    qreg_b = QuantumRegister(n, name='b')
+    qc = QuantumCircuit(qreg_a, qreg_b, name='V')
+    
+    # index of non-zero off diagonal in first row of A
+    first_row = list(A[0,:])
+    for i in range(1,N):
+        if first_row[i] > 0:
+            break
+    i_bin = np.binary_repr(i, width=n)
+    
+    for q in range(n):
+        a, b = qreg_a[q], qreg_b[q]
+        if i_bin[n-1-q] == '1':
+            qc.x(a)
+            qc.cx(a,b)
+            qc.x(a)
+        else:
+            qc.cx(a,b)
+    
+    v_gate = qc.to_gate()
+            
+    return v_gate
+
+
 ############# Quantum Phase Estimation
    
 # DEVNOTE: The QPE and IQPE methods below mirror the mechanism in Hector_Wong
