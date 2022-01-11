@@ -291,6 +291,61 @@ def V_gate(A):
     return v_gate
 
 
+def control_Ham_sim(A, t):
+    """
+        A : sparse matrix
+        t : time parameter
+        
+        returns : QuantumCircuit for control-e^(-i*H*t)
+    """
+    
+    # temporary hard-coded matrix elements
+    off_diag_el = 0.5
+    diag_el = 1.5
+    
+    # read in number of qubits
+    N = len(A)
+    n = int(np.log2(N))
+    
+    # create registers
+    qreg = QuantumRegister(n, name='q')
+    qreg_a = QuantumRegister(n, name='q_a') # n qubit ancilla register 
+    anc_reg = QuantumRegister(n, name='q_anc') # ancilla qubit register
+    con_reg = QuantumRegister(1, name='q_con')
+    qc = QuantumCircuit(con_reg, qreg, qreg_a, anc_reg, name='c-e^(-iAt)')
+    
+    
+    # apply sparse A oracle gate
+    v_gate = V_gate(A)
+    qc.append(v_gate, [qreg, qreg_a])
+    
+    # use ancilla for phase kickback
+    qc.crz(2*t*diag_el, con_reg[0], anc_reg[0])
+    
+    # apply W gate that diagonalizes SWAP operator and Toffoli
+    for j in range(n):
+        qc.append(W_gate(), [qreg[j], qreg_a[j]])
+        qc.x(qreg_a[j])
+        qc.ccx(qreg[j], qreg_a[j], anc_reg[0])
+        
+    # phase
+    qc.crz(2*t*off_diag_el, con_reg[0], anc_reg[0])
+    
+    # uncompute
+    for q in range(n):
+        j = n-1-q
+        qc.ccx(qreg[j], qreg_a[j], anc_reg[0])
+        qc.x(qreg_a[j])
+        qc.append(W_gate(), [qreg[j], qreg_a[j]])
+    
+    # sparse A oracle gate is its own inverse
+    qc.append(v_gate, [qreg, qreg_a])
+    
+    con_Ham_sim = qc.to_gate()
+    
+    return con_Ham_sim
+
+
 ############# Quantum Phase Estimation
    
 # DEVNOTE: The QPE and IQPE methods below mirror the mechanism in Hector_Wong
@@ -298,7 +353,7 @@ def V_gate(A):
 # seems to require the QFT be implemented in reverse also.  TODO
 
 # Append a series of Quantum Phase Estimation gates to the circuit   
-def qpe(qc, clock, target):
+def qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1):
     qc.barrier()
 
     ''' original code from Hector_Wong 
@@ -321,36 +376,47 @@ def qpe(qc, clock, target):
     # DEVNOTE: have not found a way to create a controlled operation that contains a U gate 
     # with the global phase; instead do it piecemeal for now
     
-    repeat = 1
-    #for j in reversed(range(len(clock))):
-    for j in (range(len(clock))):
-
-        # create U with exponent of 1, but in a loop repeating N times
-        for k in range(repeat):
-        
-            # this global phase is applied to clock qubit
-            qc.u1(3*np.pi/4, clock[j]);
+    if method == 1:
+    
+        repeat = 1
+        #for j in reversed(range(len(clock))):
+        for j in (range(len(clock))):
+    
+            # create U with exponent of 1, but in a loop repeating N times
+            for k in range(repeat):
             
-            # apply the rest of U controlled by clock qubit
-            #cp, _ = ctrl_u(repeat)
-            cp, _ = ctrl_u(1)
-            qc.append(cp, [clock[j], target])  
-        
-        repeat *= 2
-        
-        qc.barrier();
-
-    #Define global U operator as the phase operator (for printing later)
-    _, U_ = ctrl_u(1)
+                # this global phase is applied to clock qubit
+                qc.u1(3*np.pi/4, clock[j]);
+                
+                # apply the rest of U controlled by clock qubit
+                #cp, _ = ctrl_u(repeat)
+                cp, _ = ctrl_u(1)
+                qc.append(cp, [clock[j], target])  
+            
+            repeat *= 2
+            
+            qc.barrier();
     
-    #qc.barrier();
-    
-    # Perform an inverse QFT on the register holding the eigenvalues
-    #qft_dagger(qc, clock, 2)
-    qc.append(inv_qft_gate(len(clock)), clock)
+        #Define global U operator as the phase operator (for printing later)
+        _, U_ = ctrl_u(1)
+        
+        #qc.barrier();
+        
+        # Perform an inverse QFT on the register holding the eigenvalues
+        #qft_dagger(qc, clock, 2)
+        qc.append(inv_qft_gate(len(clock)), clock)
+        
+    if method == 2:
+        
+        for j in range(len(clock)):
+            
+            control = clock[j]
+            phase = 2**j
+            qc.append(control_Ham_sim(A, phase), [control, target, extra_qubits, ancilla])
+            
 
 # Append a series of Inverse Quantum Phase Estimation gates to the circuit    
-def inv_qpe(qc, clock, target):
+def inv_qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1):
     
     # Perform a QFT on the register holding the eigenvalues
     #qft(qc, clock, 2)
@@ -399,10 +465,18 @@ def inv_qpe(qc, clock, target):
     #Define global U operator as the phase operator (for printing later)
     _, UI_ = ctrl_ui(1)
     
-
-def hhl_routine(qc, ancilla, clock, input_qubits, measurement, A=None):
+    if method == 2:
+        
+        for j in range(len(clock)):
+            
+            control = clock[j]
+            phase = -2**j
+            qc.append(control_Ham_sim(A, phase), [control, target, extra_qubits, ancilla])
     
-    qpe(qc, clock, input_qubits)
+
+def hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits=None, A=None, method=1):
+    
+    qpe(qc, clock, input_qubits, extra_qubits, ancilla, A, method)
 
     qc.barrier()
     
@@ -415,25 +489,25 @@ def hhl_routine(qc, ancilla, clock, input_qubits, measurement, A=None):
     
     qc.measure(ancilla, measurement[0])
     qc.barrier()
-    inv_qpe(qc, clock, input_qubits)
+    inv_qpe(qc, clock, input_qubits, extra_qubits, ancilla, A, method)
 
 
 def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, A=None, method=1):
     
-    # Create the various registers needed
-    clock = QuantumRegister(num_clock_qubits, name='clock')
-    input_qubits = QuantumRegister(num_input_qubits, name='b')
-    ancilla = QuantumRegister(1, name='ancilla')
-    measurement = ClassicalRegister(2, name='c')
-
-    # Create an empty circuit with the specified registers
-    qc = QuantumCircuit(ancilla, clock, input_qubits, measurement)
-
-    # size of input is one less than available qubits
-    input_size = num_qubits - 1
-
     if method == 1:
-        
+    
+        # Create the various registers needed
+        clock = QuantumRegister(num_clock_qubits, name='clock')
+        input_qubits = QuantumRegister(num_input_qubits, name='b')
+        ancilla = QuantumRegister(1, name='ancilla')
+        measurement = ClassicalRegister(2, name='c')
+    
+        # Create an empty circuit with the specified registers
+        qc = QuantumCircuit(ancilla, clock, input_qubits, measurement)
+    
+        # size of input is one less than available qubits
+        input_size = num_qubits - 1
+            
         # State preparation. (various initial values, done with initialize method)
         # intial_state = [0,1]
         # intial_state = [1,0]
@@ -444,23 +518,36 @@ def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, A=Non
         
         # use an RY rotation to initialize the input state between 0 and 1
         qc.ry(2 * np.arcsin(np.sqrt(beta)), input_qubits)
-
+    
         # Put clock qubits into uniform superposition
         qc.h(clock)
-
+    
         # Perform the HHL routine
         hhl_routine(qc, ancilla, clock, input_qubits, measurement)
-
+    
         # Perform a Hadamard Transform on the clock qubits
         qc.h(clock)
-
+    
         qc.barrier()
-
+    
         # measure the input, which now contains the answer
         qc.measure(input_qubits, measurement[1])
     
     # sparse Hamiltonian simulation by quantum random walk
     if method == 2:
+        
+        # Create the various registers needed
+        clock = QuantumRegister(num_clock_qubits, name='clock')
+        input_qubits = QuantumRegister(num_input_qubits, name='b')
+        extra_qubits = QuantumRegister(num_input_qubits, name='a')
+        ancilla = QuantumRegister(1, name='ancilla')
+        measurement = ClassicalRegister(2, name='c')
+        
+        # Create an empty circuit with the specified registers
+        qc = QuantumCircuit(ancilla, clock, input_qubits, extra_qubits, measurement)
+        
+        # size of input is one less than available qubits
+        input_size = num_qubits - 1 - num_input_qubits
         
         # use an RY rotation to initialize the input state between 0 and 1
         qc.ry(2 * np.arcsin(np.sqrt(beta)), input_qubits)
@@ -469,7 +556,7 @@ def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, A=Non
         qc.h(clock)
 
         # Perform the HHL routine
-        hhl_routine(qc, ancilla, clock, input_qubits, measurement, A)
+        hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits, A, method)
 
         # Perform a Hadamard Transform on the clock qubits
         qc.h(clock)
