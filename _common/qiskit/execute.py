@@ -43,32 +43,44 @@ backend = Aer.get_backend("qasm_simulator")
 # Execution options, passed to transpile method
 backend_exec_options = None
 
+#####################
+# DEFAULT NOISE MODEL 
+
 # default noise model, can be overridden using set_noise_model
-noise = NoiseModel()
-# Add depolarizing error to all single qubit gates with error rate 0.3%
-#                    and to all two qubit gates with error rate 3.0%
-depol_one_qb_error = 0.003
-depol_two_qb_error = 0.03
-noise.add_all_qubit_quantum_error(depolarizing_error(depol_one_qb_error, 1), ['rx', 'ry', 'rz'])
-noise.add_all_qubit_quantum_error(depolarizing_error(depol_two_qb_error, 2), ['cx'])
+def default_noise_model():
 
-# Add amplitude damping error to all single qubit gates with error rate 0.0%
-#                         and to all two qubit gates with error rate 0.0%
-amp_damp_one_qb_error = 0.0
-amp_damp_two_qb_error = 0.0
-noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_one_qb_error, 1), ['rx', 'ry', 'rz'])
-noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_two_qb_error, 2), ['cx'])
+    noise = NoiseModel()
+    # Add depolarizing error to all single qubit gates with error rate 0.3%
+    #                    and to all two qubit gates with error rate 3.0%
+    depol_one_qb_error = 0.003
+    depol_two_qb_error = 0.03
+    noise.add_all_qubit_quantum_error(depolarizing_error(depol_one_qb_error, 1), ['rx', 'ry', 'rz'])
+    noise.add_all_qubit_quantum_error(depolarizing_error(depol_two_qb_error, 2), ['cx'])
 
-# Add reset noise to all single qubit resets
-reset_to_zero_error = 0.005
-reset_to_one_error = 0.005
-noise.add_all_qubit_quantum_error(reset_error(reset_to_zero_error, reset_to_one_error),["reset"])
+    # Add amplitude damping error to all single qubit gates with error rate 0.0%
+    #                         and to all two qubit gates with error rate 0.0%
+    amp_damp_one_qb_error = 0.0
+    amp_damp_two_qb_error = 0.0
+    noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_one_qb_error, 1), ['rx', 'ry', 'rz'])
+    noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_two_qb_error, 2), ['cx'])
 
-# Add readout error
-p0given1_error = 0.000
-p1given0_error = 0.000
-error_meas = ReadoutError([[1 - p1given0_error, p1given0_error], [p0given1_error, 1 - p0given1_error]])
-noise.add_all_qubit_readout_error(error_meas)
+    # Add reset noise to all single qubit resets
+    reset_to_zero_error = 0.005
+    reset_to_one_error = 0.005
+    noise.add_all_qubit_quantum_error(reset_error(reset_to_zero_error, reset_to_one_error),["reset"])
+
+    # Add readout error
+    p0given1_error = 0.000
+    p1given0_error = 0.000
+    error_meas = ReadoutError([[1 - p1given0_error, p1given0_error], [p0given1_error, 1 - p0given1_error]])
+    noise.add_all_qubit_readout_error(error_meas)
+    
+    return noise
+
+noise = default_noise_model()
+
+##########################
+# JOB MANAGEMENT VARIABLES 
 
 # Create array of batched circuits and a dict of active circuits
 batched_circuits = []
@@ -105,6 +117,8 @@ basis_gates_array = [
     ['u', 'cx']                     # general unitaries basis gates
 ]
 
+######################################################################
+# INITIALIZATION METHODS
 
 # Initialize the execution module, with a custom result handler
 def init_execution(handler):
@@ -305,9 +319,15 @@ def execute_circuit(circuit):
                     else: n1q += value
                 qc_tr_xi = n2q / (n1q + n2q)    
             #print(f"... qc_tr_xi = {qc_tr_xi} {n1q} {n2q}")
+        
+        # use noise model from execution options if given for simulator
+        this_noise = noise
+        if backend_exec_options != None and "noise_model" in backend_exec_options:
+            this_noise = backend_exec_options["noise_model"]
+            #print(f"... using custom noise model: {this_noise}")
             
         # Initiate execution (with noise if specified and this is a simulator backend)
-        if noise is not None and backend.name().endswith("qasm_simulator"):
+        if this_noise is not None and backend.name().endswith("qasm_simulator"):
             #print("... performing simulation")
             
             simulation_circuits = circuit["qc"]
@@ -335,7 +355,7 @@ def execute_circuit(circuit):
             # whether noise_model should be passed to transpile() or run() 
             st = time.time()
             job = execute(simulation_circuits, backend, shots=shots,
-                noise_model=noise, basis_gates=noise.basis_gates)
+                noise_model=this_noise, basis_gates=this_noise.basis_gates)
                 
             if verbose_time:
                     print(f"  *** qiskit.execute() time = {time.time() - st}")
