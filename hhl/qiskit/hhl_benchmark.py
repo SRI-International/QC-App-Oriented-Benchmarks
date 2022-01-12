@@ -300,8 +300,8 @@ def control_Ham_sim(A, t):
     """
     
     # temporary hard-coded matrix elements
-    off_diag_el = 0.5
-    diag_el = 1.5
+    off_diag_el = -1/3
+    diag_el = 1.0
     
     # read in number of qubits
     N = len(A)
@@ -517,7 +517,7 @@ def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, A=Non
         ##qc.initialize(intial_state, 3)
         
         # use an RY rotation to initialize the input state between 0 and 1
-        qc.ry(2 * np.arcsin(np.sqrt(beta)), input_qubits)
+        qc.ry(2 * np.arcsin(beta), input_qubits)
     
         # Put clock qubits into uniform superposition
         qc.h(clock)
@@ -550,7 +550,7 @@ def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, A=Non
         input_size = num_qubits - 1 - num_input_qubits
         
         # use an RY rotation to initialize the input state between 0 and 1
-        qc.ry(2 * np.arcsin(np.sqrt(beta)), input_qubits)
+        qc.ry(2 * np.arcsin(beta), input_qubits)
 
         # Put clock qubits into uniform superposition
         qc.h(clock)
@@ -611,8 +611,16 @@ saved_result = None
 #   Then we compare the ratios obtained with expected ratio to determine fidelity (incorrectly)
 
 def compute_expectation(beta, num_shots):
-    x = 9/8 - (3 * beta)/4
-    y = 3/8 + (3 * beta)/4
+    
+    # hard-code A for now
+    A = np.array([[1.0, -1/3],[-1/3,1.0]])
+    
+    # beta is defined in circits
+    b = np.array([np.sqrt(1-beta**2),beta])
+    
+    v = np.linalg.inv(A) @ b # solution vector
+    
+    x, y = v[0], v[1]
     ratio = x / y
     ratio_sq = ratio * ratio
     #print(f"  ... x,y = {x, y} ratio={ratio} ratio_sq={ratio_sq}")
