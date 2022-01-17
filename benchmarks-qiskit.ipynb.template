@@ -76,7 +76,7 @@
     "\n",
     "# # Example of TrueQ Randomized Compilation\n",
     "# import _common.transformers.trueq_rc as trueq_rc\n",
-    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": trueq_rc.do_rc } \n",
+    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": trueq_rc.local_rc } \n",
     "\n",
     "# # Define a custom noise model to be used during execution\n",
     "# import _common.custom.custom_qiskit_noise_model as custom_qiskit_noise_model\n",
