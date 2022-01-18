@@ -68,31 +68,26 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "# # Additional options can be specified in this cell (below is an example)\n",
+    "# Custom optimization options can be specified in this cell (below is an example)\n",
     "\n",
-    "# # Some circuits can be sparse or have long idle periods.\n",
-    "# # Dynamical decoupling can echo away static ZZ errors during those idling periods.\n",
-    "# # Set up a pass manager to add the decoupling pulses to the circuit before executing\n",
+    "# # Add Qiskit pass manager as a custom 'transformer' method\n",
+    "# import _common.transformers.qiskit_passmgr as qiskit_passmgr\n",
+    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": qiskit_passmgr.do_transform }\n",
     "\n",
-    "# from qiskit.transpiler import PassManager, InstructionDurations\n",
-    "# from qiskit.transpiler.passes import ALAPSchedule, DynamicalDecoupling\n",
-    "# from qiskit.circuit.library import XGate\n",
-    "# def do_transform(circuit, backend):\n",
-    "#     durations = InstructionDurations.from_backend(backend)\n",
-    "#     dd_sequence = [XGate(), XGate()]\n",
-    "#     pm = PassManager([ALAPSchedule(durations),\n",
-    "#                       DynamicalDecoupling(durations, dd_sequence)])\n",
-    "#     return pm.run(circuit)\n",
+    "# # Example of TrueQ Randomized Compilation\n",
+    "# import _common.transformers.trueq_rc as trueq_rc\n",
+    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": trueq_rc.local_rc } \n",
     "\n",
-    "# # Add this pass manager as a 'transformer' method\n",
-    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": do_transform }"
+    "# # Define a custom noise model to be used during execution\n",
+    "# import _common.custom.custom_qiskit_noise_model as custom_qiskit_noise_model\n",
+    "# exec_options = { \"noise_model\": custom_qiskit_noise_model.my_noise_model() }\n"
    ]
   },
   {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
-    "scrolled": false
+    "tags": []
    },
    "outputs": [],
    "source": [
@@ -108,9 +103,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run bernstein-vazirani/qiskit/bv_benchmark.py\n",
@@ -123,11 +116,11 @@
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
-    {
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
-    "scrolled": false
+    "tags": []
    },
    "outputs": [],
    "source": [
@@ -144,9 +137,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run hidden-shift/qiskit/hs_benchmark.py\n",
@@ -161,9 +152,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run quantum-fourier-transform/qiskit/qft_benchmark.py\n",
@@ -179,9 +168,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run quantum-fourier-transform/qiskit/qft_benchmark.py\n",
@@ -197,9 +184,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run grovers/qiskit/grovers_benchmark.py\n",
@@ -211,12 +196,10 @@
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
    ]
   },
-    {
+  {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run phase-estimation/qiskit/pe_benchmark.py\n",
@@ -231,9 +214,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run amplitude-estimation/qiskit/ae_benchmark.py\n",
@@ -248,9 +229,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run monte-carlo/qiskit/mc_benchmark.py\n",
@@ -265,9 +244,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run hamiltonian-simulation/qiskit/hamiltonian_simulation_benchmark.py\n",
@@ -283,9 +260,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run vqe/qiskit/vqe_benchmark.py\n",
@@ -302,9 +277,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run shors/qiskit/shors_benchmark.py\n",
@@ -320,9 +293,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "#%run shors/qiskit/shors_benchmark.py\n",
@@ -338,9 +309,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [],
    "source": [
     "import sys\n",
