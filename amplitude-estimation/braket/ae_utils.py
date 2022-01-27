@@ -1,6 +1,7 @@
 """
 Amplitude Estimation Benchmark Program via Phase Estimation Utils - Braket
 """
+import numpy as np
 from braket.circuits import Circuit
 
 # Function that generates a circuit object corresponding to the adjoint of a given circuit
@@ -103,23 +104,147 @@ def adjoint(circuit):
     
     return adjoint_circ
 
-# Function to apply MCX gate to Ctrl_Q, implemented using ancilla qubits
-# Adapted from AWS Braket QAA Example: 
-# https://github.com/aws/amazon-braket-examples/blob/main/examples/advanced_circuits_algorithms/QAA/utils_qaa.py
-def applyMCX(circuit):
-    qubits = circuit.qubits
+# Function to apply MCX gate without ancilla qubits
+# Adapted from Barenco et al: https://arxiv.org/pdf/quant-ph/9503016.pdf
+def MCX(num_state_qubits):
+    qc = Circuit()
+    m = num_state_qubits
 
-    # Dynamically add ancilla qubits, starting on the next unused qubit in the circuit
-    ancilla_start = max(qubits) + 1
+    # First check to see if m = 1 or m = 2, in which case this simplifies to 
+    # CNOT or CCNOT
+    if m == 2:
+        qc.ccnot(control1=0, control2=1, target=2)
+        return qc
+    elif m == 1:
+        qc.cnot(control=0, target=1)
+        return qc
 
-    # Apply CCNOT on first two qubits
-    circuit.ccnot(qubits[0], qubits[1], ancilla_start)
+    ## ELSE: use gray code method from Barenco et al to generate appropriate gates
+    ## Probably some room for improvement... it produces an equivalent circuit, but 
+    ## with extra CNOT gates.
 
-    # Now add a CCNOT from each of the next register qubits, comparing with the ancilla we just added.
-    # Target on a new ancilla. If len(qubits) is 2, this does not execute.
-    for ii, qubit in enumerate(qubits[2:]):
-        circuit.ccnot(qubit, ancilla_start + ii, ancilla_start + ii + 1)
+    # Generate list of qubit indices for the circuit
+    qubits = list(range(num_state_qubits + 1))
 
-    # TODO ... Finish MCX gate implementation. Do we need to use ancilla qubits?
+    # Using the notation from Barenco et al, U = X, thus we want to select
+    # V such that V^(m + 1) = U = X => V = (2^(m - 1))-root(X)
+    def n_root_X_matrix(n):
+        factor = np.exp(1j * (np.pi / n))
+        print(factor)
+
+        matrix = 0.5 * np.array([
+            [1 + factor, 1 - factor],
+            [1 - factor, 1 + factor]
+        ])
+
+        return np.matrix(matrix)
     
+    # V and V_dagger unitary matrix
+    V_unitary_matrix = n_root_X_matrix(2 ** (m - 1))
+    V_dagger_unitary_matrix = V_unitary_matrix.H
 
+    # Generate gray code sequence for number of control qubits
+    def generateGrayCode(n):
+        if (n <= 0): return
+
+        gray = []
+
+        gray.append("0")
+        gray.append("1")
+
+        i = 2
+        j = 0
+        while True:
+            if i >= 1 << n:
+                break
+            
+            for j in range(i - 1, -1, -1):
+                gray.append(gray[j])
+            
+            for j in range(i):
+                gray[j] = "0" + gray[j]
+
+            for j in range(i, 2*i):
+                gray[j] = "1" + gray[j]
+            
+            i = i << 1
+        
+        return gray
+
+    # Generate gray code and remove first element (000)
+    grayCode = generateGrayCode(m)[1:]
+
+    # Use gray code to apply appropriate gates in order
+    # Note: even/odd parity of bitstring determines whether or not
+    # to apply V or V_dagger.
+    for sequence in grayCode:
+        # Gates to apply for a given sequence
+        applyToQubits = []
+        odd_parity = False
+        for i in range(m):
+            # Reverse sequence to match paper, does it matter?
+            if sequence[::-1][i] == "1":
+                odd_parity = ~odd_parity
+                applyToQubits.append(qubits[i])
+            elif sequence[i] == "0":
+                pass
+        
+        # If it's only one qubit, apply controlled V
+        if len(applyToQubits) == 1:
+            qc.add_circuit(controlled_unitary(
+                control=applyToQubits[0], 
+                targets=[num_state_qubits], 
+                unitary=V_unitary_matrix, 
+                display_name="V"
+            ))
+        elif len(applyToQubits) > 1:
+            # Else, we need to iterate through and apply CNOT gates
+            for qubit_index in range(len(applyToQubits) - 1):
+                qc.cnot(control=applyToQubits[qubit_index], target=applyToQubits[len(applyToQubits) - 1])
+
+            # Apply controlled V/V_dagger on last qubit line
+            if odd_parity:
+                qc.add_circuit(controlled_unitary(
+                    control=applyToQubits[-1], 
+                    targets=[num_state_qubits],
+                    unitary=V_unitary_matrix, 
+                    display_name="V"
+                ))    
+            else:
+                qc.add_circuit(controlled_unitary(
+                    control=applyToQubits[-1], 
+                    targets=[num_state_qubits], 
+                    unitary=V_dagger_unitary_matrix,
+                    display_name="V_dagger"
+                ))
+            
+            # Apply cnot gates in reverse order to undo operations
+            for qubit_index in reversed(range(len(applyToQubits) - 1)):
+                qc.cnot(control=applyToQubits[qubit_index], target=applyToQubits[len(applyToQubits) - 1])
+
+    return qc
+
+
+# Function to create a controlled arbitrary unitary gate
+# Adapted from AWS Braket QPE Example:
+# https://github.com/aws/amazon-braket-examples/blob/main/examples/advanced_circuits_algorithms/QPE/utils_qpe.py
+def controlled_unitary(control, targets, unitary, display_name):
+    # Define projectors onto the computational basis
+    p0 = np.array([[1.0, 0.0], [0.0, 0.0]])
+
+    p1 = np.array([[0.0, 0.0], [0.0, 1.0]])
+
+    # Instantiate circuit object
+    circ = Circuit()
+
+    # Construct numpy matrix
+    id_matrix = np.eye(len(unitary))
+    controlled_matrix = np.kron(p0, id_matrix) + np.kron(p1, unitary)
+
+    # Set all target qubits
+    target_qubits = [control] + targets
+
+    # Add controlled unitary
+    circ.unitary(matrix=controlled_matrix, targets=target_qubits, display_name=display_name)
+
+    return circ

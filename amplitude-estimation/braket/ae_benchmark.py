@@ -4,13 +4,19 @@ Amplitude Estimation Benchmark Program via Phase Estimation - Braket
 import time
 import sys
 import numpy as np
-from ae_utils import adjoint
+from ae_utils import adjoint, MCX, controlled_unitary
 from braket.circuits import Circuit
+from braket.circuits.unitary_calculation import calculate_unitary
 
 sys.path[1:1] = ["_common", "_common/braket", "quantum-fourier-transform/braket"]
 sys.path[1:1] = ["../../_common", "../../_common/braket", "../../quantum-fourier-transform/braket"]
 import execute as ex
 import metrics as metrics
+from qft_benchmark import inv_qft_gate
+
+np.random.seed(0)
+
+verbose = False
 
 # saved subcircuits circuits for printing
 A_ = None
@@ -24,13 +30,62 @@ QFTI_ = None
 def AmplitudeEstimation(num_state_qubits, num_counting_qubits, a, psi_zero=None, psi_one=None):
     qc = Circuit()
 
+    num_qubits = num_state_qubits + 1 + num_counting_qubits
+
+    qubits = list(range(num_qubits))
+
     # create the Amplitude Generator circuit
     A = A_gen(num_state_qubits, a, psi_zero, psi_one)
 
     # create the Quantum Operator circuit and a controlled version of it
-    cQ, Q = Ctrl_Q(num_state_qubits, A)
+    Q_unitary, Q = Q_Unitary(num_state_qubits, A)
 
-    # TODO ...
+    # save small example subcircuits for visualization
+    global A_, Q_, cQ_, QFTI_
+    if (cQ_ and Q_) == None or num_state_qubits <= 6:
+        if num_state_qubits < 9: 
+            sample_controlled_unitary = controlled_unitary(
+                control=qubits[0],
+                targets=[qubits[l] for l in range(num_counting_qubits, num_qubits)],
+                unitary=Q_unitary,
+                display_name="CQ"
+            )
+            
+            cQ_ = sample_controlled_unitary; Q_ = Q; A_ = A
+    if QFTI_ == None or num_qubits <= 5:
+        if num_qubits < 9: QFTI_ = inv_qft_gate(num_counting_qubits)
+    
+    # Prepare state A, and counting qubits with H transform
+    # counting range = range(num_counting)
+    # state range = range(num_counting, num_counting + num_state)
+    # objective qubit = -1 or range(num_counting + num_state, num_qubits)
+    # state and objective range = range(num_counting, num_qubits)
+    qc.add_circuit(A, target=list(range(num_counting_qubits, num_qubits)))
+    for i in range(num_counting_qubits):
+        qc.h(qubits[i])
+    
+    repeat = 1
+    for j in reversed(range(num_counting_qubits)):
+        for _ in range(repeat):
+            qc.add_circuit(
+                controlled_unitary(
+                    control=qubits[j],
+                    targets=[qubits[l] for l in range(num_counting_qubits, num_qubits)],
+                    unitary=Q_unitary,
+                    display_name="CQ"
+                )
+            )
+        repeat *= 2
+    
+    # Inverse quantum Fourier transofrm only on counting qubits
+    qc.add_circuit(inv_qft_gate(num_counting_qubits))
+
+    # save smaller circuit example for display
+    global QC_
+    if QC_ == None or num_qubits <= 5:
+        if num_qubits < 9: QC_ = qc
+    
+    return qc
 
 # Construct A operator that takes |0>_{n+1} to sqrt(1-a) |psi_0>|0> + sqrt(a) |psi_1>|1>
 def A_gen(num_state_qubits, a, psi_zero=None, psi_one=None):
@@ -52,49 +107,89 @@ def A_gen(num_state_qubits, a, psi_zero=None, psi_one=None):
     qc_A.x(num_state_qubits)
     for i in range(num_state_qubits):
         if psi_zero[i] == '1':
-            qc_A.cnot(num_state_qubits, i)
+            qc_A.cnot(control=num_state_qubits, target=i)
     qc_A.x(num_state_qubits)
 
     # takes state to sqrt(1-a) |psi_0>|0> + sqrt(a) |psi_1>|1>
     for i in range(num_state_qubits):
         if psi_one[i] == '1':
-            qc_A.cnot(num_state_qubits, i)
+            qc_A.cnot(control=num_state_qubits, target=i)
     
     return qc_A
 
-# Construct the gover-like operator and a controlled version of it
-def Ctrl_Q(num_state_qubits, A_circ):
+# Construct the gover-like operator
+def Q_Unitary(num_state_qubits, A_circ):
     
     # index n is the objective qubit, and indexes 0 through n-1 are state qubits
-    qc = Circuit()
+    qc_Q = Circuit()
     
     temp_A = A_circ.copy()
     A_inverse = adjoint(temp_A)
 
     ### Each cycle in Q applies in order: -S_chi, A_circ_inverse, S_0, A_circ
     # -S_chi
-    qc.x(num_state_qubits)
-    qc.z(num_state_qubits)
-    qc.x(num_state_qubits)
+    qc_Q.x(num_state_qubits)
+    qc_Q.z(num_state_qubits)
+    qc_Q.x(num_state_qubits)
 
     # A_circ_inverse
-    qc.add_circuit(A_inverse)
+    qc_Q.add_circuit(A_inverse)
 
     # S_0
     for i in range(num_state_qubits + 1):
-        qc.x(i)
-    qc.h(num_state_qubits)
+        qc_Q.x(i)
+    qc_Q.h(num_state_qubits)
 
-    # TODO ... Work on MCX gate implementation
+    # Apply MCX gate
+    qc_MCX = MCX(num_state_qubits)
+    qc_Q.add_circuit(qc_MCX, target=list(range(num_state_qubits + 1)))
 
+    qc_Q.h(num_state_qubits)
+    for i in range(num_state_qubits + 1):
+        qc_Q.x(i)
 
-    
+    # A_circ
+    qc_Q.add_circuit(temp_A, target=list(range(num_state_qubits + 1)))
+
+    # Calculate unitary matrix representation
+    Q_matrix_rep = calculate_unitary(qc_Q.qubit_count, qc_Q.instructions)
+
+    # Returning just the matrix representation, to create a controlled unitary,
+    # we need to pass the control when the circuit is formed
+    return Q_matrix_rep, qc_Q
 
 
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
-def analyze_and_print_result(qc, result, num_counting_qubits, s_int, num_shots):
-    print("Results: ", results)
+def analyze_and_print_result(qc, result, num_counting_qubits, s_int):
+    
+    # Braket measures all qubits, we need to remove the state qubits
+    counts_r = result.measurement_counts
+    counts_str = {}
+    for measurement_r in counts_r.keys():
+        measurement = measurement_r[:num_counting_qubits][::-1] # remove state qubits and reverse order
+        if measurement in counts_str:
+            counts_str[measurement] += counts_r[measurement_r]
+        else:
+            counts_str[measurement] = counts_r[measurement_r]
+    
+    counts = bitstring_to_a(counts_str, num_counting_qubits)
+    a = a_from_s_int(s_int, num_counting_qubits)
+
+    if verbose: print(f"For amplitude {a} measure: {counts}")
+
+    # correct distribution is measuring ampltiude a 100% of the time
+    correct_dist = {a: 1.0}
+
+    # generate thermal_dist with amplitudes instead, to be comparable to correct dist
+    bit_thermal_dist = metrics.uniform_dist(num_counting_qubits)
+    thermal_dist = bitstring_to_a(bit_thermal_dist, num_counting_qubits)
+
+    # use our polarization fidelity rescaling
+    fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
+
+    return counts, fidelity
+
 
 def bitstring_to_a(counts, num_counting_qubits):
     est_counts = {}
@@ -124,7 +219,7 @@ MAX_QUBITS=8
 
 # Execute program with default parameters
 def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
-        num_state_qubits=1, # default, not exposed to users
+        num_state_qubits=3, # default, not exposed to users
         backend_id='simulator'):
     
     print("Amplitude Estimation Benchmark Program - Braket")
@@ -145,12 +240,12 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     metrics.init_metrics()
 
     # define custom result handler
-    def execution_handler(qc, result, num_qubits, s_int, num_shots):
+    def execution_handler(qc, result, num_qubits, s_int):
 
         # determine fidelity of result set
         num_counting_qubits = int(num_qubits) - num_state_qubits - 1
-        counts, fidelity = analyze_and_print_result(qc, result, num_counting_qubits, int(s_int), num_shots)
-        metrics.score_metric(num_qubits, s_int, 'fidelity', fidelity)
+        counts, fidelity = analyze_and_print_result(qc, result, num_counting_qubits, int(s_int))
+        metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
