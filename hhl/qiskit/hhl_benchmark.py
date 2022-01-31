@@ -49,7 +49,7 @@ QFTI_ = None
 
 ############### Generate random problem instance
 
-def generate_sparse_A(n, k, sparsity=2):
+def generate_sparse_A(n, k, sparsity=2, diag_el=1.0, off_diag_el=-1/3):
     """
         n (int) : number of qubits. A will be 2^n by 2^n
         
@@ -67,7 +67,7 @@ def generate_sparse_A(n, k, sparsity=2):
     k_bin = np.binary_repr(k, width=n)
     
     # initialize A
-    A = np.diag(1.5*np.ones(N))
+    A = np.diag(diag_el*np.ones(N))
     
     pairs = []
     tot_indices = []
@@ -88,8 +88,8 @@ def generate_sparse_A(n, k, sparsity=2):
     # fill in A
     for pair in pairs:
         i, j = pair[0], pair[1]
-        A[i,j] = 0.5
-        A[j,i] = 0.5
+        A[i,j] = off_diag_el
+        A[j,i] = off_diag_el
     
     return A
 
@@ -260,7 +260,7 @@ def W_gate():
 def V_gate(A):
     """
         Hamiltonian oracle V|a,b> = |a,b+v(a)>
-    
+        
     """
     
     N = len(A)
@@ -320,7 +320,7 @@ def control_Ham_sim(A, t):
     qc.append(v_gate, [qreg, qreg_a])
     
     # use ancilla for phase kickback
-    qc.crz(2*t*diag_el, con_reg[0], anc_reg[0])
+    qc.crz((2*t*diag_el)%(2*np.pi), con_reg[0], anc_reg[0])
     
     # apply W gate that diagonalizes SWAP operator and Toffoli
     for j in range(n):
@@ -329,7 +329,7 @@ def control_Ham_sim(A, t):
         qc.ccx(qreg[j], qreg_a[j], anc_reg[0])
         
     # phase
-    qc.crz(2*t*off_diag_el, con_reg[0], anc_reg[0])
+    qc.crz((2*t*off_diag_el)%(2*np.pi), con_reg[0], anc_reg[0])
     
     # uncompute
     for q in range(n):
@@ -400,78 +400,81 @@ def qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1):
         #Define global U operator as the phase operator (for printing later)
         _, U_ = ctrl_u(1)
         
-        #qc.barrier();
-        
-        # Perform an inverse QFT on the register holding the eigenvalues
-        #qft_dagger(qc, clock, 2)
-        qc.append(inv_qft_gate(len(clock)), clock)
         
     if method == 2:
         
         for j in range(len(clock)):
             
             control = clock[j]
-            phase = 2**j
+            phase = -(2*np.pi)*2**j
+            #phase = -(2**j)
             qc.append(control_Ham_sim(A, phase), [control, target, extra_qubits, ancilla])
+            #qc.reset(ancilla)
+    
+    # Perform an inverse QFT on the register holding the eigenvalues
+    qc.append(inv_qft_gate(len(clock)), clock)
             
 
 # Append a series of Inverse Quantum Phase Estimation gates to the circuit    
 def inv_qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1):
     
     # Perform a QFT on the register holding the eigenvalues
-    #qft(qc, clock, 2)
     qc.append(qft_gate(len(clock)), clock)
-
-    qc.barrier()
-
-    ''' original code from Hector_Wong 
-    # e^{i*A*t*2}
-    #qc.cu(np.pi, np.pi, 0, 0, clock[1], target, label='U2');
-    qc.cu3(np.pi, np.pi, 0, clock[1], target);
-
-    # e^{i*A*t}
-    #qc.cu(np.pi/2, np.pi/2, -np.pi/2, -3*np.pi/4, clock[0], target, label='U');
-    # The CU gate is equivalent to a CU1 on the control bit followed by a CU3
-    qc.u1(-3*np.pi/4, clock[0]);
-    qc.cu3(np.pi/2, np.pi/2, -np.pi/2, clock[0], target);
-
-    qc.barrier()
-    '''
     
-    # apply inverse series of controlled U operations to the state |1>
-    # does nothing to state |0> 
-    # DEVNOTE: have not found a way to create a controlled operation that contains a U gate 
-    # with the global phase; instead do it piecemeal for now
+    qc.barrier()
     
-    repeat = 2 ** (len(clock) - 1)
-    for j in reversed(range(len(clock))):
-    #for j in (range(len(clock))):
-
-        # create U with exponent of 1, but in a loop repeating N times
-        for k in range(repeat):
-
-            # this global phase is applied to clock qubit
-            qc.u1(-3*np.pi/4, clock[j]);
+    if method == 1:
+    
+        ''' original code from Hector_Wong 
+        # e^{i*A*t*2}
+        #qc.cu(np.pi, np.pi, 0, 0, clock[1], target, label='U2');
+        qc.cu3(np.pi, np.pi, 0, clock[1], target);
+    
+        # e^{i*A*t}
+        #qc.cu(np.pi/2, np.pi/2, -np.pi/2, -3*np.pi/4, clock[0], target, label='U');
+        # The CU gate is equivalent to a CU1 on the control bit followed by a CU3
+        qc.u1(-3*np.pi/4, clock[0]);
+        qc.cu3(np.pi/2, np.pi/2, -np.pi/2, clock[0], target);
+    
+        qc.barrier()
+        '''
+        
+        # apply inverse series of controlled U operations to the state |1>
+        # does nothing to state |0> 
+        # DEVNOTE: have not found a way to create a controlled operation that contains a U gate 
+        # with the global phase; instead do it piecemeal for now
+        
+        repeat = 2 ** (len(clock) - 1)
+        for j in reversed(range(len(clock))):
+        #for j in (range(len(clock))):
+    
+            # create U with exponent of 1, but in a loop repeating N times
+            for k in range(repeat):
+    
+                # this global phase is applied to clock qubit
+                qc.u1(-3*np.pi/4, clock[j]);
+                
+                # apply the rest of U controlled by clock qubit
+                #cp, _ = ctrl_u(repeat)
+                cp, _ = ctrl_ui(1)
+                qc.append(cp, [clock[j], target])  
             
-            # apply the rest of U controlled by clock qubit
-            #cp, _ = ctrl_u(repeat)
-            cp, _ = ctrl_ui(1)
-            qc.append(cp, [clock[j], target])  
-        
-        repeat = int(repeat / 2)
-        
-        qc.barrier();
-
-    #Define global U operator as the phase operator (for printing later)
-    _, UI_ = ctrl_ui(1)
+            repeat = int(repeat / 2)
+            
+            qc.barrier();
+    
+        #Define global U operator as the phase operator (for printing later)
+        _, UI_ = ctrl_ui(1)
     
     if method == 2:
         
-        for j in range(len(clock)):
+        for j in reversed(range(len(clock))):
             
             control = clock[j]
-            phase = -2**j
+            phase = (2*np.pi)*2**j
+            #phase = 2**j
             qc.append(control_Ham_sim(A, phase), [control, target, extra_qubits, ancilla])
+            #qc.reset(ancilla)
     
 
 def hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits=None, A=None, method=1):
@@ -484,15 +487,18 @@ def hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits=None
     # since we are not swapping after the QFT, reverse order of qubits from what is in papers
     qc.cry(np.pi, clock[1], ancilla)
     qc.cry(np.pi/3, clock[0], ancilla)
+        
 
     qc.barrier()
     
     qc.measure(ancilla, measurement[0])
+    
     qc.barrier()
     inv_qpe(qc, clock, input_qubits, extra_qubits, ancilla, A, method)
+    
 
 
-def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, A=None, method=1):
+def HHL (num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
     
     if method == 1:
     
@@ -557,6 +563,7 @@ def HHL (num_qubits, num_input_qubits, num_clock_qubits, secret_int, beta, A=Non
 
         # Perform the HHL routine
         hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits, A, method)
+        
 
         # Perform a Hadamard Transform on the clock qubits
         qc.h(clock)
@@ -615,10 +622,11 @@ def compute_expectation(beta, num_shots):
     # hard-code A for now
     A = np.array([[1.0, -1/3],[-1/3,1.0]])
     
-    # beta is defined in circits
+    # initial state |b>
     b = np.array([np.sqrt(1-beta**2),beta])
     
-    v = np.linalg.inv(A) @ b # solution vector
+    # solution vector
+    v = np.linalg.inv(A) @ b
     
     x, y = v[0], v[1]
     ratio = x / y
@@ -678,10 +686,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         hub="ibm-q", group="open", project="main", exec_options=None):
 
     print("HHL Benchmark Program - Qiskit")
+    
+    # hard code A for now
+    A = np.array([[1,-1/3],[-1/3,1]])
 
     # validate parameters (smallest circuit is 4 qubits, largest 6)
-    max_qubits = max(6, max_qubits)
-    min_qubits = min(max(4, min_qubits), max_qubits)
+    #max_qubits = max(6, max_qubits)
+    #min_qubits = min(max(4, min_qubits), max_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
 
     # Variable for new qubit group ordering if using mid_circuit measurements
@@ -715,7 +726,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
         # based on num_qubits, determine input and clock sizes
         num_input_qubits = 1
-        num_clock_qubits = num_qubits - num_input_qubits - 1  # need 1 for ancilla also 
+        if method == 1:
+            num_clock_qubits = num_qubits - num_input_qubits - 1  # need 1 for ancilla also
+        if method == 2:
+            num_clock_qubits = num_qubits - 2*num_input_qubits - 1 # need 1 for ancilla also
     
         # determine number of circuits to execute for this group
         num_circuits = min(2**(num_qubits), max_circuits)
@@ -747,7 +761,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = HHL(num_qubits, num_input_qubits, num_clock_qubits, s_int, beta, method)
+            qc = HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=A, method=method)
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
             # collapse the sub-circuit levels used in this benchmark (for qiskit)
@@ -775,5 +789,5 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                          transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
 # if main, execute method
-if __name__ == '__main__': run()
+#if __name__ == '__main__': run()
    
