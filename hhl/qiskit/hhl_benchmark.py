@@ -19,6 +19,7 @@ import sys
 import time
 
 import numpy as np
+from sympy.combinatorics.graycode import GrayCode
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 # include QFT in this list, so we can refer to the QFT sub-circuit definition
@@ -49,7 +50,7 @@ QFTI_ = None
 
 ############### Generate random problem instance
 
-def generate_sparse_A(n, k, sparsity=2, diag_el=1.0, off_diag_el=-1/3):
+def generate_sparse_A(n, k, sparsity=2, diag_el=0.5, off_diag_el=-0.25):
     """
         n (int) : number of qubits. A will be 2^n by 2^n
         
@@ -58,7 +59,7 @@ def generate_sparse_A(n, k, sparsity=2, diag_el=1.0, off_diag_el=-1/3):
         
         sparsity (int) : max non-zero elemtns per row
         
-        generates 2-sparse symmetric A with 1.5 on diagonal and 0.5 on
+        generates 2-sparse symmetric A with 0.5 on diagonal and 0.25 on
         off diagonal
 
     """
@@ -92,6 +93,96 @@ def generate_sparse_A(n, k, sparsity=2, diag_el=1.0, off_diag_el=-1/3):
         A[j,i] = off_diag_el
     
     return A
+
+############### Functions for performing uniformly-controlled rotations
+
+def dot_product(str1, str2):
+    """ dot product between 2 binary string """
+    
+    prod = 0
+    for j in range(len(str1)):
+        if str1[j] == '1' and str2[j] == '1':
+            prod = (prod + 1)%2
+    
+    return prod
+
+
+def conversion_matrix(N):
+    
+    M = np.zeros((N,N))
+    n = int(np.log2(N))
+    
+    gc_list = list(GrayCode(n).generate_gray()) # list of gray code strings
+    
+    for i in range(N):
+        g_i = gc_list[i]
+        for j in range(N):
+            b_j = np.binary_repr(j, width=n)[::-1]
+            M[i,j] = (-1)**dot_product(g_i, b_j)/(2**n)
+    
+    return M
+
+
+def alpha2theta(alpha):
+    """   
+    alpha : list of angles that get applied controlled on 0,...,2^n-1
+    theta : list of angles occuring in circuit construction
+    """
+    
+    N = len(alpha)
+    
+    M = conversion_matrix(N)
+    theta = M @ np.array(alpha)
+    
+    return theta
+
+
+def uni_con_rot_recursive_step(qc, qubits, anc, theta):
+    """
+    qc : qiskit QuantumCircuit object
+    qubits : qiskit QuantumRegister object
+    anc : ancilla qubit register on which rotation acts
+    theta : list of angles specifying rotations for 0, ..., 2^(n-1)
+    
+    """
+    
+    if type(qubits) == list:
+        n = len(qubits)
+    else:
+        n = qubits.size
+    
+    # lowest level of recursion
+    if n == 1:
+        qc.ry(theta[0], anc[0])
+        qc.cx(qubits[0], anc[0])
+        qc.ry(theta[1], anc[0])
+    
+    elif n > 1:
+        
+        qc = uni_con_rot_recursive_step(qc, qubits[1:], anc, theta[0:int(len(theta)/2)])
+        qc.cx(qubits[0], anc[0])
+        qc = uni_con_rot_recursive_step(qc, qubits[1:], anc, theta[int(len(theta)/2):])
+    
+    return qc
+    
+
+def uniformly_controlled_rot(qc, qubits, anc, theta):
+    """
+    
+    Uniformly controlled rotation from arXiv:0407010
+    
+    qc : qiskit QuantumCircuit object
+    qubits : qiskit QuantumRegister object
+    anc : ancilla qubit register on which rotation acts
+    theta : list of angles specifying rotations for 0, ..., 2^(n-1)
+    
+    """
+    
+    qc = uni_con_rot_recursive_step(qc, qubits, anc, theta)
+    qc.cx(qubits[0], anc[0])
+    
+    return qc
+
 
 ############### Circuit Definitions 
 
@@ -299,13 +390,17 @@ def control_Ham_sim(A, t):
         returns : QuantumCircuit for control-e^(-i*H*t)
     """
     
-    # temporary hard-coded matrix elements
-    off_diag_el = -1/3
-    diag_el = 1.0
-    
     # read in number of qubits
     N = len(A)
     n = int(np.log2(N))
+    
+    # (temporary only for sparsity=2)
+    # read in matrix elements
+    diag_el = A[0,0]
+    for j in range(1,N):
+        if A[0,j] != 0:
+            off_diag_el = A[0,j]
+            break
     
     # create registers
     qreg = QuantumRegister(n, name='q')
@@ -407,9 +502,7 @@ def qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1):
             
             control = clock[j]
             phase = -(2*np.pi)*2**j
-            #phase = -(2**j)
             qc.append(control_Ham_sim(A, phase), [control, target, extra_qubits, ancilla])
-            #qc.reset(ancilla)
     
     # Perform an inverse QFT on the register holding the eigenvalues
     qc.append(inv_qft_gate(len(clock)), clock)
@@ -789,5 +882,5 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                          transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
 # if main, execute method
-#if __name__ == '__main__': run()
+if __name__ == '__main__': run()
    
