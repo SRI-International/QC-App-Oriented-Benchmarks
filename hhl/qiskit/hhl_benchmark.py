@@ -576,10 +576,31 @@ def hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits=None
 
     qc.barrier()
     
-    # This section is to test and implement C = 1   
-    # since we are not swapping after the QFT, reverse order of qubits from what is in papers
-    qc.cry(np.pi, clock[1], ancilla)
-    qc.cry(np.pi/3, clock[0], ancilla)
+    if method == 1:
+        # This section is to test and implement C = 1   
+        # since we are not swapping after the QFT, reverse order of qubits from what is in papers
+        qc.cry(np.pi, clock[1], ancilla)
+        qc.cry(np.pi/3, clock[0], ancilla)
+    
+    # uniformly-controlled rotation
+    elif method == 2:
+        
+        n_clock = clock.size
+        C = 1/4 # constant in rotation (lower bound on eigenvalues A)
+        
+        # compute angles for inversion rotations
+        alpha = [2*np.arcsin(C)]
+        for x in range(1,2**n_clock):
+            x_bin_rev = np.binary_repr(x, width=n_clock)[::-1]
+            lam = int(x_bin_rev,2)/(2**n_clock)
+            if lam < C:
+                alpha.append(0)
+            elif lam >= C:
+                alpha.append(2*np.arcsin(C/lam))
+        theta = alpha2theta(alpha)
+        
+        # do inversion step
+        qc = uniformly_controlled_rot(qc, clock, ancilla, theta)
         
 
     qc.barrier()
@@ -645,11 +666,8 @@ def HHL (num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1)
         # Create an empty circuit with the specified registers
         qc = QuantumCircuit(ancilla, clock, input_qubits, extra_qubits, measurement)
         
-        # size of input is one less than available qubits
-        input_size = num_qubits - 1 - num_input_qubits
-        
         # use an RY rotation to initialize the input state between 0 and 1
-        qc.ry(2 * np.arcsin(beta), input_qubits)
+        qc.ry(2*np.arcsin(beta), input_qubits)
 
         # Put clock qubits into uniform superposition
         qc.h(clock)
@@ -710,7 +728,7 @@ saved_result = None
 #   For now, we just return a distribution of only the 01 and 11 counts
 #   Then we compare the ratios obtained with expected ratio to determine fidelity (incorrectly)
 
-def compute_expectation(beta, num_shots):
+def compute_expectation(A, beta, num_shots):
     
     # hard-code A for now
     A = np.array([[1.0, -1/3],[-1/3,1.0]])
@@ -883,4 +901,3 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
 # if main, execute method
 if __name__ == '__main__': run()
-   
