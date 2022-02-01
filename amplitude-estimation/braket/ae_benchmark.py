@@ -4,7 +4,7 @@ Amplitude Estimation Benchmark Program via Phase Estimation - Braket
 import time
 import sys
 import numpy as np
-from ae_utils import adjoint, MCX, controlled_unitary
+from ae_utils import adjoint, controlled_unitary
 from braket.circuits import Circuit
 from braket.circuits.unitary_calculation import calculate_unitary
 
@@ -24,6 +24,9 @@ Q_ = None
 cQ_ = None
 QC_ = None
 QFTI_ = None
+
+# On Braket some devices don't support cu1 (cphaseshift)  
+_use_cu1_shim = False
 
 ############### Circuit Definition
 
@@ -141,8 +144,7 @@ def Q_Unitary(num_state_qubits, A_circ):
     qc_Q.h(num_state_qubits)
 
     # Apply MCX gate
-    qc_MCX = MCX(num_state_qubits)
-    qc_Q.add_circuit(qc_MCX, target=list(range(num_state_qubits + 1)))
+    add_mcx(qc_Q, [x for x in range(num_state_qubits)], num_state_qubits)
 
     qc_Q.h(num_state_qubits)
     for i in range(num_state_qubits + 1):
@@ -158,6 +160,71 @@ def Q_Unitary(num_state_qubits, A_circ):
     # we need to pass the control when the circuit is formed
     return Q_matrix_rep, qc_Q
 
+############### CPHASESHIFT shim 
+
+# a CU1 or CPHASESHIFT equivalent
+def add_cphaseshift(qc, control, target, theta):
+    qc.rz(control, theta/2)
+    qc.cnot(control, target)
+    qc.rz(target, -theta/2)
+    qc.cnot(control, target)
+    qc.rz(target, theta/2)
+    
+############### MCX shim
+
+# single cx / cu1 unit for mcx implementation
+def add_cx_unit(qc, cxcu1_unit, controls, target):
+    num_controls = len(controls)
+    i_qubit = cxcu1_unit[1]
+    j_qubit = cxcu1_unit[0]
+    theta = cxcu1_unit[2]
+    
+    if j_qubit != None:
+        qc.cnot(controls[j_qubit], controls[i_qubit]) 
+        
+    #qc.cu1(theta, controls[i_qubit], target)
+    if _use_cu1_shim:
+        add_cphaseshift(qc, controls[i_qubit], target, theta)
+    else:
+        qc.cphaseshift(controls[i_qubit], target, theta)
+    
+    i_qubit = i_qubit - 1
+    if j_qubit == None:
+        j_qubit = i_qubit + 1
+    else:
+        j_qubit = j_qubit - 1
+        
+    if theta < 0:
+        theta = -theta
+    
+    new_units = []
+    if i_qubit >= 0:
+        new_units += [ [ j_qubit, i_qubit, -theta ] ]
+        new_units += [ [ num_controls - 1, i_qubit, theta ] ]
+        
+    return new_units
+
+# mcx recursion loop 
+def add_cxcu1_units(qc, cxcu1_units, controls, target):
+    new_units = []
+    for cxcu1_unit in cxcu1_units:
+        new_units += add_cx_unit(qc, cxcu1_unit, controls, target)
+    cxcu1_units.clear()
+    return new_units
+
+# mcx gate implementation: brute force and inefficient
+# start with a single CU1 on last control and target
+# and recursively expand for each additional control
+def add_mcx(qc, controls, target):
+    num_controls = len(controls)
+    theta = np.pi / 2**num_controls
+    qc.h(target)
+    cxcu1_units = [ [ None, num_controls - 1, theta] ]
+    while len(cxcu1_units) > 0:
+        cxcu1_units += add_cxcu1_units(qc, cxcu1_units, controls, target)
+    qc.h(target)
+
+############### Analysis
 
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
@@ -220,7 +287,7 @@ MAX_QUBITS=8
 # Execute program with default parameters
 def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
         num_state_qubits=1, # default, not exposed to users
-        backend_id='simulator'):
+        backend_id='simulator', use_cu1_shim=False):
     
     print("Amplitude Estimation Benchmark Program - Braket")
 
@@ -235,6 +302,13 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
         print(f"ERROR: AE Benchmark needs at least {num_state_qubits + 2} qubits to run")
         return
     min_qubits = max(max(3, min_qubits), num_state_qubits + 2)
+
+    # set the flag to use a cu1 (cphaseshift) shim if given, or for devices that don't support it
+    global _use_cu1_shim
+    if "ionq/" in backend_id: use_cu1_shim=True
+    _use_cu1_shim = use_cu1_shim
+    if _use_cu1_shim:
+        print("... using CPHASESHIFT shim")
 
     # Initialize metrics module
     metrics.init_metrics()
