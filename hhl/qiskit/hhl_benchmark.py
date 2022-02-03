@@ -494,8 +494,8 @@ def make_circuit(A, num_clock_qubits):
     n = int(np.log2(N))
     n_t = int(num_clock_qubits) # number of qubits in clock register
     
-    #C = min(np.linalg.eigh(A)[0])
-    C = 1/2**n_t
+    #C = 1/2**n_t
+    C = 1/4 # lower bound on eigenvalues of A
     
     # create quantum registers
     qr = QuantumRegister(n)
@@ -636,15 +636,6 @@ def compute_expectation(A, b):
     # normalize x
     x = x/np.linalg.norm(x)
     
-    #x, y = v[0], v[1]
-    #ratio = x / y
-    #ratio_sq = ratio * ratio
-    #print(f"  ... x,y = {x, y} ratio={ratio} ratio_sq={ratio_sq}")
-    
-    #iy = int(num_shots / (1 + ratio_sq))
-    #ix = num_shots - iy
-    #print(f"    ... ix,iy = {ix, iy}")
-    
     # compute true distribution
     true_dist = {}
     for j, xj in enumerate(x):
@@ -671,7 +662,6 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
         print(f'Ratio of counts with ancilla measured |1> : {round(anc_succ_ratio, 4)}')
     
     # compute beta from secret_int, and get expected distribution
-    # compute ratio of 01 to 11 measurements for both expected and obtained
     #beta = secret_int / 10000
     A = np.array([[0.75, -0.25],[-0.25, 0.75]])
     b = np.array([1,0])
@@ -691,32 +681,6 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # use TVD as infidelity
     fidelity = 1 - tvd
-            
-    
-    
-    #print(f"... expected = {expected_dist}")
-    
-    #try:
-    #    ratio_exp = expected_dist['01'] / expected_dist['11']
-    #    ratio_counts = counts['01'] / counts['11']
-    #except Exception as e:
-    #    ratio_exp = 0
-    #    ratio_counts = 0
-    
-    #print(f"  ... ratio_exp={ratio_exp}  ratio_counts={ratio_counts}")
-    
-    # (NOTE: we should use this fidelity calculation, but cannot since we don't know actual expected)
-    # use our polarization fidelity rescaling
-    #fidelity = metrics.polarization_fidelity(post_counts, expected_dist)
-    
-    # instead, approximate fidelity by comparing ratios
-    #if ratio_exp == 0 or ratio_counts == 0:
-    #    fidelity = 0
-    #elif ratio_exp > ratio_counts:
-    #    fidelity = ratio_counts / ratio_exp
-    #else:
-    #    fidelity = ratio_exp / ratio_counts
-    #if verbose: print(f"  ... fidelity = {fidelity}")
     
     
     return post_counts, fidelity
@@ -732,7 +696,7 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
     print("HHL Benchmark Program - Qiskit")
     
     # hard code A for now
-    A = np.array([[0.75,-0.25],[-0.25,0.75]])
+    #A = np.array([[0.75,-0.25],[-0.25,0.75]])
 
     # validate parameters (smallest circuit is 4 qubits, largest 6)
     #max_qubits = max(6, max_qubits)
@@ -740,7 +704,7 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
 
     # Variable for new qubit group ordering if using mid_circuit measurements
-    mid_circuit_qubit_group = []
+    #mid_circuit_qubit_group = []
 
     # If using mid_circuit measurements, set transform qubit group to true
     #transform_qubit_group = True if method == 2 else False
@@ -762,21 +726,23 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
             hub=hub, group=group, project=project, exec_options=exec_options)
 
     # for noiseless simulation, set noise model to be None
-    # ex.set_noise_model(None)
+    ex.set_noise_model(None)
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1):
         
         # based on num_qubits, determine input and clock sizes
-        num_input_qubits = 1
         if method == 1:
+            num_input_qubits = 1
             num_clock_qubits = num_qubits - num_input_qubits - 1  # need 1 for ancilla also
         if method == 2:
+            # let both input and clock size scale
+            num_input_qubits = int(np.ceil((num_qubits-2)/3))
             num_clock_qubits = num_qubits - 2*num_input_qubits - 1 # need 1 for ancilla also
     
         # determine number of circuits to execute for this group
-        num_circuits = min(2**(num_qubits), max_circuits)
+        num_circuits = min(2**(num_input_qubits)-1, max_circuits)
         
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
         
@@ -792,15 +758,21 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
         '''
         
         # supply hard-coded beta array (during initial testing)
-        beta_range = [0.0]
-        if max_circuits < len(beta_range): beta_range = beta_range[:max_circuits]   
+        #beta_range = [0.0]
+        #if max_circuits < len(beta_range): beta_range = beta_range[:max_circuits]
+        
+        # create array of indices labeling problem instances
+        instances = list(np.random.choice(range(1,2**num_input_qubits), size=num_circuits))
         
         # loop over limited # of inputs for this
-        for i in range(len(beta_range)):
-            beta = beta_range[i]
+        for i in instances:
+            beta = 0
+            A = shs.generate_sparse_H(num_input_qubits, i)
             
             # create integer that represents beta to precision 4; use s_int as circuit id
-            s_int = int(beta * 10000)
+            # create integer that represents matrix size and index; use as circuit id
+            #s_int = int(beta * 10000)
+            s_int = int(i*num_input_qubits)
             print(f"  ... i={i} s_int={s_int}  beta={beta}")
             
             # create the circuit for given qubit size and secret string, store time metric
@@ -833,5 +805,5 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
                          #transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
 # if main, execute method
-#if __name__ == '__main__': run()
+if __name__ == '__main__': run()
    
