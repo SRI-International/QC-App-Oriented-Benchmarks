@@ -329,7 +329,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 
                     # Must wait for circuit to complete
                     #ex.throttle_execution(metrics.finalize_group)
-                    ex.finalize_execution(None)    # don't finalize group until all circuits done
+                    ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                 
                     return compute_objective(saved_result, nodes, edges)
             
