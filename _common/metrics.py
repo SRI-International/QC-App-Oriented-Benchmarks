@@ -36,6 +36,10 @@ from datetime import datetime
 
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
+
+circuit_metrics_detail = {  }    # for iterative algorithms
+circuit_metrics_detail_2 = {  }  # used to break down to 3rd dimension
+
 group_metrics = { "groups": [],
     "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [],
     "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [],
@@ -102,6 +106,8 @@ def init_metrics ():
     
     # create empty dictionary for circuit metrics
     circuit_metrics.clear()
+    circuit_metrics_detail.clear()
+    circuit_metrics_detail_2.clear()
     
     # create empty arrays for group metrics
     group_metrics["groups"] = []
@@ -298,7 +304,7 @@ def report_metrics ():
         report_metrics_for_group(group)
         
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete
-def finalize_group(group):
+def finalize_group(group, report=True):
 
     #print(f"... finalize group={group}")
 
@@ -312,7 +318,35 @@ def finalize_group(group):
             break
     
     #print(f"  ... group_done = {group} {group_done}")
+    if group_done and report:
+        aggregate_metrics_for_group(group)
+        print("************")
+        report_metrics_for_group(group)
+        
+    # sort the group metrics (sometimes they come back out of order)
+    sort_group_metrics()
+    
+# Aggregate and report on metrics for the given groups, if all circuits in group are complete (2 levels)
+def finalize_group_2_level(group):
+
+    #print(f"... finalize group={group} 2-level")
+
+    # loop over circuits in group to generate totals
+    group_done = True
+    for circuit in circuit_metrics[group]:
+        #print(f"  ... metrics = {group} {circuit} {circuit_metrics[group][circuit]}")
+        
+        if "elapsed_time" not in circuit_metrics[group][circuit]:
+            group_done = False
+            break
+    
+    #print(f"  ... group_done = {group} {group_done}")
     if group_done:
+    
+        # before aggregating, perform aggregtion at 3rd level to create a single entry 
+        # for each circuit_id and a separate table of detail metrics
+        process_circuit_metrics_2_level(group)
+        
         aggregate_metrics_for_group(group)
         print("************")
         report_metrics_for_group(group)
@@ -334,8 +368,116 @@ def sort_group_metrics():
     # save the sorted group names when all done 
     xy = sorted(zip(igroups, group_metrics["groups"]))    
     group_metrics["groups"] = [y for x, y in xy]
-    
 
+# Process the circuit metrics to aggregate to third level by splitting circuit_id 
+# This is used when there is a third level of iteration.  The same circuit is executed multiple times
+# and the metrics collected are indexed by as idx1 * 1000 and idx2
+# Create a circuit_metrics_detail containing all these metrics, aggregate them to circuit_metrics
+# Create a circuit_metrics_detail_2 that has the detail metrics aggregated to support plotting
+
+def process_circuit_metrics_2_level(num_qubits):
+    global circuit_metrics_detail
+    global circuit_metrics_detail_2
+    
+    group = str(num_qubits)
+    
+    # print out what was received
+    #jsonDataStr = json.dumps(circuit_metrics[group], indent=2).replace('\n', '\n  ')
+    #print("  ==> circuit_metrics: %s" % jsonDataStr) 
+    
+    #print(f"... process_circuit_metrics_2_level({num_qubits})") 
+    circuit_metrics_detail[group] = circuit_metrics[group]
+    circuit_metrics[group] = { }
+    
+    circuit_metrics_detail_2[group] = { }
+    
+    avg_fidelity = 0
+    total_elapsed_time = 0
+    total_exec_time = 0
+    
+    # loop over all the collected metrics to split the index into idx1 and idx2
+    count = 0
+    for circuit_id in circuit_metrics_detail[group]:
+        #if count == 0: print(f"...   circuit_id={circuit_id}")
+                
+        id = int(circuit_id)
+        idx1 = id; idx2 = -1
+        if id >= 1000:
+            idx1 = int(id / 1000)
+            idx2 = id % 1000
+            
+        #print(f"...   idx1, idx2={idx1} {idx2}") 
+        
+        # if we have metrics for this (outer) circuit_id, then we need to accumulate these metrics
+        # as they are encountered; otherwise there will just be one added the first time.
+        # The result is that the circuit_metrics_detail dict is created, but indexed by one index (idx1 * 1000 + idx2)
+        if idx1 in circuit_metrics[group]:
+            last_circuit_id = str(int(circuit_id) - 1)
+            circuit_metrics_detail[group][circuit_id]["elapsed_time"] += circuit_metrics_detail[group][last_circuit_id]["elapsed_time"]
+            circuit_metrics_detail[group][circuit_id]["exec_time"] += circuit_metrics_detail[group][last_circuit_id]["exec_time"]
+       
+        # if there are no circuit_metrics created yet for this idx1, start a detail_2 table 
+        else:
+            circuit_metrics_detail_2[group][idx1] = { }
+          
+        # copy each of the detail metrics to the detail_2 dict indexed by idx1 and idx2 as they are encountered
+        circuit_metrics_detail_2[group][idx1][idx2] = circuit_metrics_detail[group][circuit_id]
+        
+        # copy each detail entry to circuit_metrics_new so last one ends up there,
+        # storing the last entry as the primary entry for this circuit id
+        circuit_metrics[group][idx1] = circuit_metrics_detail[group][circuit_id]  
+        
+        # at the end we have one entry in the circuit_metrics table for the group and primary circuit_id
+        # circuit_metrics_detail_2 has all the detail metrics indexed by group, idx1 and idx2 (where idx1=circuit_id)
+        # circuit_metrics_detail is not used, just an intermediate
+        
+        count += 1 
+
+
+# The method below is used in one form of iteration benchmark (TDB whether to retain JN)
+
+iterations_metrics = {}
+
+# Separate out metrics for final vs. intermediate circuits
+
+def process_iteration_metrics(group_id):
+    global circuit_metrics
+    global iterations_metrics
+    g_id = str(group_id)
+    iterations_metrics[g_id] = {}
+    
+    for iteration, data in circuit_metrics[g_id].items():            
+        for key, value in data.items():
+            if iteration == '1':
+                iterations_metrics[g_id][key] = []
+            
+            iterations_metrics[g_id][key].append(value)
+      
+    del circuit_metrics[g_id]
+    return iterations_metrics
+ 
+ 
+# convenience funtions to print all circuit metrics (for degugging)
+
+def dump_json(msg, data):
+    jsonDataStr = json.dumps(data, indent=2).replace('\n', '\n  ')    
+    print(f"{msg}: {jsonDataStr}") 
+    
+def print_all_circuit_metrics():
+
+    dump_json("  ==> all circuit_metrics", circuit_metrics)
+    
+    print(f"  ==> all detail 2 circuit_metrics:")
+    for group in circuit_metrics_detail_2:
+        for circuit_id in circuit_metrics_detail_2[group]:
+            print(f"    group {group} circuit {circuit_id}")
+            for it in circuit_metrics_detail_2[group][circuit_id]:
+                mets = circuit_metrics_detail_2[group][circuit_id][it]
+                elt = round(mets["elapsed_time"], 3)
+                ext = round(mets["exec_time"], 3)
+                fid = round(mets["fidelity"], 3)
+                print(f"      iteration {it} = {elt} {ext} {fid}")
+                
 ##########################################
 # ANALYSIS AND VISUALIZATION
 
@@ -1102,6 +1244,7 @@ def polarization_fidelity(counts, correct_dist, thermal_dist=None):
     fidelity = rescale_fidelity(fidelity, floor_fidelity, new_floor_fidelity)
 
     return fidelity
+
 
 ##############################################
 # VOLUMETRIC PLOT
