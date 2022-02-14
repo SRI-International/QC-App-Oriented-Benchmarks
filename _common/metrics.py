@@ -700,7 +700,113 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         
         #display plot
         plt.show()       
+        
+        
+def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}):
+    """
+    Plots a score metric as an area plot, on axes defined by x_metric and y_metric
+    
+    fixed_metrics: (dict) A dictionary mapping metric keywords to the values they are to be held at;
+                          for example: 
+                          
+                          fixed_metrics = {'rounds': 2}
+                              
+                              when the y-axis is num_qubits or 
+                          
+                          fixed_metrics = {'num_qubits': 4}
+                          
+                              when the y-axis is rounds.    
+    """
+    num_x_buckets = 20
+    
+    #print(f"  ==> all detail 2 circuit_metrics:")
+    for group in circuit_metrics_detail_2:
+        
+        num_qubits = int(group)
+        
+        if 'num_qubits' in fixed_metrics:
+            if num_qubits != fixed_metrics['num_qubits']:
+                continue
+        
+        x_groups = []
+        y_groups = []
+        score_groups = []
+        
+        for circuit_id in circuit_metrics_detail_2[group]:
+            # Each problem instance at size num_qubits; need to collate across iterations
+            x_last = 0
+            x_points = []
+            y_points = []
+            score_points = []
+            
+            
+            for it in circuit_metrics_detail_2[group][circuit_id]:
+                mets = circuit_metrics_detail_2[group][circuit_id][it]
+                
+                x = x_last + mets[x_metric]
+                x_last = x
+                
+                if y_metric == 'num_qubits':
+                    y = num_qubits
+                else:
+                    y = mets[y_metric]
+                
+                # Count only iterations at valid fixed_metric values
+                for fixed_m in fixed_metrics:
+                    if mets[fixed_m] != fixed_metrics[fixed_m]:
+                        continue
+                    # Support intervals e.g. {'depth': (15, 65)}
+                    elif len(fixed_metrics[fixed_m]) == 2:
+                        if mets[fixed_m]<fixed_metrics[fixed_m][0] or mets[fixed_m]>fixed_metrics[fixed_m][1]:
+                            continue
+                
+                x_points.append(x)
+                y_points.append(y)
+                score_points.append(mets[score_metric])
+            
+            print(x_points)
+            print('')
+            
+            x_groups.append(x_points)
+            y_groups.append(y_points)
+            score_groups.append(score_points)
+        
+        x, y, scores = bin_averaging(x_groups, y_groups, score_groups)
+        
+        print(x)
+        ### TODO: With properly binned metrics, detailing average fidelity at (time +/- delta, num_qubits)
+        ###       pairs, implement area plotting function on newly binned data. 
+        
 
+# Helper function to bin for averaging metrics, for instances occuring at equal num_qubits
+def bin_averaging(x_groups, y_groups, score_groups, num_bins=20):
+    bin_x, bin_y, bin_s = {}, {}, {}
+    x_min, x_max = x_groups[0][0], x_groups[-1][-1]
+    step = (x_max - x_min)/num_bins
+    
+    for group in range(len(x_groups)):      
+        
+        k = 0
+        for i in range(len(x_groups[group])):
+            if x_groups[group][i] >= x_min + k*step:
+                k += 1
+                if k not in bin_x:
+                    bin_x[k] = []
+                    bin_y[k] = []
+                    bin_s[k] = []
+                    
+            bin_x[k] = bin_x[k] + [x_groups[group][i]]
+            bin_y[k] = bin_y[k] + [y_groups[group][i]]
+            bin_s[k] = bin_s[k] + [score_groups[group][i]]
+        
+    new_x, new_y, new_s = [], [], []    
+    for k in bin_x:
+        new_x.append(sum(bin_x[k])/len(bin_x[k]))
+        new_y.append(sum(bin_y[k])/len(bin_y[k]))
+        new_s.append(sum(bin_s[k])/len(bin_s[k]))
+    
+    return new_x, new_y, new_s
+    
     
 # Plot metrics over all groups (2)
 def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-1"):    

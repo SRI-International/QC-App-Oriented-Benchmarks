@@ -357,17 +357,19 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-
-    if method == 2:
-        metrics.print_all_circuit_metrics()
              
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
-
+    
+    
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
+    if method == 1:
+        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
+    elif method == 2:
+        #metrics.print_all_circuit_metrics()
+        metrics.plot_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
 
 # if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__': run(min_qubits=4, max_qubits=6, method=2)
    
