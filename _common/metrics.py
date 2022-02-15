@@ -702,7 +702,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         plt.show()       
         
         
-def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=400):
+def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=10):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -762,30 +762,26 @@ def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time'
             y_groups.append(y_points)
             score_groups.append(score_points)
         
-        #x_, y_, scores_ = bin_averaging(x_groups, y_groups, score_groups, num_x_bins=num_x_bins)
-        x_, y_, scores_ = [], [], []
-        for j in range(len(x_groups)):
-            for l in range(len(x_groups[j])):
-                x_.append(x_groups[j][l])
-                y_.append(y_groups[j][l])
-                scores_.append(score_groups[j][l])
+        x_, y_, scores_ = x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins=num_x_bins)
+        #x_, y_, scores_ = [], [], []
+        #for j in range(len(x_groups)):
+        #    for l in range(len(x_groups[j])):
+        #        x_.append(x_groups[j][l])
+        #        y_.append(y_groups[j][l])
+        #        scores_.append(score_groups[j][l])
    
         x = x + x_
         y = y + y_
         scores = scores + scores_
-    print(x)
-    
-    ### TODO: With properly binned metrics, detailing average fidelity at (time +/- delta, num_qubits)
-    ###       pairs, implement area plotting function on newly binned data. 
-        
+            
     ax = plot_metrics_background(y_metric, x_metric, score_metric, y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x), suptitle=None)
-    plot_volumetric_data(ax, y, x, scores, depth_base=0, label='Depth',
-        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False)
+    plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth',
+        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, x_size=0.05, y_size=1.0)
     
         
 
 # Helper function to bin for averaging metrics, for instances occuring at equal num_qubits
-def bin_averaging(x_groups, y_groups, score_groups, num_x_bins):
+def x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins):
     bin_x, bin_y, bin_s = {}, {}, {}
     x_min, x_max = x_groups[0][0], x_groups[0][0]
     for group in x_groups:
@@ -1393,14 +1389,13 @@ def get_color(value):
 # return the base index for a circuit depth value
 # take the log in the depth base, and add 1
 def depth_index(d, depth_base):
-    if depth_base <= 0:
+    if depth_base <= 1:
         return d
     return math.log(d, depth_base) + 1
 
 
 # draw a box at x,y with various attributes   
-def box_at(x, y, value, type=1, fill=True):
-    size = 1.0
+def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0):
     
     value = min(value, 1.0)
     value = max(value, 0.0)
@@ -1408,11 +1403,11 @@ def box_at(x, y, value, type=1, fill=True):
     fc = get_color(value)
     ec = (0.5,0.5,0.5)
     
-    return Rectangle((x - size/2, y - size/2), size, size,
+    return Rectangle((x - (x_size/2), y - (y_size/2)), x_size, y_size,
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
-             lw=0.5)
+             lw=0.5*y_size)
              
 def box4_at(x, y, value, type=1, fill=True):
     size = 1.0
@@ -1611,7 +1606,7 @@ def plot_metrics_background(y_metric, x_metric, score_metric, y_max, x_max, y_mi
         suptitle = f"{y_metric} vs. {x_metric} Parameter Positioning of {score_metric}"
     
     plot_width = 6.8
-    plot_height = 3.5 + plot_width
+    plot_height = 5.0
     #print(f"... {plot_width} {plot_height}")
     
     # define matplotlib figure and axis; use constrained layout to fit colorbar to right
@@ -1623,12 +1618,11 @@ def plot_metrics_background(y_metric, x_metric, score_metric, y_max, x_max, y_mi
     plt.ylim(y_min*0.5, y_max*1.5)
 
     # circuit depth axis (x axis)
-    xbasis = [x for x in range(1,21)]
-    xround = [(x_max - x_min)/20 * x for x in xbasis]
+    xround = [(x_max - x_min)/20 * x for x in range(25)]
     xlabels = [format_number(x) for x in xround]
     ax.set_xlabel(x_metric)
-    ax.set_xticks(xbasis)  
-    plt.xticks(xbasis, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
+    ax.set_xticks(xround)  
+    plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
     
     # other label options
     #plt.xticks(xbasis, xlabels, color='black', rotation=-60, ha='left')
@@ -1664,7 +1658,7 @@ def vplot_anno_init ():
 
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
-        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False):
+        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, x_size=1.0, y_size=1.0):
 
     # since data may come back out of order, save point at max y for annotation
     i_anno = 0
@@ -1676,7 +1670,7 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
         x = depth_index(d_data[i], depth_base)
         y = float(w_data[i])
         f = f_data[i]
-        ax.add_patch(box_at(x, y, f, type=type, fill=fill))
+        ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
 
         if y >= y_anno:
             x_anno = x

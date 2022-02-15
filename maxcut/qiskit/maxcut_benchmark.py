@@ -194,7 +194,7 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1,
+        method=1, rounds=1, max_iter_circs=300, max_iter_time=100,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
         
@@ -301,9 +301,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                       
                 # a unique circuit index used inside the inner minimizer loop as identifier         
                 unique_circuit_index = 0 
+                start_iters_t = time.time()
                 
                 p_depth = 2
                 thetas_init = 2*p_depth*[1.0]
+                
             
                 def expectation(theta):
                     global unique_circuit_index
@@ -312,6 +314,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     unique_id = s_int*1000 + unique_circuit_index
                     
                     unique_circuit_index += 1
+                    current_t = time.time() - start_iters_t
+                    if current_t > max_iter_time or unique_circuit_index > max_iter_circs:
+                        return compute_objective(saved_result, nodes, edges)
                 
                     # create the circuit for given qubit size and secret string, store time metric
                     ts = time.time()
