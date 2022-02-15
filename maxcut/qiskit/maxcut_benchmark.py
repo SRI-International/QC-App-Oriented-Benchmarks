@@ -367,7 +367,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     if method == 1:
         metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
     elif method == 2:
-        #metrics.print_all_circuit_metrics()
+        metrics.print_all_circuit_metrics()
         metrics.plot_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
 
 # if main, execute method

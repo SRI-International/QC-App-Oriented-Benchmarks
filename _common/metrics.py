@@ -702,7 +702,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         plt.show()       
         
         
-def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}):
+def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=400):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -717,8 +717,7 @@ def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time'
                           
                               when the y-axis is rounds.    
     """
-    num_x_buckets = 20
-    
+    x, y, scores = [], [], []
     #print(f"  ==> all detail 2 circuit_metrics:")
     for group in circuit_metrics_detail_2:
         
@@ -728,28 +727,23 @@ def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time'
             if num_qubits != fixed_metrics['num_qubits']:
                 continue
         
-        x_groups = []
-        y_groups = []
-        score_groups = []
+        x_groups, y_groups, score_groups = [], [], []
         
         for circuit_id in circuit_metrics_detail_2[group]:
             # Each problem instance at size num_qubits; need to collate across iterations
             x_last = 0
-            x_points = []
-            y_points = []
-            score_points = []
-            
+            x_points, y_points, score_points = [], [], []            
             
             for it in circuit_metrics_detail_2[group][circuit_id]:
                 mets = circuit_metrics_detail_2[group][circuit_id][it]
                 
-                x = x_last + mets[x_metric]
-                x_last = x
+                x_now = x_last + mets[x_metric]
+                x_last = x_now
                 
                 if y_metric == 'num_qubits':
-                    y = num_qubits
+                    y_now = num_qubits
                 else:
-                    y = mets[y_metric]
+                    y_now = mets[y_metric]
                 
                 # Count only iterations at valid fixed_metric values
                 for fixed_m in fixed_metrics:
@@ -760,40 +754,58 @@ def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time'
                         if mets[fixed_m]<fixed_metrics[fixed_m][0] or mets[fixed_m]>fixed_metrics[fixed_m][1]:
                             continue
                 
-                x_points.append(x)
-                y_points.append(y)
+                x_points.append(x_now)
+                y_points.append(y_now)
                 score_points.append(mets[score_metric])
-            
-            print(x_points)
-            print('')
-            
+                        
             x_groups.append(x_points)
             y_groups.append(y_points)
             score_groups.append(score_points)
         
-        x, y, scores = bin_averaging(x_groups, y_groups, score_groups)
+        #x_, y_, scores_ = bin_averaging(x_groups, y_groups, score_groups, num_x_bins=num_x_bins)
+        x_, y_, scores_ = [], [], []
+        for j in range(len(x_groups)):
+            for l in range(len(x_groups[j])):
+                x_.append(x_groups[j][l])
+                y_.append(y_groups[j][l])
+                scores_.append(score_groups[j][l])
+   
+        x = x + x_
+        y = y + y_
+        scores = scores + scores_
+    print(x)
+    
+    ### TODO: With properly binned metrics, detailing average fidelity at (time +/- delta, num_qubits)
+    ###       pairs, implement area plotting function on newly binned data. 
         
-        print(x)
-        ### TODO: With properly binned metrics, detailing average fidelity at (time +/- delta, num_qubits)
-        ###       pairs, implement area plotting function on newly binned data. 
+    ax = plot_metrics_background(y_metric, x_metric, score_metric, y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x), suptitle=None)
+    plot_volumetric_data(ax, y, x, scores, depth_base=0, label='Depth',
+        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False)
+    
         
 
 # Helper function to bin for averaging metrics, for instances occuring at equal num_qubits
-def bin_averaging(x_groups, y_groups, score_groups, num_bins=20):
+def bin_averaging(x_groups, y_groups, score_groups, num_x_bins):
     bin_x, bin_y, bin_s = {}, {}, {}
-    x_min, x_max = x_groups[0][0], x_groups[-1][-1]
-    step = (x_max - x_min)/num_bins
+    x_min, x_max = x_groups[0][0], x_groups[0][0]
+    for group in x_groups:
+        min_, max_ = min(group), max(group)
+        if min_ < x_min:
+            x_min = min_
+        if max_ > x_max:
+            x_max = max_
+    step = (x_max - x_min)/num_x_bins
     
     for group in range(len(x_groups)):      
         
         k = 0
         for i in range(len(x_groups[group])):
-            if x_groups[group][i] >= x_min + k*step:
+            while x_groups[group][i] >= x_min + k*step:
                 k += 1
-                if k not in bin_x:
-                    bin_x[k] = []
-                    bin_y[k] = []
-                    bin_s[k] = []
+            if k not in bin_x:
+                bin_x[k] = []
+                bin_y[k] = []
+                bin_s[k] = []
                     
             bin_x[k] = bin_x[k] + [x_groups[group][i]]
             bin_y[k] = bin_y[k] + [y_groups[group][i]]
@@ -1381,6 +1393,8 @@ def get_color(value):
 # return the base index for a circuit depth value
 # take the log in the depth base, and add 1
 def depth_index(d, depth_base):
+    if depth_base <= 0:
+        return d
     return math.log(d, depth_base) + 1
 
 
@@ -1586,6 +1600,48 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     # add colorbar to right of plot
     plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label="Avg Result Fidelity", panchor=(0.0, 0.7))
             
+    return ax
+
+
+
+# Linear Background Analog of the QV Volumetric Background, to allow arbitrary metrics on each axis
+def plot_metrics_background(y_metric, x_metric, score_metric, y_max, x_max, y_min=0, x_min=0, suptitle=None):
+    
+    if suptitle == None:
+        suptitle = f"{y_metric} vs. {x_metric} Parameter Positioning of {score_metric}"
+    
+    plot_width = 6.8
+    plot_height = 3.5 + plot_width
+    #print(f"... {plot_width} {plot_height}")
+    
+    # define matplotlib figure and axis; use constrained layout to fit colorbar to right
+    fig, ax = plt.subplots(figsize=(plot_width, plot_height), constrained_layout=True)
+
+    plt.suptitle(suptitle)
+
+    plt.xlim(x_min, x_max)
+    plt.ylim(y_min*0.5, y_max*1.5)
+
+    # circuit depth axis (x axis)
+    xbasis = [x for x in range(1,21)]
+    xround = [(x_max - x_min)/20 * x for x in xbasis]
+    xlabels = [format_number(x) for x in xround]
+    ax.set_xlabel(x_metric)
+    ax.set_xticks(xbasis)  
+    plt.xticks(xbasis, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
+    
+    # other label options
+    #plt.xticks(xbasis, xlabels, color='black', rotation=-60, ha='left')
+    #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
+
+    # circuit width axis (y axis)
+    ybasis = [y for y in range(9)]
+    ax.set_ylabel(y_metric)
+    ax.set_yticks(ybasis)
+    
+    # add colorbar to right of plot
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=f"Avg Result {score_metric}", panchor=(0.0, 0.7))
+    
     return ax
 
 x_annos = []
