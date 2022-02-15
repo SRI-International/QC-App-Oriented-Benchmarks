@@ -702,7 +702,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         plt.show()       
         
         
-def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=10):
+def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -776,7 +776,7 @@ def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time'
             
     ax = plot_metrics_background(y_metric, x_metric, score_metric, y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x), suptitle=None)
     plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth',
-        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, x_size=0.05, y_size=1.0)
+        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, x_size=(max(x)-min(x))/num_x_bins, y_size=1.0)
     
         
 
