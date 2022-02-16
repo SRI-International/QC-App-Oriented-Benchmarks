@@ -701,8 +701,22 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         #display plot
         plt.show()       
         
+def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
+    if type(score_metric) == str:
+        score_metric = [score_metric]
+    if type(x_metric) == str:
+        x_metric = [x_metric]
+    if type(y_metric) == str:
+        y_metric = [y_metric]
+    
+    for s_m in score_metric:
+        for x_m in x_metric:
+            for y_m in y_metric:
+                plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size)
+    
+    
         
-def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
+def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -783,9 +797,8 @@ def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time'
         y = y + y_
         scores = scores + scores_
             
-    print(max(y))
-    ax = plot_metrics_background(y_metric, x_metric, score_metric, y_max=max(y), x_max=max(x),
-                                 y_min=min(y), x_min=min(x), suptitle=None)
+    ax = plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max=max(y), x_max=max(x),
+                                 y_min=min(y), x_min=min(x))
     if x_size == None:
         x_size=(max(x)-min(x))/num_x_bins
     if y_size == None:
@@ -1615,7 +1628,7 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
 
 
 # Linear Background Analog of the QV Volumetric Background, to allow arbitrary metrics on each axis
-def plot_metrics_background(y_metric, x_metric, score_metric, y_max, x_max, y_min=0, x_min=0, suptitle=None):
+def plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max, x_max, y_min=0, x_min=0):
     
     if suptitle == None:
         suptitle = f"{y_metric} vs. {x_metric} Parameter Positioning of {score_metric}"

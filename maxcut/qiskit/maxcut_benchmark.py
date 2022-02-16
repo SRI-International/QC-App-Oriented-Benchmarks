@@ -229,8 +229,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100, method=1,
         nodes, edges = common.read_maxcut_instance(instance_filename)
         opt, _ = common.read_maxcut_solution(instance_filename)
         
-        f = -1 * compute_objective(result, nodes, edges) / opt
-        metrics.store_metric(num_qubits, s_int, 'fidelity', f)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
+        metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+        
+        a_r = -1 * compute_objective(result, nodes, edges) / opt
+        metrics.store_metric(num_qubits, s_int, 'approx_ratio', a_r)
         
         saved_result = result
      
@@ -371,7 +374,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100, method=1,
         metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
     elif method == 2:
         #metrics.print_all_circuit_metrics()
-        metrics.plot_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric,
+        metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric,
                                   x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
                                   num_x_bins=num_x_bins, x_size=x_size, y_size=y_size)
 
