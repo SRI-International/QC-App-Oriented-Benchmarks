@@ -193,8 +193,9 @@ saved_result = None
 instance_filename = None
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1, max_iter_circs=300, max_iter_time=100,
+def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100, method=1,
+        rounds=1, max_iter=15, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits',
+        fixed_metrics={}, num_x_bins=20, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
         
@@ -314,9 +315,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     unique_id = s_int*1000 + unique_circuit_index
                     
                     unique_circuit_index += 1
-                    current_t = time.time() - start_iters_t
-                    if current_t > max_iter_time or unique_circuit_index > max_iter_circs:
-                        return compute_objective(saved_result, nodes, edges)
                 
                     # create the circuit for given qubit size and secret string, store time metric
                     ts = time.time()
@@ -338,7 +336,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 
                     return compute_objective(saved_result, nodes, edges)
             
-                res = minimize(expectation, thetas_init, method='COBYLA', options = { 'maxiter': 6} )
+                res = minimize(expectation, thetas_init, method='COBYLA', options = { 'maxiter': max_iter} )
                 opt, sol = common.read_maxcut_solution(instance_filename)
             
                 num_qubits = int(num_qubits)
@@ -350,7 +348,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 metrics.store_metric(num_qubits, s_int, 'rounds', p_depth)
                 '''
                 #print(res)
-            
+                
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
         if method == 2:                  
@@ -372,8 +370,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     if method == 1:
         metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
     elif method == 2:
-        metrics.print_all_circuit_metrics()
-        metrics.plot_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
+        #metrics.print_all_circuit_metrics()
+        metrics.plot_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric,
+                                  x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
+                                  num_x_bins=num_x_bins, x_size=x_size, y_size=y_size)
 
 # if main, execute method
 if __name__ == '__main__': run(min_qubits=4, max_qubits=6, method=2)

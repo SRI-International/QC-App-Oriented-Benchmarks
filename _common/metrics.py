@@ -702,7 +702,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         plt.show()       
         
         
-def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100):
+def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -718,6 +718,14 @@ def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time'
                               when the y-axis is rounds.    
     """
     x, y, scores = [], [], []
+    cumulative_flag, maximum_flag = False, False
+    if len(x_metric) > 11 and x_metric[:11] == 'cumulative_':
+        cumulative_flag = True
+        x_metric = x_metric[11:]
+    if score_metric[:4] == 'max_':
+        maximum_flag = True
+        score_metric = score_metric[4:]
+    
     #print(f"  ==> all detail 2 circuit_metrics:")
     for group in circuit_metrics_detail_2:
         
@@ -731,13 +739,14 @@ def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time'
         
         for circuit_id in circuit_metrics_detail_2[group]:
             # Each problem instance at size num_qubits; need to collate across iterations
-            x_last = 0
+            x_last, score_last = 0, 0
             x_points, y_points, score_points = [], [], []            
             
             for it in circuit_metrics_detail_2[group][circuit_id]:
                 mets = circuit_metrics_detail_2[group][circuit_id][it]
                 
-                x_now = x_last + mets[x_metric]
+                if cumulative_flag:
+                    x_now = x_last + mets[x_metric]
                 x_last = x_now
                 
                 if y_metric == 'num_qubits':
@@ -754,29 +763,35 @@ def plot_area_metrics(suptitle="", score_metric='fidelity', x_metric='exec_time'
                         if mets[fixed_m]<fixed_metrics[fixed_m][0] or mets[fixed_m]>fixed_metrics[fixed_m][1]:
                             continue
                 
+                if maximum_flag:
+                    score_now = max(score_last, mets[score_metric])
+                else:
+                    score_now = mets[score_metric]
+                score_last = score_now
+                
                 x_points.append(x_now)
                 y_points.append(y_now)
-                score_points.append(mets[score_metric])
+                score_points.append(score_now)
                         
             x_groups.append(x_points)
             y_groups.append(y_points)
             score_groups.append(score_points)
         
         x_, y_, scores_ = x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins=num_x_bins)
-        #x_, y_, scores_ = [], [], []
-        #for j in range(len(x_groups)):
-        #    for l in range(len(x_groups[j])):
-        #        x_.append(x_groups[j][l])
-        #        y_.append(y_groups[j][l])
-        #        scores_.append(score_groups[j][l])
    
         x = x + x_
         y = y + y_
         scores = scores + scores_
             
-    ax = plot_metrics_background(y_metric, x_metric, score_metric, y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x), suptitle=None)
-    plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth',
-        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, x_size=(max(x)-min(x))/num_x_bins, y_size=1.0)
+    print(max(y))
+    ax = plot_metrics_background(y_metric, x_metric, score_metric, y_max=max(y), x_max=max(x),
+                                 y_min=min(y), x_min=min(x), suptitle=None)
+    if x_size == None:
+        x_size=(max(x)-min(x))/num_x_bins
+    if y_size == None:
+        y_size = 1.0
+    plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
+                         labelrot=0, type=1, fill=True, w_max=18, do_label=False, x_size=x_size, y_size=y_size)
     
         
 
@@ -1614,10 +1629,10 @@ def plot_metrics_background(y_metric, x_metric, score_metric, y_max, x_max, y_mi
 
     plt.suptitle(suptitle)
 
-    plt.xlim(x_min, x_max)
+    plt.xlim(x_min - (x_max-x_min)/20, x_max)
     plt.ylim(y_min*0.5, y_max*1.5)
 
-    # circuit depth axis (x axis)
+    # circuit metrics (x axis)
     xround = [(x_max - x_min)/20 * x for x in range(25)]
     xlabels = [format_number(x) for x in xround]
     ax.set_xlabel(x_metric)
@@ -1628,10 +1643,11 @@ def plot_metrics_background(y_metric, x_metric, score_metric, y_max, x_max, y_mi
     #plt.xticks(xbasis, xlabels, color='black', rotation=-60, ha='left')
     #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
 
-    # circuit width axis (y axis)
-    ybasis = [y for y in range(9)]
+    # circuit metrics (y axis)
+    yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]
+    xlabels = [format_number(y) for y in yround]
     ax.set_ylabel(y_metric)
-    ax.set_yticks(ybasis)
+    ax.set_yticks(yround)  
     
     # add colorbar to right of plot
     plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=f"Avg Result {score_metric}", panchor=(0.0, 0.7))
