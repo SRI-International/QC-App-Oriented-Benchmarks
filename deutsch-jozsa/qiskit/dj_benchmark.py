@@ -201,7 +201,7 @@ def run (min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     print("\nBalanced Oracle 'Uf' ="); print(B_ORACLE_ if B_ORACLE_ != None else " ... too large or not used!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Deutsch-Jozsa - Qiskit")
+    metrics.plot_metrics_aq("Benchmark Results - Deutsch-Jozsa - Qiskit")
 
 # if main, execute method
 if __name__ == '__main__': run()
