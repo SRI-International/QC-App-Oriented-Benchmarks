@@ -355,6 +355,9 @@ def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
     # Accumulate metrics asynchronously as circuits complete
     for input_size in range(min_qubits, max_qubits + 1, 2):
 
+        # reset random seed
+        np.random.seed(0)
+
         # determine the number of circuits to execute for this group
         num_circuits = min(3, max_circuits)
 
