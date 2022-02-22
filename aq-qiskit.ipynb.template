@@ -73,7 +73,7 @@
     "sys.path.insert(1, \"quantum-fourier-transform/qiskit\")\n",
     "import qft_benchmark\n",
     "min_qubits=6\n",
-    "max_qubits=18\n",
+    "max_qubits=15\n",
     "qft_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                method=1,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
@@ -107,8 +107,8 @@
     "import sys\n",
     "sys.path.insert(1, \"amplitude-estimation/qiskit\")\n",
     "import ae_benchmark\n",
-    "min_qubits=3\n",
-    "max_qubits=8\n",
+    "min_qubits=4\n",
+    "max_qubits=6\n",
     "ae_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
@@ -125,7 +125,7 @@
     "sys.path.insert(1, \"monte-carlo/qiskit\")\n",
     "import mc_benchmark\n",
     "min_qubits=4\n",
-    "max_qubits=7\n",
+    "max_qubits=6\n",
     "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
@@ -198,7 +198,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.9.7"
+   "version": "3.8.5"
   }
  },
  "nbformat": 4,
