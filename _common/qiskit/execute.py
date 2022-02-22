@@ -283,6 +283,7 @@ def execute_circuit(circuit):
     qc_tr_size = qc_size
     qc_tr_count_ops = qc_count_ops
     qc_tr_xi = 0; 
+    qc_tr_n2q = 0
     #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
     
     try:    
@@ -298,7 +299,7 @@ def execute_circuit(circuit):
                 qc = transpile(circuit["qc"], backend)
             else:
                 basis_gates = basis_gates_array[basis_selector]
-                qc = transpile(circuit["qc"], basis_gates=basis_gates)
+                qc = transpile(circuit["qc"], basis_gates=basis_gates,seed_transpiler=0)
             
             if verbose_time:
                 print(f"*** normalization qiskit.transpile() time = {time.time() - st}")
@@ -317,7 +318,8 @@ def execute_circuit(circuit):
                     if key == "barrier": continue
                     if key.startswith("c"): n2q += value
                     else: n1q += value
-                qc_tr_xi = n2q / (n1q + n2q)    
+                qc_tr_xi = n2q / (n1q + n2q) 
+                qc_tr_n2q = n2q   
             #print(f"... qc_tr_xi = {qc_tr_xi} {n1q} {n2q}")
         
         # use noise model from execution options if given for simulator
@@ -446,6 +448,7 @@ def execute_circuit(circuit):
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_depth', qc_tr_depth)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_size', qc_tr_size)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_xi', qc_tr_xi)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_n2q', qc_tr_n2q)
     
     # return, so caller can do other things while waiting for jobs to complete
 

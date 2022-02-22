@@ -163,7 +163,7 @@ def uniform_prep(qc, qr, num_state_qubits):
     """
     for i in range(num_state_qubits):
         qc.h(i)
-            
+
 def AE_Subroutine(num_state_qubits, num_counting_qubits, A_circuit):
     qr_state = QuantumRegister(num_state_qubits+1)
     qr_counting = QuantumRegister(num_counting_qubits)
@@ -265,6 +265,9 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots, met
 
     # obtain bit_counts from the result object
     bit_counts = result.get_counts(qc)
+
+    # calculate the expected output histogram
+    bit_correct_dist = a_to_bitstring(exact, num_counting_qubits)
     
     # convert bit_counts into expectation values counts according to Quantum Risk Analysis paper
     counts = expectation_from_bits(bit_counts, num_counting_qubits, num_shots, method)
@@ -278,6 +281,7 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots, met
 
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
+    aq_fidelity = metrics.hellinger_fidelity_with_expected(bit_counts, bit_correct_dist)
 
     ###########################################################################
     # NOTE: in this benchmark, we are testing how well the amplitude estimation routine
@@ -293,7 +297,19 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots, met
     
     if verbose: print(f"Solution counts: {counts}")
         
-    return counts, fidelity
+    return counts, fidelity, aq_fidelity
+
+def a_to_bitstring(a, num_counting_qubits):
+    m = num_counting_qubits
+
+    # solution 1
+    num1 = round(np.arcsin(np.sqrt(a)) / np.pi * 2**m)
+    num2 = round( (np.pi - np.arcsin(np.sqrt(a))) / np.pi * 2**m)
+    if num1 != num2 and num2 < 2**m and num1 < 2**m:
+        counts = {format(num1, "0"+str(m)+"b"): 0.5, format(num2, "0"+str(m)+"b"): 0.5}
+    else:
+        counts = {format(num1, "0"+str(m)+"b"): 1}
+    return counts
 
 def expectation_from_bits(bits, num_qubits, num_shots, method):
     amplitudes = {}
@@ -370,8 +386,9 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
     def execution_handler(qc, result, num_qubits, mu, num_shots):
         # determine fidelity of result set
         num_counting_qubits = int(num_qubits) - num_state_qubits -1
-        counts, fidelity = analyze_and_print_result(qc, result, num_counting_qubits, float(mu), num_shots, method=method, num_state_qubits=num_state_qubits)
+        counts, fidelity, aq_fidelity = analyze_and_print_result(qc, result, num_counting_qubits, float(mu), num_shots, method=method, num_state_qubits=num_state_qubits)
         metrics.store_metric(num_qubits, mu, 'fidelity', fidelity)
+        metrics.store_metric(num_qubits, mu, 'aq_fidelity', aq_fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -381,6 +398,9 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1):
+
+        # reset random seed
+        np.random.seed(0)
 
         input_size = num_qubits - 1 # TODO: keep using inputsize? only used in num_circuits
         
@@ -435,7 +455,7 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
     print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Monte Carlo Sampling ({method}) - Qiskit")
+    metrics.plot_metrics_aq(f"Benchmark Results - Monte Carlo Sampling ({method}) - Qiskit")
     
     
         

@@ -192,8 +192,9 @@ def analyze_and_print_result(qc, result, num_qubits, marked_item, num_shots):
 
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    aq_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
 
-    return counts, fidelity
+    return counts, fidelity, aq_fidelity
 
 def grovers_dist(num_qubits, marked_item):
     
@@ -249,8 +250,9 @@ def run(min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
 
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
+        counts, fidelity, aq_fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+        metrics.store_metric(num_qubits, s_int, 'aq_fidelity', aq_fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -300,7 +302,7 @@ def run(min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
     print("\nDiffuser ="); print(diffusion_operator )
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Grover's Search - Qiskit")
+    metrics.plot_metrics_aq("Benchmark Results - Grover's Search - Qiskit")
 
 
 # if main, execute method

@@ -327,8 +327,9 @@ def analyze_and_print_result(qc, result, num_qubits, order, num_shots, method):
 
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    aq_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
 
-    return counts, fidelity
+    return counts, fidelity, aq_fidelity
 
         
 #################### Benchmark Loop        
@@ -367,8 +368,9 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
         num_qubits = int(num_qubits)
         #Must convert number_order from string to array
         order = eval(number_order)[1]
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, order, num_shots, method)
+        counts, fidelity, aq_fidelity = analyze_and_print_result(qc, result, num_qubits, order, num_shots, method)
         metrics.store_metric(num_qubits, number_order, 'fidelity', fidelity)
+        metrics.store_metric(num_qubits, number_order, 'aq_fidelity', aq_fidelity)
 
 
     # Initialize execution module using the execution result handler above and specified backend_id
@@ -434,7 +436,7 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Shor's Order Finding ({method}) - Qiskit")
+    metrics.plot_metrics_aq(f"Benchmark Results - Shor's Order Finding ({method}) - Qiskit")
 
     
 # if main, execute method

@@ -235,10 +235,11 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots, met
             
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    aq_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
 
     if verbose: print(f"For secret int {secret_int} measured: {counts} fidelity: {fidelity}")
 
-    return counts, fidelity
+    return counts, fidelity, aq_fidelity
 
 ################ Benchmark Loop
 
@@ -264,8 +265,9 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, num_shots = 100,
      
         # determine fidelity of result set
         num_qubits = int(input_size)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots, method)
+        counts, fidelity, aq_fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots, method)
         metrics.store_metric(input_size, s_int, 'fidelity', fidelity)
+        metrics.store_metric(input_size, s_int, 'aq_fidelity', aq_fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -276,6 +278,9 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, num_shots = 100,
     # Accumulate metrics asynchronously as circuits complete
     for input_size in range(min_qubits, max_qubits + 1):
         
+        # reset random seed 
+        np.random.seed(0)
+
         num_qubits = input_size
 
         # determine number of circuits to execute for this group
@@ -331,7 +336,7 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, num_shots = 100,
     print("\nInverse QFT Circuit ="); print(QFTI_)
      
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Quantum Fourier Transform ({method}) - Qiskit")
+    metrics.plot_metrics_aq(f"Benchmark Results - Quantum Fourier Transform ({method}) - Qiskit")
 
 # if main, execute method 1
 if __name__ == '__main__': run()

@@ -1,6 +1,7 @@
 # Application-Oriented Performance Benchmarks for Quantum Computing
 
-Note: To use this repository to calculate #AQ, please see file AQ_instructions.txt .
+> Note: This fork contains proposed updates to the Quantum Economic Development Consortium's benchmark suite.
+> To use this repository to calculate #AQ, please see [the instructions here](./_doc/AQ.md).
 
 This repository contains a collection of prototypical application- or algorithm-centric benchmark programs designed for the purpose of characterizing the end-user perception of the performance of current-generation Quantum Computers.
 

@@ -1,0 +1,206 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### QED-C Prototype Benchmarks - Qiskit Version\n",
+    "The notebook contains a suite of prototype application benchmarks for the IBM Qiskit API, along with the volumetric and the algorithmic qubit (AQ) measurement. \n",
+    "Configure and run the cell below with the desired execution settings.\n",
+    "Then execute the remaining cells, each containing one prototype benchmark program."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "min_qubits=2\n",
+    "max_qubits=8\n",
+    "max_circuits=3\n",
+    "num_shots=1000\n",
+    "\n",
+    "backend_id=\"qasm_simulator\"\n",
+    "hub=\"ibm-q\"; group=\"open\"; project=\"main\"\n",
+    "provider_backend = None\n",
+    "exec_options = None\n",
+    "\n",
+    "# # *** If using IBMQ hardware, run this once to authenticate\n",
+    "# from qiskit import IBMQ\n",
+    "# IBMQ.save_account('YOUR_API_TOKEN_HERE')\n",
+    "\n",
+    "# # *** If you are part of an IBMQ group, set hub, group, and project name here\n",
+    "# hub=\"YOUR_HUB_NAME\"\n",
+    "# group=\"YOUR_GROUP_NAME\"\n",
+    "# project=\"YOUR_PROJECT_NAME\"\n",
+    "\n",
+    "# # *** This example shows how to specify the backend using a known \"backend_id\"\n",
+    "# # Use 'sabre' layout for IBM backends\n",
+    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre' }\n",
+    "# backend_id=\"ibmq_belem\"\n",
+    "\n",
+    "# # *** Here's an example of using a typical custom provider backend (e.g. AQT simulator)\n",
+    "# import os\n",
+    "# from qiskit_aqt_provider import AQTProvider\n",
+    "# provider = AQTProvider(os.environ.get('AQT_ACCESS_KEY'))    # get your key from environment\n",
+    "# provider_backend = provider.backends.aqt_qasm_simulator_noise_1\n",
+    "# backend_id=\"aqt_qasm_simulator_noise_1\"\n",
+    "\n",
+    "# # An example using IonQ provider\n",
+    "# from qiskit_ionq import IonQProvider\n",
+    "# provider = IonQProvider()   # Be sure to set the QISKIT_IONQ_API_TOKEN environment variable\n",
+    "# provider_backend = provider.get_backend(\"ionq_qpu\")\n",
+    "# backend_id=\"ionq_qpu\"\n",
+    "\n",
+    "# # *** Use these lines when running on hardware backend, to limit use of resources\n",
+    "# min_qubits=2\n",
+    "# max_qubits=5\n",
+    "# max_circuits=1\n",
+    "# num_shots=100"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#%run quantum-fourier-transform/qiskit/qft_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"quantum-fourier-transform/qiskit\")\n",
+    "import qft_benchmark\n",
+    "min_qubits=6\n",
+    "max_qubits=15\n",
+    "qft_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "                method=1,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#%run phase-estimation/qiskit/pe_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"phase-estimation/qiskit\")\n",
+    "import pe_benchmark\n",
+    "min_qubits=6\n",
+    "max_qubits=20\n",
+    "pe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#%run amplitude-estimation/qiskit/ae_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"amplitude-estimation/qiskit\")\n",
+    "import ae_benchmark\n",
+    "min_qubits=4\n",
+    "max_qubits=6\n",
+    "ae_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#%run monte-carlo/qiskit/mc_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"monte-carlo/qiskit\")\n",
+    "import mc_benchmark\n",
+    "min_qubits=4\n",
+    "max_qubits=6\n",
+    "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#%run hamiltonian-simulation/qiskit/hamiltonian_simulation_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"hamiltonian-simulation/qiskit\")\n",
+    "import hamiltonian_simulation_benchmark\n",
+    "min_qubits=6\n",
+    "max_qubits=16\n",
+    "hamiltonian_simulation_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits,\n",
+    "                max_circuits=max_circuits, num_shots=num_shots,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#%run vqe/qiskit/vqe_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"vqe/qiskit\")\n",
+    "import vqe_benchmark\n",
+    "vqe_num_shots=4098\n",
+    "min_qubits=4\n",
+    "max_qubits=8\n",
+    "vqe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=vqe_num_shots,\n",
+    "                method=1,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"_common\")\n",
+    "import metrics\n",
+    "\n",
+    "metrics.plot_all_app_metrics_aq(backend_id, do_all_plots=False, include_apps=None, is_individual=True)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}

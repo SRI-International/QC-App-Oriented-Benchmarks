@@ -131,8 +131,9 @@ def analyze_and_print_result (qc, result, num_qubits, type, num_shots):
 
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    aq_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
 
-    return counts, fidelity
+    return counts, fidelity, aq_fidelity
 
 ################ Benchmark Loop
 
@@ -156,8 +157,9 @@ def run (min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
      
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(type), num_shots)
+        counts, fidelity, aq_fidelity = analyze_and_print_result(qc, result, num_qubits, int(type), num_shots)
         metrics.store_metric(num_qubits, type, 'fidelity', fidelity)
+        metrics.store_metric(num_qubits, type, 'aq_fidelity', aq_fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -201,7 +203,7 @@ def run (min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     print("\nBalanced Oracle 'Uf' ="); print(B_ORACLE_ if B_ORACLE_ != None else " ... too large or not used!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Deutsch-Jozsa - Qiskit")
+    metrics.plot_metrics_aq("Benchmark Results - Deutsch-Jozsa - Qiskit")
 
 # if main, execute method
 if __name__ == '__main__': run()

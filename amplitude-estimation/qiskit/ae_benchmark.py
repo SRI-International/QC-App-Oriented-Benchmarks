@@ -151,7 +151,10 @@ def Ctrl_Q(num_state_qubits, A_circ):
 # Expected result is always the secret_int, so fidelity calc is simple
 def analyze_and_print_result(qc, result, num_counting_qubits, s_int, num_shots):
     
-    counts = bitstring_to_a(result.get_counts(qc), num_counting_qubits)
+    
+    bit_counts = result.get_counts(qc)
+
+    counts = bitstring_to_a(bit_counts, num_counting_qubits)
     a = a_from_s_int(s_int, num_counting_qubits)    
     
     if verbose: print(f"For amplitude {a} measured: {counts}")
@@ -159,14 +162,30 @@ def analyze_and_print_result(qc, result, num_counting_qubits, s_int, num_shots):
     # correct distribution is measuring amplitude a 100% of the time
     correct_dist = {a: 1.0}
 
+    # calculate expected output histogram
+    bit_correct_dist = a_to_bitstring(a, num_counting_qubits)
+
     # generate thermal_dist with amplitudes instead, to be comparable to correct_dist
     bit_thermal_dist = metrics.uniform_dist(num_counting_qubits)
     thermal_dist = bitstring_to_a(bit_thermal_dist, num_counting_qubits)
 
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
+    aq_fidelity = metrics.hellinger_fidelity_with_expected(bit_counts, bit_correct_dist)
     
-    return counts, fidelity
+    return counts, fidelity, aq_fidelity
+
+def a_to_bitstring(a, num_counting_qubits):
+    m = num_counting_qubits
+
+    # solution 1
+    num1 = round(np.arcsin(np.sqrt(a)) / np.pi * 2**m)
+    num2 = round( (np.pi - np.arcsin(np.sqrt(a))) / np.pi * 2**m)
+    if num1 != num2 and num2 < 2**m and num1 < 2**m:
+        counts = {format(num1, "0"+str(m)+"b"): 0.5, format(num2, "0"+str(m)+"b"): 0.5}
+    else:
+        counts = {format(num1, "0"+str(m)+"b"): 1}
+    return counts
 
 def bitstring_to_a(counts, num_counting_qubits):
     est_counts = {}
@@ -223,8 +242,9 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
 
         # determine fidelity of result set
         num_counting_qubits = int(num_qubits) - num_state_qubits - 1
-        counts, fidelity = analyze_and_print_result(qc, result, num_counting_qubits, int(s_int), num_shots)
+        counts, fidelity, aq_fidelity = analyze_and_print_result(qc, result, num_counting_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+        metrics.store_metric(num_qubits, s_int, 'aq_fidelity', aq_fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -234,6 +254,9 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1):
+
+        # reset random seed
+        np.random.seed(0)
         
         # as circuit width grows, the number of counting qubits is increased
         num_counting_qubits = num_qubits - num_state_qubits - 1
@@ -279,7 +302,7 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     print("\nInverse QFT Circuit ="); print(QFTI_ if QC_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Amplitude Estimation - Qiskit")
+    metrics.plot_metrics_aq("Benchmark Results - Amplitude Estimation - Qiskit")
 
 
 # if main, execute method
