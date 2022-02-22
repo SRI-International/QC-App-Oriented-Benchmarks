@@ -421,7 +421,7 @@ def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
     print("\nCluster Operator Example 'Cluster Op' ="); print(CO_ if CO_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - VQE Simulation ({method}) - Qiskit")
+    metrics.plot_metrics_aq(f"Benchmark Results - VQE Simulation ({method}) - Qiskit")
 
 # if main, execute methods     
 if __name__ == "__main__": run()

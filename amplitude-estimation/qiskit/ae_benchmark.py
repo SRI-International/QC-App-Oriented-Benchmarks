@@ -279,7 +279,7 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     print("\nInverse QFT Circuit ="); print(QFTI_ if QC_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Amplitude Estimation - Qiskit")
+    metrics.plot_metrics_aq("Benchmark Results - Amplitude Estimation - Qiskit")
 
 
 # if main, execute method

@@ -434,7 +434,7 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Shor's Order Finding ({method}) - Qiskit")
+    metrics.plot_metrics_aq(f"Benchmark Results - Shor's Order Finding ({method}) - Qiskit")
 
     
 # if main, execute method

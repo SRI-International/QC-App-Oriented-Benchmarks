@@ -435,7 +435,7 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
     print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Monte Carlo Sampling ({method}) - Qiskit")
+    metrics.plot_metrics_aq(f"Benchmark Results - Monte Carlo Sampling ({method}) - Qiskit")
     
     
         
