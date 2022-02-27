@@ -758,9 +758,11 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
             
             for it in circuit_metrics_detail_2[group][circuit_id]:
                 mets = circuit_metrics_detail_2[group][circuit_id][it]
-                
+
+                # get each metric and accumulate if indicated
+                x_now = mets[x_metric]
                 if cumulative_flag:
-                    x_now = x_last + mets[x_metric]
+                    x_now += x_last
                 x_last = x_now
                 
                 if y_metric == 'num_qubits':
@@ -803,9 +805,10 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
         x_size=(max(x)-min(x))/num_x_bins
     if y_size == None:
         y_size = 1.0
+        
     plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
-                         labelrot=0, type=1, fill=True, w_max=18, do_label=False, x_size=x_size, y_size=y_size)
-    
+                         labelrot=0, type=1, fill=True, w_max=18, do_label=False,
+                         x_size=x_size, y_size=y_size)   
         
 
 # Helper function to bin for averaging metrics, for instances occuring at equal num_qubits
@@ -1687,7 +1690,8 @@ def vplot_anno_init ():
 
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
-        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, x_size=1.0, y_size=1.0):
+        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False,
+        x_size=1.0, y_size=1.0):
 
     # since data may come back out of order, save point at max y for annotation
     i_anno = 0
