@@ -413,8 +413,10 @@ def process_circuit_metrics_2_level(num_qubits):
         # The result is that the circuit_metrics_detail dict is created, but indexed by one index (idx1 * 1000 + idx2)
         if idx1 in circuit_metrics[group]:
             last_circuit_id = str(int(circuit_id) - 1)
+            ''' note: do not accumulate here, it is done in the plotting code
             circuit_metrics_detail[group][circuit_id]["elapsed_time"] += circuit_metrics_detail[group][last_circuit_id]["elapsed_time"]
             circuit_metrics_detail[group][circuit_id]["exec_time"] += circuit_metrics_detail[group][last_circuit_id]["exec_time"]
+            '''
        
         # if there are no circuit_metrics created yet for this idx1, start a detail_2 table 
         else:
@@ -457,7 +459,7 @@ def process_iteration_metrics(group_id):
     return iterations_metrics
  
  
-# convenience funtions to print all circuit metrics (for degugging)
+# convenience functions to print all circuit metrics (for debugging)
 
 def dump_json(msg, data):
     jsonDataStr = json.dumps(data, indent=2).replace('\n', '\n  ')    
@@ -751,8 +753,10 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
         
         x_groups, y_groups, score_groups = [], [], []
         
+        # Each problem instance at size num_qubits; need to collate across iterations
+        i = 0
         for circuit_id in circuit_metrics_detail_2[group]:
-            # Each problem instance at size num_qubits; need to collate across iterations
+                
             x_last, score_last = 0, 0
             x_points, y_points, score_points = [], [], []            
             
@@ -793,7 +797,9 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
             y_groups.append(y_points)
             score_groups.append(score_points)
         
+        #print(f"  ... x_ = {num_x_bins} {len(x_groups)} {x_groups}")
         x_, y_, scores_ = x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins=num_x_bins)
+        #print(f"  ... x_ = {len(x_)} {x_}") 
    
         x = x + x_
         y = y + y_
@@ -805,14 +811,21 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
         x_size=(max(x)-min(x))/num_x_bins
     if y_size == None:
         y_size = 1.0
+     
+    ## x_size = 0.05    # for testing
+    
+    #print(f"... num: {num_x_bins} {len(x)} {x_size} {x}")
         
     plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
                          labelrot=0, type=1, fill=True, w_max=18, do_label=False,
                          x_size=x_size, y_size=y_size)   
         
 
-# Helper function to bin for averaging metrics, for instances occuring at equal num_qubits
+# Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
+# DEVNOTE: this binning approach creates unevenly spaced bins, cannot use the delta between then for size
 def x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins):
+
+    # find min and max across all the groups
     bin_x, bin_y, bin_s = {}, {}, {}
     x_min, x_max = x_groups[0][0], x_groups[0][0]
     for group in x_groups:
@@ -823,8 +836,11 @@ def x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins):
             x_max = max_
     step = (x_max - x_min)/num_x_bins
     
+    # loop over each group
     for group in range(len(x_groups)):      
         
+        # for each item in the group, accumulate into bins
+        # place into a new bin, if if has larger x value than last one
         k = 0
         for i in range(len(x_groups[group])):
             while x_groups[group][i] >= x_min + k*step:
@@ -837,7 +853,8 @@ def x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins):
             bin_x[k] = bin_x[k] + [x_groups[group][i]]
             bin_y[k] = bin_y[k] + [y_groups[group][i]]
             bin_s[k] = bin_s[k] + [score_groups[group][i]]
-        
+    
+    # for each bin, compute average from all the elements in the bin
     new_x, new_y, new_s = [], [], []    
     for k in bin_x:
         new_x.append(sum(bin_x[k])/len(bin_x[k]))

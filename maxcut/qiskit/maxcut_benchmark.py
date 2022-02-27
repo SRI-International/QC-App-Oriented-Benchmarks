@@ -268,7 +268,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
         # loop over each of num_circuits
         # assume the solution files start with 3 and go up from there
-        for i in range(3, 3 + num_circuits):    
+        for i in range(3, 3 + num_circuits):
         
             # create integer that represents the problem instance; use s_int as circuit id
             s_int = i
