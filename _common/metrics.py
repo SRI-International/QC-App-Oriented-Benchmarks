@@ -733,7 +733,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
                           
                               when the y-axis is rounds.    
     """
-    x, y, scores = [], [], []
+    xs, x, y, scores = [], [], [], []
     cumulative_flag, maximum_flag = False, False
     if len(x_metric) > 11 and x_metric[:11] == 'cumulative_':
         cumulative_flag = True
@@ -751,20 +751,20 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
             if num_qubits != fixed_metrics['num_qubits']:
                 continue
         
-        x_groups, y_groups, score_groups = [], [], []
+        x_size_groups, x_groups, y_groups, score_groups = [], [], [], []
         
         # Each problem instance at size num_qubits; need to collate across iterations
         i = 0
         for circuit_id in circuit_metrics_detail_2[group]:
                 
             x_last, score_last = 0, 0
-            x_points, y_points, score_points = [], [], []            
+            x_sizes, x_points, y_points, score_points = [], [], [], []            
             
             for it in circuit_metrics_detail_2[group][circuit_id]:
                 mets = circuit_metrics_detail_2[group][circuit_id][it]
 
                 # get each metric and accumulate if indicated
-                x_now = mets[x_metric]
+                x_raw = x_now = mets[x_metric]
                 if cumulative_flag:
                     x_now += x_last
                 x_last = x_now
@@ -788,45 +788,66 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
                 else:
                     score_now = mets[score_metric]
                 score_last = score_now
-                
-                x_points.append(x_now)
+      
+                # need to shift x_now by the 'size', since x_now inb the cumulative 
+                #x_points.append((x_now - x_raw) if cumulative_flag else x_now)
+                #x_points.append((x_now - x_raw))
+                x_points.append(x_now - x_raw/2)
                 y_points.append(y_now)
+                x_sizes.append(x_raw)
                 score_points.append(score_now)
-                        
+            
+            x_size_groups.append(x_sizes)
             x_groups.append(x_points)
             y_groups.append(y_points)
             score_groups.append(score_points)
         
+        ''' don't do binning for now
         #print(f"  ... x_ = {num_x_bins} {len(x_groups)} {x_groups}")
-        x_, y_, scores_ = x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins=num_x_bins)
+        #x_sizes_, x_, y_, scores_ = x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins=num_x_bins)
+        '''
+        # instead use the last of the groups
+        i_last = len(x_groups) - 1
+        x_sizes_ = x_size_groups[i_last]
+        x_ = x_groups[i_last]
+        y_ = y_groups[i_last]
+        scores_ = score_groups[i_last]
+        
         #print(f"  ... x_ = {len(x_)} {x_}") 
-   
+        #print(f"  ... x_sizes_ = {len(x_sizes_)} {x_sizes_}")
+        
+        xs = xs + x_sizes_
         x = x + x_
         y = y + y_
         scores = scores + scores_
-            
-    ax = plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max=max(y), x_max=max(x),
-                                 y_min=min(y), x_min=min(x))
-    if x_size == None:
-        x_size=(max(x)-min(x))/num_x_bins
+    
+    score_metric_label = score_metric
+    if maximum_flag: score_metric_label += " (max)"
+    
+    ax = plot_metrics_background(suptitle, y_metric, x_metric, score_metric,
+                y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
+                                 
+    # no longer used, instead we pass the array of sizes
+    #if x_size == None:
+        #x_size=(max(x)-min(x))/num_x_bins
+        
     if y_size == None:
         y_size = 1.0
-     
-    ## x_size = 0.05    # for testing
     
     #print(f"... num: {num_x_bins} {len(x)} {x_size} {x}")
-        
+    
+    # plot all the bars, with width specified as an array that matches the array size of the x,y values
     plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
-                         labelrot=0, type=1, fill=True, w_max=18, do_label=False,
-                         x_size=x_size, y_size=y_size)   
+                        labelrot=0, type=1, fill=True, w_max=18, do_label=False,
+                        x_size=xs, y_size=y_size)                         
         
 
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
 # DEVNOTE: this binning approach creates unevenly spaced bins, cannot use the delta between then for size
-def x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins):
+def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins):
 
     # find min and max across all the groups
-    bin_x, bin_y, bin_s = {}, {}, {}
+    bin_xs, bin_x, bin_y, bin_s = {}, {}, {}, {}
     x_min, x_max = x_groups[0][0], x_groups[0][0]
     for group in x_groups:
         min_, max_ = min(group), max(group)
@@ -846,22 +867,25 @@ def x_bin_averaging(x_groups, y_groups, score_groups, num_x_bins):
             while x_groups[group][i] >= x_min + k*step:
                 k += 1
             if k not in bin_x:
+                bin_xs[k] = []
                 bin_x[k] = []
                 bin_y[k] = []
                 bin_s[k] = []
                     
+            bin_xs[k] = bin_xs[k] + [x_size_groups[group][i]]
             bin_x[k] = bin_x[k] + [x_groups[group][i]]
             bin_y[k] = bin_y[k] + [y_groups[group][i]]
             bin_s[k] = bin_s[k] + [score_groups[group][i]]
     
     # for each bin, compute average from all the elements in the bin
-    new_x, new_y, new_s = [], [], []    
+    new_xs, new_x, new_y, new_s = [], [], [], []    
     for k in bin_x:
+        new_xs.append(sum(bin_xs[k])/len(bin_xs[k]))
         new_x.append(sum(bin_x[k])/len(bin_x[k]))
         new_y.append(sum(bin_y[k])/len(bin_y[k]))
         new_s.append(sum(bin_s[k])/len(bin_s[k]))
     
-    return new_x, new_y, new_s
+    return new_xs, new_x, new_y, new_s
     
     
 # Plot metrics over all groups (2)
@@ -1720,7 +1744,11 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
         x = depth_index(d_data[i], depth_base)
         y = float(w_data[i])
         f = f_data[i]
-        ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
+        
+        if isinstance(x_size, list):
+            ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size))
+        else:
+            ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
 
         if y >= y_anno:
             x_anno = x

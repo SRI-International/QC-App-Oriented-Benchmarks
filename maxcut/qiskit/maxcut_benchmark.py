@@ -212,6 +212,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     max_circuits = min(10, max_circuits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
     
+    # given that this benchmark does every other width, set y_size default to 1.5
+    if y_size == None:
+        y_size = 1.5
+    
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -363,9 +367,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-
-    if method == 2:
-        metrics.print_all_circuit_metrics()
              
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
