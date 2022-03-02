@@ -28,6 +28,7 @@ import copy
 import metrics
 import importlib
 from collections import Counter
+import numpy as np
 
 from qiskit import execute, Aer, transpile
 from qiskit import IBMQ
@@ -378,15 +379,37 @@ def execute_circuit(circuit):
                 routing_method = None
                 if "routing_method" in backend_exec_options: 
                     routing_method = backend_exec_options["routing_method"]
+
                 
                 #job = execute(circuit["qc"], backend, shots=shots,
                 
                 # the 'execute' method includes transpile, use transpile + run instead (to enable time metrics)
                 st = time.time()
-                trans_qc = transpile(circuit["qc"], backend, 
+
+
+                # transpile many times and pick shortest circuit
+                if "transpile_attempt_count" in backend_exec_options:
+                    trans_qc_list = [transpile(circuit["qc"], backend, 
                     optimization_level=optimization_level,
                     layout_method=layout_method,
-                    routing_method=routing_method)
+                    routing_method=routing_method) for _ in range(backend_exec_options['transpile_attempt_count'])]
+
+                    if 'cx' in trans_qc_list[0].count_ops().keys(): # check if there are cx in transpiled circs
+                        best_cx_count = [circ.count_ops()['cx'] for circ in trans_qc_list]
+                        best_idx = np.where(best_cx_count == np.min(best_cx_count))[0][0]
+                        trans_qc = trans_qc_list[best_idx]
+                    elif 'sx' in trans_qc_list[0].count_ops().keys(): # check if there are sx in transpiled circs
+                        best_sx_count = [circ.count_ops()['sx'] for circ in trans_qc_list]
+                        best_idx = np.where(best_sx_count == np.min(best_sx_count))[0][0]
+                        trans_qc = trans_qc_list[best_idx] 
+                    else: # otherwise just pick the first in the list
+                        trans_qc = trans_qc_list[0] 
+
+                else:
+                    trans_qc = transpile(circuit["qc"], backend, 
+                        optimization_level=optimization_level,
+                        layout_method=layout_method,
+                        routing_method=routing_method)
                     
                 if verbose_time:
                     print(f"  *** qiskit.transpile() time = {time.time() - st}")
