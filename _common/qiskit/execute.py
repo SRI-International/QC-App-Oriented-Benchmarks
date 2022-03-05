@@ -394,14 +394,16 @@ def execute_circuit(circuit):
                     layout_method=layout_method,
                     routing_method=routing_method) for _ in range(backend_exec_options['transpile_attempt_count'])]
 
-                    if 'cx' in trans_qc_list[0].count_ops().keys(): # check if there are cx in transpiled circs
-                        best_cx_count = [circ.count_ops()['cx'] for circ in trans_qc_list]
-                        best_idx = np.where(best_cx_count == np.min(best_cx_count))[0][0]
+                    best_op_count = []
+                    for circ in trans_qc_list:
+                        if 'cx' in circ.count_ops().keys(): # check if there are cx in transpiled circs
+                            best_op_count.append( circ.count_ops()['cx'] ) # get number of operations
+                        elif 'sx' in circ.count_ops().keys(): # check if there are sx in transpiled circs
+                            best_op_count.append( circ.count_ops()['sx'] ) # get number of operations
+
+                    if len(best_op_count) > 0:
+                        best_idx = np.where(best_op_count == np.min(best_op_count))[0][0] # pick circuit with lowest number of operations
                         trans_qc = trans_qc_list[best_idx]
-                    elif 'sx' in trans_qc_list[0].count_ops().keys(): # check if there are sx in transpiled circs
-                        best_sx_count = [circ.count_ops()['sx'] for circ in trans_qc_list]
-                        best_idx = np.where(best_sx_count == np.min(best_sx_count))[0][0]
-                        trans_qc = trans_qc_list[best_idx] 
                     else: # otherwise just pick the first in the list
                         trans_qc = trans_qc_list[0] 
 
