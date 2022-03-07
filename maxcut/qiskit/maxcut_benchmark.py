@@ -188,7 +188,7 @@ def compute_objective(results, nodes, edges):
 ################ Benchmark Loop
 
 # Problem definitions only available for up to 10 qubits currently
-MAX_QUBITS = 10
+MAX_QUBITS = 16
 saved_result = None
 instance_filename = None
 
@@ -202,6 +202,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
     global circuits_done
     global unique_circuit_index
+    global opt_ts
     
     print("MaxCut Benchmark Program - Qiskit")
 
@@ -315,11 +316,19 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 p_depth = 2
                 thetas_init = 2*p_depth*[1.0]
             
+                # create variable for marking optimizer iteration times
+                #opt_ts = -1
+                
                 def expectation(theta):
                     global unique_circuit_index
-                
+                    global opt_ts
+                    
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                     unique_id = s_int*1000 + unique_circuit_index
+                    
+                    # store the optimizer execution time of last cycle
+                    # NOTE: the first time it is stored it is just the initialization time for optimizer
+                    metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
                     
                     unique_circuit_index += 1
                 
@@ -341,9 +350,21 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     #ex.throttle_execution(metrics.finalize_group)
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                 
+                    # reset timer for optimizer execution after each iteration of quantum program completes
+                    opt_ts = time.time()
+                    
                     return compute_objective(saved_result, nodes, edges)
             
+                opt_ts = time.time()
+                
+                # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
                 res = minimize(expectation, thetas_init, method='COBYLA', options = { 'maxiter': max_iter} )
+                
+                unique_circuit_index = 0
+                unique_id = s_int*1000 + unique_circuit_index
+                metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
+                
+                #read solution from file for this instance
                 opt, sol = common.read_maxcut_solution(instance_filename)
             
                 num_qubits = int(num_qubits)

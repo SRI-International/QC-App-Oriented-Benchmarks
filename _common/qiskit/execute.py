@@ -27,6 +27,7 @@ import time
 import copy
 import metrics
 import importlib
+import traceback
 from collections import Counter
 
 from qiskit import execute, Aer, transpile
@@ -574,6 +575,7 @@ def job_complete(job):
         except Exception as e:
             print(f'ERROR: failed to execute result_handler for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
             print(f"... exception = {e}")
+            print(traceback.format_exc())
 
 
 # Process a job, whose status cannot be obtained

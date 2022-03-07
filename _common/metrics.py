@@ -477,8 +477,9 @@ def print_all_circuit_metrics():
                 mets = circuit_metrics_detail_2[group][circuit_id][it]
                 elt = round(mets["elapsed_time"], 3)
                 ext = round(mets["exec_time"], 3)
-                fid = round(mets["fidelity"], 3)
-                print(f"      iteration {it} = {elt} {ext} {fid}")
+                fid = round(mets["fidelity"], 3) if "fidelity" in mets else -1
+                opt_ext = round(mets["opt_exec_time"], 3) if "opt_exec_time" in mets else -1
+                print(f"      iteration {it} = {elt} {ext} {fid} {opt_ext}")
                 
 ##########################################
 # ANALYSIS AND VISUALIZATION
