@@ -233,7 +233,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         global instance_filename
         
         nodes, edges = common.read_maxcut_instance(instance_filename)
-        opt, _ = common.read_maxcut_solution(instance_filename)
+        opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol')
         
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
