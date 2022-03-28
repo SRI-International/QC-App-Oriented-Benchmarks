@@ -367,17 +367,9 @@ def execute_circuit(circuit):
             # use execution options if set for backend
             if backend_exec_options != None:
                         
-                optimization_level = 1
-                if "optimization_level" in backend_exec_options: 
-                    optimization_level = backend_exec_options["optimization_level"]
-                
-                layout_method = None
-                if "layout_method" in backend_exec_options: 
-                    layout_method = backend_exec_options["layout_method"]
-                
-                routing_method = None
-                if "routing_method" in backend_exec_options: 
-                    routing_method = backend_exec_options["routing_method"]
+                optimization_level = backend_exec_options.pop("optimization_level", 1)
+                layout_method = backend_exec_options.get("layout_method", None)
+                routing_method = backend_exec_options.pop("routing_method", None)
                 
                 #job = execute(circuit["qc"], backend, shots=shots,
                 
