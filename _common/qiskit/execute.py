@@ -322,6 +322,8 @@ def execute_circuit(circuit):
         
         # use noise model from execution options if given for simulator
         this_noise = noise
+        backend_exec_options = copy.copy(backend_exec_options)
+
         if backend_exec_options != None and "noise_model" in backend_exec_options:
             this_noise = backend_exec_options["noise_model"]
             #print(f"... using custom noise model: {this_noise}")
@@ -368,7 +370,7 @@ def execute_circuit(circuit):
             if backend_exec_options != None:
                         
                 optimization_level = backend_exec_options.pop("optimization_level", 1)
-                layout_method = backend_exec_options.get("layout_method", None)
+                layout_method = backend_exec_options.pop("layout_method", None)
                 routing_method = backend_exec_options.pop("routing_method", None)
                 
                 #job = execute(circuit["qc"], backend, shots=shots,
@@ -384,10 +386,11 @@ def execute_circuit(circuit):
                     print(f"  *** qiskit.transpile() time = {time.time() - st}")
                 
                 # apply transformer pass if provided
-                if "transformer" in backend_exec_options:
+                transformer = backend_exec_options.pop("transformer", None)
+                if transformer:
                     st = time.time()
                     #print("... applying transformer!")
-                    trans_qc2 = backend_exec_options["transformer"](trans_qc, backend)
+                    trans_qc2 = transformer(trans_qc, backend)
                     trans_qc = trans_qc2
                 
                     # if transformer results in multiple circuits, divide shot count
@@ -400,7 +403,7 @@ def execute_circuit(circuit):
                         print(f"  *** transformer() time = {time.time() - st}")
                 
                 st = time.time()                
-                job = backend.run(trans_qc, shots=shots)
+                job = backend.run(trans_qc, shots=shots, **backend_exec_options)
                 
                 if verbose_time:
                     print(f"  *** qiskit.run() time = {time.time() - st}")
