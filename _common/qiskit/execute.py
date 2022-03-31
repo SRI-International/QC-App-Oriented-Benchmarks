@@ -439,7 +439,8 @@ def execute_circuit(circuit):
     except Exception as e:
         print(f'ERROR: Failed to execute circuit {active_circuit["group"]} {active_circuit["circuit"]}')
         print(f"... exception = {e}")
-        print(traceback.format_exc())
+        if verbose:
+            print(traceback.format_exc())
         return
     
     # print("Job status is ", job.status() )
@@ -584,7 +585,8 @@ def job_complete(job):
         except Exception as e:
             print(f'ERROR: failed to execute result_handler for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
             print(f"... exception = {e}")
-            print(traceback.format_exc())
+            if verbose:
+                print(traceback.format_exc())
 
 
 # Process a job, whose status cannot be obtained
