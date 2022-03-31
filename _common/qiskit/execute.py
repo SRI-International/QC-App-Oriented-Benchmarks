@@ -27,6 +27,7 @@ import time
 import copy
 import metrics
 import importlib
+import traceback
 from collections import Counter
 
 from qiskit import execute, Aer, transpile
@@ -438,6 +439,8 @@ def execute_circuit(circuit):
     except Exception as e:
         print(f'ERROR: Failed to execute circuit {active_circuit["group"]} {active_circuit["circuit"]}')
         print(f"... exception = {e}")
+        if verbose:
+            print(traceback.format_exc())
         return
     
     # print("Job status is ", job.status() )
@@ -582,6 +585,8 @@ def job_complete(job):
         except Exception as e:
             print(f'ERROR: failed to execute result_handler for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
             print(f"... exception = {e}")
+            if verbose:
+                print(traceback.format_exc())
 
 
 # Process a job, whose status cannot be obtained
@@ -654,7 +659,7 @@ def throttle_execution(completion_handler=metrics.finalize_group):
 # Return when there are no more active circuits.
 # This is used as a way to complete all groups of circuits and report results.
 
-def finalize_execution(completion_handler=metrics.finalize_group):
+def finalize_execution(completion_handler=metrics.finalize_group, report_end=True):
 
     #if verbose:
         #print("... finalize_execution")
@@ -683,7 +688,8 @@ def finalize_execution(completion_handler=metrics.finalize_group):
         if pollcount > 0: print("")
     
     # indicate we are done collecting metrics (called once at end of app)
-    metrics.end_metrics()
+    if report_end:
+        metrics.end_metrics()
     
     
 # Check if any active jobs are complete - process if so
