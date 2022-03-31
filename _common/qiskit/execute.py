@@ -322,8 +322,12 @@ def execute_circuit(circuit):
         
         # use noise model from execution options if given for simulator
         this_noise = noise
+        
+        # make a clone of the backend options so we can remove elements that we use, then pass to .run()
+        global backend_exec_options
         backend_exec_options = copy.copy(backend_exec_options)
 
+        # get noise model from options; used only in simulator for now
         if backend_exec_options != None and "noise_model" in backend_exec_options:
             this_noise = backend_exec_options["noise_model"]
             #print(f"... using custom noise model: {this_noise}")
@@ -337,12 +341,17 @@ def execute_circuit(circuit):
             # use execution options if set for simulator
             if backend_exec_options != None:
             
+                # we already have the noise model, just need to remove it from the options
+                # (only for simulator;  for other backends, it is treaded like keyword arg)
+                dummy = backend_exec_options.pop("noise_model", None)
+                
                 # apply transformer pass if provided
-                if "transformer" in backend_exec_options:
+                transformer = backend_exec_options.pop("transformer", None)
+                if transformer:
                     #print("... applying transformer to sim!")
                     st = time.time()
                     trans_qc = transpile(circuit["qc"], backend)
-                    simulation_circuits = backend_exec_options["transformer"](trans_qc, backend=backend)
+                    simulation_circuits = transformer(trans_qc, backend=backend)
                     
                     # if transformer results in multiple circuits, divide shot count
                     # results will be accumulated in job_complete
@@ -352,17 +361,21 @@ def execute_circuit(circuit):
                     
                     if verbose_time:
                         print(f"  *** transformer() time = {time.time() - st}")
+                        
+            else:
+                backend_exec_options = {}
        
             # for noisy simulator, use execute() which works; it is unclear from docs
             # whether noise_model should be passed to transpile() or run() 
             st = time.time()
             job = execute(simulation_circuits, backend, shots=shots,
-                noise_model=this_noise, basis_gates=this_noise.basis_gates)
+                noise_model=this_noise, basis_gates=this_noise.basis_gates,
+                **backend_exec_options)
                 
             if verbose_time:
                     print(f"  *** qiskit.execute() time = {time.time() - st}")
                 
-        # Initiate excution for all other backends and noiseless simulator
+        # Initiate execution for all other backends and noiseless simulator
         else:
             #print(f"... executing on backend: {backend.name()}")
             
@@ -390,7 +403,7 @@ def execute_circuit(circuit):
                 if transformer:
                     st = time.time()
                     #print("... applying transformer!")
-                    trans_qc2 = transformer(trans_qc, backend)
+                    trans_qc2 = transformer(trans_qc, backend=backend)
                     trans_qc = trans_qc2
                 
                     # if transformer results in multiple circuits, divide shot count
