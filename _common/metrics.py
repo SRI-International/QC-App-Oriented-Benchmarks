@@ -38,7 +38,7 @@ from datetime import datetime
 circuit_metrics = {  }
 group_metrics = { "groups": [],
     "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [],
-    "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [],
+    "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [], "avg_tr_n2qs": [],
     "avg_exec_creating_times": [], "avg_exec_validating_times": [], "avg_exec_running_times": []
 }
 
@@ -115,6 +115,7 @@ def init_metrics ():
     group_metrics["avg_xis"] = []
     group_metrics["avg_tr_depths"] = []
     group_metrics["avg_tr_xis"] = []
+    group_metrics["avg_tr_n2qs"] = []
     
     group_metrics["avg_exec_creating_times"] = []
     group_metrics["avg_exec_validating_times"] = []
@@ -162,6 +163,7 @@ def aggregate_metrics_for_group (group):
         group_xi = 0
         group_tr_depth = 0
         group_tr_xi = 0
+        group_tr_n2q = 0
         group_exec_creating_time = 0
         group_exec_validating_time = 0
         group_exec_running_time = 0
@@ -181,6 +183,7 @@ def aggregate_metrics_for_group (group):
                 if metric == "xi": group_xi += value
                 if metric == "tr_depth": group_tr_depth += value
                 if metric == "tr_xi": group_tr_xi += value
+                if metric == "tr_n2q": group_tr_n2q += value
                 
                 if metric == "exec_creating_time": group_exec_creating_time += value
                 if metric == "exec_validating_time": group_exec_validating_time += value
@@ -196,6 +199,7 @@ def aggregate_metrics_for_group (group):
         avg_xi = round(group_xi / num_circuits, 3)
         avg_tr_depth = round(group_tr_depth / num_circuits, 0)
         avg_tr_xi = round(group_tr_xi / num_circuits, 3)
+        avg_tr_n2q = round(group_tr_n2q / num_circuits, 3)
         
         avg_exec_creating_time = round(group_exec_creating_time / num_circuits, 3)
         avg_exec_validating_time = round(group_exec_validating_time / num_circuits, 3)
@@ -217,6 +221,8 @@ def aggregate_metrics_for_group (group):
             group_metrics["avg_tr_depths"].append(avg_tr_depth)
         if avg_tr_xi > 0:
             group_metrics["avg_tr_xis"].append(avg_tr_xi)
+        if avg_tr_n2q > 0:
+            group_metrics["avg_tr_n2qs"].append(avg_tr_n2q)
         
         if avg_exec_creating_time > 0:
             group_metrics["avg_exec_creating_times"].append(avg_exec_creating_time)
@@ -251,10 +257,14 @@ def report_metrics_for_group (group):
             if len(group_metrics["avg_tr_xis"]) > 0:
                 avg_tr_xi = group_metrics["avg_tr_xis"][group_index]
                 
+            avg_tr_n2q = 0
+            if len(group_metrics["avg_tr_n2qs"]) > 0:
+                avg_tr_n2q = group_metrics["avg_tr_n2qs"][group_index]
+            
             if len(group_metrics["avg_tr_depths"]) > 0:
                 avg_tr_depth = group_metrics["avg_tr_depths"][group_index]
                 if avg_tr_depth > 0:
-                    print(f"Average Transpiled Depth, \u03BE (xi) for the {group} qubit group = {int(avg_tr_depth)}, {avg_tr_xi}")
+                    print(f"Average Transpiled Depth, \u03BE (xi), 2q gates for the {group} qubit group = {int(avg_tr_depth)}, {avg_tr_xi}, {avg_tr_n2q}")
                     
             avg_create_time = group_metrics["avg_create_times"][group_index]
             print(f"Average Creation Time for the {group} qubit group = {avg_create_time} secs")
