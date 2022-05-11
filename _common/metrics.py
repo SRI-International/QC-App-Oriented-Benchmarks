@@ -36,6 +36,10 @@ from datetime import datetime
 
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
+
+circuit_metrics_detail = {  }    # for iterative algorithms
+circuit_metrics_detail_2 = {  }  # used to break down to 3rd dimension
+
 group_metrics = { "groups": [],
     "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [],
     "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [], "avg_tr_n2qs": [],
@@ -102,6 +106,8 @@ def init_metrics ():
     
     # create empty dictionary for circuit metrics
     circuit_metrics.clear()
+    circuit_metrics_detail.clear()
+    circuit_metrics_detail_2.clear()
     
     # create empty arrays for group metrics
     group_metrics["groups"] = []
@@ -308,7 +314,7 @@ def report_metrics ():
         report_metrics_for_group(group)
         
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete
-def finalize_group(group):
+def finalize_group(group, report=True):
 
     #print(f"... finalize group={group}")
 
@@ -322,15 +328,42 @@ def finalize_group(group):
             break
     
     #print(f"  ... group_done = {group} {group_done}")
-    if group_done:
+    if group_done and report:
         aggregate_metrics_for_group(group)
         print("************")
         report_metrics_for_group(group)
         
     # sort the group metrics (sometimes they come back out of order)
     sort_group_metrics()
+    
+# Aggregate and report on metrics for the given groups, if all circuits in group are complete (2 levels)
+def finalize_group_2_level(group):
+
+    #print(f"... finalize group={group} 2-level")
+
+    # loop over circuits in group to generate totals
+    group_done = True
+    for circuit in circuit_metrics[group]:
+        #print(f"  ... metrics = {group} {circuit} {circuit_metrics[group][circuit]}")
         
+        if "elapsed_time" not in circuit_metrics[group][circuit]:
+            group_done = False
+            break
+    
+    #print(f"  ... group_done = {group} {group_done}")
+    if group_done:
+    
+        # before aggregating, perform aggregtion at 3rd level to create a single entry 
+        # for each circuit_id and a separate table of detail metrics
+        process_circuit_metrics_2_level(group)
         
+        aggregate_metrics_for_group(group)
+        print("************")
+        report_metrics_for_group(group)
+        
+    # sort the group metrics (sometimes they come back out of order)
+    sort_group_metrics()
+    
 # sort the group array as integers, then all metrics relative to it
 def sort_group_metrics():
 
@@ -344,10 +377,122 @@ def sort_group_metrics():
     # save the sorted group names when all done 
     xy = sorted(zip(igroups, group_metrics["groups"]))    
     group_metrics["groups"] = [y for x, y in xy]
-    
 
-##########################################
-# ANALYSIS AND VISUALIZATION
+# Process the circuit metrics to aggregate to third level by splitting circuit_id 
+# This is used when there is a third level of iteration.  The same circuit is executed multiple times
+# and the metrics collected are indexed by as idx1 * 1000 and idx2
+# Create a circuit_metrics_detail containing all these metrics, aggregate them to circuit_metrics
+# Create a circuit_metrics_detail_2 that has the detail metrics aggregated to support plotting
+
+def process_circuit_metrics_2_level(num_qubits):
+    global circuit_metrics_detail
+    global circuit_metrics_detail_2
+    
+    group = str(num_qubits)
+    
+    # print out what was received
+    #jsonDataStr = json.dumps(circuit_metrics[group], indent=2).replace('\n', '\n  ')
+    #print("  ==> circuit_metrics: %s" % jsonDataStr) 
+    
+    #print(f"... process_circuit_metrics_2_level({num_qubits})") 
+    circuit_metrics_detail[group] = circuit_metrics[group]
+    circuit_metrics[group] = { }
+    
+    circuit_metrics_detail_2[group] = { }
+    
+    avg_fidelity = 0
+    total_elapsed_time = 0
+    total_exec_time = 0
+    
+    # loop over all the collected metrics to split the index into idx1 and idx2
+    count = 0
+    for circuit_id in circuit_metrics_detail[group]:
+        #if count == 0: print(f"...   circuit_id={circuit_id}")
+                
+        id = int(circuit_id)
+        idx1 = id; idx2 = -1
+        if id >= 1000:
+            idx1 = int(id / 1000)
+            idx2 = id % 1000
+            
+        #print(f"...   idx1, idx2={idx1} {idx2}") 
+        
+        # if we have metrics for this (outer) circuit_id, then we need to accumulate these metrics
+        # as they are encountered; otherwise there will just be one added the first time.
+        # The result is that the circuit_metrics_detail dict is created, but indexed by one index (idx1 * 1000 + idx2)
+        if idx1 in circuit_metrics[group]:
+            last_circuit_id = str(int(circuit_id) - 1)
+            ''' note: do not accumulate here, it is done in the plotting code
+            circuit_metrics_detail[group][circuit_id]["elapsed_time"] += circuit_metrics_detail[group][last_circuit_id]["elapsed_time"]
+            circuit_metrics_detail[group][circuit_id]["exec_time"] += circuit_metrics_detail[group][last_circuit_id]["exec_time"]
+            '''
+       
+        # if there are no circuit_metrics created yet for this idx1, start a detail_2 table 
+        else:
+            circuit_metrics_detail_2[group][idx1] = { }
+          
+        # copy each of the detail metrics to the detail_2 dict indexed by idx1 and idx2 as they are encountered
+        circuit_metrics_detail_2[group][idx1][idx2] = circuit_metrics_detail[group][circuit_id]
+        
+        # copy each detail entry to circuit_metrics_new so last one ends up there,
+        # storing the last entry as the primary entry for this circuit id
+        circuit_metrics[group][idx1] = circuit_metrics_detail[group][circuit_id]  
+        
+        # at the end we have one entry in the circuit_metrics table for the group and primary circuit_id
+        # circuit_metrics_detail_2 has all the detail metrics indexed by group, idx1 and idx2 (where idx1=circuit_id)
+        # circuit_metrics_detail is not used, just an intermediate
+        
+        count += 1 
+
+
+# The method below is used in one form of iteration benchmark (TDB whether to retain JN)
+
+iterations_metrics = {}
+
+# Separate out metrics for final vs. intermediate circuits
+
+def process_iteration_metrics(group_id):
+    global circuit_metrics
+    global iterations_metrics
+    g_id = str(group_id)
+    iterations_metrics[g_id] = {}
+    
+    for iteration, data in circuit_metrics[g_id].items():            
+        for key, value in data.items():
+            if iteration == '1':
+                iterations_metrics[g_id][key] = []
+            
+            iterations_metrics[g_id][key].append(value)
+      
+    del circuit_metrics[g_id]
+    return iterations_metrics
+ 
+ 
+# convenience functions to print all circuit metrics (for debugging)
+
+def dump_json(msg, data):
+    jsonDataStr = json.dumps(data, indent=2).replace('\n', '\n  ')    
+    print(f"{msg}: {jsonDataStr}") 
+    
+def print_all_circuit_metrics():
+
+    dump_json("  ==> all circuit_metrics", circuit_metrics)
+    
+    print(f"  ==> all detail 2 circuit_metrics:")
+    for group in circuit_metrics_detail_2:
+        for circuit_id in circuit_metrics_detail_2[group]:
+            print(f"    group {group} circuit {circuit_id}")
+            for it in circuit_metrics_detail_2[group][circuit_id]:
+                mets = circuit_metrics_detail_2[group][circuit_id][it]
+                elt = round(mets["elapsed_time"], 3)
+                ext = round(mets["exec_time"], 3)
+                fid = round(mets["fidelity"], 3) if "fidelity" in mets else -1
+                opt_ext = round(mets["opt_exec_time"], 3) if "opt_exec_time" in mets else -1
+                print(f"      iteration {it} = {elt} {ext} {fid} {opt_ext}")
+
+               
+############################################
+# ANALYSIS AND VISUALIZATION - METRICS PLOTS
 
 import matplotlib.pyplot as plt
     
@@ -568,8 +713,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         
         #display plot
         plt.show()       
-
-    
+        
+   
 # Plot metrics over all groups (2)
 def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-1"):    
     
@@ -915,7 +1060,197 @@ def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, su
     group_metrics = shared_data[app]["group_metrics"]
     plot_metrics(app, filters=filters, suffix=suffix)
 
+
+#################################################
+# ANALYSIS AND VISUALIZATION - AREA METRICS PLOTS
+
+def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
+    if type(score_metric) == str:
+        score_metric = [score_metric]
+    if type(x_metric) == str:
+        x_metric = [x_metric]
+    if type(y_metric) == str:
+        y_metric = [y_metric]
+    
+    for s_m in score_metric:
+        for x_m in x_metric:
+            for y_m in y_metric:
+                plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size)
+       
+        
+def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
+    """
+    Plots a score metric as an area plot, on axes defined by x_metric and y_metric
+    
+    fixed_metrics: (dict) A dictionary mapping metric keywords to the values they are to be held at;
+                          for example: 
+                          
+                          fixed_metrics = {'rounds': 2}
+                              
+                              when the y-axis is num_qubits or 
+                          
+                          fixed_metrics = {'num_qubits': 4}
+                          
+                              when the y-axis is rounds.    
+    """
+    xs, x, y, scores = [], [], [], []
+    cumulative_flag, maximum_flag = False, False
+    if len(x_metric) > 11 and x_metric[:11] == 'cumulative_':
+        cumulative_flag = True
+        x_metric = x_metric[11:]
+    if score_metric[:4] == 'max_':
+        maximum_flag = True
+        score_metric = score_metric[4:]
+    
+    #print(f"  ==> all detail 2 circuit_metrics:")
+    for group in circuit_metrics_detail_2:
+        
+        num_qubits = int(group)
+        
+        if 'num_qubits' in fixed_metrics:
+            if num_qubits != fixed_metrics['num_qubits']:
+                continue
+        
+        x_size_groups, x_groups, y_groups, score_groups = [], [], [], []
+        
+        # Each problem instance at size num_qubits; need to collate across iterations
+        i = 0
+        for circuit_id in circuit_metrics_detail_2[group]:
+                
+            x_last, score_last = 0, 0
+            x_sizes, x_points, y_points, score_points = [], [], [], []            
+            
+            for it in circuit_metrics_detail_2[group][circuit_id]:
+                mets = circuit_metrics_detail_2[group][circuit_id][it]
+
+                # get each metric and accumulate if indicated
+                x_raw = x_now = mets[x_metric]
+                if cumulative_flag:
+                    x_now += x_last
+                x_last = x_now
+                
+                if y_metric == 'num_qubits':
+                    y_now = num_qubits
+                else:
+                    y_now = mets[y_metric]
+                
+                # Count only iterations at valid fixed_metric values
+                for fixed_m in fixed_metrics:
+                    if mets[fixed_m] != fixed_metrics[fixed_m]:
+                        continue
+                    # Support intervals e.g. {'depth': (15, 65)}
+                    elif len(fixed_metrics[fixed_m]) == 2:
+                        if mets[fixed_m]<fixed_metrics[fixed_m][0] or mets[fixed_m]>fixed_metrics[fixed_m][1]:
+                            continue
+                
+                if maximum_flag:
+                    score_now = max(score_last, mets[score_metric])
+                else:
+                    score_now = mets[score_metric]
+                score_last = score_now
+      
+                # need to shift x_now by the 'size', since x_now inb the cumulative 
+                #x_points.append((x_now - x_raw) if cumulative_flag else x_now)
+                #x_points.append((x_now - x_raw))
+                x_points.append(x_now - x_raw/2)
+                y_points.append(y_now)
+                x_sizes.append(x_raw)
+                score_points.append(score_now)
+            
+            x_size_groups.append(x_sizes)
+            x_groups.append(x_points)
+            y_groups.append(y_points)
+            score_groups.append(score_points)
+        
+        ''' don't do binning for now
+        #print(f"  ... x_ = {num_x_bins} {len(x_groups)} {x_groups}")
+        #x_sizes_, x_, y_, scores_ = x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins=num_x_bins)
+        '''
+        # instead use the last of the groups
+        i_last = len(x_groups) - 1
+        x_sizes_ = x_size_groups[i_last]
+        x_ = x_groups[i_last]
+        y_ = y_groups[i_last]
+        scores_ = score_groups[i_last]
+        
+        #print(f"  ... x_ = {len(x_)} {x_}") 
+        #print(f"  ... x_sizes_ = {len(x_sizes_)} {x_sizes_}")
+        
+        xs = xs + x_sizes_
+        x = x + x_
+        y = y + y_
+        scores = scores + scores_
+    
+    score_metric_label = score_metric
+    if maximum_flag: score_metric_label += " (max)"
+    
+    ax = plot_metrics_background(suptitle, y_metric, x_metric, score_metric,
+                y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
+                                 
+    # no longer used, instead we pass the array of sizes
+    #if x_size == None:
+        #x_size=(max(x)-min(x))/num_x_bins
+        
+    if y_size == None:
+        y_size = 1.0
+    
+    #print(f"... num: {num_x_bins} {len(x)} {x_size} {x}")
+    
+    # plot all the bars, with width specified as an array that matches the array size of the x,y values
+    plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
+                        labelrot=0, type=1, fill=True, w_max=18, do_label=False,
+                        x_size=xs, y_size=y_size)                         
+        
+
+# Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
+# DEVNOTE: this binning approach creates unevenly spaced bins, cannot use the delta between then for size
+def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins):
+
+    # find min and max across all the groups
+    bin_xs, bin_x, bin_y, bin_s = {}, {}, {}, {}
+    x_min, x_max = x_groups[0][0], x_groups[0][0]
+    for group in x_groups:
+        min_, max_ = min(group), max(group)
+        if min_ < x_min:
+            x_min = min_
+        if max_ > x_max:
+            x_max = max_
+    step = (x_max - x_min)/num_x_bins
+    
+    # loop over each group
+    for group in range(len(x_groups)):      
+        
+        # for each item in the group, accumulate into bins
+        # place into a new bin, if if has larger x value than last one
+        k = 0
+        for i in range(len(x_groups[group])):
+            while x_groups[group][i] >= x_min + k*step:
+                k += 1
+            if k not in bin_x:
+                bin_xs[k] = []
+                bin_x[k] = []
+                bin_y[k] = []
+                bin_s[k] = []
+                    
+            bin_xs[k] = bin_xs[k] + [x_size_groups[group][i]]
+            bin_x[k] = bin_x[k] + [x_groups[group][i]]
+            bin_y[k] = bin_y[k] + [y_groups[group][i]]
+            bin_s[k] = bin_s[k] + [score_groups[group][i]]
+    
+    # for each bin, compute average from all the elements in the bin
+    new_xs, new_x, new_y, new_s = [], [], [], []    
+    for k in bin_x:
+        new_xs.append(sum(bin_xs[k])/len(bin_xs[k]))
+        new_x.append(sum(bin_x[k])/len(bin_x[k]))
+        new_y.append(sum(bin_y[k])/len(bin_y[k]))
+        new_s.append(sum(bin_s[k])/len(bin_s[k]))
+    
+    return new_xs, new_x, new_y, new_s
+    
  
+#############################################
+# ANALYSIS AND VISUALIZATION - DATA UTILITIES
+
 ##### Data File Methods      
      
 # Save the application metrics data to a shared file for the current device
@@ -1119,6 +1454,7 @@ def polarization_fidelity(counts, correct_dist, thermal_dist=None):
 import math
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from matplotlib.patches import Circle
 
 import matplotlib.cm as cm
 
@@ -1142,11 +1478,30 @@ def get_color(value):
 # return the base index for a circuit depth value
 # take the log in the depth base, and add 1
 def depth_index(d, depth_base):
+    if depth_base <= 1:
+        return d
+    if d == 0:
+        return 0
     return math.log(d, depth_base) + 1
 
 
 # draw a box at x,y with various attributes   
-def box_at(x, y, value, type=1, fill=True):
+def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0):
+    
+    value = min(value, 1.0)
+    value = max(value, 0.0)
+
+    fc = get_color(value)
+    ec = (0.5,0.5,0.5)
+    
+    return Rectangle((x - (x_size/2), y - (y_size/2)), x_size, y_size,
+             edgecolor = ec,
+             facecolor = fc,
+             fill=fill,
+             lw=0.5*y_size)
+
+# draw a circle at x,y with various attributes 
+def circle_at(x, y, value, type=1, fill=True):
     size = 1.0
     
     value = min(value, 1.0)
@@ -1155,7 +1510,8 @@ def box_at(x, y, value, type=1, fill=True):
     fc = get_color(value)
     ec = (0.5,0.5,0.5)
     
-    return Rectangle((x - size/2, y - size/2), size, size,
+    return Circle((x, y), size/2,
+             alpha = 0.5,
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
@@ -1349,6 +1705,48 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
             
     return ax
 
+
+
+# Linear Background Analog of the QV Volumetric Background, to allow arbitrary metrics on each axis
+def plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max, x_max, y_min=0, x_min=0):
+    
+    if suptitle == None:
+        suptitle = f"{y_metric} vs. {x_metric} Parameter Positioning of {score_metric}"
+    
+    plot_width = 6.8
+    plot_height = 5.0
+    #print(f"... {plot_width} {plot_height}")
+    
+    # define matplotlib figure and axis; use constrained layout to fit colorbar to right
+    fig, ax = plt.subplots(figsize=(plot_width, plot_height), constrained_layout=True)
+
+    plt.suptitle(suptitle)
+
+    plt.xlim(x_min - (x_max-x_min)/20, x_max)
+    plt.ylim(y_min*0.5, y_max*1.5)
+
+    # circuit metrics (x axis)
+    xround = [(x_max - x_min)/20 * x for x in range(25)]
+    xlabels = [format_number(x) for x in xround]
+    ax.set_xlabel(x_metric)
+    ax.set_xticks(xround)  
+    plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
+    
+    # other label options
+    #plt.xticks(xbasis, xlabels, color='black', rotation=-60, ha='left')
+    #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
+
+    # circuit metrics (y axis)
+    yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]
+    xlabels = [format_number(y) for y in yround]
+    ax.set_ylabel(y_metric)
+    ax.set_yticks(yround)  
+    
+    # add colorbar to right of plot
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=f"Avg Result {score_metric}", panchor=(0.0, 0.7))
+    
+    return ax
+
 x_annos = []
 y_annos = []
 x_anno_offs = []
@@ -1369,7 +1767,8 @@ def vplot_anno_init ():
 
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
-        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False):
+        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False,
+        x_size=1.0, y_size=1.0):
 
     # since data may come back out of order, save point at max y for annotation
     i_anno = 0
@@ -1381,7 +1780,11 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
         x = depth_index(d_data[i], depth_base)
         y = float(w_data[i])
         f = f_data[i]
-        ax.add_patch(box_at(x, y, f, type=type, fill=fill))
+        
+        if isinstance(x_size, list):
+            ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size))
+        else:
+            ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
 
         if y >= y_anno:
             x_anno = x
