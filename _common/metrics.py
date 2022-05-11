@@ -101,7 +101,11 @@ def set_properties ( properties=None ):
         _properties = { "api":"unknown", "backend_id":"unknown" }
     else:
         _properties = properties
-       
+
+
+##################################################
+# DATA ANALYSIS - METRICS COLLECTION AND REPORTING
+      
 # Initialize the metrics module, creating an empty table of metrics
 def init_metrics ():
     global start_time
@@ -141,10 +145,8 @@ def end_metrics():
     end_time = time.time()
     print(f'... execution complete at {strftime("%Y-%m-%d %H:%M:%S", gmtime())}')
     print("")
-    
-    
-##### Metrics methods
-
+ 
+ 
 # Store an individual metric associate with a group and circuit in the group
 def store_metric (group, circuit, metric, value):
     group = str(group)
@@ -243,8 +245,7 @@ def aggregate_metrics_for_group (group):
             group_metrics["avg_exec_validating_times"].append(avg_exec_validating_time)
         if avg_exec_running_time > 0:
             group_metrics["avg_exec_running_times"].append(avg_exec_running_time)
-
-    
+ 
 # Aggregate all metrics by group
 def aggregate_metrics ():
     for group in circuit_metrics:
@@ -321,7 +322,8 @@ def report_metrics ():
     # loop over all groups and print metrics for that group
     for group in circuit_metrics:
         report_metrics_for_group(group)
-        
+
+       
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete
 def finalize_group(group, report=True):
 
@@ -345,6 +347,24 @@ def finalize_group(group, report=True):
     # sort the group metrics (sometimes they come back out of order)
     sort_group_metrics()
     
+# sort the group array as integers, then all metrics relative to it
+def sort_group_metrics():
+
+    # get groups as integer, then sort each metric with it
+    igroups = [int(group) for group in group_metrics["groups"]]
+    for key in group_metrics:
+        if key == "groups": continue
+        xy = sorted(zip(igroups, group_metrics[key]))
+        group_metrics[key] = [y for x, y in xy]
+        
+    # save the sorted group names when all done 
+    xy = sorted(zip(igroups, group_metrics["groups"]))    
+    group_metrics["groups"] = [y for x, y in xy]
+
+
+######################################################
+# DATA ANALYSIS - LEVEL 2 METRICS - ITERATIVE CIRCUITS
+
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete (2 levels)
 def finalize_group_2_level(group):
 
@@ -373,20 +393,7 @@ def finalize_group_2_level(group):
     # sort the group metrics (sometimes they come back out of order)
     sort_group_metrics()
     
-# sort the group array as integers, then all metrics relative to it
-def sort_group_metrics():
-
-    # get groups as integer, then sort each metric with it
-    igroups = [int(group) for group in group_metrics["groups"]]
-    for key in group_metrics:
-        if key == "groups": continue
-        xy = sorted(zip(igroups, group_metrics[key]))
-        group_metrics[key] = [y for x, y in xy]
-        
-    # save the sorted group names when all done 
-    xy = sorted(zip(igroups, group_metrics["groups"]))    
-    group_metrics["groups"] = [y for x, y in xy]
-
+    
 # Process the circuit metrics to aggregate to third level by splitting circuit_id 
 # This is used when there is a third level of iteration.  The same circuit is executed multiple times
 # and the metrics collected are indexed by as idx1 * 1000 and idx2
@@ -499,6 +506,112 @@ def print_all_circuit_metrics():
                 opt_ext = round(mets["opt_exec_time"], 3) if "opt_exec_time" in mets else -1
                 print(f"      iteration {it} = {elt} {ext} {fid} {opt_ext}")
 
+
+############################################
+# DATA ANALYSIS - FIDELITY CALCULATIONS
+
+## Uniform distribution function commonly used
+
+def uniform_dist(num_state_qubits):
+    dist = {}
+    for i in range(2**num_state_qubits):
+        key = bin(i)[2:].zfill(num_state_qubits)
+        dist[key] = 1/(2**num_state_qubits)
+    return dist                
+
+### Analysis methods to be expanded and eventually compiled into a separate analysis.py file
+import math, functools
+import numpy as np
+
+# Compute the fidelity based on Hellinger distance between two discrete probability distributions
+def hellinger_fidelity_with_expected(p, q):
+    """ p: result distribution, may be passed as a counts distribution
+        q: the expected distribution to be compared against
+
+    References:
+        `Hellinger Distance @ wikipedia <https://en.wikipedia.org/wiki/Hellinger_distance>`_
+        Qiskit Hellinger Fidelity Function
+    """
+    p_sum = sum(p.values())
+    q_sum = sum(q.values())
+
+    p_normed = {}
+    for key, val in p.items():
+        p_normed[key] = val/p_sum
+
+    q_normed = {}
+    for key, val in q.items():
+        q_normed[key] = val/q_sum
+
+    total = 0
+    for key, val in p_normed.items():
+        if key in q_normed.keys():
+            total += (np.sqrt(val) - np.sqrt(q_normed[key]))**2
+            del q_normed[key]
+        else:
+            total += val
+    total += sum(q_normed.values())
+    dist = np.sqrt(total)/np.sqrt(2)
+    fidelity = (1-dist**2)**2
+
+    return fidelity
+    
+def rescale_fidelity(fidelity, floor_fidelity, new_floor_fidelity):
+    """
+    Linearly rescales our fidelities to allow comparisons of fidelities across benchmarks
+    
+    fidelity: raw fidelity to rescale
+    floor_fidelity: threshold fidelity which is equivalent to random guessing
+    new_floor_fidelity: what we rescale the floor_fidelity to 
+
+    Ex, with floor_fidelity = 0.25, new_floor_fidelity = 0.0:
+        1 -> 1;
+        0.25 -> 0;
+        0.5 -> 0.3333;
+    """
+    rescaled_fidelity = (1-new_floor_fidelity)/(1-floor_fidelity) * (fidelity - 1) + 1
+    
+    # ensure fidelity is within bounds (0, 1)
+    if rescaled_fidelity < 0:
+        rescaled_fidelity = 0.0
+    if rescaled_fidelity > 1:
+        rescaled_fidelity = 1.0
+    
+    return rescaled_fidelity
+
+def polarization_fidelity(counts, correct_dist, thermal_dist=None):
+    """
+    Combines Hellinger fidelity and polarization rescaling into fidelity calculation
+    used in every benchmark
+
+    counts: the measurement outcomes after `num_shots` algorithm runs
+    correct_dist: the distribution we expect to get for the algorithm running perfectly
+    thermal_dist: optional distribution to pass in distribution from a uniform
+                  superposition over all states. If `None`: generated as 
+                  `uniform_dist` with the same qubits as in `counts`
+
+    Polarization from: `https://arxiv.org/abs/2008.11294v1`
+    """
+    # calculate fidelity via hellinger fidelity between correct distribution and our measured expectation values
+    fidelity = hellinger_fidelity_with_expected(counts, correct_dist)
+
+    if thermal_dist == None:
+        # get length of random key in counts to find how many qubits measured
+        num_measured_qubits = len(list(counts.keys())[0])
+        
+        # generate thermal dist based on number of qubits
+        thermal_dist = uniform_dist(num_measured_qubits)
+
+    # set our fidelity rescaling value as the hellinger fidelity for a depolarized state
+    floor_fidelity = hellinger_fidelity_with_expected(thermal_dist, correct_dist)
+
+    # rescale fidelity result so uniform superposition (random guessing) returns fidelity
+    # rescaled to 0 to provide a better measure of success of the algorithm (polarization)
+    new_floor_fidelity = 0
+    fidelity = rescale_fidelity(fidelity, floor_fidelity, new_floor_fidelity)
+
+    return fidelity
+    
                
 ############################################
 # ANALYSIS AND VISUALIZATION - METRICS PLOTS
@@ -1813,7 +1926,30 @@ def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, su
     group_metrics = shared_data[app]["group_metrics"]
     plot_metrics(app, filters=filters, suffix=suffix)
 
+# save plot as image
+def save_plot_image(plt, imagename, backend_id):
 
+    # don't leave slashes in the filename
+    backend_id = backend_id.replace("/", "_")
+     
+    # not used currently
+    date_of_file = datetime.now().strftime("%d%m%Y_%H%M%S")
+    
+    if not os.path.exists('__images'): os.makedirs('__images')
+    if not os.path.exists(f'__images/{backend_id}'): os.makedirs(f'__images/{backend_id}')
+    
+    pngfilename = f"{backend_id}/{imagename}"
+    pngfilepath = os.path.join(os.getcwd(),"__images", pngfilename + ".jpg")
+    
+    plt.savefig(pngfilepath)
+    
+    #print(f"... saving (plot) image file:{pngfilename}.jpg")   
+    
+    pdffilepath = os.path.join(os.getcwd(),"__images", pngfilename + ".pdf")
+    
+    plt.savefig(pdffilepath)
+    
+    
 #################################################
 # ANALYSIS AND VISUALIZATION - AREA METRICS PLOTS
 
@@ -2091,131 +2227,6 @@ def load_app_metrics (api, backend_id):
  
     return shared_data
             
-            
-# save plot as image
-def save_plot_image(plt, imagename, backend_id):
-
-    # don't leave slashes in the filename
-    backend_id = backend_id.replace("/", "_")
-     
-    # not used currently
-    date_of_file = datetime.now().strftime("%d%m%Y_%H%M%S")
-    
-    if not os.path.exists('__images'): os.makedirs('__images')
-    if not os.path.exists(f'__images/{backend_id}'): os.makedirs(f'__images/{backend_id}')
-    
-    pngfilename = f"{backend_id}/{imagename}"
-    pngfilepath = os.path.join(os.getcwd(),"__images", pngfilename + ".jpg")
-    
-    plt.savefig(pngfilepath)
-    
-    #print(f"... saving (plot) image file:{pngfilename}.jpg")   
-    
-    pdffilepath = os.path.join(os.getcwd(),"__images", pngfilename + ".pdf")
-    
-    plt.savefig(pdffilepath)
-
-## Uniform distribution function commonly used
-
-def uniform_dist(num_state_qubits):
-    dist = {}
-    for i in range(2**num_state_qubits):
-        key = bin(i)[2:].zfill(num_state_qubits)
-        dist[key] = 1/(2**num_state_qubits)
-    return dist                
-
-### Analysis methods to be expanded and eventually compiled into a separate analysis.py file
-import math, functools
-import numpy as np
-
-# Compute the fidelity based on Hellinger distance between two discrete probability distributions
-def hellinger_fidelity_with_expected(p, q):
-    """ p: result distribution, may be passed as a counts distribution
-        q: the expected distribution to be compared against
-
-    References:
-        `Hellinger Distance @ wikipedia <https://en.wikipedia.org/wiki/Hellinger_distance>`_
-        Qiskit Hellinger Fidelity Function
-    """
-    p_sum = sum(p.values())
-    q_sum = sum(q.values())
-
-    p_normed = {}
-    for key, val in p.items():
-        p_normed[key] = val/p_sum
-
-    q_normed = {}
-    for key, val in q.items():
-        q_normed[key] = val/q_sum
-
-    total = 0
-    for key, val in p_normed.items():
-        if key in q_normed.keys():
-            total += (np.sqrt(val) - np.sqrt(q_normed[key]))**2
-            del q_normed[key]
-        else:
-            total += val
-    total += sum(q_normed.values())
-    dist = np.sqrt(total)/np.sqrt(2)
-    fidelity = (1-dist**2)**2
-
-    return fidelity
-    
-def rescale_fidelity(fidelity, floor_fidelity, new_floor_fidelity):
-    """
-    Linearly rescales our fidelities to allow comparisons of fidelities across benchmarks
-    
-    fidelity: raw fidelity to rescale
-    floor_fidelity: threshold fidelity which is equivalent to random guessing
-    new_floor_fidelity: what we rescale the floor_fidelity to 
-
-    Ex, with floor_fidelity = 0.25, new_floor_fidelity = 0.0:
-        1 -> 1;
-        0.25 -> 0;
-        0.5 -> 0.3333;
-    """
-    rescaled_fidelity = (1-new_floor_fidelity)/(1-floor_fidelity) * (fidelity - 1) + 1
-    
-    # ensure fidelity is within bounds (0, 1)
-    if rescaled_fidelity < 0:
-        rescaled_fidelity = 0.0
-    if rescaled_fidelity > 1:
-        rescaled_fidelity = 1.0
-    
-    return rescaled_fidelity
-
-def polarization_fidelity(counts, correct_dist, thermal_dist=None):
-    """
-    Combines Hellinger fidelity and polarization rescaling into fidelity calculation
-    used in every benchmark
-
-    counts: the measurement outcomes after `num_shots` algorithm runs
-    correct_dist: the distribution we expect to get for the algorithm running perfectly
-    thermal_dist: optional distribution to pass in distribution from a uniform
-                  superposition over all states. If `None`: generated as 
-                  `uniform_dist` with the same qubits as in `counts`
-
-    Polarization from: `https://arxiv.org/abs/2008.11294v1`
-    """
-    # calculate fidelity via hellinger fidelity between correct distribution and our measured expectation values
-    fidelity = hellinger_fidelity_with_expected(counts, correct_dist)
-
-    if thermal_dist == None:
-        # get length of random key in counts to find how many qubits measured
-        num_measured_qubits = len(list(counts.keys())[0])
-        
-        # generate thermal dist based on number of qubits
-        thermal_dist = uniform_dist(num_measured_qubits)
-
-    # set our fidelity rescaling value as the hellinger fidelity for a depolarized state
-    floor_fidelity = hellinger_fidelity_with_expected(thermal_dist, correct_dist)
-
-    # rescale fidelity result so uniform superposition (random guessing) returns fidelity
-    # rescaled to 0 to provide a better measure of success of the algorithm (polarization)
-    new_floor_fidelity = 0
-    fidelity = rescale_fidelity(fidelity, floor_fidelity, new_floor_fidelity)
-
-    return fidelity
 
 ##############################################
 # VOLUMETRIC PLOT
