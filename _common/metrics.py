@@ -33,6 +33,7 @@ import json
 import time
 from time import gmtime, strftime
 from datetime import datetime
+import traceback
 
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
@@ -157,6 +158,10 @@ def store_metric (group, circuit, metric, value):
         circuit_metrics[group][circuit] = { }
     circuit_metrics[group][circuit][metric] = value
     #print(f'{group} {circuit} {metric} -> {value}')
+    
+    # DEVNOTE: temporary hack for AQ fidelity
+    if metric == 'fidelity':
+        store_metric (group, circuit, 'aq_fidelity', value)
 
 
 # Aggregate metrics for a specific group, creating average across circuits in group
@@ -826,8 +831,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
                 label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
         
         except Exception as e:
-            print(f'ERROR: failure when creating volumetric positioning chart')
+            print(f'ERROR: plot_metrics(), failure when creating volumetric positioning chart')
             print(f"... exception = {e}")
+            if verbose:
+                print(traceback.format_exc())
         
         # save plot image to file
         if save_plot_images:
@@ -835,6 +842,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         
         #display plot
         plt.show()       
+
     
 # Plot bar charts for each metric over all groups
 def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix=""):
@@ -1055,8 +1063,10 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
                 label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
         
         except Exception as e:
-            print(f'ERROR: failure when creating volumetric positioning chart')
+            print(f'ERROR: plot_metrics_aq(), failure when creating volumetric positioning chart')
             print(f"... exception = {e}")
+            if verbose:
+                print(traceback.format_exc())
         
         # save plot image to file
         if save_plot_images:
@@ -1065,7 +1075,9 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
         #display plot
         plt.show()       
 
-    
+
+#################################################
+
 # Plot metrics over all groups (2)
 def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-1"):    
     
@@ -1131,8 +1143,10 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
     
     except Exception as e:
-        print(f'ERROR: failure when creating volumetric positioning chart')
+        print(f'ERROR: plot_metrics_all_overlaid(), failure when creating volumetric positioning chart')
         print(f"... exception = {e}")
+        if verbose:
+            print(traceback.format_exc())
     
     # save plot image file
     if save_plot_images:
@@ -1208,8 +1222,10 @@ def plot_metrics_all_overlaid_aq (shared_data, backend_id, suptitle=None, imagen
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
     
     except Exception as e:
-        print(f'ERROR: failure when creating volumetric positioning chart')
+        print(f'ERROR: plot_metrics_all_overlaid_aq(), failure when creating volumetric positioning chart')
         print(f"... exception = {e}")
+        if verbose:
+            print(traceback.format_exc())
     
     # save plot image file
     if save_plot_images:
@@ -1219,167 +1235,7 @@ def plot_metrics_all_overlaid_aq (shared_data, backend_id, suptitle=None, imagen
     plt.show()    
 
 
-def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
-      
-    global circuit_metrics
-    global aq_metrics
-  
-    # generate separate figure for volumetric positioning chart of depth metrics
-    # found it difficult to share the x axis with first 3, but have diff axis for this one
-    
-    #print(f"... {max_depth_log}")
-    
-    #if True:
-    try:
-        #print(f"... {d_data} {d_tr_data}")
-        
-        # determine largest and smallest width for all apps
-        w_max = 0
-        w_min = 0
-        for app in shared_data:
-            aq_metrics = shared_data[app]["aq_metrics"]
-            w_data = aq_metrics["groups"]
-            for i in range(len(w_data)):
-                y = float(w_data[i])
-                w_max = max(w_max, y)
-                w_min = min(w_min, y)
-        
-        #determine width for AQ
-        AQ=w_max
-        for app in shared_data:
-            aq_metrics = shared_data[app]["aq_metrics"]
-            w_data = aq_metrics["groups"]
-            n2q_data = aq_metrics["tr_n2qs"]       
-            fidelity_data=aq_metrics["aq_fidelities"]
-            while True:
-                n2q_cutoff=AQ*AQ
-                fail_w=[i for i in range(len(n2q_data)) if (float(n2q_data[i]) <= n2q_cutoff and float(w_data[i]) <=AQ and float(fidelity_data[i])<aq_cutoff)] 
-                if len(fail_w)==0:
-                    break        
-                AQ-=1
-
-        if AQ<w_min:
-            AQ=0
-        
-      
-        # allow one more in width to accommodate the merge values below
-        max_qubits = int(w_max) + 1     
-        #print(f"... {w_max} {max_qubits}")
-        
-        ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ, depth_base=depth_base, suptitle=suptitle, avail_qubits=avail_qubits)
-        
-        # create 2D array to hold merged value arrays with gradations, one array for each qubit size
-        num_grads = 4
-        depth_values_merged = []
-        for w in range(max_qubits):
-            depth_values_merged.append([ None ] * (num_grads * max_depth_log))
-        
-        #print(depth_values_merged)
-            
-        # run through depth metrics for all apps, splitting cells into gradations
-        for app in shared_data:
-            #print(shared_data[app])
-            
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
-            aq_metrics = shared_data[app]["aq_metrics"]
-            #print(aq_metrics)
-            
-            if len(aq_metrics["groups"]) == 0:
-                print(f"****** NO RESULTS for {appname} ****** ")
-                continue
-
-            # check if we have depth metrics
-            do_depths = len(aq_metrics["tr_n2qs"]) > 0
-            if not do_depths:
-                continue
-                
-            w_data = aq_metrics["groups"]          
-            n2q_tr_data = aq_metrics["tr_n2qs"]
-            f_data = aq_metrics["aq_fidelities"]
-    
-            #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base,
-                   #label=appname, labelpos=(0.4, 0.6), labelrot=50, type=1)  
-
-            # aggregate value metrics for each depth cell over all apps
-            for i in range(len(w_data)):
-                x = depth_index(n2q_tr_data[i], depth_base)
-                y = float(w_data[i])
-                f = f_data[i]
-                
-                # accumulate largest width for all apps
-                w_max = max(w_max, y)
-                
-                xp = x * 4
-                
-                if x > max_depth_log - 1:
-                    print(f"... data out of chart range, skipped; w={y} d={n2q_tr_data[i]}")
-                    continue;
-                    
-                for grad in range(num_grads):
-                    e = depth_values_merged[int(w_data[i])][int(xp + grad)]
-                    if e == None: 
-                        e = { "value": 0.0, "count": 0 }
-                    e["count"] += 1
-                    e["value"] += f
-                    depth_values_merged[int(w_data[i])][int(xp + grad)] = e
-        
-        # Now overlay depth metrics for each app with unfilled rects, to outline each circuit
-        
-        vplot_anno_init()
-        
-        for app in shared_data:
-        
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-    
-            aq_metrics = shared_data[app]["aq_metrics"]
-            
-            # check if we have depth metrics for group
-            if len(aq_metrics["groups"]) == 0:
-                continue
-            if len(aq_metrics["tr_n2qs"]) == 0:
-                continue
-                
-            w_data = aq_metrics["groups"]
-            n2q_tr_data=aq_metrics['tr_n2qs']
-            f_data = aq_metrics["aq_fidelities"]            
-
-            # plot data rectangles
-            '''
-            for i in range(len(d_data)):
-                x = depth_index(d_tr_data[i], depth_base)
-                y = float(w_data[i])
-                f = f_data[i]
-                ax.add_patch(box_at(x, y, f, type=1, fill=False))
-            '''
-            
-            #print(f"... plotting {appname}")
-                
-            plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=True, w_max=w_max)
-        
-        # do annotation separately, spreading labels for readability
-        anno_volumetric_data(ax, depth_base,
-                   label=appname, labelpos=(3.0, 1.5), labelrot=15, type=1, fill=False)
-          
-        #Final pass to overlay unfilled rects for each cell (this is incorrect, should be removed)
-        #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=False,
-                   #label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
-    
-    except Exception as e:
-        print(f'ERROR: failure when creating volumetric positioning chart')
-        print(f"... exception = {e}")
-    
-    # save plot image file
-    if save_plot_images:
-        save_plot_image(plt, imagename, backend_id)
-
-    #display plot
-    plt.show()
+#################################################
 
 # Plot metrics over all groups (2), merging data from all apps into smaller cells
 def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
@@ -1544,8 +1400,10 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
                    #label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
     
     except Exception as e:
-        print(f'ERROR: failure when creating volumetric positioning chart')
+        print(f'ERROR: plot_metrics_all_merged(), failure when creating volumetric positioning chart')
         print(f"... exception = {e}")
+        if verbose:
+            print(traceback.format_exc())
     
     # save plot image file
     if save_plot_images:
@@ -1553,6 +1411,7 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
 
     #display plot
     plt.show()
+
 
 # Plot metrics over all groups (2), merging data from all apps into smaller cells
 def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
@@ -1739,8 +1598,10 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
                    #label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
     
     except Exception as e:
-        print(f'ERROR: failure when creating volumetric positioning chart')
+        print(f'ERROR: plot_metrics_all_merged_aq(), failure when creating volumetric positioning chart')
         print(f"... exception = {e}")
+        if verbose:
+            print(traceback.format_exc())
     
     # save plot image file
     if save_plot_images:
@@ -1749,6 +1610,192 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
     #display plot
     plt.show()
 
+
+def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
+      
+    global circuit_metrics
+    global aq_metrics
+  
+    # generate separate figure for volumetric positioning chart of depth metrics
+    # found it difficult to share the x axis with first 3, but have diff axis for this one
+    
+    #print(f"... {max_depth_log}")
+    
+    #if True:
+    try:
+        #print(f"... {d_data} {d_tr_data}")
+        
+        # determine largest and smallest width for all apps
+        w_max = 0
+        w_min = 0
+        for app in shared_data:
+        
+            if "aq_metrics" not in shared_data[app]:
+                print(f"  .. skipping app: {app}")
+                continue
+                
+            aq_metrics = shared_data[app]["aq_metrics"]
+            w_data = aq_metrics["groups"]
+            for i in range(len(w_data)):
+                y = float(w_data[i])
+                w_max = max(w_max, y)
+                w_min = min(w_min, y)
+        
+        #determine width for AQ
+        AQ=w_max
+        for app in shared_data:
+        
+            if "aq_metrics" not in shared_data[app]:
+                print(f"  .. skipping app: {app}")
+                continue
+            
+            aq_metrics = shared_data[app]["aq_metrics"]
+            w_data = aq_metrics["groups"]
+            n2q_data = aq_metrics["tr_n2qs"]       
+            fidelity_data=aq_metrics["aq_fidelities"]
+            while True:
+                n2q_cutoff=AQ*AQ
+                fail_w=[i for i in range(len(n2q_data)) if (float(n2q_data[i]) <= n2q_cutoff and float(w_data[i]) <=AQ and float(fidelity_data[i])<aq_cutoff)] 
+                if len(fail_w)==0:
+                    break        
+                AQ-=1
+
+        if AQ<w_min:
+            AQ=0
+            
+        # allow one more in width to accommodate the merge values below
+        max_qubits = int(w_max) + 1     
+        #print(f"... {w_max} {max_qubits}")
+        
+        ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ, depth_base=depth_base, suptitle=suptitle, avail_qubits=avail_qubits)
+        
+        # create 2D array to hold merged value arrays with gradations, one array for each qubit size
+        num_grads = 4
+        depth_values_merged = []
+        for w in range(max_qubits):
+            depth_values_merged.append([ None ] * (num_grads * max_depth_log))
+        
+        #print(depth_values_merged)
+            
+        # run through depth metrics for all apps, splitting cells into gradations
+        for app in shared_data:
+            #print(shared_data[app])
+            
+            # Extract shorter app name from the title passed in by user
+            appname = app[len('Benchmark Results - '):len(app)]
+            appname = appname[:appname.index(' - ')]
+            
+            
+            if "aq_metrics" not in shared_data[app]:
+                print(f"  .. skipping app: {app}")
+                continue
+            
+            aq_metrics = shared_data[app]["aq_metrics"]
+            #print(aq_metrics)
+            
+            if len(aq_metrics["groups"]) == 0:
+                print(f"****** NO RESULTS for {appname} ****** ")
+                continue
+
+            # check if we have depth metrics
+            do_depths = len(aq_metrics["tr_n2qs"]) > 0
+            if not do_depths:
+                continue
+                
+            w_data = aq_metrics["groups"]          
+            n2q_tr_data = aq_metrics["tr_n2qs"]
+            f_data = aq_metrics["aq_fidelities"]
+    
+            #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base,
+                   #label=appname, labelpos=(0.4, 0.6), labelrot=50, type=1)  
+
+            # aggregate value metrics for each depth cell over all apps
+            for i in range(len(w_data)):
+                x = depth_index(n2q_tr_data[i], depth_base)
+                y = float(w_data[i])
+                f = f_data[i]
+                
+                # accumulate largest width for all apps
+                w_max = max(w_max, y)
+                
+                xp = x * 4
+                
+                if x > max_depth_log - 1:
+                    print(f"... data out of chart range, skipped; w={y} d={n2q_tr_data[i]}")
+                    continue;
+                    
+                for grad in range(num_grads):
+                    e = depth_values_merged[int(w_data[i])][int(xp + grad)]
+                    if e == None: 
+                        e = { "value": 0.0, "count": 0 }
+                    e["count"] += 1
+                    e["value"] += f
+                    depth_values_merged[int(w_data[i])][int(xp + grad)] = e
+        
+        # Now overlay depth metrics for each app with unfilled rects, to outline each circuit
+        
+        vplot_anno_init()
+        
+        for app in shared_data:
+        
+            # Extract shorter app name from the title passed in by user
+            appname = app[len('Benchmark Results - '):len(app)]
+            appname = appname[:appname.index(' - ')]
+    
+            
+            if "aq_metrics" not in shared_data[app]:
+                print(f"  .. skipping app: {app}")
+                continue
+            
+            aq_metrics = shared_data[app]["aq_metrics"]
+            
+            # check if we have depth metrics for group
+            if len(aq_metrics["groups"]) == 0:
+                continue
+            if len(aq_metrics["tr_n2qs"]) == 0:
+                continue
+                
+            w_data = aq_metrics["groups"]
+            n2q_tr_data=aq_metrics['tr_n2qs']
+            f_data = aq_metrics["aq_fidelities"]            
+
+            # plot data rectangles
+            '''
+            for i in range(len(d_data)):
+                x = depth_index(d_tr_data[i], depth_base)
+                y = float(w_data[i])
+                f = f_data[i]
+                ax.add_patch(box_at(x, y, f, type=1, fill=False))
+            '''
+            
+            print(f"... plotting {appname} {f_data}")
+                
+            plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base,
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=True, w_max=w_max)
+        
+        # do annotation separately, spreading labels for readability
+        anno_volumetric_data(ax, depth_base,
+                   label=appname, labelpos=(3.0, 1.5), labelrot=15, type=1, fill=False)
+          
+        #Final pass to overlay unfilled rects for each cell (this is incorrect, should be removed)
+        #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=False,
+                   #label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+    
+    except Exception as e:
+        print(f'ERROR: plot_metrics_all_merged_individual_aq(), failure when creating volumetric positioning chart')
+        print(f"... exception = {e}")
+        if verbose:
+            print(traceback.format_exc())
+    
+    # save plot image file
+    if save_plot_images:
+        save_plot_image(plt, imagename, backend_id)
+
+    #display plot
+    plt.show()
+
+
+#################################################
 
 ### plot metrics across all apps for a backend_id
 
@@ -1815,7 +1862,6 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
         
         cmap = cmap_spectral
         suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {timestr} UTC"
-        
         plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits)
         
     # show all app metrics charts if enabled
@@ -1905,7 +1951,8 @@ def plot_all_app_metrics_aq(backend_id, do_all_plots=False,
             #print(app)
             group_metrics = shared_data[app]["group_metrics"]
             plot_metrics(app)
- 
+
+
 ### Plot Metrics for a specific application
 
 def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, suffix=""):
