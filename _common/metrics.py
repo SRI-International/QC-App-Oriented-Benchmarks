@@ -33,6 +33,7 @@ import json
 import time
 from time import gmtime, strftime
 from datetime import datetime
+import traceback
 
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
@@ -817,8 +818,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
                 label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
         
         except Exception as e:
-            print(f'ERROR: failure when creating volumetric positioning chart')
+            print(f'ERROR: plot_metrics(), failure when creating volumetric positioning chart')
             print(f"... exception = {e}")
+            if verbose:
+                print(traceback.format_exc())
         
         # save plot image to file
         if save_plot_images:
@@ -826,8 +829,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         
         #display plot
         plt.show()       
-        
-   
+
+
+#################################################
+
 # Plot metrics over all groups (2)
 def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-1"):    
     
@@ -893,8 +898,10 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
     
     except Exception as e:
-        print(f'ERROR: failure when creating volumetric positioning chart')
+        print(f'ERROR: plot_metrics_all_overlaid(), failure when creating volumetric positioning chart')
         print(f"... exception = {e}")
+        if verbose:
+            print(traceback.format_exc())
     
     # save plot image file
     if save_plot_images:
@@ -903,6 +910,8 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
     #display plot
     plt.show()    
 
+
+#################################################
 
 # Plot metrics over all groups (2), merging data from all apps into smaller cells
 def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
@@ -1067,8 +1076,10 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
                    #label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
     
     except Exception as e:
-        print(f'ERROR: failure when creating volumetric positioning chart')
+        print(f'ERROR: plot_metrics_all_merged(), failure when creating volumetric positioning chart')
         print(f"... exception = {e}")
+        if verbose:
+            print(traceback.format_exc())
     
     # save plot image file
     if save_plot_images:
@@ -1077,6 +1088,8 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
     #display plot
     plt.show()
 
+
+#################################################
 
 ### plot metrics across all apps for a backend_id
 
