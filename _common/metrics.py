@@ -75,9 +75,11 @@ do_app_charts_with_all_metrics = False
 max_depth_log = 22
 
 # Quantum Volume to display on volumetric background
-AQ=22
 QV = 32
-aq_cutoff=0.368
+
+# Algorithmic Qubits (defaults)
+AQ = 22
+aq_cutoff = 0.368   # below this circuits not considered successful
 
 # average transpile factor between base QV depth and our depth based on results from QV notebook
 QV_transpile_factor = 12.7     
