@@ -25,6 +25,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Deutsch-Jozsa"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -32,7 +39,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run deutsch-jozsa/projectq/dj_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"deutsch-jozsa/projectq\")\n",
     "import dj_benchmark\n",
@@ -40,12 +46,18 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Bernstein-Vazirani"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {},
    "outputs": [],
    "source": [
-    "#%run bernstein-vazirani/projectq/bv_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"bernstein-vazirani/projectq\")\n",
     "import bv_benchmark\n",
@@ -53,6 +65,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Hidden Shift"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -60,7 +79,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run hidden-shift/projectq/hs_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"hidden-shift/projectq\")\n",
     "import hs_benchmark\n",
@@ -68,6 +86,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Quantum Fourier Transform"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -75,7 +100,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run quantum-fourier-transform/projectq/qft_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"quantum-fourier-transform/projectq\")\n",
     "import qft_benchmark\n",
@@ -83,6 +107,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Grover"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -90,7 +121,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run grovers/projectq/grovers_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"grovers/projectq\")\n",
     "import grovers_benchmark\n",
@@ -98,6 +128,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Amplitude Estimation"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -105,7 +142,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run amplitude-estimation/projectq/ae_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"amplitude-estimation/projectq\")\n",
     "import ae_benchmark\n",
@@ -113,6 +149,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Monte Carlo"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -120,11 +163,17 @@
    },
    "outputs": [],
    "source": [
-    "#%run monte-carlo/projectq/mc_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"monte-carlo/projectq\")\n",
     "import mc_benchmark\n",
     "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Shor"
    ]
   },
   {
@@ -133,19 +182,11 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "#%run shors/projectq/shors_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"shors/projectq\")\n",
     "import shors_benchmark\n",
     "shors_benchmark.run(min_qubits=min_qubits, max_qubits=10, max_circuits=3, verbose=True, interactive=True)"
    ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {},
-   "outputs": [],
-   "source": []
   }
  ],
  "metadata": {
