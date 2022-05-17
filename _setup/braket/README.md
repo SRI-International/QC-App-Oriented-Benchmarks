@@ -5,19 +5,9 @@
 This directory describes the requirements and operational conventions for using Braket as the programming environment for running the prototype benchmark programs contained in the QC-Proto-Benchmarks repository.
 In particular, this document explains how to set up the tools needed to run the Braket implementation of these benchmarks.
 
-Note: the instructions contained here describe configuring a Windows environment to run the benchmark programs. Similar procedures will be used in a Linux environment using appropriate syntax of course.
+## Configure a Braket Environment
 
-## Configure a Python Environment
-
-The Braket version of the prototype benchmark programs require that you have available Python version 3.6 or later, and have installed the necessary Python packages.
-
-If you have a proper Python environment available, skip this section and go directly the the *'Install Braket'* section below.
-
-If you do not already have Python available, a convenient way to set one up is to download a minimum version of the Anaconda package (called Miniconda). Go to the URL below and follow the instructions to set up the "Miniconda" package.
-
-    https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html
-
-Once you have installed the Miniconda package, from the Windows Start menu launch an Anaconda prompt in which you will run the programs. It is recommended that you create a conda "environment" to hold the specific set of Python packages you will install to run the benchmark programs. Create an environment named "braket" and then "activate" it using the following commands:
+Create an environment named "braket" and then "activate" it using the following commands:
 
     conda create -n braket python=3
 
@@ -26,6 +16,14 @@ Once you have installed the Miniconda package, from the Windows Start menu launc
 The conda environment is now ready for you to install the Braket package.
 
 ## Install Braket
+
+After activating the conda environment, to ensure you are using the correct installation of `pip`, run the following command:
+
+    pip show pip
+
+If everything is working correctly, the `Location` field should have your newly created environment's name present. For example:
+
+    Location: c:\users\[user]\miniconda\envs\braket\lib\site-packages
 
 Enter the following commands to install the latest version of Amazon Braket SDK and the other required packages.
 
