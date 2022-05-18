@@ -85,6 +85,11 @@ QV_transpile_factor = 12.7
 #1) need to round to avoid duplicates, and 2) trailing zeros are getting removed 
 depth_base = 2
 
+# Get the current time formatted
+def get_timestr():
+    #timestr = strftime("%Y-%m-%d %H:%M:%S UTC", gmtime())
+    timestr = strftime("%b %d, %Y %H:%M:%S UTC", gmtime())
+    return timestr
 
 ##### Initialize methods
 
@@ -134,14 +139,14 @@ def init_metrics ():
     
     # store the start of execution for the current app
     start_time = time.time()
-    print(f'... execution starting at {strftime("%Y-%m-%d %H:%M:%S", gmtime())}')
+    print(f'... execution starting at {get_timestr()}')
 
 # End metrics collection for an application
 def end_metrics():
     global end_time
 
     end_time = time.time()
-    print(f'... execution complete at {strftime("%Y-%m-%d %H:%M:%S", gmtime())}')
+    print(f'... execution complete at {get_timestr()}')
     print("")
  
  
@@ -689,8 +694,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     fig, axs = plt.subplots(rows, cols, sharex=True, figsize=(fig_w, fig_h))
     
     # append the circuit metrics subtitle to the title
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    realtitle = suptitle + f"\nDevice={backend_id}  {timestr} UTC"
+    realtitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
     '''
     realtitle = suptitle
     if subtitle != None:
@@ -772,10 +776,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     plt.show()
     
     ###################### Volumetric Plot
-    
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    
-    suptitle = f"Volumetric Positioning - {appname}\nDevice={backend_id}  {timestr} UTC"
+        
+    suptitle = f"Volumetric Positioning - {appname}\nDevice={backend_id}  {get_timestr()}"
     
     global cmap   
     
@@ -1135,8 +1137,6 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
     
     # since the bar plots use the subtitle field, set it here
     circuit_metrics["subtitle"] = f"device = {backend_id}"
-    
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
 
     # show vplots if enabled
     if do_volumetric_plots:
@@ -1144,18 +1144,18 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
         # this is an overlay plot, not very useful; better to merge
         '''
         cmap = cmap_spectral
-        suptitle = f"Volumetric Positioning - All Applications (Combined)\nDevice={backend_id}  {timestr} UTC"
+        suptitle = f"Volumetric Positioning - All Applications (Combined)\nDevice={backend_id}  {get_timestr()}"
         plot_metrics_all_overlaid(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2")
         '''
         
         # draw the volumetric plots with two different colormaps, for comparison purposes
         
-        #suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {timestr} UTC"
+        #suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
         #cmap = cmap_blues
         #plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-1"+suffix, avail_qubits=avail_qubits)
         
         cmap = cmap_spectral
-        suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {timestr} UTC"
+        suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
         plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits)
         
     # show all app metrics charts if enabled
@@ -1178,9 +1178,7 @@ def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, su
     
     # since the bar plots use the subtitle field, set it here
     circuit_metrics["subtitle"] = f"device = {backend_id}"
-    
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    
+        
     app = "Benchmark Results - " + appname + " - " + apiname
     
     group_metrics = shared_data[app]["group_metrics"]
@@ -1193,7 +1191,7 @@ def save_plot_image(plt, imagename, backend_id):
     backend_id = backend_id.replace("/", "_")
      
     # not used currently
-    date_of_file = datetime.now().strftime("%d%m%Y_%H%M%S")
+    date_of_file = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     if not os.path.exists('__images'): os.makedirs('__images')
     if not os.path.exists(f'__images/{backend_id}'): os.makedirs(f'__images/{backend_id}')
@@ -1539,7 +1537,7 @@ def circle_at(x, y, value, type=1, fill=True):
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
-             lw=0.5)
+             lw=0.8)                # DEVNOTE: changed to 0.8 from 0.5, to handle only one cell
              
 def box4_at(x, y, value, type=1, fill=True):
     size = 1.0
