@@ -1250,10 +1250,15 @@ def plot_metrics_all_overlaid_aq (shared_data, backend_id, suptitle=None, imagen
 #################################################
 
 # Plot metrics over all groups (2), merging data from all apps into smaller cells
-def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
+def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0, is_individual=True):    
     
     if aq_mode == 2:
-        return plot_metrics_all_merged_individual_aq(shared_data=shared_data, backend_id=backend_id, suptitle=suptitle, imagename=imagename, avail_qubits=avail_qubits)
+        #return plot_metrics_all_merged_individual_aq(shared_data=shared_data, backend_id=backend_id, suptitle=suptitle, imagename=imagename, avail_qubits=avail_qubits)
+        
+        if is_individual is False:
+            return plot_metrics_all_merged_aq(shared_data=shared_data, backend_id=backend_id, suptitle=suptitle, imagename=imagename, avail_qubits=avail_qubits)
+        else:
+            return plot_metrics_all_merged_individual_aq(shared_data=shared_data, backend_id=backend_id, suptitle=suptitle, imagename=imagename, avail_qubits=avail_qubits)                
         
     global circuit_metrics
     global group_metrics
@@ -1459,15 +1464,21 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
         for app in shared_data:
             group_metrics = shared_data[app]["group_metrics"]
             w_data = group_metrics["groups"]
-            n2q_data = group_metrics["avg_tr_n2qs"]       
+             
+            if "avg_tr_n2qs" not in group_metrics:
+                continue
+            if "avg_aq_fidelities" not in group_metrics:
+                continue
+            
+            n2q_data = group_metrics["avg_tr_n2qs"]            
             fidelity_data=group_metrics["avg_aq_fidelities"]
+            
             while True:
                 n2q_cutoff=AQ*AQ
                 fail_w=[i for i in range(len(n2q_data)) if (float(n2q_data[i]) <= n2q_cutoff and float(w_data[i]) <=AQ and float(fidelity_data[i])<aq_cutoff)] 
                 if len(fail_w)==0:
                     break        
                 AQ-=1
-        
         
         if AQ<w_min:
             AQ=0
@@ -1508,7 +1519,13 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
                 
             w_data = group_metrics["groups"]
             d_data = group_metrics["avg_depths"]
-            d_tr_data = group_metrics["avg_tr_depths"]            
+            d_tr_data = group_metrics["avg_tr_depths"] 
+
+            if "avg_tr_n2qs" not in group_metrics:
+                continue
+            if "avg_aq_fidelities" not in group_metrics:
+                continue
+                
             n2q_tr_data = group_metrics["avg_tr_n2qs"]
             f_data = group_metrics["avg_aq_fidelities"]
     
@@ -1587,6 +1604,12 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
             w_data = group_metrics["groups"]
             d_data = group_metrics["avg_depths"]
             d_tr_data = group_metrics["avg_tr_depths"]
+            
+            if "avg_tr_n2qs" not in group_metrics:
+                continue
+            if "avg_aq_fidelities" not in group_metrics:
+                continue
+                
             n2q_tr_data=group_metrics['avg_tr_n2qs']
             f_data = group_metrics["avg_aq_fidelities"]            
 
@@ -1691,7 +1714,8 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
             depth_values_merged.append([ None ] * (num_grads * max_depth_log))
         
         #print(depth_values_merged)
-            
+          
+        '''
         # run through depth metrics for all apps, splitting cells into gradations
         for app in shared_data:
             #print(shared_data[app])
@@ -1746,8 +1770,9 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
                     e["count"] += 1
                     e["value"] += f
                     depth_values_merged[int(w_data[i])][int(xp + grad)] = e
+        '''
         
-        # Now overlay depth metrics for each app with unfilled rects, to outline each circuit
+        # Place circles at each point
         
         vplot_anno_init()
         
@@ -1756,8 +1781,7 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
             # Extract shorter app name from the title passed in by user
             appname = app[len('Benchmark Results - '):len(app)]
             appname = appname[:appname.index(' - ')]
-    
-            
+               
             if "aq_metrics" not in shared_data[app]:
                 print(f"  .. skipping app: {app}")
                 continue
@@ -1815,7 +1839,7 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
 ### plot metrics across all apps for a backend_id
 
 def plot_all_app_metrics(backend_id, do_all_plots=False,
-        include_apps=None, exclude_apps=None, suffix="", avail_qubits=0):
+        include_apps=None, exclude_apps=None, suffix="", avail_qubits=0, is_individual=True):
 
     global circuit_metrics
     global group_metrics
@@ -1875,84 +1899,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
         
         cmap = cmap_spectral
         suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
-        plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits)
-        
-    # show all app metrics charts if enabled
-    if do_app_charts_with_all_metrics or do_all_plots:
-        for app in shared_data:
-            #print("")
-            #print(app)
-            group_metrics = shared_data[app]["group_metrics"]
-            plot_metrics(app)
- 
-
-def plot_all_app_metrics_aq(backend_id, do_all_plots=False,
-        include_apps=None, exclude_apps=None, suffix="", avail_qubits=0, is_individual=False):
-
-    global circuit_metrics
-    global group_metrics
-    global aq_metrics
-    global cmap
-
-    # load saved data from file
-    api = "qiskit"
-    shared_data = load_app_metrics(api, backend_id)
-    
-    # apply include / exclude lists
-    if include_apps != None:
-        new_shared_data = {}
-        for app in shared_data:
-        
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
-            if appname in include_apps:
-                new_shared_data[app] = shared_data[app]
-                
-        shared_data = new_shared_data
-    
-    if exclude_apps != None:
-        new_shared_data = {}
-        for app in shared_data:
-        
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
-            if appname not in exclude_apps:
-                new_shared_data[app] = shared_data[app]
-                
-        shared_data = new_shared_data  
- 
-    #print(shared_data)
-    
-    # since the bar plots use the subtitle field, set it here
-    circuit_metrics["subtitle"] = f"device = {backend_id}"
-
-    # show vplots if enabled
-    if do_volumetric_plots:
-    
-        # this is an overlay plot, not very useful; better to merge
-        '''
-        cmap = cmap_spectral
-        suptitle = f"Volumetric Positioning - All Applications (Combined)\nDevice={backend_id}  {get_timestr()}"
-        plot_metrics_all_overlaid(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2")
-        '''
-        
-        # draw the volumetric plots with two different colormaps, for comparison purposes
-        
-        #suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
-        #cmap = cmap_blues
-        #plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-1"+suffix, avail_qubits=avail_qubits)
-        
-        cmap = cmap_spectral
-        suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
-        
-        if is_individual is False:
-            plot_metrics_all_merged_aq(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits)
-        else:
-            plot_metrics_all_merged_individual_aq(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits)
+        plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits, is_individual=is_individual)
         
     # show all app metrics charts if enabled
     if do_app_charts_with_all_metrics or do_all_plots:
