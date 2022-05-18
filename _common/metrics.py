@@ -1669,7 +1669,7 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
         for app in shared_data:
         
             if "aq_metrics" not in shared_data[app]:
-                print(f"  .. skipping app: {app}")
+                if verbose: print(f"  ... skipping app: {app}")
                 continue
                 
             aq_metrics = shared_data[app]["aq_metrics"]
@@ -1684,7 +1684,7 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
         for app in shared_data:
         
             if "aq_metrics" not in shared_data[app]:
-                print(f"  .. skipping app: {app}")
+                if verbose: print(f"  ... skipping app: {app}")
                 continue
             
             aq_metrics = shared_data[app]["aq_metrics"]
@@ -1783,7 +1783,7 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
             appname = appname[:appname.index(' - ')]
                
             if "aq_metrics" not in shared_data[app]:
-                print(f"  .. skipping app: {app}")
+                if verbose: print(f"  ... skipping app: {app}")
                 continue
             
             aq_metrics = shared_data[app]["aq_metrics"]
