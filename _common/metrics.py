@@ -81,6 +81,8 @@ QV = 32
 AQ = 22
 aq_cutoff = 0.368   # below this circuits not considered successful
 
+aq_mode = 2         # 0 - use default plot behavior, 1 - use AQ modified plot behavior, 2 - use separate method for AQ plots
+
 # average transpile factor between base QV depth and our depth based on results from QV notebook
 QV_transpile_factor = 12.7     
 
@@ -89,6 +91,11 @@ QV_transpile_factor = 12.7
 #1) need to round to avoid duplicates, and 2) trailing zeros are getting removed 
 depth_base = 2
 
+# Get the current time formatted
+def get_timestr():
+    #timestr = strftime("%Y-%m-%d %H:%M:%S UTC", gmtime())
+    timestr = strftime("%b %d, %Y %H:%M:%S UTC", gmtime())
+    return timestr
 
 ##### Initialize methods
 
@@ -139,14 +146,14 @@ def init_metrics ():
     
     # store the start of execution for the current app
     start_time = time.time()
-    print(f'... execution starting at {strftime("%Y-%m-%d %H:%M:%S", gmtime())}')
+    print(f'... execution starting at {get_timestr()}')
 
 # End metrics collection for an application
 def end_metrics():
     global end_time
 
     end_time = time.time()
-    print(f'... execution complete at {strftime("%Y-%m-%d %H:%M:%S", gmtime())}')
+    print(f'... execution complete at {get_timestr()}')
     print("")
  
  
@@ -627,6 +634,9 @@ import matplotlib.pyplot as plt
     
 # Plot bar charts for each metric over all groups
 def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix=""):
+
+    if aq_mode == 2:
+        return plot_metrics_aq(suptitle=suptitle, transform_qubit_group = transform_qubit_group, new_qubit_group = new_qubit_group, filters=filters, suffix=suffix)
     
     subtitle = circuit_metrics["subtitle"]
     
@@ -704,8 +714,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     fig, axs = plt.subplots(rows, cols, sharex=True, figsize=(fig_w, fig_h))
     
     # append the circuit metrics subtitle to the title
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    realtitle = suptitle + f"\nDevice={backend_id}  {timestr} UTC"
+    realtitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
     '''
     realtitle = suptitle
     if subtitle != None:
@@ -787,10 +796,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     plt.show()
     
     ###################### Volumetric Plot
-    
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    
-    suptitle = f"Volumetric Positioning - {appname}\nDevice={backend_id}  {timestr} UTC"
+        
+    suptitle = f"Volumetric Positioning - {appname}\nDevice={backend_id}  {get_timestr()}"
     
     global cmap   
     
@@ -859,7 +866,7 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
     appname = appname.replace(' ', '-')
     
     backend_id = subtitle[9:]   
-
+    
     # save the metrics for current application to the DATA file, one file per device
     if save_metrics:
         #data = group_metrics
@@ -881,7 +888,7 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
         print(f"\n{suptitle}")
         print(f"     ****** NO RESULTS ****** ")
         return
-    
+        
     # sort the group metrics (in case they weren't sorted when collected)
     sort_group_metrics()
     
@@ -924,8 +931,7 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
     fig, axs = plt.subplots(rows, cols, sharex=True, figsize=(fig_w, fig_h))
     
     # append the circuit metrics subtitle to the title
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    realtitle = suptitle + f"\nDevice={backend_id}  {timestr} UTC"
+    realtitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
     '''
     realtitle = suptitle
     if subtitle != None:
@@ -1006,10 +1012,8 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
     plt.show()
     
     ###################### Volumetric Plot
-    
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    
-    suptitle = f"Volumetric Positioning - {appname}\nDevice={backend_id}  {timestr} UTC"
+        
+    suptitle = f"Volumetric Positioning - {appname}\nDevice={backend_id}  {get_timestr()}"
     
     global cmap   
     
@@ -1019,6 +1023,7 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
     # found it difficult to share the x axis with first 3, but have diff axis for this one
     if do_depths and do_volumetric_plots and do_vbplot:
 
+        ''' DEVNOTE: This code supplied for AQ copies metrics from the circuit metrics.  Instead, just use the averages, for now.
         aq_metrics={}
         aq_metrics["groups"]=[]
         aq_metrics["tr_n2qs"]=[]
@@ -1033,8 +1038,13 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
                 aq_metrics["aq_fidelities"].append(circuit_metrics[group][key]["aq_fidelity"])
         
         w_data = aq_metrics["groups"]
-        n2q_tr_data = aq_metrics["tr_n2qs"]
+        d_tr_data = aq_metrics["tr_n2qs"]
         f_data = aq_metrics["aq_fidelities"]
+        '''
+        
+        w_data = group_metrics["groups"]
+        d_tr_data = group_metrics["avg_tr_n2qs"]
+        f_data = group_metrics["avg_aq_fidelities"]
         
         try:
             #print(f"... {d_data} {d_tr_data}")
@@ -1058,7 +1068,7 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
                 w_data = new_qubit_group
                 aq_metrics["groups"] = w_data
 
-            plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base, fill=True,
+            plot_volumetric_data_aq(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)  
             
             anno_volumetric_data(ax, depth_base,
@@ -1241,7 +1251,10 @@ def plot_metrics_all_overlaid_aq (shared_data, backend_id, suptitle=None, imagen
 
 # Plot metrics over all groups (2), merging data from all apps into smaller cells
 def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
-      
+    
+    if aq_mode == 2:
+        return plot_metrics_all_merged_individual_aq(shared_data=shared_data, backend_id=backend_id, suptitle=suptitle, imagename=imagename, avail_qubits=avail_qubits)
+        
     global circuit_metrics
     global group_metrics
   
@@ -1843,8 +1856,6 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
     
     # since the bar plots use the subtitle field, set it here
     circuit_metrics["subtitle"] = f"device = {backend_id}"
-    
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
 
     # show vplots if enabled
     if do_volumetric_plots:
@@ -1852,18 +1863,18 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
         # this is an overlay plot, not very useful; better to merge
         '''
         cmap = cmap_spectral
-        suptitle = f"Volumetric Positioning - All Applications (Combined)\nDevice={backend_id}  {timestr} UTC"
+        suptitle = f"Volumetric Positioning - All Applications (Combined)\nDevice={backend_id}  {get_timestr()}"
         plot_metrics_all_overlaid(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2")
         '''
         
         # draw the volumetric plots with two different colormaps, for comparison purposes
         
-        #suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {timestr} UTC"
+        #suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
         #cmap = cmap_blues
         #plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-1"+suffix, avail_qubits=avail_qubits)
         
         cmap = cmap_spectral
-        suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {timestr} UTC"
+        suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
         plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits)
         
     # show all app metrics charts if enabled
@@ -1918,9 +1929,6 @@ def plot_all_app_metrics_aq(backend_id, do_all_plots=False,
     
     # since the bar plots use the subtitle field, set it here
     circuit_metrics["subtitle"] = f"device = {backend_id}"
-    
-    # timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    timestr = strftime("%b %d, %Y", gmtime())
 
     # show vplots if enabled
     if do_volumetric_plots:
@@ -1928,18 +1936,18 @@ def plot_all_app_metrics_aq(backend_id, do_all_plots=False,
         # this is an overlay plot, not very useful; better to merge
         '''
         cmap = cmap_spectral
-        suptitle = f"Volumetric Positioning - All Applications (Combined)\nDevice={backend_id}  {timestr} UTC"
+        suptitle = f"Volumetric Positioning - All Applications (Combined)\nDevice={backend_id}  {get_timestr()}"
         plot_metrics_all_overlaid(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2")
         '''
         
         # draw the volumetric plots with two different colormaps, for comparison purposes
         
-        #suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {timestr} UTC"
+        #suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
         #cmap = cmap_blues
         #plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-1"+suffix, avail_qubits=avail_qubits)
         
         cmap = cmap_spectral
-        suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {timestr} UTC"
+        suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
         
         if is_individual is False:
             plot_metrics_all_merged_aq(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits)
@@ -1967,9 +1975,7 @@ def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, su
     
     # since the bar plots use the subtitle field, set it here
     circuit_metrics["subtitle"] = f"device = {backend_id}"
-    
-    timestr = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    
+        
     app = "Benchmark Results - " + appname + " - " + apiname
     
     group_metrics = shared_data[app]["group_metrics"]
@@ -1982,7 +1988,7 @@ def save_plot_image(plt, imagename, backend_id):
     backend_id = backend_id.replace("/", "_")
      
     # not used currently
-    date_of_file = datetime.now().strftime("%d%m%Y_%H%M%S")
+    date_of_file = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     if not os.path.exists('__images'): os.makedirs('__images')
     if not os.path.exists(f'__images/{backend_id}'): os.makedirs(f'__images/{backend_id}')
@@ -2344,7 +2350,7 @@ def circle_at(x, y, value, type=1, fill=True):
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
-             lw=0.5)
+             lw=0.8)                # DEVNOTE: changed to 0.8 from 0.5, to handle only one cell
              
 def box4_at(x, y, value, type=1, fill=True):
     size = 1.0
