@@ -1368,14 +1368,6 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
             f_data = group_metrics["avg_fidelities"]            
 
             # plot data rectangles
-            '''
-            for i in range(len(d_data)):
-                x = depth_index(d_tr_data[i], depth_base)
-                y = float(w_data[i])
-                f = f_data[i]
-                ax.add_patch(box_at(x, y, f, type=1, fill=False))
-            '''
-            
             #print(f"... plotting {appname}")
                 
             plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base,
@@ -1570,14 +1562,6 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
             f_data = group_metrics["avg_aq_fidelities"]            
 
             # plot data rectangles
-            '''
-            for i in range(len(d_data)):
-                x = depth_index(d_tr_data[i], depth_base)
-                y = float(w_data[i])
-                f = f_data[i]
-                ax.add_patch(box_at(x, y, f, type=1, fill=False))
-            '''
-            
             #print(f"... plotting {appname}")
                 
             plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base,
