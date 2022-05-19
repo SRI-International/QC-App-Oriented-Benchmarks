@@ -220,13 +220,6 @@
    ]
   },
   {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": [
-    "## Method 1"
-   ]
-  },
-  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -238,30 +231,6 @@
     "sys.path.insert(1, \"monte-carlo/cirq\")\n",
     "import mc_benchmark\n",
     "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
-    "                method=1,\n",
-    "                backend_id=backend_id, provider_backend=provider_backend)"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": [
-    "## Method 2"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
-   "outputs": [],
-   "source": [
-    "import sys\n",
-    "sys.path.insert(1, \"monte-carlo/cirq\")\n",
-    "import mc_benchmark\n",
-    "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
-    "                method=2,\n",
     "                backend_id=backend_id, provider_backend=provider_backend)"
    ]
   },
