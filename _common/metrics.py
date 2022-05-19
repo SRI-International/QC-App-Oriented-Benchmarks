@@ -532,6 +532,10 @@ def hellinger_fidelity_with_expected(p, q):
     p_sum = sum(p.values())
     q_sum = sum(q.values())
 
+    if q_sum == 0:
+        print(f'ERROR: q_sum = {q_sum}, returning 0')
+        return 0
+
     p_normed = {}
     for key, val in p.items():
         p_normed[key] = val/p_sum
@@ -550,6 +554,8 @@ def hellinger_fidelity_with_expected(p, q):
     total += sum(q_normed.values())
     dist = np.sqrt(total)/np.sqrt(2)
     fidelity = (1-dist**2)**2
+
+
 
     return fidelity
     

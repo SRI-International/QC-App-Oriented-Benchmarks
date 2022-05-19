@@ -1,7 +1,8 @@
 
 import os
 
-DIR = 'instance'
+INSTANCE_DIR = 'instance'
+RESULTS_DIR = 'results'
 
 def read_maxcut_instance(file_path):
     if os.path.exists(file_path) and os.path.isfile(file_path):
