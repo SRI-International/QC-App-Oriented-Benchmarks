@@ -282,13 +282,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
         # loop over each of num_circuits
         # assume the solution files start with 3 and go up from there
         if degree > 0: 
-            _range = range(degree, degree + num_circuits) 
+            degree_range = range(degree, degree + num_circuits) 
         else:
-            _range = range(num_qubits + degree, num_qubits + degree - num_circuits, -1)
+            degree_range = range(num_qubits + degree, num_qubits + degree - num_circuits, -1)
 
-        print(_range)
+        # print(degree_range)
 
-        for i in _range:
+        for i in degree_range:
         
             # create integer that represents the problem instance; use s_int as circuit id
             s_int = i
@@ -297,7 +297,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
             # create filename from num_qubits and circuit_id (s_int), then load the problem file
             global instance_filename
             instance_filename = os.path.join(
-                max_cut_dir, "_common", "instance", f"mc_{num_qubits:03d}_{i:03d}_000.txt"
+                max_cut_dir, "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt"
             )
             print(f"... instance_filename = {instance_filename}")
             nodes, edges = common.read_maxcut_instance(instance_filename)

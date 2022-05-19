@@ -1,7 +1,7 @@
 
 import os
 
-INSTANCE_DIR = 'instance'
+INSTANCE_DIR = 'instances'
 RESULTS_DIR = 'results'
 
 def read_maxcut_instance(file_path):
