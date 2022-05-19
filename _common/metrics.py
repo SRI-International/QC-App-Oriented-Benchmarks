@@ -1101,20 +1101,11 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
     print("Overlaid Results From All Applications")
     
     # generate separate figure for volumetric positioning chart of depth metrics
-    # found it difficult to share the x axis with first 3, but have diff axis for this one
     
-    try:
-        #print(f"... {d_data} {d_tr_data}")
-        
+    try:    
         # determine largest width for all apps
-        w_max = 0
-        for app in shared_data:
-            group_metrics = shared_data[app]["group_metrics"]
-            w_data = group_metrics["groups"]
-            for i in range(len(w_data)):
-                y = float(w_data[i])
-                w_max = max(w_max, y)
-        
+        w_min, w_max = get_min_max(shared_data)
+
         # allow one more in width to accommodate the merge values below
         max_qubits = int(w_max) + 1     
         #print(f"... {w_max} {max_qubits}")
@@ -1179,19 +1170,10 @@ def plot_metrics_all_overlaid_aq (shared_data, backend_id, suptitle=None, imagen
     print("Overlaid Results From All Applications")
     
     # generate separate figure for volumetric positioning chart of depth metrics
-    # found it difficult to share the x axis with first 3, but have diff axis for this one
-    
-    try:
-        #print(f"... {d_data} {d_tr_data}")
-        
+ 
+    try:      
         # determine largest width for all apps
-        w_max = 0
-        for app in shared_data:
-            group_metrics = shared_data[app]["group_metrics"]
-            w_data = group_metrics["groups"]
-            for i in range(len(w_data)):
-                y = float(w_data[i])
-                w_max = max(w_max, y)
+        w_min, w_max = get_min_max(shared_data)
         
         # allow one more in width to accommodate the merge values below
         max_qubits = int(w_max) + 1     
@@ -1264,23 +1246,11 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
     global group_metrics
   
     # generate separate figure for volumetric positioning chart of depth metrics
-    # found it difficult to share the x axis with first 3, but have diff axis for this one
-    
-    #print(f"... {max_depth_log}")
-    
-    #if True:
-    try:
-        #print(f"... {d_data} {d_tr_data}")
-        
+
+    try:       
         # determine largest width for all apps
-        w_max = 0
-        for app in shared_data:
-            group_metrics = shared_data[app]["group_metrics"]
-            w_data = group_metrics["groups"]
-            for i in range(len(w_data)):
-                y = float(w_data[i])
-                w_max = max(w_max, y)
-        
+        w_min, w_max = get_min_max(shared_data)
+
         # allow one more in width to accommodate the merge values below
         max_qubits = int(w_max) + 1     
         #print(f"... {w_max} {max_qubits}")
@@ -1440,24 +1410,10 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
     global group_metrics
   
     # generate separate figure for volumetric positioning chart of depth metrics
-    # found it difficult to share the x axis with first 3, but have diff axis for this one
     
-    #print(f"... {max_depth_log}")
-    
-    #if True:
-    try:
-        #print(f"... {d_data} {d_tr_data}")
-        
+    try:      
         # determine largest width for all apps
-        w_max = 0
-        w_min = 0
-        for app in shared_data:
-            group_metrics = shared_data[app]["group_metrics"]
-            w_data = group_metrics["groups"]
-            for i in range(len(w_data)):
-                y = float(w_data[i])
-                w_max = max(w_max, y)
-                w_min = min(w_min, y)
+        w_min, w_max = get_min_max(shared_data)
         
         #determine width for AQ
         AQ=w_max
@@ -1655,14 +1611,8 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
     global aq_metrics
   
     # generate separate figure for volumetric positioning chart of depth metrics
-    # found it difficult to share the x axis with first 3, but have diff axis for this one
-    
-    #print(f"... {max_depth_log}")
-    
-    #if True:
-    try:
-        #print(f"... {d_data} {d_tr_data}")
-        
+
+    try:       
         # determine largest and smallest width for all apps
         w_max = 0
         w_min = 0
@@ -1832,6 +1782,19 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
 
     #display plot
     plt.show()
+
+# get the min and max width over all apps in shared_data
+def get_min_max(shared_data):
+    w_max = 0
+    w_min = 0
+    for app in shared_data:
+        group_metrics = shared_data[app]["group_metrics"]
+        w_data = group_metrics["groups"]
+        for i in range(len(w_data)):
+            y = float(w_data[i])
+            w_max = max(w_max, y)
+            w_min = min(w_min, y)       
+    return w_min, w_max
 
 
 #################################################
