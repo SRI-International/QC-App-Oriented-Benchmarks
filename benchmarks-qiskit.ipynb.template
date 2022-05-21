@@ -87,7 +87,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Deutsch-Jozsa"
+    "## Deutsch-Jozsa"
    ]
   },
   {
@@ -110,14 +110,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Bernstein-Vazirani"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": [
-    "## Method 1"
+    "## Bernstein-Vazirani - Method 1"
    ]
   },
   {
@@ -139,7 +132,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Method 2"
+    "## Bernstein-Vazirani - Method 2"
    ]
   },
   {
@@ -163,7 +156,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Hidden Shift"
+    "## Hidden Shift"
    ]
   },
   {
@@ -184,14 +177,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Quantum Fourier Transform"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": [
-    "## Method 1"
+    "## Quantum Fourier Transform - Method 1"
    ]
   },
   {
@@ -213,7 +199,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Method 2"
+    "## Quantum Fourier Transform - Method 2"
    ]
   },
   {
@@ -235,7 +221,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Grover"
+    "## Grover"
    ]
   },
   {
@@ -256,7 +242,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Phase Estimation"
+    "## Phase Estimation"
    ]
   },
   {
@@ -277,7 +263,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Amplitude Estimation"
+    "## Amplitude Estimation"
    ]
   },
   {
@@ -298,7 +284,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Monte Carlo"
+    "## Monte Carlo"
    ]
   },
   {
@@ -319,7 +305,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Hamiltonian Simulation"
+    "## Hamiltonian Simulation"
    ]
   },
   {
@@ -341,7 +327,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# VQE"
+    "## VQE - Method 1"
    ]
   },
   {
@@ -364,14 +350,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# Shor"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": [
-    "## Method 1"
+    "## Shor - Method 1"
    ]
   },
   {
@@ -393,7 +372,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Method 2"
+    "## Shor - Method 2"
    ]
   },
   {
