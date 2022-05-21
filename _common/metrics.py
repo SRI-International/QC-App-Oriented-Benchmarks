@@ -81,7 +81,7 @@ QV = 32
 AQ = 22
 aq_cutoff = 0.368   # below this circuits not considered successful
 
-aq_mode = 2         # 0 - use default plot behavior, 1 - use AQ modified plot behavior, 2 - use separate method for AQ plots
+aq_mode = 2         # 0 - use default plot behavior, 1 - use AQ modified plots, 2 - use separate method for AQ plots
 
 # average transpile factor between base QV depth and our depth based on results from QV notebook
 QV_transpile_factor = 12.7     
@@ -651,9 +651,6 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
 
     # save the metrics for current application to the DATA file, one file per device
     if save_metrics:
-        #data = group_metrics
-        #filename = f"DATA-{subtitle[9:]}.json"
-        #title = suptitle
 
         # If using mid-circuit transformation, convert old qubit group to new qubit group
         if transform_qubit_group:
@@ -665,7 +662,6 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         else:
             store_app_metrics(backend_id, circuit_metrics, group_metrics, suptitle,
                 start_time=start_time, end_time=end_time)
-
         
     if len(group_metrics["groups"]) == 0:
         print(f"\n{suptitle}")
@@ -679,18 +675,29 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     do_creates = True
     do_executes = True
     do_fidelities = True
+    do_hf_fidelities = False
     do_depths = True
-    do_vbplot = True
+    do_2qs = False
+    do_vbplot = True     
     
     # check if we have depth metrics to show
     do_depths = len(group_metrics["avg_depths"]) > 0
-    
+
+    # in AQ mode, show different metrics
+    if aq_mode > 0:
+        do_fidelities = False
+        do_depths = False       
+        do_hf_fidelities = True
+        do_2qs = True 
+        
     # if filters set, adjust these flags
     if filters != None:
         if "create" not in filters: do_creates = False
         if "execute" not in filters: do_executes = False
         if "fidelity" not in filters: do_fidelities = False
+        if "hf_fidelity" not in filters: do_hf_fidelities = False
         if "depth" not in filters: do_depths = False
+        if "2q" not in filters: do_2qs = False
         if "vbplot" not in filters: do_vbplot = False
     
     # generate one-column figure with multiple bar charts, with shared X axis
@@ -701,7 +708,9 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_creates: numplots += 1
     if do_executes: numplots += 1
     if do_fidelities: numplots += 1
+    if do_hf_fidelities: numplots += 1
     if do_depths: numplots += 1
+    if do_2qs: numplots += 1
     
     rows = numplots
     
@@ -769,6 +778,18 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             
         axi += 1
     
+    if do_hf_fidelities:
+        axs[axi].set_ylim([0, 1.0])
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"])
+        #axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"]) 
+        axs[axi].set_ylabel('Avg Hellinger Fidelity')
+        
+        if rows > 0 and not xaxis_set:
+            axs[axi].sharex(axs[rows-1])
+            xaxis_set = True
+            
+        axi += 1
+        
     if do_depths:
         if max(group_metrics["avg_tr_depths"]) < 20:
             axs[axi].set_ylim([0, 20])  
@@ -783,6 +804,19 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axs[axi].legend(['Circuit Depth', 'Transpiled Depth'], loc='upper left')
         axi += 1
     
+    if do_2qs:
+        if max(group_metrics["avg_tr_n2qs"]) < 20:
+            axs[axi].set_ylim([0, 20])  
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_n2qs"], 0.5, color='C9') 
+        axs[axi].set_ylabel('2Q Gates')
+        
+        if rows > 0 and not xaxis_set:
+            axs[axi].sharex(axs[rows-1])
+            xaxis_set = True
+            
+        axs[axi].legend(['Transpiled 2Q Gates'], loc='upper left')
+        axi += 1
+        
     # shared x axis label
     axs[rows - 1].set_xlabel('Circuit Width (Number of Qubits)')
      
@@ -869,9 +903,6 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
     
     # save the metrics for current application to the DATA file, one file per device
     if save_metrics:
-        #data = group_metrics
-        #filename = f"DATA-{subtitle[9:]}.json"
-        #title = suptitle
 
         # If using mid-circuit transformation, convert old qubit group to new qubit group
         if transform_qubit_group:
@@ -1066,6 +1097,8 @@ def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubi
             # If using mid-circuit transformation, convert width data to singular circuit width value
             if transform_qubit_group:
                 w_data = new_qubit_group
+                
+                ## store the data used here as the aq metrics for combined plot
                 aq_metrics["groups"] = w_data
 
             plot_volumetric_data_aq(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
