@@ -42,7 +42,7 @@ circuit_metrics_detail = {  }    # for iterative algorithms
 circuit_metrics_detail_2 = {  }  # used to break down to 3rd dimension
 
 group_metrics = { "groups": [],
-    "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [],
+    "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [], "avg_hf_fidelities": [],
     "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [], "avg_tr_n2qs": [],
     "avg_exec_creating_times": [], "avg_exec_validating_times": [], "avg_exec_running_times": []
 }
@@ -132,6 +132,7 @@ def init_metrics ():
     group_metrics["avg_elapsed_times"] = []
     group_metrics["avg_exec_times"] = []
     group_metrics["avg_fidelities"] = []
+    group_metrics["avg_hf_fidelities"] = []
     
     group_metrics["avg_depths"] = []
     group_metrics["avg_xis"] = []
@@ -166,6 +167,10 @@ def store_metric (group, circuit, metric, value):
         circuit_metrics[group][circuit] = { }
     circuit_metrics[group][circuit][metric] = value
     #print(f'{group} {circuit} {metric} -> {value}')
+    
+    # DEVNOTE: temporary hack for AQ fidelity
+    if metric == 'fidelity':
+        store_metric (group, circuit, 'hf_fidelity', value)
 
 
 # Aggregate metrics for a specific group, creating average across circuits in group
@@ -179,6 +184,7 @@ def aggregate_metrics_for_group (group):
         group_elapsed_time = 0
         group_exec_time = 0
         group_fidelity = 0
+        group_hf_fidelity = 0
         group_depth = 0
         group_xi = 0
         group_tr_depth = 0
@@ -198,6 +204,7 @@ def aggregate_metrics_for_group (group):
                 if metric == "elapsed_time": group_elapsed_time += value
                 if metric == "exec_time": group_exec_time += value
                 if metric == "fidelity": group_fidelity += value
+                if metric == "hf_fidelity": group_hf_fidelity += value
                 
                 if metric == "depth": group_depth += value
                 if metric == "xi": group_xi += value
@@ -214,6 +221,7 @@ def aggregate_metrics_for_group (group):
         avg_elapsed_time = round(group_elapsed_time / num_circuits, 3)
         avg_exec_time = round(group_exec_time / num_circuits, 3)
         avg_fidelity = round(group_fidelity / num_circuits, 3)
+        avg_hf_fidelity = round(group_hf_fidelity / num_circuits, 3)
         
         avg_depth = round(group_depth / num_circuits, 0)
         avg_xi = round(group_xi / num_circuits, 3)
@@ -231,8 +239,9 @@ def aggregate_metrics_for_group (group):
         group_metrics["avg_create_times"].append(avg_create_time)
         group_metrics["avg_elapsed_times"].append(avg_elapsed_time)
         group_metrics["avg_exec_times"].append(avg_exec_time)
-        group_metrics["avg_fidelities"].append(avg_fidelity)
-        
+        group_metrics["avg_fidelities"].append(avg_fidelity)        
+        group_metrics["avg_hf_fidelities"].append(avg_hf_fidelity)
+
         if avg_depth > 0:
             group_metrics["avg_depths"].append(avg_depth)
         if avg_xi > 0:
@@ -311,7 +320,10 @@ def report_metrics_for_group (group):
                 print(f"Average Transpiling, Validating, Running Times for group {group} = {avg_exec_creating_time}, {avg_exec_validating_time}, {avg_exec_running_time} secs")
             
             avg_fidelity = group_metrics["avg_fidelities"][group_index]
+            avg_hf_fidelity = group_metrics["avg_hf_fidelities"][group_index]
             print(f"Average Fidelity for the {group} qubit group = {avg_fidelity}")
+            if aq_mode > 0:
+                print(f"Average Hellinger Fidelity for the {group} qubit group = {avg_hf_fidelity}")
             
             print("")
             return
