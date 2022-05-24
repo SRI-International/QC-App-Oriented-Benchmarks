@@ -81,7 +81,7 @@ QV = 32
 AQ = 22
 aq_cutoff = 0.368   # below this circuits not considered successful
 
-aq_mode = 2         # 0 - use default plot behavior, 1 - use AQ modified plots, 2 - use separate method for AQ plots
+aq_mode = 1         # 0 - use default plot behavior, 1 - use AQ modified plots, 2 - use separate method for AQ plots
 
 # average transpile factor between base QV depth and our depth based on results from QV notebook
 QV_transpile_factor = 12.7     
@@ -168,9 +168,10 @@ def store_metric (group, circuit, metric, value):
     circuit_metrics[group][circuit][metric] = value
     #print(f'{group} {circuit} {metric} -> {value}')
     
-    # DEVNOTE: temporary hack for AQ fidelity
-    if metric == 'fidelity':
-        store_metric (group, circuit, 'hf_fidelity', value)
+    # if the value is a dict, store each metric provided
+    if type(value) is dict:
+        for key in value:
+            store_metric(group, circuit, key, value[key])
 
 
 # Aggregate metrics for a specific group, creating average across circuits in group
@@ -322,8 +323,9 @@ def report_metrics_for_group (group):
             avg_fidelity = group_metrics["avg_fidelities"][group_index]
             avg_hf_fidelity = group_metrics["avg_hf_fidelities"][group_index]
             print(f"Average Fidelity for the {group} qubit group = {avg_fidelity}")
-            if aq_mode > 0:
-                print(f"Average Hellinger Fidelity for the {group} qubit group = {avg_hf_fidelity}")
+            #if aq_mode > 0:
+            #   print(f"Average Hellinger Fidelity for the {group} qubit group = {avg_hf_fidelity}")
+            print(f"Average Hellinger Fidelity for the {group} qubit group = {avg_hf_fidelity}")
             
             print("")
             return
@@ -608,11 +610,13 @@ def polarization_fidelity(counts, correct_dist, thermal_dist=None):
     thermal_dist: optional distribution to pass in distribution from a uniform
                   superposition over all states. If `None`: generated as 
                   `uniform_dist` with the same qubits as in `counts`
+                  
+    returns both polarization fidelity and the hellinger fidelity
 
     Polarization from: `https://arxiv.org/abs/2008.11294v1`
     """
     # calculate fidelity via hellinger fidelity between correct distribution and our measured expectation values
-    fidelity = hellinger_fidelity_with_expected(counts, correct_dist)
+    hf_fidelity = hellinger_fidelity_with_expected(counts, correct_dist)
 
     if thermal_dist == None:
         # get length of random key in counts to find how many qubits measured
@@ -627,9 +631,9 @@ def polarization_fidelity(counts, correct_dist, thermal_dist=None):
     # rescale fidelity result so uniform superposition (random guessing) returns fidelity
     # rescaled to 0 to provide a better measure of success of the algorithm (polarization)
     new_floor_fidelity = 0
-    fidelity = rescale_fidelity(fidelity, floor_fidelity, new_floor_fidelity)
+    fidelity = rescale_fidelity(hf_fidelity, floor_fidelity, new_floor_fidelity)
 
-    return fidelity
+    return { 'fidelity':fidelity, 'hf_fidelity':hf_fidelity }
     
                
 ############################################
@@ -690,11 +694,12 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
 
     # in AQ mode, show different metrics
     if aq_mode > 0:
-        do_fidelities = False
+        do_fidelities = True        # make this True so we can compare
         do_depths = False       
         do_hf_fidelities = True
         do_2qs = True 
-        
+    
+    print(f"... aq_mode: {aq_mode} {do_fidelities} {do_hf_fidelities}")
     # if filters set, adjust these flags
     if filters != None:
         if "create" not in filters: do_creates = False
@@ -718,7 +723,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_2qs: numplots += 1
     
     rows = numplots
-    
+    print(f"... numplots: {numplots}")
     # DEVNOTE: this calculation is based on visual assessment of results and could be refined
     # compute height needed to draw same height plots, no matter how many there are
     fig_h = 3.5 + 2.0 * (rows - 1) + 0.25 * (rows - 1)
@@ -785,8 +790,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     if do_hf_fidelities:
         axs[axi].set_ylim([0, 1.0])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"])
-        #axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"]) 
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"]) 
         axs[axi].set_ylabel('Avg Hellinger Fidelity')
         
         if rows > 0 and not xaxis_set:
