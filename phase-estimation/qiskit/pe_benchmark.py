@@ -115,9 +115,9 @@ def analyze_and_print_result(qc, result, num_counting_qubits, theta, num_shots):
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
     #fidelity = metrics.polarization_fidelity(app_counts, app_correct_dist, app_thermal_dist)
     
-    aq_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
+    hf_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
     
-    if verbose: print(f"  ... fidelity: {fidelity}  aq_fidelity: {aq_fidelity}")
+    if verbose: print(f"  ... fidelity: {fidelity}  hf_fidelity: {hf_fidelity}")
         
     return counts, fidelity
 
