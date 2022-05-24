@@ -50,7 +50,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Deutsch-Jozsa"
+    "### Deutsch-Jozsa"
    ]
   },
   {
@@ -72,7 +72,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Bernstein-Vazirani"
+    "### Bernstein-Vazirani"
    ]
   },
   {
@@ -94,7 +94,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Hidden Shift"
+    "### Hidden Shift"
    ]
   },
   {
@@ -116,7 +116,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Quantum Fourier Transform - Method 1"
+    "### Quantum Fourier Transform - Method 1"
    ]
   },
   {
@@ -139,7 +139,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Quantum Fourier Transform - Method 2"
+    "### Quantum Fourier Transform - Method 2"
    ]
   },
   {
@@ -162,7 +162,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Grover"
+    "### Grover"
    ]
   },
   {
@@ -184,7 +184,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Phase Estimation"
+    "### Phase Estimation"
    ]
   },
   {
@@ -206,7 +206,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Hamiltonian Simulation"
+    "### Hamiltonian Simulation"
    ]
   },
   {

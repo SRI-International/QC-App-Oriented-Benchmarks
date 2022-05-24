@@ -31,7 +31,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Deutsch-Jozsa"
+    "### Deutsch-Jozsa"
    ]
   },
   {
@@ -53,7 +53,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Bernstein-Vazirani"
+    "### Bernstein-Vazirani"
    ]
   },
   {
@@ -75,7 +75,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Hidden Shift"
+    "### Hidden Shift"
    ]
   },
   {
@@ -97,7 +97,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Quantum Fourier Transform - Method 1"
+    "### Quantum Fourier Transform - Method 1"
    ]
   },
   {
@@ -120,7 +120,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Quantum Fourier Transform - Method 2"
+    "### Quantum Fourier Transform - Method 2"
    ]
   },
   {
@@ -143,7 +143,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Grover"
+    "### Grover"
    ]
   },
   {
@@ -165,7 +165,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Phase Estimation"
+    "### Phase Estimation"
    ]
   },
   {
@@ -187,7 +187,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Amplitude Estimation"
+    "### Amplitude Estimation"
    ]
   },
   {
@@ -209,7 +209,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Monte Carlo"
+    "### Monte Carlo"
    ]
   },
   {
@@ -231,7 +231,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Hamiltonian Simulation"
+    "### Hamiltonian Simulation"
    ]
   },
   {
@@ -254,7 +254,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Shor - Method 1"
+    "### Shor - Method 1"
    ]
   },
   {
@@ -276,7 +276,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Shor - Method 2"
+    "### Shor - Method 2"
    ]
   },
   {
@@ -292,6 +292,13 @@
     "import shors_benchmark\n",
     "shors_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=1, num_shots=num_shots,\n",
     "                method = 2, backend_id=backend_id, provider_backend=provider_backend)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Combined Benchmark Results"
    ]
   },
   {
