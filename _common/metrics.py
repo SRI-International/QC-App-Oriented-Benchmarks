@@ -552,6 +552,7 @@ def hellinger_fidelity_with_expected(p, q):
 
     if q_sum == 0:
         print("ERROR: polarization_fidelity(), expected distribution is invalid, all counts equal to 0")
+
         return 0
 
     p_normed = {}
@@ -572,6 +573,8 @@ def hellinger_fidelity_with_expected(p, q):
     total += sum(q_normed.values())
     dist = np.sqrt(total)/np.sqrt(2)
     fidelity = (1-dist**2)**2
+
+
 
     return fidelity
     
