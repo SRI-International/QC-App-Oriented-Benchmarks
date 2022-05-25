@@ -698,8 +698,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         do_depths = False       
         do_hf_fidelities = True
         do_2qs = True 
-    
-    print(f"... aq_mode: {aq_mode} {do_fidelities} {do_hf_fidelities}")
+        
     # if filters set, adjust these flags
     if filters != None:
         if "create" not in filters: do_creates = False
@@ -723,7 +722,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_2qs: numplots += 1
     
     rows = numplots
-    print(f"... numplots: {numplots}")
+    
     # DEVNOTE: this calculation is based on visual assessment of results and could be refined
     # compute height needed to draw same height plots, no matter how many there are
     fig_h = 3.5 + 2.0 * (rows - 1) + 0.25 * (rows - 1)
@@ -844,24 +843,30 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     global cmap   
     
-    # note: if using filters, both "depth" and "vbplot" must be set for this to draw
+    # note: if using filters, both "depth or 2qs" and "vbplot" must be set for this to draw
+    # with some packages, like Cirq and Braket, we do not calculate depth metrics or 2qs
     
     # generate separate figure for volumetric positioning chart of depth metrics
-    # found it difficult to share the x axis with first 3, but have diff axis for this one
-    if do_depths and do_volumetric_plots and do_vbplot:
+    if {do_depths or do_2qs} and do_volumetric_plots and do_vbplot:
         
         w_data = group_metrics["groups"]
-        d_tr_data = group_metrics["avg_tr_depths"]
+        if aq_mode > 0:
+            d_tr_data = group_metrics["avg_tr_n2qs"]
+        else:
+            d_tr_data = group_metrics["avg_tr_depths"]
         f_data = group_metrics["avg_fidelities"]
         
-        try:
-            #print(f"... {d_data} {d_tr_data}")
-            
+        try:            
             vplot_anno_init()
             
             max_qubits = max([int(group) for group in w_data])
             
-            ax = plot_volumetric_background(max_qubits, QV, depth_base, suptitle=suptitle)
+            if aq_mode > 0:
+                ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=0,
+                    depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Result Fidelity")
+            else:
+                ax = plot_volumetric_background(max_qubits=max_qubits, QV=QV,
+                    depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Result Fidelity")
             
             # determine width for circuit
             w_max = 0
@@ -876,9 +881,13 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
                 w_data = new_qubit_group
                 group_metrics["groups"] = w_data
 
-            plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)  
-            
+            if aq_mode > 0:
+                plot_volumetric_data_aq(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
+                        label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+            else:
+                plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
+                        label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+
             anno_volumetric_data(ax, depth_base,
                 label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
         
@@ -891,6 +900,55 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         # save plot image to file
         if save_plot_images:
             save_plot_image(plt, f"{appname}-vplot", backend_id) 
+        
+        #display plot
+        plt.show()       
+
+    # generate separate figure for volumetric positioning chart of depth metrics
+    if aq_mode > 0 and {do_depths or do_2qs} and do_volumetric_plots and do_vbplot:
+        
+        w_data = group_metrics["groups"]
+        d_tr_data = group_metrics["avg_tr_n2qs"]
+        f_data = group_metrics["avg_hf_fidelities"]
+        
+        try:            
+            vplot_anno_init()
+            
+            max_qubits = max([int(group) for group in w_data])
+            
+            ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=0,
+                depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Hellinger Fidelity")
+            
+            # determine width for circuit
+            w_max = 0
+            for i in range(len(w_data)):
+                y = float(w_data[i])
+                w_max = max(w_max, y)
+
+            cmap = cmap_spectral
+
+            # If using mid-circuit transformation, convert width data to singular circuit width value
+            if transform_qubit_group:
+                w_data = new_qubit_group
+                
+                ## store the data used here as the aq metrics for combined plot
+                aq_metrics["groups"] = w_data
+
+            plot_volumetric_data_aq(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)  
+            
+            anno_volumetric_data(ax, depth_base,
+                label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
+        
+        except Exception as e:
+            print(f'ERROR: plot_metrics_aq(), failure when creating volumetric positioning chart')
+            print(f"... exception = {e}")
+            if verbose:
+                print(traceback.format_exc())
+        
+        # save plot image to file
+        if save_plot_images:
+            save_plot_image(plt, f"{appname}-vplot-hf", backend_id) 
         
         #display plot
         plt.show()       
@@ -2282,11 +2340,11 @@ def circle_at(x, y, value, type=1, fill=True):
     ec = (0.5,0.5,0.5)
     
     return Circle((x, y), size/2,
-             alpha = 0.5,
+             alpha = 0.7,                       # DEVNOTE: changed to 0.7 from 0.5, to handle only one cell
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
-             lw=0.8)                # DEVNOTE: changed to 0.8 from 0.5, to handle only one cell
+             lw=0.5)
              
 def box4_at(x, y, value, type=1, fill=True):
     size = 1.0
@@ -2350,7 +2408,7 @@ def format_number(num):
 ##### Volumetric Plots
 
 # Plot the background for the volumetric analysis    
-def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None, avail_qubits=0):
+def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity"):
     
     if suptitle == None:
         suptitle = f"Volumetric Positioning\nCircuit Dimensions and Fidelity Overlaid on Quantum Volume = {QV}"
@@ -2472,12 +2530,12 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
                 bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
                 
     # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label="Avg Result Fidelity", panchor=(0.0, 0.7))
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
             
     return ax
 
 
-def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=None, avail_qubits=0):
+def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity"):
     
     if suptitle == None:
         suptitle = f"Volumetric Positioning\nCircuit Dimensions and Fidelity Overlaid on Algorithmic Qubits = {AQ}"
@@ -2600,7 +2658,7 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
                 bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
                 
     # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label="Avg Result Fidelity", panchor=(0.0, 0.7))
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
             
     return ax
 
