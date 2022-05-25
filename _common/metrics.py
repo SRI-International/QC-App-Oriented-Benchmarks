@@ -840,24 +840,30 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     global cmap   
     
-    # note: if using filters, both "depth" and "vbplot" must be set for this to draw
+    # note: if using filters, both "depth or 2qs" and "vbplot" must be set for this to draw
+    # with some packages, like Cirq and Braket, we do not calculate depth metrics or 2qs
     
     # generate separate figure for volumetric positioning chart of depth metrics
-    # found it difficult to share the x axis with first 3, but have diff axis for this one
-    if do_depths and do_volumetric_plots and do_vbplot:
+    if {do_depths or do_2qs} and do_volumetric_plots and do_vbplot:
         
         w_data = group_metrics["groups"]
-        d_tr_data = group_metrics["avg_tr_depths"]
+        if aq_mode > 0:
+            d_tr_data = group_metrics["avg_tr_n2qs"]
+        else:
+            d_tr_data = group_metrics["avg_tr_depths"]
         f_data = group_metrics["avg_fidelities"]
         
-        try:
-            #print(f"... {d_data} {d_tr_data}")
-            
+        try:            
             vplot_anno_init()
             
             max_qubits = max([int(group) for group in w_data])
             
-            ax = plot_volumetric_background(max_qubits, QV, depth_base, suptitle=suptitle)
+            if aq_mode > 0:
+                ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=0,
+                    depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Result Fidelity")
+            else:
+                ax = plot_volumetric_background(max_qubits=max_qubits, QV=QV,
+                    depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Result Fidelity")
             
             # determine width for circuit
             w_max = 0
@@ -872,9 +878,13 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
                 w_data = new_qubit_group
                 group_metrics["groups"] = w_data
 
-            plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)  
-            
+            if aq_mode > 0:
+                plot_volumetric_data_aq(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
+                        label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+            else:
+                plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
+                        label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+
             anno_volumetric_data(ax, depth_base,
                 label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
         
@@ -887,6 +897,55 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         # save plot image to file
         if save_plot_images:
             save_plot_image(plt, f"{appname}-vplot", backend_id) 
+        
+        #display plot
+        plt.show()       
+
+    # generate separate figure for volumetric positioning chart of depth metrics
+    if aq_mode > 0 and {do_depths or do_2qs} and do_volumetric_plots and do_vbplot:
+        
+        w_data = group_metrics["groups"]
+        d_tr_data = group_metrics["avg_tr_n2qs"]
+        f_data = group_metrics["avg_hf_fidelities"]
+        
+        try:            
+            vplot_anno_init()
+            
+            max_qubits = max([int(group) for group in w_data])
+            
+            ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=0,
+                depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Hellinger Fidelity")
+            
+            # determine width for circuit
+            w_max = 0
+            for i in range(len(w_data)):
+                y = float(w_data[i])
+                w_max = max(w_max, y)
+
+            cmap = cmap_spectral
+
+            # If using mid-circuit transformation, convert width data to singular circuit width value
+            if transform_qubit_group:
+                w_data = new_qubit_group
+                
+                ## store the data used here as the aq metrics for combined plot
+                aq_metrics["groups"] = w_data
+
+            plot_volumetric_data_aq(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)  
+            
+            anno_volumetric_data(ax, depth_base,
+                label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
+        
+        except Exception as e:
+            print(f'ERROR: plot_metrics_aq(), failure when creating volumetric positioning chart')
+            print(f"... exception = {e}")
+            if verbose:
+                print(traceback.format_exc())
+        
+        # save plot image to file
+        if save_plot_images:
+            save_plot_image(plt, f"{appname}-vplot-hf", backend_id) 
         
         #display plot
         plt.show()       
@@ -1208,7 +1267,8 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
             #print(app)
             group_metrics = shared_data[app]["group_metrics"]
             plot_metrics(app)
- 
+
+
 ### Plot Metrics for a specific application
 
 def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, suffix=""):
@@ -1576,11 +1636,11 @@ def circle_at(x, y, value, type=1, fill=True):
     ec = (0.5,0.5,0.5)
     
     return Circle((x, y), size/2,
-             alpha = 0.5,
+             alpha = 0.7,                       # DEVNOTE: changed to 0.7 from 0.5, to handle only one cell
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
-             lw=0.8)                # DEVNOTE: changed to 0.8 from 0.5, to handle only one cell
+             lw=0.5)
              
 def box4_at(x, y, value, type=1, fill=True):
     size = 1.0
@@ -1644,7 +1704,7 @@ def format_number(num):
 ##### Volumetric Plots
 
 # Plot the background for the volumetric analysis    
-def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None, avail_qubits=0):
+def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity"):
     
     if suptitle == None:
         suptitle = f"Volumetric Positioning\nCircuit Dimensions and Fidelity Overlaid on Quantum Volume = {QV}"
@@ -1766,10 +1826,137 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
                 bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
                 
     # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label="Avg Result Fidelity", panchor=(0.0, 0.7))
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
             
     return ax
 
+
+def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity"):
+    
+    if suptitle == None:
+        suptitle = f"Volumetric Positioning\nCircuit Dimensions and Fidelity Overlaid on Algorithmic Qubits = {AQ}"
+
+    AQ0 = AQ
+    aq_estimate = False
+    est_str = ""
+
+    if AQ == 0:
+        AQ=20
+        
+    if AQ < 0:   
+        AQ0 = 0             # AQ < 0 indicates "add est. to label"
+        AQ = -AQ
+        aq_estimate = True
+        est_str = " (est.)"
+        
+    max_width = 13
+    if max_qubits > 11: max_width = 18
+    if max_qubits > 14: max_width = 20
+    if max_qubits > 16: max_width = 24
+    #print(f"... {avail_qubits} {max_qubits} {max_width}")
+    
+    seed = 6.8
+    #plot_width = 0.5 + seed * (max_width / max_depth_log)
+    plot_width = seed
+    plot_height = 0.5 + seed * (max_width / max_depth_log)
+    #print(f"... {plot_width} {plot_height}")
+    
+    # define matplotlib figure and axis; use constrained layout to fit colorbar to right
+    fig, ax = plt.subplots(figsize=(plot_width, plot_height), constrained_layout=True)
+
+    plt.suptitle(suptitle)
+
+    plt.xlim(0, max_depth_log)
+    plt.ylim(0, max_width)
+
+    # circuit depth axis (x axis)
+    xbasis = [x for x in range(1,max_depth_log)]
+    xround = [depth_base**(x-1) for x in xbasis]
+    xlabels = [format_number(x) for x in xround]
+    ax.set_xlabel('Number of 2Q gates')
+    ax.set_xticks(xbasis)  
+    plt.xticks(xbasis, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
+    
+    # other label options
+    #plt.xticks(xbasis, xlabels, color='black', rotation=-60, ha='left')
+    #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
+
+    # circuit width axis (y axis)
+    ybasis = [y for y in range(1,max_width)]
+    yround = [1,2,3,4,5,6,7,8,10,12,15]     # not used now
+    ylabels = [str(y) for y in yround]      # not used now 
+    #ax.set_ylabel('Circuit Width (Number of Qubits)')
+    ax.set_ylabel('Circuit Width')
+    ax.set_yticks(ybasis)
+
+    #create simple line plot (not used right now)
+    #ax.plot([0, 10],[0, 10])
+    
+    #log2AQsq = math.log2(AQ*AQ)
+    AQ_width = AQ
+    AQ_depth = AQ*AQ
+    
+    # show a quantum volume rectangle of AQ = 6 e.g. (6 x 36)
+    if AQ0 != 0:
+        ax.add_patch(qv_box_at(1, 1, AQ_width, AQ_depth, 0.87, depth_base))
+    
+    # the untranspiled version is commented out - we do not show this by default
+    # also show a quantum volume rectangle un-transpiled
+    # ax.add_patch(qv_box_at(1, 1, QV_width, QV_width, 0.80, depth_base))
+
+    # show 2D array of volumetric cells based on this QV_transpiled
+    # DEVNOTE: we use +1 only to make the visuals work; s/b without
+    # Also, the second arg of the min( below seems incorrect, needs correction
+    maxprod = AQ_depth
+    for w in range(1, max_width):
+        
+        # don't show VB squares if width greater than known available qubits
+        if avail_qubits != 0 and w > avail_qubits:
+            continue
+        
+        i_success = 0
+        for d in xround:
+                    
+            # if circuit would fail here, don't draw box
+            if d > maxprod: continue
+            if (w-1) > maxprod: continue
+            
+            # guess for how to capture how hardware decays with width, not entirely correct
+
+            # # reduce maxtext by a factor of number of qubits > QV_width
+            # # just an approximation to account for qubit distances
+            # if w > QV_width:
+            #     over = w - QV_width 
+            #     maxtest = maxtest / (1 + (over/QV_width))
+
+            # draw a box at this width and depth
+            id = depth_index(d, depth_base) 
+            
+            # show vb rectangles; if not showing QV, make all hollow
+            if AQ0 == 0:
+                ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+            else:
+                ax.add_patch(bkg_box_at(id, w, 0.5))
+            
+            # save index of last successful depth
+            i_success += 1
+        
+        # plot empty rectangle after others       
+        d = xround[i_success]
+        id = depth_index(d, depth_base) 
+        ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+        
+    
+    # Add annotation showing quantum volume
+    if AQ0 != 0:
+        t = ax.text(max_depth_log - 2.0, 1.5, f"AQ{est_str}={AQ}", size=12,
+                horizontalalignment='right', verticalalignment='center', color=(0.2,0.2,0.2),
+                bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
+                
+    # add colorbar to right of plot
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
+            
+    return ax
 
 
 # Linear Background Analog of the QV Volumetric Background, to allow arbitrary metrics on each axis
@@ -1890,6 +2077,63 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
     if do_label:
         ax.annotate(label, xy=(x_anno+labelpos[0], y_anno+labelpos[1]), rotation=labelrot,
             horizontalalignment='left', verticalalignment='bottom', color=(0.2,0.2,0.2))
+
+
+def plot_volumetric_data_aq(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
+        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False):
+
+    # since data may come back out of order, save point at max y for annotation
+    i_anno = 0
+    x_anno = 0 
+    y_anno = 0
+    
+    # plot data rectangles
+    for i in range(len(d_data)):
+        x = depth_index(d_data[i], depth_base)
+        y = float(w_data[i])
+        f = f_data[i]
+        ax.add_patch(circle_at(x, y, f, type=type, fill=fill))
+
+        if y >= y_anno:
+            x_anno = x
+            y_anno = y
+            i_anno = i
+            
+    x_annos.append(x_anno)
+    y_annos.append(y_anno)
+    
+    anno_dist = math.sqrt( (y_anno - 1)**2 + (x_anno - 1)**2 )
+    
+    # adjust radius of annotation circle based on maximum width of apps
+    anno_max = 10
+    if w_max > 10:
+        anno_max = 14
+    if w_max > 14:
+        anno_max = 18
+        
+    scale = anno_max / anno_dist
+
+    # offset of text from end of arrow
+    if scale > 1:
+        x_anno_off = scale * x_anno - x_anno - 0.5
+        y_anno_off = scale * y_anno - y_anno
+    else:
+        x_anno_off = 0.7
+        y_anno_off = 0.5
+        
+    x_anno_off += x_anno
+    y_anno_off += y_anno
+    
+    # print(f"... {xx} {yy} {anno_dist}")
+    x_anno_offs.append(x_anno_off)
+    y_anno_offs.append(y_anno_off)
+    
+    anno_labels.append(label)
+    
+    if do_label:
+        ax.annotate(label, xy=(x_anno+labelpos[0], y_anno+labelpos[1]), rotation=labelrot,
+            horizontalalignment='left', verticalalignment='bottom', color=(0.2,0.2,0.2))
+
 
 
 # Arrange the stored annotations optimally and add to plot 
