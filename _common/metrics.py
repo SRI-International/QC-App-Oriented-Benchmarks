@@ -643,9 +643,6 @@ import matplotlib.pyplot as plt
     
 # Plot bar charts for each metric over all groups
 def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix=""):
-
-    if aq_mode == 2:
-        return plot_metrics_aq(suptitle=suptitle, transform_qubit_group = transform_qubit_group, new_qubit_group = new_qubit_group, filters=filters, suffix=suffix)
     
     subtitle = circuit_metrics["subtitle"]
     
@@ -941,7 +938,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
                 label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
         
         except Exception as e:
-            print(f'ERROR: plot_metrics_aq(), failure when creating volumetric positioning chart')
+            print(f'ERROR: plot_metrics(), failure when creating volumetric positioning chart')
             print(f"... exception = {e}")
             if verbose:
                 print(traceback.format_exc())
@@ -953,242 +950,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         #display plot
         plt.show()       
 
-    
-# Plot bar charts for each metric over all groups
-def plot_metrics_aq (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix=""):
-    
-    subtitle = circuit_metrics["subtitle"]
-    
-    # Extract shorter app name from the title passed in by user
-    appname = suptitle[len('Benchmark Results - '):len(suptitle)]
-    appname = appname[:appname.index(' - ')]
-    
-    # for creating plot image filenames replace spaces
-    appname = appname.replace(' ', '-')
-    
-    backend_id = subtitle[9:]   
-    
-    # save the metrics for current application to the DATA file, one file per device
-    if save_metrics:
-
-        # If using mid-circuit transformation, convert old qubit group to new qubit group
-        if transform_qubit_group:
-            original_data = group_metrics["groups"]
-            group_metrics["groups"] = new_qubit_group
-            store_app_metrics(backend_id, circuit_metrics, group_metrics, suptitle,
-                start_time=start_time, end_time=end_time)
-            group_metrics["groups"] = original_data
-        else:
-            store_app_metrics(backend_id, circuit_metrics, group_metrics, suptitle,
-                start_time=start_time, end_time=end_time)
-
-    if len(group_metrics["groups"]) == 0:
-        print(f"\n{suptitle}")
-        print(f"     ****** NO RESULTS ****** ")
-        return
-        
-    # sort the group metrics (in case they weren't sorted when collected)
-    sort_group_metrics()
-    
-    # flags for charts to show
-    do_creates = True
-    do_executes = True
-    do_hf_fidelities = True
-    do_2qs = True
-    do_vbplot = True
-    
-    # check if we have depth metrics to show
-    do_depths = len(group_metrics["avg_depths"]) > 0
-    
-    # if filters set, adjust these flags
-    if filters != None:
-        if "create" not in filters: do_creates = False
-        if "execute" not in filters: do_executes = False
-        if "hf_fidelity" not in filters: do_hf_fidelities = False
-        if "2q" not in filters: do_2qs = False
-        if "vbplot" not in filters: do_vbplot = False
-    
-    # generate one-column figure with multiple bar charts, with shared X axis
-    cols = 1
-    fig_w = 6.0
-    
-    numplots = 0
-    if do_creates: numplots += 1
-    if do_executes: numplots += 1
-    if do_hf_fidelities: numplots += 1
-    if do_2qs: numplots += 1
-    
-    rows = numplots
-    
-    # DEVNOTE: this calculation is based on visual assessment of results and could be refined
-    # compute height needed to draw same height plots, no matter how many there are
-    fig_h = 3.5 + 2.0 * (rows - 1) + 0.25 * (rows - 1)
-    #print(fig_h)
-    
-    # create the figure into which plots will be placed
-    fig, axs = plt.subplots(rows, cols, sharex=True, figsize=(fig_w, fig_h))
-    
-    # append the circuit metrics subtitle to the title
-    realtitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
-    '''
-    realtitle = suptitle
-    if subtitle != None:
-        realtitle += ("\n" + subtitle)
-    '''    
-    plt.suptitle(realtitle)
-    
-    axi = 0
-    xaxis_set = False
-    
-    if rows == 1:
-        ax = axs
-        axs = [ax]
-    
-    if do_creates:
-        if max(group_metrics["avg_create_times"]) < 0.01:
-            axs[axi].set_ylim([0, 0.01])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_create_times"])
-        axs[axi].set_ylabel('Avg Creation Time (sec)')
-        
-        if rows > 0 and not xaxis_set:
-            axs[axi].sharex(axs[rows-1])
-            xaxis_set = True
-            
-        plt.setp(axs[axi].get_xticklabels(), visible=False)
-        axi += 1
-    
-    if do_executes:
-        if max(group_metrics["avg_exec_times"]) < 0.1:
-            axs[axi].set_ylim([0, 0.1])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"])
-        axs[axi].set_ylabel('Avg Execution Time (sec)')
-        
-        if rows > 0 and not xaxis_set:
-            axs[axi].sharex(axs[rows-1])
-            xaxis_set = True
-            
-        # none of these methods of sharing the x axis gives proper effect; makes extra white space
-        #axs[axi].sharex(axs[2])
-        #plt.setp(axs[axi].get_xticklabels(), visible=False)
-        #axs[axi].set_xticklabels([])
-        axi += 1
-    
-    if do_hf_fidelities:
-        axs[axi].set_ylim([0, 1.0])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"]) 
-        axs[axi].set_ylabel('Avg Hellinger Fidelity')
-        
-        if rows > 0 and not xaxis_set:
-            axs[axi].sharex(axs[rows-1])
-            xaxis_set = True
-            
-        axi += 1
-    
-    if do_2qs:
-        if max(group_metrics["avg_tr_n2qs"]) < 20:
-            axs[axi].set_ylim([0, 20])  
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_n2qs"], 0.5, color='C9') 
-        axs[axi].set_ylabel('2Q Gates')
-        
-        if rows > 0 and not xaxis_set:
-            axs[axi].sharex(axs[rows-1])
-            xaxis_set = True
-            
-        axs[axi].legend(['Transpiled 2Q Gates'], loc='upper left')
-        axi += 1
-    
-    # shared x axis label
-    axs[rows - 1].set_xlabel('Circuit Width (Number of Qubits)')
-     
-    fig.tight_layout() 
-    
-    # save plot image to file
-    if save_plot_images:
-        save_plot_image(plt, f"{appname}-metrics" + suffix, backend_id) 
-            
-    # show the plot for user to see
-    plt.show()
-    
-    ###################### Volumetric Plot
-        
-    suptitle = f"Volumetric Positioning - {appname}\nDevice={backend_id}  {get_timestr()}"
-    
-    global cmap   
-    
-    # note: if using filters, both "depth" and "vbplot" must be set for this to draw
-    
-    # generate separate figure for volumetric positioning chart of depth metrics
-    # found it difficult to share the x axis with first 3, but have diff axis for this one
-    if do_depths and do_volumetric_plots and do_vbplot:
-
-        ''' DEVNOTE: This code supplied for AQ copies metrics from the circuit metrics.  Instead, just use the averages, for now.
-        aq_metrics={}
-        aq_metrics["groups"]=[]
-        aq_metrics["tr_n2qs"]=[]
-        aq_metrics["hf_fidelities"]=[]
-        for group in circuit_metrics:
-            if group=='subtitle':
-                continue
-        
-            for key in circuit_metrics[group]:
-                aq_metrics["groups"].append(group)
-                aq_metrics["tr_n2qs"].append(circuit_metrics[group][key]["tr_n2q"])
-                aq_metrics["hf_fidelities"].append(circuit_metrics[group][key]["hf_fidelity"])
-        
-        w_data = aq_metrics["groups"]
-        d_tr_data = aq_metrics["tr_n2qs"]
-        f_data = aq_metrics["hf_fidelities"]
-        '''
-        
-        w_data = group_metrics["groups"]
-        d_tr_data = group_metrics["avg_tr_n2qs"]
-        f_data = group_metrics["avg_hf_fidelities"]
-        
-        try:
-            #print(f"... {d_data} {d_tr_data}")
-            
-            vplot_anno_init()
-            
-            max_qubits = max([int(group) for group in w_data])
-            
-            ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=0, depth_base=depth_base, suptitle=suptitle)
-            
-            # determine width for circuit
-            w_max = 0
-            for i in range(len(w_data)):
-                y = float(w_data[i])
-                w_max = max(w_max, y)
-
-            cmap = cmap_spectral
-
-            # If using mid-circuit transformation, convert width data to singular circuit width value
-            if transform_qubit_group:
-                w_data = new_qubit_group
-                
-                ## store the data used here as the aq metrics for combined plot
-                aq_metrics["groups"] = w_data
-
-            plot_volumetric_data_aq(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)  
-            
-            anno_volumetric_data(ax, depth_base,
-                label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
-        
-        except Exception as e:
-            print(f'ERROR: plot_metrics_aq(), failure when creating volumetric positioning chart')
-            print(f"... exception = {e}")
-            if verbose:
-                print(traceback.format_exc())
-        
-        # save plot image to file
-        if save_plot_images:
-            save_plot_image(plt, f"{appname}-vplot", backend_id) 
-        
-        #display plot
-        plt.show()       
-
 
 #################################################
+
+# DEVNOTE: this function is not used, as the overlaid rectanges are not useful
 
 # Plot metrics over all groups (2)
 def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-1"):    
@@ -1210,8 +975,13 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
         max_qubits = int(w_max) + 1     
         #print(f"... {w_max} {max_qubits}")
         
-        ax = plot_volumetric_background(max_qubits, QV, depth_base, suptitle=suptitle)
-        
+        if aq_mode > 0:
+            ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ,
+                depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Hellinger Fidelity")
+        else:
+            ax = plot_volumetric_background(max_qubits=max_qubits, QV=QV,
+                depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Result Fidelity")
+            
         vplot_anno_init()
         
         for app in shared_data:
@@ -1236,9 +1006,18 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
             w_data = group_metrics["groups"]
             d_data = group_metrics["avg_depths"]
             d_tr_data = group_metrics["avg_tr_depths"]
-            f_data = group_metrics["avg_fidelities"]
+            
+            if "avg_tr_n2qs" not in group_metrics: continue
+            n2q_tr_data = group_metrics["avg_tr_n2qs"]
     
-            plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
+            if aq_mode > 0:
+                if "avg_hf_fidelities" not in group_metrics: continue
+                f_data = group_metrics["avg_hf_fidelities"]
+                plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base, fill=True,
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+            else:
+                f_data = group_metrics["avg_fidelities"]
+                plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)  
 
         # do annotation separately, spreading labels for readability
@@ -1253,82 +1032,13 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
     
     # save plot image file
     if save_plot_images:
+        if aq_mode > 0: imagename += '-aq'
         save_plot_image(plt, imagename, backend_id) 
     
     #display plot
     plt.show()    
 
-
-# Plot metrics over all groups (2)
-def plot_metrics_all_overlaid_aq (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-1"):    
-    
-    global circuit_metrics
-    global group_metrics
-    
-    subtitle = circuit_metrics["subtitle"]
-    
-    print("Overlaid Results From All Applications")
-    
-    # generate separate figure for volumetric positioning chart of depth metrics
- 
-    try:      
-        # determine largest width for all apps
-        w_min, w_max = get_min_max(shared_data)
-        
-        # allow one more in width to accommodate the merge values below
-        max_qubits = int(w_max) + 1     
-        #print(f"... {w_max} {max_qubits}")
-        
-        ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ, depth_base=depth_base, suptitle=suptitle)
-        
-        vplot_anno_init()
-        
-        for app in shared_data:
-            #print(shared_data[app])
-
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
-            group_metrics = shared_data[app]["group_metrics"]
-            #print(group_metrics)
-            
-            if len(group_metrics["groups"]) == 0:
-                print(f"****** NO RESULTS for {appname} ****** ")
-                continue
-
-            # check if we have depth metrics
-            do_depths = len(group_metrics["avg_depths"]) > 0
-            if not do_depths:
-                continue
-                
-            w_data = group_metrics["groups"]
-            d_data = group_metrics["avg_depths"]
-            d_tr_data = group_metrics["avg_tr_depths"]            
-            n2q_tr_data = group_metrics["avg_tr_n2qs"]
-            f_data = group_metrics["avg_hf_fidelities"]
-    
-            plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base, fill=True,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)  
-
-        # do annotation separately, spreading labels for readability
-        anno_volumetric_data(ax, depth_base,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
-    
-    except Exception as e:
-        print(f'ERROR: plot_metrics_all_overlaid_aq(), failure when creating volumetric positioning chart')
-        print(f"... exception = {e}")
-        if verbose:
-            print(traceback.format_exc())
-    
-    # save plot image file
-    if save_plot_images:
-        save_plot_image(plt, imagename, backend_id) 
-    
-    #display plot
-    plt.show()    
-
-
+                                                    
 #################################################
 
 # Plot metrics over all groups (2), merging data from all apps into smaller cells
@@ -1350,12 +1060,19 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
     try:       
         # determine largest width for all apps
         w_min, w_max = get_min_max(shared_data)
+        
+        #determine width for AQ
+        AQ = get_aq_width(shared_data, w_min, w_max, "avg_hf_fidelities")
 
         # allow one more in width to accommodate the merge values below
         max_qubits = int(w_max) + 1     
-        #print(f"... {w_max} {max_qubits}")
         
-        ax = plot_volumetric_background(max_qubits, QV, depth_base, suptitle=suptitle, avail_qubits=avail_qubits)
+        if aq_mode > 0:
+            ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ, depth_base=depth_base,
+                suptitle=suptitle, avail_qubits=avail_qubits, colorbar_label="Avg Hellinger Fidelity")
+        else:
+            ax = plot_volumetric_background(max_qubits=max_qubits, QV=QV, depth_base=depth_base,
+                suptitle=suptitle, avail_qubits=avail_qubits, colorbar_label="Avg Result Fidelity")
         
         # create 2D array to hold merged value arrays with gradations, one array for each qubit size
         num_grads = 4
@@ -1363,19 +1080,14 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
         for w in range(max_qubits):
             depth_values_merged.append([ None ] * (num_grads * max_depth_log))
         
-        #print(depth_values_merged)
-            
         # run through depth metrics for all apps, splitting cells into gradations
         for app in shared_data:
-            #print(shared_data[app])
             
             # Extract shorter app name from the title passed in by user
             appname = app[len('Benchmark Results - '):len(app)]
             appname = appname[:appname.index(' - ')]
             
             group_metrics = shared_data[app]["group_metrics"]
-            #print(group_metrics)
-            
             if len(group_metrics["groups"]) == 0:
                 print(f"****** NO RESULTS for {appname} ****** ")
                 continue
@@ -1389,7 +1101,16 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
             d_data = group_metrics["avg_depths"]
             d_tr_data = group_metrics["avg_tr_depths"]
             f_data = group_metrics["avg_fidelities"]
+            
+            if aq_mode > 0:
+                if "avg_tr_n2qs" not in group_metrics: continue
+                n2q_tr_data = group_metrics["avg_tr_n2qs"]
+                d_tr_data = n2q_tr_data
+                
+                if "avg_hf_fidelities" not in group_metrics: continue
+                f_data = group_metrics["avg_hf_fidelities"]
     
+            # instead of plotting data here, split into gradations in code below
             #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base,
                    #label=appname, labelpos=(0.4, 0.6), labelrot=50, type=1)  
 
@@ -1464,14 +1185,20 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
                 
             w_data = group_metrics["groups"]
             d_data = group_metrics["avg_depths"]
-            d_tr_data = group_metrics["avg_tr_depths"]
-            f_data = group_metrics["avg_fidelities"]            
-
-            # plot data rectangles
-            #print(f"... plotting {appname}")
-                
-            plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False, w_max=w_max)
+            d_tr_data = group_metrics["avg_tr_depths"]    
+                   
+            if "avg_tr_n2qs" not in group_metrics: continue
+            n2q_tr_data = group_metrics["avg_tr_n2qs"]
+    
+            if aq_mode > 0:
+                if "avg_hf_fidelities" not in group_metrics: continue
+                f_data = group_metrics["avg_hf_fidelities"]
+                plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base, fill=False,
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+            else:
+                f_data = group_metrics["avg_fidelities"]
+                plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=False,
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
         
         # do annotation separately, spreading labels for readability
         anno_volumetric_data(ax, depth_base,
@@ -1489,12 +1216,13 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
     
     # save plot image file
     if save_plot_images:
+        if aq_mode > 0: imagename += '-aq'
         save_plot_image(plt, imagename, backend_id)
 
     #display plot
     plt.show()
 
-
+'''
 # Plot metrics over all groups (2), merging data from all apps into smaller cells
 def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
       
@@ -1508,32 +1236,10 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
         w_min, w_max = get_min_max(shared_data)
         
         #determine width for AQ
-        AQ=w_max
-        for app in shared_data:
-            group_metrics = shared_data[app]["group_metrics"]
-            w_data = group_metrics["groups"]
-             
-            if "avg_tr_n2qs" not in group_metrics:
-                continue
-            if "avg_hf_fidelities" not in group_metrics:
-                continue
-            
-            n2q_data = group_metrics["avg_tr_n2qs"]            
-            fidelity_data=group_metrics["avg_hf_fidelities"]
-            
-            while True:
-                n2q_cutoff=AQ*AQ
-                fail_w=[i for i in range(len(n2q_data)) if (float(n2q_data[i]) <= n2q_cutoff and float(w_data[i]) <=AQ and float(fidelity_data[i])<aq_cutoff)] 
-                if len(fail_w)==0:
-                    break        
-                AQ-=1
-        
-        if AQ<w_min:
-            AQ=0
+        AQ = get_aq_width(shared_data, w_min, w_max)
         
         # allow one more in width to accommodate the merge values below
         max_qubits = int(w_max) + 1     
-        #print(f"... {w_max} {max_qubits}")
         
         ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ, depth_base=depth_base, suptitle=suptitle, avail_qubits=avail_qubits)
         
@@ -1542,20 +1248,15 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
         depth_values_merged = []
         for w in range(max_qubits):
             depth_values_merged.append([ None ] * (num_grads * max_depth_log))
-        
-        #print(depth_values_merged)
-            
+                    
         # run through depth metrics for all apps, splitting cells into gradations
         for app in shared_data:
-            #print(shared_data[app])
             
             # Extract shorter app name from the title passed in by user
             appname = app[len('Benchmark Results - '):len(app)]
             appname = appname[:appname.index(' - ')]
             
-            group_metrics = shared_data[app]["group_metrics"]
-            #print(group_metrics)
-            
+            group_metrics = shared_data[app]["group_metrics"]            
             if len(group_metrics["groups"]) == 0:
                 print(f"****** NO RESULTS for {appname} ****** ")
                 continue
@@ -1687,7 +1388,7 @@ def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagenam
 
     #display plot
     plt.show()
-
+'''
 
 def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
       
@@ -1714,27 +1415,8 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
                 w_min = min(w_min, y)
         
         #determine width for AQ
-        AQ=w_max
-        for app in shared_data:
-        
-            if "aq_metrics" not in shared_data[app]:
-                if verbose: print(f"  ... skipping app: {app}")
-                continue
-            
-            aq_metrics = shared_data[app]["aq_metrics"]
-            w_data = aq_metrics["groups"]
-            n2q_data = aq_metrics["tr_n2qs"]       
-            fidelity_data=aq_metrics["hf_fidelities"]
-            while True:
-                n2q_cutoff=AQ*AQ
-                fail_w=[i for i in range(len(n2q_data)) if (float(n2q_data[i]) <= n2q_cutoff and float(w_data[i]) <=AQ and float(fidelity_data[i])<aq_cutoff)] 
-                if len(fail_w)==0:
-                    break        
-                AQ-=1
-
-        if AQ<w_min:
-            AQ=0
-            
+        AQ = get_aq_width(shared_data, w_min, w_max, "avg_hf_fidelities")
+   
         # allow one more in width to accommodate the merge values below
         max_qubits = int(w_max) + 1     
         #print(f"... {w_max} {max_qubits}")
@@ -1880,6 +1562,33 @@ def get_min_max(shared_data):
             w_min = min(w_min, y)       
     return w_min, w_max
 
+#determine width for AQ
+def get_aq_width(shared_data, w_min, w_max, fidelity_metric):
+    AQ=w_max
+    for app in shared_data:
+        group_metrics = shared_data[app]["group_metrics"]
+        w_data = group_metrics["groups"]
+         
+        if "avg_tr_n2qs" not in group_metrics:
+            continue
+        if fidelity_metric not in group_metrics:
+            continue
+        
+        n2q_data = group_metrics["avg_tr_n2qs"]            
+        fidelity_data=group_metrics[fidelity_metric]
+        
+        while True:
+            n2q_cutoff=AQ*AQ
+            fail_w=[i for i in range(len(n2q_data)) if (float(n2q_data[i]) <= n2q_cutoff and float(w_data[i]) <=AQ and float(fidelity_data[i])<aq_cutoff)] 
+            if len(fail_w)==0:
+                break        
+            AQ-=1
+    
+    if AQ<w_min:
+        AQ=0
+        
+    return AQ
+
 
 #################################################
 
@@ -1931,14 +1640,15 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
     # show vplots if enabled
     if do_volumetric_plots:
     
-        # this is an overlay plot, not very useful; better to merge
+        # this is an overlay plot, no longer used, not very useful; better to merge
         '''
         cmap = cmap_spectral
         suptitle = f"Volumetric Positioning - All Applications (Combined)\nDevice={backend_id}  {get_timestr()}"
         plot_metrics_all_overlaid(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2")
+        
         '''
         
-        # draw the volumetric plots with two different colormaps, for comparison purposes
+        # draw the volumetric plots with two different colormaps, for comparison purposes (just do one actually)
         
         #suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
         #cmap = cmap_blues
