@@ -56,13 +56,13 @@ def create_qaoa_circ(nqubits, edges, parameters):
         
         # problem unitary
         for i,j in edges:
-            qc.rzz(2 * par.gamma, i, j)
+            qc.rzz(2 * par.gamma, i, j) # Parameter gamma
 
         qc.barrier()
         
         # mixer unitary
         for i in range(0, nqubits):
-            qc.rx(2 * par.beta, i)
+            qc.rx(2 * par.beta, i) # Parameter beta 
 
     return qc
     
@@ -217,8 +217,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
     max_circuits = min(10, max_circuits)
-    # assert(abs(degree) >= 3)
-    # assert(num_qubits - degree >= 3)
+    # abs(degree) >= 3)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
     
     # given that this benchmark does every other width, set y_size default to 1.5
@@ -284,9 +283,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
         if degree > 0: 
             degree_range = range(degree, degree + num_circuits) 
         else:
-            degree_range = range(num_qubits + degree, num_qubits + degree - num_circuits, -1)
+            _start = max(3, (num_qubits + degree - max_circuits))
+            degree_range = range(_start, _start + max_circuits)
 
-        # print(degree_range)
 
         for i in degree_range:
         
@@ -421,28 +420,4 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
                                   num_x_bins=num_x_bins, x_size=x_size, y_size=y_size)
 
 # if main, execute method
-if __name__ == '__main__':
-    run(degree=-3, min_qubits=8, max_qubits=12, max_circuits=2, method=2)
-
-    # """ 
-    # n_qubits = 8
-    # max_circuits = 1
-    # degree = 3
-    # 008_003_000
-
-    # n_qubits = 8
-    # max_circuits = 2
-    # degree = 3
-    # 008_003_000
-    # 008_004_000
-
-
-    # max_circuits = 1 ( N problems )
-    # degree = -3
-    # 008_004_000 or 008_005_000
-    
-    # max_circuits = 1
-    # degree = -3
-    # 008_004_000 or 008_005_000
-    # 008_003_000 or 008_004_000
-    # """
+if __name__ == '__main__': run()
