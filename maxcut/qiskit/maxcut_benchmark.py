@@ -2,21 +2,27 @@
 MaxCut Benchmark Program - Qiskit
 """
 
+import os
 import sys
 import time
 from collections import namedtuple
 
 import numpy as np
 from scipy.optimize import minimize
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
-from qiskit import Aer, execute # for computing expectation tables
+from sympy import deg
+
+from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
+                    QuantumCircuit, QuantumRegister, execute)
 
 sys.path[1:1] = [ "_common", "_common/qiskit" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
 import execute as ex
 import metrics as metrics
 
-import common       # from lanl-ansi-max-cut
+qiskit_dir = os.path.dirname(os.path.abspath(__file__))
+max_cut_dir = os.path.dirname(qiskit_dir)
+sys.path.insert(0, max_cut_dir)
+import _common.common as common
 
 np.random.seed(0)
 
@@ -50,13 +56,13 @@ def create_qaoa_circ(nqubits, edges, parameters):
         
         # problem unitary
         for i,j in edges:
-            qc.rzz(2 * par.gamma, i, j)
+            qc.rzz(2 * par.gamma, i, j) # Parameter gamma
 
         qc.barrier()
         
         # mixer unitary
         for i in range(0, nqubits):
-            qc.rx(2 * par.beta, i)
+            qc.rx(2 * par.beta, i) # Parameter beta 
 
     return qc
     
@@ -193,8 +199,8 @@ saved_result = None
 instance_filename = None
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1,
+def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
+        method=1, rounds=1, degree=3,
         max_iter=15, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=20, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
@@ -211,6 +217,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
     max_circuits = min(10, max_circuits)
+    # abs(degree) >= 3)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
     
     # given that this benchmark does every other width, set y_size default to 1.5
@@ -273,7 +280,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
         # loop over each of num_circuits
         # assume the solution files start with 3 and go up from there
-        for i in range(3, 3 + num_circuits):
+        if degree > 0: 
+            degree_range = range(degree, degree + num_circuits) 
+        else:
+            _start = max(3, (num_qubits + degree - max_circuits))
+            degree_range = range(_start, _start + max_circuits)
+
+
+        for i in degree_range:
         
             # create integer that represents the problem instance; use s_int as circuit id
             s_int = i
@@ -281,15 +295,17 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
             # create filename from num_qubits and circuit_id (s_int), then load the problem file
             global instance_filename
-            instance_filename = f"instance/mc_{str(num_qubits).zfill(3)}_{str(i).zfill(3)}_000.txt"
-            #print(f"... instance_filename = {instance_filename}")
+            instance_filename = os.path.join(
+                max_cut_dir, "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt"
+            )
+            print(f"... instance_filename = {instance_filename}")
             nodes, edges = common.read_maxcut_instance(instance_filename)
             #print(f"nodes = {nodes}")
             #print(f"edges = {edges}")
         
             # if the file does not exist, we are done with this number of qubits
             if nodes == None:
-                print(f"  ... problem {str(i).zfill(3)} not found, limiting to {circuits_complete} circuit(s).")
+                print(f"  ... problem {i:03d} not found, limiting to {circuits_complete} circuit(s).")
                 break;
         
             circuits_complete += 1
@@ -313,6 +329,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 unique_circuit_index = 0 
                 start_iters_t = time.time()
                 
+                # ?
                 p_depth = 2
                 thetas_init = 2*p_depth*[1.0]
             
@@ -404,4 +421,3 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
 # if main, execute method
 if __name__ == '__main__': run()
-   
