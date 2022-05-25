@@ -1,7 +1,7 @@
 from pytket.extensions.qiskit import qiskit_to_tk, tk_to_qiskit
 from pytket.passes import (  # type: ignore
     BasePass,
-    RebaseCustom,
+    auto_rebase_pass,
     RemoveRedundancies,
     SequencePass,
     SynthesiseTket,
@@ -11,23 +11,20 @@ from pytket.passes import (  # type: ignore
     CliffordSimp,
     SimplifyInitial,
 )
-from pytket.routing import Architecture, NoiseAwarePlacement
+from pytket.architecture import Architecture
+from pytket.placement import NoiseAwarePlacement
 from pytket.extensions.qiskit.qiskit_convert import (
     process_characterisation,
     get_avg_characterisation,
 )
-from pytket.extensions.qiskit.backends.ibm import _tk1_to_x_sx_rz
 from pytket import OpType, Circuit
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit.providers import BaseBackend
 
 def rebase_pass():
-    return RebaseCustom(
-        {OpType.CX},
-        Circuit(2).CX(0, 1),
-        {OpType.X, OpType.SX, OpType.Rz},
-        _tk1_to_x_sx_rz,
-    )
+    return auto_rebase_pass(
+            {OpType.CX, OpType.X, OpType.SX, OpType.Rz},
+        )
 
 def high_optimisation(circuit:QuantumCircuit, backend:BaseBackend) -> list[QuantumCircuit]:
     """Perform thourough but generic optimisation using 
