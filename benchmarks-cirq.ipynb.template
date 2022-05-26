@@ -24,7 +24,14 @@
     "num_shots=1000\n",
     "\n",
     "backend_id=\"simulator\"\n",
-    "provider_backend = None\n"
+    "provider_backend = None"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Deutsch-Jozsa"
    ]
   },
   {
@@ -35,7 +42,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run deutsch-jozsa/cirq/dj_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"deutsch-jozsa/cirq\")\n",
     "import dj_benchmark\n",
@@ -44,6 +50,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Bernstein-Vazirani"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -51,7 +64,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run bernstein-vazirani/cirq/bv_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"bernstein-vazirani/cirq\")\n",
     "import bv_benchmark\n",
@@ -60,6 +72,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Hidden Shift"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -67,7 +86,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run hidden-shift/cirq/hs_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"hidden-shift/cirq\")\n",
     "import hs_benchmark\n",
@@ -76,6 +94,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Quantum Fourier Transform - Method 1"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -83,7 +108,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run quantum-fourier-transform/cirq/qft_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"quantum-fourier-transform/cirq\")\n",
     "import qft_benchmark\n",
@@ -92,7 +116,14 @@
     "                backend_id=backend_id, provider_backend=provider_backend)"
    ]
   },
-    {
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Quantum Fourier Transform - Method 2"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -100,7 +131,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run quantum-fourier-transform/cirq/qft_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"quantum-fourier-transform/cirq\")\n",
     "import qft_benchmark\n",
@@ -110,6 +140,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Grover"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -117,7 +154,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run grovers/cirq/grovers_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"grovers/cirq\")\n",
     "import grovers_benchmark\n",
@@ -126,6 +162,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Phase Estimation"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -133,7 +176,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run phase-estimation/cirq/pe_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"phase-estimation/cirq\")\n",
     "import pe_benchmark\n",
@@ -142,36 +184,10 @@
    ]
   },
   {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
-   "outputs": [],
+   "cell_type": "markdown",
+   "metadata": {},
    "source": [
-    "#%run amplitude-estimation/cirq/ae_benchmark.py\n",
-    "import sys\n",
-    "sys.path.insert(1, \"amplitude-estimation/cirq\")\n",
-    "import ae_benchmark\n",
-    "ae_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
-    "                backend_id=backend_id, provider_backend=provider_backend)"
-   ]
-  },
-{
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
-   "outputs": [],
-   "source": [
-    "#%run monte-carlo/cirq/mc_benchmark.py\n",
-    "import sys\n",
-    "sys.path.insert(1, \"monte-carlo/cirq\")\n",
-    "import mc_benchmark\n",
-    "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
-    "                method=2,\n",
-    "                backend_id=backend_id, provider_backend=provider_backend)"
+    "### Amplitude Estimation"
    ]
   },
   {
@@ -182,7 +198,50 @@
    },
    "outputs": [],
    "source": [
-    "#%run hamiltonian_simulation/cirq/hamiltonian-simulation_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"amplitude-estimation/cirq\")\n",
+    "import ae_benchmark\n",
+    "ae_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Monte Carlo"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"monte-carlo/cirq\")\n",
+    "import mc_benchmark\n",
+    "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Hamiltonian Simulation"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [],
+   "source": [
     "import sys\n",
     "sys.path.insert(1, \"hamiltonian-simulation/cirq\")\n",
     "import hamiltonian_simulation_benchmark\n",
@@ -192,19 +251,10 @@
    ]
   },
   {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
-   "outputs": [],
+   "cell_type": "markdown",
+   "metadata": {},
    "source": [
-    "#%run shors/cirq/shors_benchmark.py\n",
-    "import sys\n",
-    "sys.path.insert(1, \"shors/cirq\")\n",
-    "import shors_benchmark\n",
-    "shors_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=1, num_shots=num_shots,\n",
-    "                method = 1, backend_id=backend_id, provider_backend=provider_backend)"
+    "### Shor - Method 1"
    ]
   },
   {
@@ -215,12 +265,40 @@
    },
    "outputs": [],
    "source": [
-    "#%run shors/cirq/shors_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"shors/cirq\")\n",
+    "import shors_benchmark\n",
+    "shors_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=1, num_shots=num_shots,\n",
+    "                method = 1, backend_id=backend_id, provider_backend=provider_backend)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Shor - Method 2"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [],
+   "source": [
     "import sys\n",
     "sys.path.insert(1, \"shors/cirq\")\n",
     "import shors_benchmark\n",
     "shors_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=1, num_shots=num_shots,\n",
     "                method = 2, backend_id=backend_id, provider_backend=provider_backend)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Combined Benchmark Results"
    ]
   },
   {
@@ -240,13 +318,6 @@
     "\n",
     "metrics.plot_all_app_metrics(backend_id, do_all_plots=False, include_apps=None)\n"
    ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {},
-   "outputs": [],
-   "source": []
   }
  ],
  "metadata": {

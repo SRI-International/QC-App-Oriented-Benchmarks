@@ -289,7 +289,7 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots, met
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
     #fidelity = metrics.polarization_fidelity(app_counts, app_correct_dist, app_thermal_dist)
     
-    aq_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
+    hf_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
     
     ###########################################################################
     # NOTE: in this benchmark, we are testing how well the amplitude estimation routine
@@ -305,7 +305,7 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots, met
 
     if verbose: print(f"Solution counts: {counts}")
     
-    if verbose: print(f"  ... fidelity: {fidelity}  aq_fidelity: {aq_fidelity}")
+    if verbose: print(f"  ... fidelity: {fidelity}  hf_fidelity: {hf_fidelity}")
     
     return counts, fidelity
 
