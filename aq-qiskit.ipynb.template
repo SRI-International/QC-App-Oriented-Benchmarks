@@ -178,7 +178,7 @@
     "sys.path.insert(1, \"_common\")\n",
     "import metrics\n",
     "\n",
-    "metrics.plot_all_app_metrics(backend_id, do_all_plots=False, include_apps=None, is_individual=True)"
+    "metrics.plot_all_app_metrics(backend_id, do_all_plots=False, include_apps=None)"
    ]
   }
  ],
