@@ -1038,20 +1038,21 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
     #display plot
     plt.show()    
 
-                                                    
+
 #################################################
 
-# Plot metrics over all groups (2), merging data from all apps into smaller cells
+# Plot metrics over all groups (level 2), merging data from all apps into smaller cells if not is_individual
 def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0, is_individual=True):    
-    
+
     if aq_mode == 2:
-        #return plot_metrics_all_merged_individual_aq(shared_data=shared_data, backend_id=backend_id, suptitle=suptitle, imagename=imagename, avail_qubits=avail_qubits)
-        
+
         if is_individual is False:
-            return plot_metrics_all_merged_aq(shared_data=shared_data, backend_id=backend_id, suptitle=suptitle, imagename=imagename, avail_qubits=avail_qubits)
-        else:
+            #return plot_metrics_all_merged_aq(shared_data=shared_data, backend_id=backend_id, suptitle=suptitle, imagename=imagename, avail_qubits=avail_qubits)
+            pass
+            
+        if is_individual is True:
             return plot_metrics_all_merged_individual_aq(shared_data=shared_data, backend_id=backend_id, suptitle=suptitle, imagename=imagename, avail_qubits=avail_qubits)                
-        
+  
     global circuit_metrics
     global group_metrics
   
@@ -1075,97 +1076,12 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
                 suptitle=suptitle, avail_qubits=avail_qubits, colorbar_label="Avg Result Fidelity")
         
         # create 2D array to hold merged value arrays with gradations, one array for each qubit size
-        num_grads = 4
-        depth_values_merged = []
-        for w in range(max_qubits):
-            depth_values_merged.append([ None ] * (num_grads * max_depth_log))
-        
-        # run through depth metrics for all apps, splitting cells into gradations
-        for app in shared_data:
-            
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
-            group_metrics = shared_data[app]["group_metrics"]
-            if len(group_metrics["groups"]) == 0:
-                print(f"****** NO RESULTS for {appname} ****** ")
-                continue
-
-            # check if we have depth metrics
-            do_depths = len(group_metrics["avg_depths"]) > 0
-            if not do_depths:
-                continue
-                
-            w_data = group_metrics["groups"]
-            d_data = group_metrics["avg_depths"]
-            d_tr_data = group_metrics["avg_tr_depths"]
-            f_data = group_metrics["avg_fidelities"]
-            
-            if aq_mode > 0:
-                if "avg_tr_n2qs" not in group_metrics: continue
-                n2q_tr_data = group_metrics["avg_tr_n2qs"]
-                d_tr_data = n2q_tr_data
-                
-                if "avg_hf_fidelities" not in group_metrics: continue
-                f_data = group_metrics["avg_hf_fidelities"]
-    
-            # instead of plotting data here, split into gradations in code below
-            #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base,
-                   #label=appname, labelpos=(0.4, 0.6), labelrot=50, type=1)  
-
-            # aggregate value metrics for each depth cell over all apps
-            for i in range(len(d_data)):
-                x = depth_index(d_tr_data[i], depth_base)
-                y = float(w_data[i])
-                f = f_data[i]
-                
-                # accumulate largest width for all apps
-                w_max = max(w_max, y)
-                
-                xp = x * 4
-                
-                if x > max_depth_log - 1:
-                    print(f"... data out of chart range, skipped; w={y} d={d_tr_data[i]}")
-                    continue;
-                    
-                for grad in range(num_grads):
-                    e = depth_values_merged[int(w_data[i])][int(xp + grad)]
-                    if e == None: 
-                        e = { "value": 0.0, "count": 0 }
-                    e["count"] += 1
-                    e["value"] += f
-                    depth_values_merged[int(w_data[i])][int(xp + grad)] = e
-                    
-        #print(depth_values_merged)
-        
-        # compute and plot the average fidelity at each width / depth gradation with narrow filled rects 
-        for wi in range(len(depth_values_merged)):
-            w = depth_values_merged[wi]
-            #print(f"... w = {w}")
-            
-            for di in range(len(w)):
-            
-                e = w[di]
-                
-                if e != None:
-                    e["value"] /= e["count"]
-                    e["count"] = 1
-                
-                    x = di / 4
-                    
-                    # move half cell to left, to account for num grads
-                    x -= 0.25
-                    
-                    y = float(wi)
-                    f = e["value"]
-                    
-                    ax.add_patch(box4_at(x, y, f, type=1, fill=True))
-        
-        #print("**** merged...")
-        #print(depth_values_merged)
+        # plot rectangles representing these result gradations
+        if not is_individual:
+            plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max)
         
         # Now overlay depth metrics for each app with unfilled rects, to outline each circuit
+        # if is_individual, do filled rects as there is no background fill
         
         vplot_anno_init()
         
@@ -1190,23 +1106,21 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
             if "avg_tr_n2qs" not in group_metrics: continue
             n2q_tr_data = group_metrics["avg_tr_n2qs"]
     
+            filled = is_individual
+            
             if aq_mode > 0:
                 if "avg_hf_fidelities" not in group_metrics: continue
                 f_data = group_metrics["avg_hf_fidelities"]
-                plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base, fill=False,
+                plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base, fill=filled,
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
             else:
                 f_data = group_metrics["avg_fidelities"]
-                plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=False,
+                plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=filled,
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
         
         # do annotation separately, spreading labels for readability
         anno_volumetric_data(ax, depth_base,
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
-          
-        #Final pass to overlay unfilled rects for each cell (this is incorrect, should be removed)
-        #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=False,
-                   #label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
     
     except Exception as e:
         print(f'ERROR: plot_metrics_all_merged(), failure when creating volumetric positioning chart')
@@ -1222,173 +1136,97 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
     #display plot
     plt.show()
 
-'''
-# Plot metrics over all groups (2), merging data from all apps into smaller cells
-def plot_metrics_all_merged_aq (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
-      
-    global circuit_metrics
-    global group_metrics
-  
-    # generate separate figure for volumetric positioning chart of depth metrics
+
+# Plot filled but borderless rectangles based on merged gradations of result metrics
+def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads = 4):
+
+    depth_values_merged = []
+    for w in range(max_qubits):
+        depth_values_merged.append([ None ] * (num_grads * max_depth_log))
     
-    try:      
-        # determine largest width for all apps
-        w_min, w_max = get_min_max(shared_data)
+    # run through depth metrics for all apps, splitting cells into gradations
+    for app in shared_data:
         
-        #determine width for AQ
-        AQ = get_aq_width(shared_data, w_min, w_max)
+        # Extract shorter app name from the title passed in by user
+        appname = app[len('Benchmark Results - '):len(app)]
+        appname = appname[:appname.index(' - ')]
         
-        # allow one more in width to accommodate the merge values below
-        max_qubits = int(w_max) + 1     
-        
-        ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ, depth_base=depth_base, suptitle=suptitle, avail_qubits=avail_qubits)
-        
-        # create 2D array to hold merged value arrays with gradations, one array for each qubit size
-        num_grads = 4
-        depth_values_merged = []
-        for w in range(max_qubits):
-            depth_values_merged.append([ None ] * (num_grads * max_depth_log))
-                    
-        # run through depth metrics for all apps, splitting cells into gradations
-        for app in shared_data:
-            
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
-            group_metrics = shared_data[app]["group_metrics"]            
-            if len(group_metrics["groups"]) == 0:
-                print(f"****** NO RESULTS for {appname} ****** ")
-                continue
+        group_metrics = shared_data[app]["group_metrics"]
+        if len(group_metrics["groups"]) == 0:
+            print(f"****** NO RESULTS for {appname} ****** ")
+            continue
 
-            # check if we have depth metrics
-            do_depths = len(group_metrics["avg_depths"]) > 0
-            if not do_depths:
-                continue
-                
-            w_data = group_metrics["groups"]
-            d_data = group_metrics["avg_depths"]
-            d_tr_data = group_metrics["avg_tr_depths"] 
-
-            if "avg_tr_n2qs" not in group_metrics:
-                continue
-            if "avg_hf_fidelities" not in group_metrics:
-                continue
-                
+        # check if we have depth metrics
+        do_depths = len(group_metrics["avg_depths"]) > 0
+        if not do_depths:
+            continue
+            
+        w_data = group_metrics["groups"]
+        d_data = group_metrics["avg_depths"]
+        d_tr_data = group_metrics["avg_tr_depths"]
+        f_data = group_metrics["avg_fidelities"]
+        
+        if aq_mode > 0:
+            if "avg_tr_n2qs" not in group_metrics: continue
             n2q_tr_data = group_metrics["avg_tr_n2qs"]
+            d_tr_data = n2q_tr_data
+            
+            if "avg_hf_fidelities" not in group_metrics: continue
             f_data = group_metrics["avg_hf_fidelities"]
-    
-            #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base,
-                   #label=appname, labelpos=(0.4, 0.6), labelrot=50, type=1)  
 
-            # aggregate value metrics for each depth cell over all apps
-            for i in range(len(d_data)):
-                x = depth_index(n2q_tr_data[i], depth_base)
-                y = float(w_data[i])
-                f = f_data[i]
-                
-                # accumulate largest width for all apps
-                w_max = max(w_max, y)
-                
-                xp = x * 4
-                
-                if x > max_depth_log - 1:
-                    print(f"... data out of chart range, skipped; w={y} d={n2q_tr_data[i]}")
-                    continue;
-                    
-                for grad in range(num_grads):
-                    e = depth_values_merged[int(w_data[i])][int(xp + grad)]
-                    if e == None: 
-                        e = { "value": 0.0, "count": 0 }
-                    e["count"] += 1
-                    e["value"] += f
-                    depth_values_merged[int(w_data[i])][int(xp + grad)] = e
-                    
-        #print(depth_values_merged)
-        
-        # compute and plot the average fidelity at each width / depth gradation with narrow filled rects 
-        for wi in range(len(depth_values_merged)):
-            w = depth_values_merged[wi]
-            #print(f"... w = {w}")
-            
-            for di in range(len(w)):
-            
-                e = w[di]
-                
-                if e != None:
-                    e["value"] /= e["count"]
-                    e["count"] = 1
-                
-                    x = di / 4
-                    
-                    # move half cell to left, to account for num grads
-                    x -= 0.25
-                    
-                    y = float(wi)
-                    f = e["value"]
-                    
-                    ax.add_patch(box4_at(x, y, f, type=1, fill=True))
-        
-        #print("**** merged...")
-        #print(depth_values_merged)
-        
-        # Now overlay depth metrics for each app with unfilled rects, to outline each circuit
-        
-        vplot_anno_init()
-        
-        for app in shared_data:
-        
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-    
-            group_metrics = shared_data[app]["group_metrics"]
-            
-            # check if we have depth metrics for group
-            if len(group_metrics["groups"]) == 0:
-                continue
-            if len(group_metrics["avg_depths"]) == 0:
-                continue
-                
-            w_data = group_metrics["groups"]
-            d_data = group_metrics["avg_depths"]
-            d_tr_data = group_metrics["avg_tr_depths"]
-            
-            if "avg_tr_n2qs" not in group_metrics:
-                continue
-            if "avg_hf_fidelities" not in group_metrics:
-                continue
-                
-            n2q_tr_data=group_metrics['avg_tr_n2qs']
-            f_data = group_metrics["avg_hf_fidelities"]            
+        # instead of plotting data here, split into gradations in code below
+        #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base,
+               #label=appname, labelpos=(0.4, 0.6), labelrot=50, type=1)  
 
-            # plot data rectangles
-            #print(f"... plotting {appname}")
+        # aggregate value metrics for each depth cell over all apps
+        for i in range(len(d_data)):
+            x = depth_index(d_tr_data[i], depth_base)
+            y = float(w_data[i])
+            f = f_data[i]
+            
+            # accumulate largest width for all apps
+            w_max = max(w_max, y)
+            
+            xp = x * 4
+            
+            if x > max_depth_log - 1:
+                print(f"... data out of chart range, skipped; w={y} d={d_tr_data[i]}")
+                continue;
                 
-            plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False, w_max=w_max)
+            for grad in range(num_grads):
+                e = depth_values_merged[int(w_data[i])][int(xp + grad)]
+                if e == None: 
+                    e = { "value": 0.0, "count": 0 }
+                e["count"] += 1
+                e["value"] += f
+                depth_values_merged[int(w_data[i])][int(xp + grad)] = e
+                        
+    # compute and plot the average fidelity at each width / depth gradation with narrow filled rects 
+    for wi in range(len(depth_values_merged)):
+        w = depth_values_merged[wi]
+        #print(f"... w = {w}")
         
-        # do annotation separately, spreading labels for readability
-        anno_volumetric_data(ax, depth_base,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
-          
-        #Final pass to overlay unfilled rects for each cell (this is incorrect, should be removed)
-        #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=False,
-                   #label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+        for di in range(len(w)):
+        
+            e = w[di]
+            
+            if e != None:
+                e["value"] /= e["count"]
+                e["count"] = 1
+            
+                x = di / 4
+                
+                # move half cell to left, to account for num grads
+                x -= 0.25
+                
+                y = float(wi)
+                f = e["value"]
+                
+                ax.add_patch(box4_at(x, y, f, type=1, fill=True))
     
-    except Exception as e:
-        print(f'ERROR: plot_metrics_all_merged_aq(), failure when creating volumetric positioning chart')
-        print(f"... exception = {e}")
-        if verbose:
-            print(traceback.format_exc())
-    
-    # save plot image file
-    if save_plot_images:
-        save_plot_image(plt, imagename, backend_id)
+    #print("**** merged...")
+    #print(depth_values_merged)
 
-    #display plot
-    plt.show()
-'''
 
 def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0):    
       
@@ -1399,95 +1237,16 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
 
     try:       
         # determine largest and smallest width for all apps
-        w_max = 0
-        w_min = 0
-        for app in shared_data:
-        
-            if "aq_metrics" not in shared_data[app]:
-                if verbose: print(f"  ... skipping app: {app}")
-                continue
-                
-            aq_metrics = shared_data[app]["aq_metrics"]
-            w_data = aq_metrics["groups"]
-            for i in range(len(w_data)):
-                y = float(w_data[i])
-                w_max = max(w_max, y)
-                w_min = min(w_min, y)
-        
+        w_min, w_max = get_min_max(shared_data)
+
         #determine width for AQ
         AQ = get_aq_width(shared_data, w_min, w_max, "avg_hf_fidelities")
    
         # allow one more in width to accommodate the merge values below
         max_qubits = int(w_max) + 1     
-        #print(f"... {w_max} {max_qubits}")
         
-        ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ, depth_base=depth_base, suptitle=suptitle, avail_qubits=avail_qubits)
-        
-        # create 2D array to hold merged value arrays with gradations, one array for each qubit size
-        num_grads = 4
-        depth_values_merged = []
-        for w in range(max_qubits):
-            depth_values_merged.append([ None ] * (num_grads * max_depth_log))
-        
-        #print(depth_values_merged)
-          
-        '''
-        # run through depth metrics for all apps, splitting cells into gradations
-        for app in shared_data:
-            #print(shared_data[app])
-            
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
-            
-            if "aq_metrics" not in shared_data[app]:
-                print(f"  .. skipping app: {app}")
-                continue
-            
-            aq_metrics = shared_data[app]["aq_metrics"]
-            #print(aq_metrics)
-            
-            if len(aq_metrics["groups"]) == 0:
-                print(f"****** NO RESULTS for {appname} ****** ")
-                continue
-
-            # check if we have depth metrics
-            do_depths = len(aq_metrics["tr_n2qs"]) > 0
-            if not do_depths:
-                continue
-                
-            w_data = aq_metrics["groups"]          
-            n2q_tr_data = aq_metrics["tr_n2qs"]
-            f_data = aq_metrics["hf_fidelities"]
-    
-            #plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base,
-                   #label=appname, labelpos=(0.4, 0.6), labelrot=50, type=1)  
-
-            # aggregate value metrics for each depth cell over all apps
-            for i in range(len(w_data)):
-                x = depth_index(n2q_tr_data[i], depth_base)
-                y = float(w_data[i])
-                f = f_data[i]
-                
-                # accumulate largest width for all apps
-                w_max = max(w_max, y)
-                
-                xp = x * 4
-                
-                if x > max_depth_log - 1:
-                    print(f"... data out of chart range, skipped; w={y} d={n2q_tr_data[i]}")
-                    continue;
-                    
-                for grad in range(num_grads):
-                    e = depth_values_merged[int(w_data[i])][int(xp + grad)]
-                    if e == None: 
-                        e = { "value": 0.0, "count": 0 }
-                    e["count"] += 1
-                    e["value"] += f
-                    depth_values_merged[int(w_data[i])][int(xp + grad)] = e
-        '''
-        
+        ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=AQ, depth_base=depth_base, suptitle=suptitle, avail_qubits=avail_qubits, colorbar_label="Avg Hellinger Fidelity")
+       
         # Place circles at each point
         
         vplot_anno_init()
@@ -1497,36 +1256,31 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
             # Extract shorter app name from the title passed in by user
             appname = app[len('Benchmark Results - '):len(app)]
             appname = appname[:appname.index(' - ')]
-               
-            if "aq_metrics" not in shared_data[app]:
-                if verbose: print(f"  ... skipping app: {app}")
-                continue
-            
-            aq_metrics = shared_data[app]["aq_metrics"]
+     
+            group_metrics = shared_data[app]["group_metrics"]
             
             # check if we have depth metrics for group
-            if len(aq_metrics["groups"]) == 0:
+            if len(group_metrics["groups"]) == 0:
                 continue
-            if len(aq_metrics["tr_n2qs"]) == 0:
+            if len(group_metrics["avg_depths"]) == 0:
                 continue
                 
-            w_data = aq_metrics["groups"]
-            n2q_tr_data=aq_metrics['tr_n2qs']
-            f_data = aq_metrics["hf_fidelities"]            
-
-            # plot data rectangles
-            '''
-            for i in range(len(d_data)):
-                x = depth_index(d_tr_data[i], depth_base)
-                y = float(w_data[i])
-                f = f_data[i]
-                ax.add_patch(box_at(x, y, f, type=1, fill=False))
-            '''
-            
-            #print(f"... plotting {appname} {f_data}")
-                
-            plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=True, w_max=w_max)
+            w_data = group_metrics["groups"]
+            d_data = group_metrics["avg_depths"]
+            d_tr_data = group_metrics["avg_tr_depths"]    
+                   
+            if "avg_tr_n2qs" not in group_metrics: continue
+            n2q_tr_data = group_metrics["avg_tr_n2qs"]
+    
+            if aq_mode > 0:
+                if "avg_hf_fidelities" not in group_metrics: continue
+                f_data = group_metrics["avg_hf_fidelities"]
+                plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base, fill=True,
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+            else:
+                f_data = group_metrics["avg_fidelities"]
+                plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=True,
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
         
         # do annotation separately, spreading labels for readability
         anno_volumetric_data(ax, depth_base,
@@ -1549,6 +1303,7 @@ def plot_metrics_all_merged_individual_aq (shared_data, backend_id, suptitle=Non
     #display plot
     plt.show()
 
+
 # get the min and max width over all apps in shared_data
 def get_min_max(shared_data):
     w_max = 0
@@ -1561,6 +1316,7 @@ def get_min_max(shared_data):
             w_max = max(w_max, y)
             w_min = min(w_min, y)       
     return w_min, w_max
+
 
 #determine width for AQ
 def get_aq_width(shared_data, w_min, w_max, fidelity_metric):
@@ -1656,6 +1412,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
         
         cmap = cmap_spectral
         suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
+        
         plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits, is_individual=is_individual)
         
     # show all app metrics charts if enabled
