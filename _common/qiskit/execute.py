@@ -29,6 +29,7 @@ import metrics
 import importlib
 import traceback
 from collections import Counter
+import numpy as np
 
 from qiskit import execute, Aer, transpile
 from qiskit import IBMQ
@@ -406,11 +407,46 @@ def execute_circuit(circuit):
                 
                 # the 'execute' method includes transpile, use transpile + run instead (to enable time metrics)
                 st = time.time()
-                trans_qc = transpile(circuit["qc"], backend, 
-                    optimization_level=optimization_level,
-                    layout_method=layout_method,
-                    routing_method=routing_method)
-                    
+                
+                # transpile many times and pick shortest circuit
+                transpile_attempt_count = backend_exec_options.pop("transpile_attempt_count", None)
+                if transpile_attempt_count:
+                    trans_qc_list = [
+                        transpile(
+                            circuit["qc"], 
+                            backend, 
+                            optimization_level=optimization_level,
+                            layout_method=layout_method,
+                            routing_method=routing_method
+                        ) for _ in range(transpile_attempt_count)
+                    ]
+                    best_op_count = []
+                    for circ in trans_qc_list:
+                        # check if there are cx in transpiled circs
+                        if 'cx' in circ.count_ops().keys(): 
+                            # get number of operations
+                            best_op_count.append( circ.count_ops()['cx'] ) 
+                        # check if there are sx in transpiled circs
+                        elif 'sx' in circ.count_ops().keys(): 
+                            # get number of operations
+                            best_op_count.append( circ.count_ops()['sx'] ) 
+                    # print(f"{best_op_count = }")
+                    if best_op_count:
+                        # pick circuit with lowest number of operations
+                        best_idx = np.where(best_op_count == np.min(best_op_count))[0][0] 
+                        trans_qc = trans_qc_list[best_idx]
+                    else: # otherwise just pick the first in the list
+                        trans_qc = trans_qc_list[0] 
+
+                else:
+                    trans_qc = transpile(
+                                    circuit["qc"], 
+                                    backend, 
+                                    optimization_level=optimization_level,
+                                    layout_method=layout_method,
+                                    routing_method=routing_method
+                                )
+
                 if verbose_time:
                     print(f"  *** qiskit.transpile() time = {time.time() - st}")
                 

@@ -49,19 +49,20 @@ def high_optimisation(circuit:QuantumCircuit, backend:BaseBackend) -> list[Quant
 
     # Add noise aware placement and routing to pass list.
     coupling_map = backend.configuration().coupling_map
-    arch = Architecture(coupling_map)
-    passlist.append(
-        CXMappingPass(
-            arch,
-            NoiseAwarePlacement(
+    if coupling_map:
+        arch = Architecture(coupling_map)
+        passlist.append(
+            CXMappingPass(
                 arch,
-                averaged_errors["node_errors"],
-                averaged_errors["edge_errors"],
-                averaged_errors["readout_errors"],
-            ),
-            directed_cx=False,
+                NoiseAwarePlacement(
+                    arch,
+                    averaged_errors["node_errors"],
+                    averaged_errors["edge_errors"],
+                    averaged_errors["readout_errors"],
+                ),
+                directed_cx=False,
+            )
         )
-    )
 
     # Perform coupling map safe optimisation.
     passlist.extend([CliffordSimp(False), SynthesiseTket()])
@@ -101,19 +102,20 @@ def quick_optimisation(circuit:QuantumCircuit, backend:BaseBackend) -> list[Quan
 
     # Add noise aware placement and routing to pass list.
     coupling_map = backend.configuration().coupling_map
-    arch = Architecture(coupling_map)
-    passlist.append(
-        CXMappingPass(
-            arch,
-            NoiseAwarePlacement(
+    if coupling_map:
+        arch = Architecture(coupling_map)
+        passlist.append(
+            CXMappingPass(
                 arch,
-                averaged_errors["node_errors"],
-                averaged_errors["edge_errors"],
-                averaged_errors["readout_errors"],
-            ),
-            directed_cx=False,
+                NoiseAwarePlacement(
+                    arch,
+                    averaged_errors["node_errors"],
+                    averaged_errors["edge_errors"],
+                    averaged_errors["readout_errors"],
+                ),
+                directed_cx=False,
+            )
         )
-    )
 
     # Rebase to backend gate set and perform basic optimisation
     passlist.append(rebase_pass())
