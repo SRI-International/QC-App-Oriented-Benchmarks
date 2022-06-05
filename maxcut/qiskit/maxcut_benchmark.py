@@ -195,7 +195,7 @@ saved_result = None
 instance_filename = None
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
+def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         method=1, rounds=1, degree=3,
         max_iter=15, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=20, y_size=None, x_size=None,
