@@ -37,6 +37,8 @@ NOTE: The remainder of this README needs to be modified with content for MaxCut.
 
 ## References
 
+[Solving combinatorial optimization problems using QAOA (Qiskit Tutorial)](https://qiskit.org/textbook/ch-applications/qaoa.html)
+
 [Unique Games hardness of Quantum Max-Cut,
 and a vector-valued Borell’s inequality](https://arxiv.org/pdf/2111.01254.pdf)
 
@@ -46,5 +48,3 @@ and a vector-valued Borell’s inequality](https://arxiv.org/pdf/2111.01254.pdf)
 for a quantum generalization of Max-Cut](https://arxiv.org/pdf/1909.08846.pdf)
 
 [Quantum Approximate Optimization Algorithm for MaxCut: A Fermionic View](https://arxiv.org/pdf/1706.02998.pdf)
-
-[Solving combinatorial optimization problems using QAOA (Qiskit Tutorial)](https://qiskit.org/textbook/ch-applications/qaoa.html)

@@ -9,20 +9,16 @@ from collections import namedtuple
 
 import numpy as np
 from scipy.optimize import minimize
-from sympy import deg
 
 from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
                     QuantumCircuit, QuantumRegister, execute)
 
 sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
+sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "maxcut/_common/" ]
 import execute as ex
 import metrics as metrics
 
-qiskit_dir = os.path.dirname(os.path.abspath(__file__))
-max_cut_dir = os.path.dirname(qiskit_dir)
-sys.path.insert(0, max_cut_dir)
-import _common.common as common
+import common
 
 np.random.seed(0)
 
@@ -56,13 +52,13 @@ def create_qaoa_circ(nqubits, edges, parameters):
         
         # problem unitary
         for i,j in edges:
-            qc.rzz(2 * par.gamma, i, j) # Parameter gamma
+            qc.rzz(2 * par.gamma, i, j)
 
         qc.barrier()
         
         # mixer unitary
         for i in range(0, nqubits):
-            qc.rx(2 * par.beta, i) # Parameter beta 
+            qc.rx(2 * par.beta, i)
 
     return qc
     
@@ -217,7 +213,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
     max_circuits = min(10, max_circuits)
-    # abs(degree) >= 3)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
     
     # given that this benchmark does every other width, set y_size default to 1.5
@@ -295,10 +290,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
         
             # create filename from num_qubits and circuit_id (s_int), then load the problem file
             global instance_filename
-            instance_filename = os.path.join(
-                max_cut_dir, "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt"
+            instance_filename = os.path.join(os.path.dirname(__file__),
+                "..", "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt"
             )
-            print(f"... instance_filename = {instance_filename}")
+            # print(f"... instance_filename = {instance_filename}")
             nodes, edges = common.read_maxcut_instance(instance_filename)
             #print(f"nodes = {nodes}")
             #print(f"edges = {edges}")
@@ -329,9 +324,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
                 unique_circuit_index = 0 
                 start_iters_t = time.time()
                 
-                # ?
-                p_depth = 2
-                thetas_init = 2*p_depth*[1.0]
+                # Initialize thetas into array of 1's of length 2*rounds
+                thetas_init = 2*rounds*[1.0]
             
                 # create variable for marking optimizer iteration times
                 #opt_ts = -1
@@ -355,7 +349,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=10_000,
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     
                     # also store the 'rounds' for each execution
-                    metrics.store_metric(num_qubits, unique_id, 'rounds', p_depth)
+                    metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
 
                     # collapse the sub-circuit levels used in this benchmark (for qiskit)
                     qc2 = qc.decompose()
