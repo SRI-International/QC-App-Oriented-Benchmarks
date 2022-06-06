@@ -2,21 +2,23 @@
 MaxCut Benchmark Program - Qiskit
 """
 
+import os
 import sys
 import time
 from collections import namedtuple
 
 import numpy as np
 from scipy.optimize import minimize
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
-from qiskit import Aer, execute # for computing expectation tables
 
-sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
+from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
+                    QuantumCircuit, QuantumRegister, execute)
+
+sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
+sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
 import execute as ex
 import metrics as metrics
 
-import common       # from lanl-ansi-max-cut
+import common
 
 np.random.seed(0)
 
@@ -194,9 +196,9 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1,
-        max_iter=15, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits',
-        fixed_metrics={}, num_x_bins=20, y_size=None, x_size=None,
+        method=1, rounds=1, degree=3,
+        max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
+        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
         
@@ -273,7 +275,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
         # loop over each of num_circuits
         # assume the solution files start with 3 and go up from there
-        for i in range(3, 3 + num_circuits):
+        if degree > 0: 
+            degree_range = range(degree, degree + num_circuits) 
+        else:
+            _start = max(3, (num_qubits + degree - max_circuits))
+            degree_range = range(_start, _start + max_circuits)
+
+
+        for i in degree_range:
         
             # create integer that represents the problem instance; use s_int as circuit id
             s_int = i
@@ -281,15 +290,17 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
             # create filename from num_qubits and circuit_id (s_int), then load the problem file
             global instance_filename
-            instance_filename = f"instance/mc_{str(num_qubits).zfill(3)}_{str(i).zfill(3)}_000.txt"
-            #print(f"... instance_filename = {instance_filename}")
+            instance_filename = os.path.join(os.path.dirname(__file__),
+                "..", "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt"
+            )
+            # print(f"... instance_filename = {instance_filename}")
             nodes, edges = common.read_maxcut_instance(instance_filename)
             #print(f"nodes = {nodes}")
             #print(f"edges = {edges}")
         
             # if the file does not exist, we are done with this number of qubits
             if nodes == None:
-                print(f"  ... problem {str(i).zfill(3)} not found, limiting to {circuits_complete} circuit(s).")
+                print(f"  ... problem {i:03d} not found, limiting to {circuits_complete} circuit(s).")
                 break;
         
             circuits_complete += 1
@@ -313,8 +324,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 unique_circuit_index = 0 
                 start_iters_t = time.time()
                 
-                p_depth = 2
-                thetas_init = 2*p_depth*[1.0]
+                # Initialize thetas into array of 1's of length 2*rounds
+                thetas_init = 2*rounds*[1.0]
             
                 # create variable for marking optimizer iteration times
                 #opt_ts = -1
@@ -338,7 +349,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     
                     # also store the 'rounds' for each execution
-                    metrics.store_metric(num_qubits, unique_id, 'rounds', p_depth)
+                    metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
 
                     # collapse the sub-circuit levels used in this benchmark (for qiskit)
                     qc2 = qc.decompose()
@@ -404,4 +415,3 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
 # if main, execute method
 if __name__ == '__main__': run()
-   
