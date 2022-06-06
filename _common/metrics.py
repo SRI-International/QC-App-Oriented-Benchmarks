@@ -1414,7 +1414,29 @@ def save_plot_image(plt, imagename, backend_id):
 #################################################
 # ANALYSIS AND VISUALIZATION - AREA METRICS PLOTS
 
+# map known X metrics to labels    
+known_x_labels = {
+    'cumulative_create_time' : 'Cumulative Circuit Creation Time',
+    'cumulative_exec_time' : 'Cumulative Quantum Execution Time',
+    'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time',
+    'cumulative_depth' : 'Cumulative Circuit Depth'
+}
+# map known Y metrics to labels    
+known_y_labels = {
+    'num_qubits' : 'Circuit Width'
+}
+# map known Score metrics to labels    
+known_score_labels = {
+    'approx_ratio' : 'Avg Approximation Ratio',
+    'max_approx_ratio' : 'Max Approximation Ratio',
+    'fidelity' : 'Avg Result Fidelity',
+    'max_fidelity' : 'Max Result Fidelity'
+}
+
+ 
+# Plot all the given "Score Metrics" against the given "X Metrics" and "Y Metrics" 
 def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
+
     if type(score_metric) == str:
         score_metric = [score_metric]
     if type(x_metric) == str:
@@ -1422,12 +1444,13 @@ def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec
     if type(y_metric) == str:
         y_metric = [y_metric]
     
+    # loop over all the given X and Score metrics, generating a plot for each combination
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
                 plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size)
        
-        
+# Plot the given "Score Metric" against the given "X Metric" and "Y Metric"         
 def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
@@ -1448,7 +1471,12 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
     
     # Extract shorter app name from the title passed in by user   
     appname = get_appname_from_title(suptitle)
-
+    
+    # map known metrics to labels    
+    x_label = known_x_labels[x_metric]
+    y_label = known_y_labels[y_metric]
+    score_label = known_score_labels[score_metric]
+    
     # process cumulative and maximum options
     xs, x, y, scores = [], [], [], []
     cumulative_flag, maximum_flag = False, False
@@ -1457,7 +1485,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
         x_metric = x_metric[11:]
     if score_metric[:4] == 'max_':
         maximum_flag = True
-        score_metric = score_metric[4:]
+        score_metric = score_metric[4:]  
     
     #print(f"  ==> all detail 2 circuit_metrics:")
     for group in circuit_metrics_detail_2:
@@ -1538,15 +1566,12 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
         y = y + y_
         scores = scores + scores_
     
-    score_metric_label = score_metric
-    if maximum_flag: score_metric_label += " (max)"
-    
     # append the circuit metrics subtitle to the title
     fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
     #fulltitle += f"\nshots=1000, rounds=2, degree=3"    # DEVNOTE: TODO
     
     # plot the metrics background with its title
-    ax = plot_metrics_background(fulltitle, y_metric, x_metric, score_metric,
+    ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                 y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
                                  
     # no longer used, instead we pass the array of sizes
@@ -2072,14 +2097,18 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
 
 
 # Linear Background Analog of the QV Volumetric Background, to allow arbitrary metrics on each axis
-def plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max, x_max, y_min=0, x_min=0):
+def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max, y_min=0, x_min=0):
     
     if suptitle == None:
-        suptitle = f"{y_metric} vs. {x_metric} Parameter Positioning of {score_metric}"
+        suptitle = f"{ylabel} vs. {x_label}, Parameter Positioning of {score_label}"
     
     plot_width = 6.8
     plot_height = 5.0
     #print(f"... {plot_width} {plot_height}")
+    
+    # assume y max is the max of the y data 
+    # we only do circuit width for now, so show 3 qubits more than the max
+    max_width = y_max + 3
     
     # define matplotlib figure and axis; use constrained layout to fit colorbar to right
     fig, ax = plt.subplots(figsize=(plot_width, plot_height), constrained_layout=True)
@@ -2087,12 +2116,14 @@ def plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max, x
     plt.suptitle(suptitle)
 
     plt.xlim(x_min - (x_max-x_min)/20, x_max)
-    plt.ylim(y_min*0.5, y_max*1.5)
+       
+    #plt.ylim(y_min*0.5, y_max*1.5)
+    plt.ylim(0, max_width)
 
     # circuit metrics (x axis)
     xround = [(x_max - x_min)/20 * x for x in range(25)]
     xlabels = [format_number(x) for x in xround]
-    ax.set_xlabel(x_metric)
+    ax.set_xlabel(x_label)
     ax.set_xticks(xround)  
     plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
     
@@ -2101,13 +2132,16 @@ def plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max, x
     #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
 
     # circuit metrics (y axis)
-    yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]
-    xlabels = [format_number(y) for y in yround]
-    ax.set_ylabel(y_metric)
-    ax.set_yticks(yround)  
+    ybasis = [y for y in range(1, max_width)]
+    #yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]    # not used now, since we only do circuit width
+    #ylabels = [format_number(y) for y in yround]
+        
+    ax.set_ylabel(ylabel)
+    #ax.set_yticks(yround)
+    ax.set_yticks(ybasis)    
     
     # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=f"Avg Result {score_metric}", panchor=(0.0, 0.7))
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
     
     return ax
 
