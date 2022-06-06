@@ -635,7 +635,68 @@ def polarization_fidelity(counts, correct_dist, thermal_dist=None):
 
     return { 'fidelity':fidelity, 'hf_fidelity':hf_fidelity }
     
-               
+
+###############################################
+# METRICS UTILITY FUNCTIONS - FOR VISUALIZATION
+
+# get the min and max width over all apps in shared_data
+def get_min_max(shared_data):
+    w_max = 0
+    w_min = 0
+    for app in shared_data:
+        group_metrics = shared_data[app]["group_metrics"]
+        w_data = group_metrics["groups"]
+        for i in range(len(w_data)):
+            y = float(w_data[i])
+            w_max = max(w_max, y)
+            w_min = min(w_min, y)       
+    return w_min, w_max
+
+
+#determine width for AQ
+def get_aq_width(shared_data, w_min, w_max, fidelity_metric):
+    AQ=w_max
+    for app in shared_data:
+        group_metrics = shared_data[app]["group_metrics"]
+        w_data = group_metrics["groups"]
+         
+        if "avg_tr_n2qs" not in group_metrics:
+            continue
+        if fidelity_metric not in group_metrics:
+            continue
+        
+        n2q_data = group_metrics["avg_tr_n2qs"]            
+        fidelity_data=group_metrics[fidelity_metric]
+        
+        while True:
+            n2q_cutoff=AQ*AQ
+            fail_w=[i for i in range(len(n2q_data)) if (float(n2q_data[i]) <= n2q_cutoff and float(w_data[i]) <=AQ and float(fidelity_data[i])<aq_cutoff)] 
+            if len(fail_w)==0:
+                break        
+            AQ-=1
+    
+    if AQ<w_min:
+        AQ=0
+        
+    return AQ
+
+# Get the backend_id for current set of circuits
+def get_backend_id():
+    subtitle = circuit_metrics["subtitle"]
+    backend_id = subtitle[9:]
+    return backend_id
+ 
+# Extract short app name from the title passed in by user
+def get_appname_from_title(suptitle):
+    appname = suptitle[len('Benchmark Results - '):len(suptitle)]
+    appname = appname[:appname.index(' - ')]
+    
+    # for creating plot image filenames replace spaces
+    appname = appname.replace(' ', '-') 
+    
+    return appname
+
+    
 ############################################
 # ANALYSIS AND VISUALIZATION - METRICS PLOTS
 
@@ -644,17 +705,12 @@ import matplotlib.pyplot as plt
 # Plot bar charts for each metric over all groups
 def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix=""):
     
-    subtitle = circuit_metrics["subtitle"]
+    # get backend id for this set of circuits
+    backend_id = get_backend_id()
     
-    # Extract shorter app name from the title passed in by user
-    appname = suptitle[len('Benchmark Results - '):len(suptitle)]
-    appname = appname[:appname.index(' - ')]
+    # Extract shorter app name from the title passed in by user   
+    appname = get_appname_from_title(suptitle)
     
-    # for creating plot image filenames replace spaces
-    appname = appname.replace(' ', '-')
-    
-    backend_id = subtitle[9:]   
-
     # save the metrics for current application to the DATA file, one file per device
     if save_metrics:
 
@@ -728,14 +784,11 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     # create the figure into which plots will be placed
     fig, axs = plt.subplots(rows, cols, sharex=True, figsize=(fig_w, fig_h))
     
-    # append the circuit metrics subtitle to the title
-    realtitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
-    '''
-    realtitle = suptitle
-    if subtitle != None:
-        realtitle += ("\n" + subtitle)
-    '''    
-    plt.suptitle(realtitle)
+    # append key circuit metrics info to the title
+    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+
+    # and add the title to the plot
+    plt.suptitle(fulltitle)
     
     axi = 0
     xaxis_set = False
@@ -836,7 +889,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     ###################### Volumetric Plot
         
-    suptitle = f"Volumetric Positioning - {appname}\nDevice={backend_id}  {get_timestr()}"
+    suptitle = f"Volumetric Positioning - {appname}"
+    
+    # append key circuit metrics info to the title
+    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
     
     global cmap   
     
@@ -860,10 +916,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             
             if aq_mode > 0:
                 ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=0,
-                    depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Result Fidelity")
+                    depth_base=depth_base, suptitle=fulltitle, colorbar_label="Avg Result Fidelity")
             else:
                 ax = plot_volumetric_background(max_qubits=max_qubits, QV=QV,
-                    depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Result Fidelity")
+                    depth_base=depth_base, suptitle=fulltitle, colorbar_label="Avg Result Fidelity")
             
             # determine width for circuit
             w_max = 0
@@ -914,7 +970,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             max_qubits = max([int(group) for group in w_data])
             
             ax = plot_volumetric_background_aq(max_qubits=max_qubits, AQ=0,
-                depth_base=depth_base, suptitle=suptitle, colorbar_label="Avg Hellinger Fidelity")
+                depth_base=depth_base, suptitle=fulltitle, colorbar_label="Avg Hellinger Fidelity")
             
             # determine width for circuit
             w_max = 0
@@ -1230,49 +1286,7 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
     
     #print("**** merged...")
     #print(depth_values_merged)
-
-
-# get the min and max width over all apps in shared_data
-def get_min_max(shared_data):
-    w_max = 0
-    w_min = 0
-    for app in shared_data:
-        group_metrics = shared_data[app]["group_metrics"]
-        w_data = group_metrics["groups"]
-        for i in range(len(w_data)):
-            y = float(w_data[i])
-            w_max = max(w_max, y)
-            w_min = min(w_min, y)       
-    return w_min, w_max
-
-
-#determine width for AQ
-def get_aq_width(shared_data, w_min, w_max, fidelity_metric):
-    AQ=w_max
-    for app in shared_data:
-        group_metrics = shared_data[app]["group_metrics"]
-        w_data = group_metrics["groups"]
-         
-        if "avg_tr_n2qs" not in group_metrics:
-            continue
-        if fidelity_metric not in group_metrics:
-            continue
-        
-        n2q_data = group_metrics["avg_tr_n2qs"]            
-        fidelity_data=group_metrics[fidelity_metric]
-        
-        while True:
-            n2q_cutoff=AQ*AQ
-            fail_w=[i for i in range(len(n2q_data)) if (float(n2q_data[i]) <= n2q_cutoff and float(w_data[i]) <=AQ and float(fidelity_data[i])<aq_cutoff)] 
-            if len(fail_w)==0:
-                break        
-            AQ-=1
     
-    if AQ<w_min:
-        AQ=0
-        
-    return AQ
-
 
 #################################################
 
@@ -1331,17 +1345,20 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
         plot_metrics_all_overlaid(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2")
         
         '''
+
+        # draw the volumetric plot and append the circuit metrics subtitle to the title
+        suptitle = f"Volumetric Positioning - All Applications (Merged)"
+        fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
         
-        # draw the volumetric plots with two different colormaps, for comparison purposes (just do one actually)
-        
-        #suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
-        #cmap = cmap_blues
-        #plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-1"+suffix, avail_qubits=avail_qubits)
-        
+        # use a spectral colormap
         cmap = cmap_spectral
-        suptitle = f"Volumetric Positioning - All Applications (Merged)\nDevice={backend_id}  {get_timestr()}"
+        plot_metrics_all_merged(shared_data, backend_id, suptitle=fulltitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits, is_individual=is_individual, score_metric=score_metric)
         
-        plot_metrics_all_merged(shared_data, backend_id, suptitle=suptitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits, is_individual=is_individual, score_metric=score_metric)
+        # also draw with a blues colormap (not now actually)
+        '''
+        cmap = cmap_blues
+        plot_metrics_all_merged(shared_data, backend_id, suptitle=fulltitle, imagename="_ALL-vplot-2b"+suffix, avail_qubits=avail_qubits)  
+        '''
         
     # show all app metrics charts if enabled
     if do_app_charts_with_all_metrics or do_all_plots:
@@ -1397,7 +1414,29 @@ def save_plot_image(plt, imagename, backend_id):
 #################################################
 # ANALYSIS AND VISUALIZATION - AREA METRICS PLOTS
 
+# map known X metrics to labels    
+known_x_labels = {
+    'cumulative_create_time' : 'Cumulative Circuit Creation Time',
+    'cumulative_exec_time' : 'Cumulative Quantum Execution Time',
+    'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time',
+    'cumulative_depth' : 'Cumulative Circuit Depth'
+}
+# map known Y metrics to labels    
+known_y_labels = {
+    'num_qubits' : 'Circuit Width'
+}
+# map known Score metrics to labels    
+known_score_labels = {
+    'approx_ratio' : 'Avg Approximation Ratio',
+    'max_approx_ratio' : 'Max Approximation Ratio',
+    'fidelity' : 'Avg Result Fidelity',
+    'max_fidelity' : 'Max Result Fidelity'
+}
+
+ 
+# Plot all the given "Score Metrics" against the given "X Metrics" and "Y Metrics" 
 def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
+
     if type(score_metric) == str:
         score_metric = [score_metric]
     if type(x_metric) == str:
@@ -1405,12 +1444,13 @@ def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec
     if type(y_metric) == str:
         y_metric = [y_metric]
     
+    # loop over all the given X and Score metrics, generating a plot for each combination
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
                 plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size)
        
-        
+# Plot the given "Score Metric" against the given "X Metric" and "Y Metric"         
 def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
@@ -1426,6 +1466,18 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
                           
                               when the y-axis is rounds.    
     """
+    # get backend id for this set of circuits
+    backend_id = get_backend_id()
+    
+    # Extract shorter app name from the title passed in by user   
+    appname = get_appname_from_title(suptitle)
+    
+    # map known metrics to labels    
+    x_label = known_x_labels[x_metric]
+    y_label = known_y_labels[y_metric]
+    score_label = known_score_labels[score_metric]
+    
+    # process cumulative and maximum options
     xs, x, y, scores = [], [], [], []
     cumulative_flag, maximum_flag = False, False
     if len(x_metric) > 11 and x_metric[:11] == 'cumulative_':
@@ -1433,7 +1485,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
         x_metric = x_metric[11:]
     if score_metric[:4] == 'max_':
         maximum_flag = True
-        score_metric = score_metric[4:]
+        score_metric = score_metric[4:]  
     
     #print(f"  ==> all detail 2 circuit_metrics:")
     for group in circuit_metrics_detail_2:
@@ -1514,10 +1566,12 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
         y = y + y_
         scores = scores + scores_
     
-    score_metric_label = score_metric
-    if maximum_flag: score_metric_label += " (max)"
+    # append the circuit metrics subtitle to the title
+    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    #fulltitle += f"\nshots=1000, rounds=2, degree=3"    # DEVNOTE: TODO
     
-    ax = plot_metrics_background(suptitle, y_metric, x_metric, score_metric,
+    # plot the metrics background with its title
+    ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                 y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
                                  
     # no longer used, instead we pass the array of sizes
@@ -2043,14 +2097,18 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
 
 
 # Linear Background Analog of the QV Volumetric Background, to allow arbitrary metrics on each axis
-def plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max, x_max, y_min=0, x_min=0):
+def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max, y_min=0, x_min=0):
     
     if suptitle == None:
-        suptitle = f"{y_metric} vs. {x_metric} Parameter Positioning of {score_metric}"
+        suptitle = f"{ylabel} vs. {x_label}, Parameter Positioning of {score_label}"
     
     plot_width = 6.8
     plot_height = 5.0
     #print(f"... {plot_width} {plot_height}")
+    
+    # assume y max is the max of the y data 
+    # we only do circuit width for now, so show 3 qubits more than the max
+    max_width = y_max + 3
     
     # define matplotlib figure and axis; use constrained layout to fit colorbar to right
     fig, ax = plt.subplots(figsize=(plot_width, plot_height), constrained_layout=True)
@@ -2058,12 +2116,14 @@ def plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max, x
     plt.suptitle(suptitle)
 
     plt.xlim(x_min - (x_max-x_min)/20, x_max)
-    plt.ylim(y_min*0.5, y_max*1.5)
+       
+    #plt.ylim(y_min*0.5, y_max*1.5)
+    plt.ylim(0, max_width)
 
     # circuit metrics (x axis)
     xround = [(x_max - x_min)/20 * x for x in range(25)]
     xlabels = [format_number(x) for x in xround]
-    ax.set_xlabel(x_metric)
+    ax.set_xlabel(x_label)
     ax.set_xticks(xround)  
     plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
     
@@ -2072,13 +2132,16 @@ def plot_metrics_background(suptitle, y_metric, x_metric, score_metric, y_max, x
     #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
 
     # circuit metrics (y axis)
-    yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]
-    xlabels = [format_number(y) for y in yround]
-    ax.set_ylabel(y_metric)
-    ax.set_yticks(yround)  
+    ybasis = [y for y in range(1, max_width)]
+    #yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]    # not used now, since we only do circuit width
+    #ylabels = [format_number(y) for y in yround]
+        
+    ax.set_ylabel(ylabel)
+    #ax.set_yticks(yround)
+    ax.set_yticks(ybasis)    
     
     # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=f"Avg Result {score_metric}", panchor=(0.0, 0.7))
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
     
     return ax
 
