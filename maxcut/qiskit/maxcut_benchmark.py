@@ -13,8 +13,8 @@ from scipy.optimize import minimize
 from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
                     QuantumCircuit, QuantumRegister, execute)
 
-sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "maxcut/_common/" ]
+sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
+sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
 import execute as ex
 import metrics as metrics
 
@@ -197,8 +197,8 @@ instance_filename = None
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         method=1, rounds=1, degree=3,
-        max_iter=15, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits',
-        fixed_metrics={}, num_x_bins=20, y_size=None, x_size=None,
+        max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
+        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
         
