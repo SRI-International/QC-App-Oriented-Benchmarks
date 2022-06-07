@@ -406,12 +406,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
+        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                options=dict(shots=num_shots))
     elif method == 2:
         #metrics.print_all_circuit_metrics()
-        metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric,
-                                  x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
-                                  num_x_bins=num_x_bins, x_size=x_size, y_size=y_size)
+        metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
+                num_x_bins=num_x_bins, x_size=x_size, y_size=y_size,
+                options=dict(shots=num_shots, rounds=rounds, degree=degree))
 
 # if main, execute method
 if __name__ == '__main__': run()
