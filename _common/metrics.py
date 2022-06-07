@@ -153,7 +153,8 @@ def end_metrics():
     global end_time
 
     end_time = time.time()
-    print(f'... execution complete at {get_timestr()}')
+    total_run_time = round(end_time - start_time, 3)
+    print(f'... execution complete at {get_timestr()} in {total_run_time} secs')
     print("")
  
  
@@ -703,7 +704,7 @@ def get_appname_from_title(suptitle):
 import matplotlib.pyplot as plt
     
 # Plot bar charts for each metric over all groups
-def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix=""):
+def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", options=None):
     
     # get backend id for this set of circuits
     backend_id = get_backend_id()
@@ -786,6 +787,12 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     # append key circuit metrics info to the title
     fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    if options != None:
+        options_str = ''
+        for key, value in options.items():
+            if len(options_str) > 0: options_str += ', '
+            options_str += f"{key}={value}"
+        fulltitle += f"\n{options_str}"
 
     # and add the title to the plot
     plt.suptitle(fulltitle)
@@ -893,6 +900,12 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     # append key circuit metrics info to the title
     fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    if options != None:
+        options_str = ''
+        for key, value in options.items():
+            if len(options_str) > 0: options_str += ', '
+            options_str += f"{key}={value}"
+        fulltitle += f"\n{options_str}"
     
     global cmap   
     
@@ -1435,7 +1448,7 @@ known_score_labels = {
 
  
 # Plot all the given "Score Metrics" against the given "X Metrics" and "Y Metrics" 
-def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
+def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None):
 
     if type(score_metric) == str:
         score_metric = [score_metric]
@@ -1448,10 +1461,10 @@ def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
-                plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size)
+                plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size, options=options)
        
 # Plot the given "Score Metric" against the given "X Metric" and "Y Metric"         
-def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None):
+def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -1568,7 +1581,12 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_tim
     
     # append the circuit metrics subtitle to the title
     fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
-    #fulltitle += f"\nshots=1000, rounds=2, degree=3"    # DEVNOTE: TODO
+    if options != None:
+        options_str = ''
+        for key, value in options.items():
+            if len(options_str) > 0: options_str += ', '
+            options_str += f"{key}={value}"
+        fulltitle += f"\n{options_str}"
     
     # plot the metrics background with its title
     ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
