@@ -1820,9 +1820,9 @@ def qv_box_at(x, y, qv_width, qv_depth, value, depth_base):
              fill=True,
              lw=1)
 
-# format a number using K,M,B,T for large numbers
+# format a number using K,M,B,T for large numbers, optionally rounding to 'digits' decimal places if num > 1
 # (sign handling may be incorrect)
-def format_number(num):
+def format_number(num, digits=0):
     if isinstance(num, str): num = float(num)
     num = float('{:.3g}'.format(abs(num)))
     sign = ''
@@ -1830,7 +1830,7 @@ def format_number(num):
     for index in metric:
         num_check = num / metric[index]
         if num_check >= 1:
-            num = round(num_check)
+            num = round(num_check, digits)
             sign = index
             break
     numstr = f"{str(num)}"
@@ -2114,15 +2114,31 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     fig, ax = plt.subplots(figsize=(plot_width, plot_height), constrained_layout=True)
 
     plt.suptitle(suptitle)
-
-    plt.xlim(x_min - (x_max-x_min)/20, x_max)
+    
+    # round the max up to be divisible evenly (in multiples of 0.1) by num_xdivs 
+    num_xdivs = 20
+    max_base = num_xdivs * 0.1
+    x_max = max_base * int((x_max + max_base) / max_base)
+    
+    #print(f"... {x_min} {x_max} {max_base} {x_max}")
+    if x_min < 0.1: x_min = 0
+    
+    step = (x_max - x_min) / num_xdivs
+    
+    plt.xlim(x_min - step/2, x_max + step/2)
        
     #plt.ylim(y_min*0.5, y_max*1.5)
     plt.ylim(0, max_width)
 
     # circuit metrics (x axis)
-    xround = [(x_max - x_min)/20 * x for x in range(25)]
-    xlabels = [format_number(x) for x in xround]
+    xround = [step * x for x in range(num_xdivs + 1)]
+    
+    # format x labels > 1 to N decimal places, depending on total range
+    digits = 0
+    if x_max < 24: digits = 1
+    if x_max < 10: digits = 2
+    xlabels = [format_number(x, digits=digits) for x in xround]
+    
     ax.set_xlabel(x_label)
     ax.set_xticks(xround)  
     plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
