@@ -1652,7 +1652,121 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     
     return new_xs, new_x, new_y, new_s
     
- 
+
+# Plot bar charts for each metric over all groups
+def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", options=None):
+    
+    # get backend id for this set of circuits
+    backend_id = get_backend_id()
+    
+    # Extract shorter app name from the title passed in by user   
+    appname = get_appname_from_title(suptitle)
+        
+    if len(group_metrics["groups"]) == 0:
+        print(f"\n{suptitle}")
+        print(f"     ****** NO RESULTS ****** ")
+        return
+    
+    # sort the group metrics (in case they weren't sorted when collected)
+    sort_group_metrics()
+    
+    # flags for charts to show
+    do_depths = True
+    
+    # check if we have depth metrics to show
+    do_depths = len(group_metrics["avg_depths"]) > 0
+    
+    # DEVNOTE: Add to group metrics here; this should be done during execute
+    group_metrics_2 = {}
+    group_metrics_2['approx_ratio'] = []
+    group_metrics_2['optimality_gap'] = []
+    for group in circuit_metrics_detail_2:
+        num_qubits = int(group)
+        
+        # Each problem instance at size num_qubits; need to collate across iterations
+        i = 0
+        for circuit_id in circuit_metrics_detail_2[group]:
+            
+        
+            for it in circuit_metrics_detail_2[group][circuit_id]:
+                mets = circuit_metrics_detail_2[group][circuit_id][it]
+                
+            # save the metric from the last iteration
+            group_metrics_2['approx_ratio'].append(mets['approx_ratio'])
+            group_metrics_2['optimality_gap'].append(1.0 - mets['approx_ratio'])
+                
+            # and just break after the first circuit, since we aare not averaging
+            break
+            
+    #print(f"... group_metrics_2['approx_ratio'] = {group_metrics_2['approx_ratio']}")
+    #print(f"... group_metrics_2['optimality_gap'] = {group_metrics_2['optimality_gap']}")       
+    
+    # generate one-column figure with multiple bar charts, with shared X axis
+    cols = 1
+    fig_w = 6.0
+    
+    numplots = 1
+  
+    rows = numplots
+    
+    # DEVNOTE: this calculation is based on visual assessment of results and could be refined
+    # compute height needed to draw same height plots, no matter how many there are
+    fig_h = 3.5 + 2.0 * (rows - 1) + 0.25 * (rows - 1)
+    #print(fig_h)
+    
+    # create the figure into which plots will be placed
+    fig, axs = plt.subplots(rows, cols, sharex=True, figsize=(fig_w, fig_h))
+    
+    # Create more appropriate title
+    suptitle = "Optimality Gaps - " + appname
+    
+    # append key circuit metrics info to the title
+    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    if options != None:
+        options_str = ''
+        for key, value in options.items():
+            if len(options_str) > 0: options_str += ', '
+            options_str += f"{key}={value}"
+        fulltitle += f"\n{options_str}"
+
+    # and add the title to the plot
+    plt.suptitle(fulltitle)
+    
+    axi = 0
+    xaxis_set = False
+    
+    if rows == 1:
+        ax = axs
+        axs = [ax]
+        
+    if do_depths:
+        if max(group_metrics["avg_tr_depths"]) < 20:
+            axs[axi].set_ylim([0, 20])  
+        axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
+        #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
+        #axs[axi].set_ylabel(known_score_labels['approx_ratio'])
+        axs[axi].set_ylabel('Optimality Gap (%)')
+        
+        if rows > 0 and not xaxis_set:
+            axs[axi].sharex(axs[rows-1])
+            xaxis_set = True
+            
+        axs[axi].legend(['Degree 3', 'Degree -3'], loc='upper left')
+        axi += 1
+    
+    # shared x axis label
+    axs[rows - 1].set_xlabel('Circuit Width (Number of Qubits)')
+     
+    fig.tight_layout() 
+    
+    # save plot image to file
+    if save_plot_images:
+        save_plot_image(plt, f"{appname}-optgaps" + suffix, backend_id) 
+            
+    # show the plot for user to see
+    plt.show()
+
+
 #############################################
 # ANALYSIS AND VISUALIZATION - DATA UTILITIES
 
