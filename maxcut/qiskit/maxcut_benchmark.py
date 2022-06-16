@@ -15,10 +15,9 @@ from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
+import common
 import execute as ex
 import metrics as metrics
-
-import common
 
 np.random.seed(0)
 
@@ -63,16 +62,7 @@ def create_qaoa_circ(nqubits, edges, parameters):
     return qc
     
 # Create the benchmark program 
-def MaxCut (num_qubits, secret_int, edges, method = 1, rounds = 1, theta = None):
-    
-    # IF angles dict are given, then bypass method check;
-    # just retern the quantum circuit with those angles
-    
-    if theta is None:
-        if method == 1:
-            # Set default angles
-            theta = 2*rounds*[1.0]
-        
+def MaxCut (num_qubits, secret_int, edges, theta):
     # put parameters into the form expected by the ansatz generator
     p = len(theta)//2  # number of qaoa rounds
     beta = theta[:p]
@@ -196,7 +186,7 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1, degree=3,
+        method=1, rounds=1, degree=3, custom_theta_init=None,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
@@ -304,12 +294,19 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 break;
         
             circuits_complete += 1
+
+            if custom_theta_init:
+                # Initialize thetas into array of length 2*rounds, with custom values
+                thetas_init = [*[custom_theta_init["beta"]]*rounds, *[custom_theta_init["gamma"]]*rounds]
+            else:
+                # Initialize thetas into array of 1's of length 2*rounds
+                thetas_init = 2*rounds*[1.0]
             
             if method != 2:
         
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                qc = MaxCut(num_qubits, s_int, edges, method, rounds)
+                qc = MaxCut(num_qubits, s_int, edges, thetas_init)
                 metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
@@ -323,12 +320,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 # a unique circuit index used inside the inner minimizer loop as identifier         
                 unique_circuit_index = 0 
                 start_iters_t = time.time()
-                
-                # Initialize thetas into array of 1's of length 2*rounds
-                thetas_init = 2*rounds*[1.0]
-            
-                # create variable for marking optimizer iteration times
-                #opt_ts = -1
                 
                 def expectation(theta):
                     global unique_circuit_index
@@ -345,7 +336,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 
                     # create the circuit for given qubit size and secret string, store time metric
                     ts = time.time()
-                    qc = MaxCut(num_qubits, unique_id, edges, method, rounds, theta)
+                    qc = MaxCut(num_qubits, unique_id, edges, theta)
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     
                     # also store the 'rounds' for each execution
@@ -418,7 +409,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 options=dict(shots=num_shots, rounds=rounds, degree=degree))
                 
         # Generate bar chart showing optimality gaps in final results
-        metrics.plot_metrics_optgaps("Benchmark Results - MaxCut ({method}) - Qiskit",
+        metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                 options=dict(shots=num_shots, rounds=rounds, degree=degree),
                             suffix=f'-s{num_shots}_r{rounds}_d{rounds}')
 
