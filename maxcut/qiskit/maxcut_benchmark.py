@@ -183,6 +183,25 @@ def compute_objective(results, nodes, edges):
 
     return avg/sum_count
 
+# Modified objective function that only considers top N largest counts when 
+# calculating the average
+def compute_max_objective(results, nodes, edges, N):
+    counts = results.get_counts()
+
+    top_n = sorted(counts, key=counts.get, reverse=True)[:N]
+    
+    avg = 0
+    sum_count = 0
+    for solution, count in counts.items():
+        if solution in top_n:
+            obj = -1*common.eval_cut(nodes, edges, solution)
+
+            avg += obj * count
+            sum_count += count
+        else:
+            continue
+
+    return avg/sum_count
 
 ################ Benchmark Loop
 
@@ -193,7 +212,7 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1, degree=3, thetas_init=None,
+        method=1, rounds=1, degree=3, thetas_init=None, N=0, 
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
@@ -237,7 +256,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
         
-        a_r = -1 * compute_objective(result, nodes, edges) / opt
+        if N:
+            a_r = -1 * compute_max_objective(result, nodes, edges, N) / opt
+        else:
+            a_r = -1 * compute_objective(result, nodes, edges) / opt
         metrics.store_metric(num_qubits, s_int, 'approx_ratio', a_r)
         
         saved_result = result
@@ -366,7 +388,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
                     
-                    return compute_objective(saved_result, nodes, edges)
+                    if N:
+                        return compute_max_objective(saved_result, nodes, edges, N)
+                    else:
+                        return compute_objective(saved_result, nodes, edges)
             
                 opt_ts = time.time()
                 
