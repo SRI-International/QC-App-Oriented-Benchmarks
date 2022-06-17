@@ -62,11 +62,18 @@ def create_qaoa_circ(nqubits, edges, parameters):
     return qc
     
 # Create the benchmark program 
-def MaxCut (num_qubits, secret_int, edges, theta):
+def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array):
+    # IF angles dict are given, then bypass method check;
+    # just retern the quantum circuit with those angles
+    
+    if thetas_array is None:
+        # Set default angles
+        thetas_array = 2*rounds*[1.0]
+
     # put parameters into the form expected by the ansatz generator
-    p = len(theta)//2  # number of qaoa rounds
-    beta = theta[:p]
-    gamma = theta[p:]
+    p = len(thetas_array)//2  # number of qaoa rounds
+    beta = thetas_array[:p]
+    gamma = thetas_array[p:]
     parameters = [QAOA_Parameter(*t) for t in zip(beta,gamma)]
         
     # and create the circuit, without measurements
@@ -186,7 +193,7 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1, degree=3, custom_theta_init=None,
+        method=1, rounds=1, degree=3, thetas_init=None,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
@@ -295,18 +302,22 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
             circuits_complete += 1
 
-            if custom_theta_init:
-                # Initialize thetas into array of length 2*rounds, with custom values
-                thetas_init = [*[custom_theta_init["beta"]]*rounds, *[custom_theta_init["gamma"]]*rounds]
-            else:
-                # Initialize thetas into array of 1's of length 2*rounds
-                thetas_init = 2*rounds*[1.0]
+            thetas_array = None
+            # Initialize thetas into array of 1's of length 2*rounds
+            if thetas_init is not None:
+                if rounds > 1 and len(thetas_init) == 2:
+                    _bs = rounds * [thetas_init["beta"]]
+                    _gs = rounds * [thetas_init["gamma"]]
+
+                    thetas_array = [*_bs, *_gs]
+                else:
+                    thetas_array = [thetas_init["beta"], thetas_init["gamma"]]
             
             if method != 2:
         
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                qc = MaxCut(num_qubits, s_int, edges, thetas_init)
+                qc = MaxCut(num_qubits, s_int, edges, rounds, thetas_array)
                 metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
@@ -321,7 +332,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 unique_circuit_index = 0 
                 start_iters_t = time.time()
                 
-                def expectation(theta):
+                def expectation(thetas_array):
                     global unique_circuit_index
                     global opt_ts
                     
@@ -336,7 +347,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 
                     # create the circuit for given qubit size and secret string, store time metric
                     ts = time.time()
-                    qc = MaxCut(num_qubits, unique_id, edges, theta)
+                    qc = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array)
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     
                     # also store the 'rounds' for each execution
@@ -360,7 +371,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 opt_ts = time.time()
                 
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
-                res = minimize(expectation, thetas_init, method='COBYLA', options = { 'maxiter': max_iter} )
+                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter} )
                 
                 unique_circuit_index = 0
                 unique_id = s_int*1000 + unique_circuit_index
