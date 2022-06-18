@@ -61,21 +61,36 @@ def create_qaoa_circ(nqubits, edges, parameters):
 
     return qc
     
-# Create the benchmark program 
+# Create the benchmark program circuit
+# Accepts optional rounds and array of thetas (betas and gammas)
 def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array):
-    # IF angles dict are given, then bypass method check;
-    # just retern the quantum circuit with those angles
-    
-    if thetas_array is None:
-        # Set default angles
-        thetas_array = 2*rounds*[1.0]
 
-    # put parameters into the form expected by the ansatz generator
-    p = len(thetas_array)//2  # number of qaoa rounds
+    # if no thetas_array passed in, create defaults 
+    if thetas_array is None:
+        thetas_array = 2*rounds*[1.0]
+    
+    #print(f"... incoming thetas_array={thetas_array} rounds={rounds}")
+       
+    # get number of qaoa rounds (p) from length of incoming array
+    p = len(thetas_array)//2 
+    
+    # if rounds passed in is less than p, truncate array
+    if rounds < p:
+        p = rounds
+        thetas_array = thetas_array[:2*rounds]
+    
+    # if more rounds requested than in thetas_array, give warning (can fill array later)
+    elif rounds > p:
+        rounds = p
+        print(f"WARNING: rounds is greater than length of thetas_array/2; using rounds={rounds}")
+    
+    #print(f"... actual thetas_array={thetas_array}")
+    
+    # create parameters in the form expected by the ansatz generator
     beta = thetas_array[:p]
     gamma = thetas_array[p:]
     parameters = [QAOA_Parameter(*t) for t in zip(beta,gamma)]
-        
+           
     # and create the circuit, without measurements
     qc = create_qaoa_circ(num_qubits, edges, parameters)   
 
@@ -85,7 +100,6 @@ def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array):
     # add the measure here
     qc.measure_all()
         
-
     # save small circuit example for display
     global QC_
     if QC_ == None or num_qubits <= 6:
@@ -212,24 +226,38 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1, degree=3, thetas_init=None, N=0, 
+        method=1, rounds=1, degree=3, thetas_array=None, N=0, 
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
-        
+    
+    global QC_
     global circuits_done
     global unique_circuit_index
     global opt_ts
     
     print("MaxCut Benchmark Program - Qiskit")
 
+    QC_ = None
+    
     # validate parameters (smallest circuit is 4 qubits)
     max_qubits = max(4, max_qubits)
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
     max_circuits = min(10, max_circuits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
+    
+    rounds = max(1, rounds)
+    
+    # if more rounds requested than in thetas_array, give warning (DEVNOTE: pad array with 1s)
+    if thetas_array != None and rounds > len(thetas_array)/2:
+        rounds = len(thetas_array)/2
+        print(f"WARNING: rounds is greater than length of thetas_array/2; using rounds={rounds}")
+        
+    # if no thetas_array passed in, create default array (required for minimizer function)
+    if thetas_array == None:
+        thetas_array = 2*rounds*[1.0]
     
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
@@ -300,7 +328,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             _start = max(3, (num_qubits + degree - max_circuits))
             degree_range = range(_start, _start + max_circuits)
 
-
         for i in degree_range:
         
             # create integer that represents the problem instance; use s_int as circuit id
@@ -323,18 +350,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 break;
         
             circuits_complete += 1
-
-            thetas_array = None
-            # Initialize thetas into array of 1's of length 2*rounds
-            if thetas_init is not None:
-                if rounds > 1 and len(thetas_init) == 2:
-                    _bs = rounds * [thetas_init["beta"]]
-                    _gs = rounds * [thetas_init["gamma"]]
-
-                    thetas_array = [*_bs, *_gs]
-                else:
-                    thetas_array = [thetas_init["beta"], thetas_init["gamma"]]
-            
+        
             if method != 2:
         
                 # create the circuit for given qubit size and secret string, store time metric
