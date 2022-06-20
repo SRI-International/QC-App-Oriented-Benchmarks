@@ -1443,7 +1443,8 @@ known_score_labels = {
     'approx_ratio' : 'Avg Approximation Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
     'fidelity' : 'Avg Result Fidelity',
-    'max_fidelity' : 'Max Result Fidelity'
+    'max_fidelity' : 'Max Result Fidelity',
+    'hf_fidelity' : 'Avg Hellinger Fidelity'
 }
 
  
