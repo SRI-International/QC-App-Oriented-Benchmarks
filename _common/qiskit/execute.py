@@ -107,6 +107,9 @@ verbose_time = False;
 # Option to perform explicit transpile to collect depth metrics
 do_transpile_metrics = True
 
+# Option to perform transpilation prior to execution (disable to execute unmodified circuit)
+do_transpile_for_execute = True
+
 # Selection of basis gate set for transpilation
 # Note: selector 1 is a hardware agnostic gate set
 basis_selector = 1
@@ -439,13 +442,16 @@ def execute_circuit(circuit):
                         trans_qc = trans_qc_list[0] 
 
                 else:
-                    trans_qc = transpile(
-                                    circuit["qc"], 
-                                    backend, 
-                                    optimization_level=optimization_level,
-                                    layout_method=layout_method,
-                                    routing_method=routing_method
-                                )
+                    if do_transpile_for_execute:
+                        trans_qc = transpile(
+                                        circuit["qc"], 
+                                        backend, 
+                                        optimization_level=optimization_level,
+                                        layout_method=layout_method,
+                                        routing_method=routing_method
+                                    )
+                    else:
+                        trans_qc = circuit["qc"]
 
                 if verbose_time:
                     print(f"  *** qiskit.transpile() time = {time.time() - st}")
@@ -476,8 +482,14 @@ def execute_circuit(circuit):
             # execute with no options set
             else:
                 st = time.time()
-                job = execute(circuit["qc"], backend, shots=shots)
-                
+                # job = execute(circuit["qc"], backend, shots=shots)
+                if do_transpile_for_execute:
+                    trans_qc = transpile(circuit["qc"], backend)
+                else:
+                    trans_qc = circuit["qc"]
+
+                job = backend.run(trans_qc, shots=shots)
+
                 if verbose_time:
                     print(f"  *** qiskit.execute() time = {time.time() - st}")
                 
