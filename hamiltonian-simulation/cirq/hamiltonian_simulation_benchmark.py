@@ -2,13 +2,15 @@
 Hamiltonian-Simulation Benchmark Program - Cirq
 """
 
-from collections import defaultdict
 import json
+import os
 import sys
 import time
+from collections import defaultdict
+
+import numpy as np
 
 import cirq
-import numpy as np
 
 sys.path[1:1] = ["_common", "_common/cirq"]
 sys.path[1:1] = ["../../_common", "../../_common/cirq"]
@@ -31,10 +33,10 @@ XXYYZZ_ = None
 _use_XX_YY_ZZ_gates = False
 
 # import precalculated data to compare against
-try:
-    precalculated_data = json.load(open('hamiltonian-simulation/_common/precalculated_data.json', 'r'))
-except:
-    precalculated_data = json.load(open('_common/precalculated_data.json', 'r'))
+filename = os.path.join(os.path.dirname(__file__), os.path.pardir, "_common", "precalculated_data.json")
+with open(filename, 'r') as file:
+    data = file.read()
+precalculated_data = json.loads(data)
 
 ############### Circuit Definition
 

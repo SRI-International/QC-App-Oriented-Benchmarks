@@ -47,6 +47,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Deutsch-Jozsa"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -54,7 +61,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run deutsch-jozsa/braket/dj_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"deutsch-jozsa/braket\")\n",
     "import dj_benchmark\n",
@@ -63,6 +69,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Bernstein-Vazirani"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -70,7 +83,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run bernstein-vazirani/braket/bv_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"bernstein-vazirani/braket\")\n",
     "import bv_benchmark\n",
@@ -79,19 +91,10 @@
    ]
   },
   {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
-   "outputs": [],
+   "cell_type": "markdown",
+   "metadata": {},
    "source": [
-    "#%run bernstein-vazirani/braket/hs_benchmark.py\n",
-    "import sys\n",
-    "sys.path.insert(1, \"hidden-shift/braket\")\n",
-    "import hs_benchmark\n",
-    "hs_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots, \n",
-    "                backend_id=backend_id)"
+    "### Hidden Shift"
    ]
   },
   {
@@ -102,7 +105,28 @@
    },
    "outputs": [],
    "source": [
-    "#%run quantum-fourier-transform/braket/qft_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"hidden-shift/braket\")\n",
+    "import hs_benchmark\n",
+    "hs_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots, \n",
+    "                backend_id=backend_id)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Quantum Fourier Transform - Method 1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [],
+   "source": [
     "import sys\n",
     "sys.path.insert(1, \"quantum-fourier-transform/braket\")\n",
     "import qft_benchmark\n",
@@ -112,6 +136,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Quantum Fourier Transform - Method 2"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -119,7 +150,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run quantum-fourier-transform/braket/qft_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"quantum-fourier-transform/braket\")\n",
     "import qft_benchmark\n",
@@ -129,6 +159,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Grover"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
@@ -136,7 +173,6 @@
    },
    "outputs": [],
    "source": [
-    "#%run grovers/braket/grovers_benchmark.py\n",
     "import sys\n",
     "sys.path.insert(1, \"grovers/braket\")\n",
     "import grovers_benchmark  \n",
@@ -145,19 +181,10 @@
    ]
   },
   {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {
-    "scrolled": false
-   },
-   "outputs": [],
+   "cell_type": "markdown",
+   "metadata": {},
    "source": [
-    "#%run phase-estimation/braket/pe_benchmark.py\n",
-    "import sys\n",
-    "sys.path.insert(1, \"phase-estimation/braket\")\n",
-    "import pe_benchmark\n",
-    "pe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
-    "                backend_id=backend_id)"
+    "### Phase Estimation"
    ]
   },
   {
@@ -168,7 +195,28 @@
    },
    "outputs": [],
    "source": [
-    "#%run hamiltonian-simulation/braket/hamiltonian_simulation_benchmark.py\n",
+    "import sys\n",
+    "sys.path.insert(1, \"phase-estimation/braket\")\n",
+    "import pe_benchmark\n",
+    "pe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "                backend_id=backend_id)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Hamiltonian Simulation"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [],
+   "source": [
     "import sys\n",
     "sys.path.insert(1, \"hamiltonian-simulation/braket\")\n",
     "import hamiltonian_simulation_benchmark\n",

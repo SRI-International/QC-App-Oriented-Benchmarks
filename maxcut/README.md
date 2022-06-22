@@ -37,27 +37,14 @@ NOTE: The remainder of this README needs to be modified with content for MaxCut.
 
 ## References
 
+[Solving combinatorial optimization problems using QAOA (Qiskit Tutorial)](https://qiskit.org/textbook/ch-applications/qaoa.html)
 
-not correct for MaxCut:
+[Unique Games hardness of Quantum Max-Cut,
+and a vector-valued Borell’s inequality](https://arxiv.org/pdf/2111.01254.pdf)
 
-https://arxiv.org/abs/0811.3171
+[Max-Cut and Traveling Salesman Problem (Qiskit Tutorial)](https://qiskit.org/documentation/optimization/tutorials/06_examples_max_cut_and_tsp.html)
 
-https://arxiv.org/abs/2108.09004
+[Almost optimal classical approximation algorithms
+for a quantum generalization of Max-Cut](https://arxiv.org/pdf/1909.08846.pdf)
 
-https://arxiv.org/abs/1110.2232v2
-
-
-[1] Ethan Bernstein and Umesh Vazirani. (1997).
-    Quantum Complexity Theory
-    [`doi/10.1137/S0097539796300921`](https://epubs.siam.org/doi/10.1137/S0097539796300921)
-
-[2] Michael A. Nielsen and Isaac L. Chuang. (2011).
-    Quantum Computation and Quantum Information: 10th Anniversary Edition (10th ed.). 
-    Cambridge University Press, New York, NY, USA.
-
-[3] Abraham Asfaw, Antonio Córcoles, Luciano Bello, Yael Ben-Haim, Mehdi Bozzo-Rey, Sergey Bravyi, Nicholas Bronn, Lauren Capelluto, Almudena Carrera Vazquez, Jack Ceroni, Richard Chen, Albert Frisch, Jay Gambetta, Shelly Garion, Leron Gil, Salvador De La Puente Gonzalez, Francis Harkins, Takashi Imamichi, Hwajung Kang, Amir h. Karamlou, Robert Loredo, David McKay, Antonio Mezzacapo, Zlatko Minev, Ramis Movassagh, Giacomo Nannicini, Paul Nation, Anna Phan, Marco Pistoia, Arthur Rattew, Joachim Schaefer, Javad Shabani, John Smolin, John Stenger, Kristan Temme, Madeleine Tod, Stephen Wood, and James Wootton. (2020).
-    [`Bernstein-Vazirani Algorithm`](https://qiskit.org/textbook/ch-algorithms/bernstein-vazirani.html)
-
-[4] Paul Nation and Blake Johnson. (2021).
-    How to measure and reset a qubit in the middle of circuit execution.
-    [`Qiskit Blog: Mid Circuit Measurements`](https://www.ibm.com/blogs/research/2021/02/quantum-mid-circuit-measurement/)
+[Quantum Approximate Optimization Algorithm for MaxCut: A Fermionic View](https://arxiv.org/pdf/1706.02998.pdf)

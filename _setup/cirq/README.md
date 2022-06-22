@@ -5,19 +5,9 @@
 This directory describes the requirements and operational conventions for using Cirq as the programming environment for running the prototype benchmark programs contained in the QC-Proto-Benchmarks repository.
 In particular, this document explains how to set up the tools needed to run the Cirq implementation of these benchmarks.
 
-Note: the instructions contained here describe configuring a Windows environment to run the benchmark programs. Similar procedures will be used in a Linux environment using appropriate syntax of course.
+## Configure a Cirq Environment
 
-## Configure a Python Environment
-
-The Cirq version of the prototype benchmark programs require that you have available Python version 3.6 or later, and have installed the necessary Python packages.
-
-If you have a proper Python environment available, skip this section and go directly the the *'Install Cirq'* section below.
-
-If you do not already have Python available, a convenient way to set one up is to download a minimum version of the Anaconda package (called Miniconda). Go to the URL below and follow the instructions to set up the "Miniconda" package.
-
-    https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html
-
-Once you have installed the Miniconda package, from the Windows Start menu launch an Anaconda prompt in which you will run the programs. It is recommended that you create a conda "environment" to hold the specific set of Python packages you will install to run the benchmark programs. Create an environment named "cirq" and then "activate" it using the following commands:
+Create an environment named "cirq" and then "activate" it using the following commands:
 
     conda create -n cirq python=3
 
@@ -26,6 +16,14 @@ Once you have installed the Miniconda package, from the Windows Start menu launc
 The conda environment is now ready for you to install the Cirq package.
 
 ## Install Cirq
+
+After activating the conda environment, to ensure you are using the correct installation of `pip`, run the following command:
+
+    pip show pip
+
+If everything is working correctly, the `Location` field should have your newly created environment's name present. For example:
+
+    Location: c:\users\[user]\miniconda\envs\cirq\lib\site-packages
 
 Enter the following commands to install the latest version of Cirq and other required packages.
 

@@ -3,11 +3,13 @@ Hamiltonian-Simulation Benchmark Program - Qiskit
 """
 
 import json
+import os
 import sys
 import time
 
 import numpy as np
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+
+from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
@@ -29,10 +31,10 @@ XXYYZZ_ = None
 _use_XX_YY_ZZ_gates = False
 
 # import precalculated data to compare against
-try:
-    precalculated_data = json.load(open('hamiltonian-simulation/_common/precalculated_data.json', 'r'))
-except:
-    precalculated_data = json.load(open('_common/precalculated_data.json', 'r'))
+filename = os.path.join(os.path.dirname(__file__), os.path.pardir, "_common", "precalculated_data.json")
+with open(filename, 'r') as file:
+    data = file.read()
+precalculated_data = json.loads(data)
 
 ############### Circuit Definition
 
@@ -235,6 +237,9 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, num_shots=100,
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1):
+
+        # reset random seed
+        np.random.seed(0)
 
         # determine number of circuits to execute for this group
         num_circuits = min(1, max_circuits)

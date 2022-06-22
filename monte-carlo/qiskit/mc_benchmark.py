@@ -263,22 +263,34 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots, met
     elif method == 2:
         exact = 0.5 # hard coded exact value from uniform dist and square function
 
-    # obtain bit_counts from the result object
-    bit_counts = result.get_counts(qc)
-    
-    # convert bit_counts into expectation values counts according to Quantum Risk Analysis paper
-    counts = expectation_from_bits(bit_counts, num_counting_qubits, num_shots, method)
-    
-    # calculate the distribution we should expect from the amplitude estimation routine
-    correct_dist = mc_utils.mc_dist(num_counting_qubits, exact, c_star, method)
+    # obtain counts from the result object
+    counts = result.get_counts(qc)
+ 
+    # calculate the expected output histogram
+    correct_dist = a_to_bitstring(exact, num_counting_qubits)
 
     # generate thermal_dist with amplitudes instead, to be comparable to correct_dist
-    bit_thermal_dist = metrics.uniform_dist(num_counting_qubits)
-    thermal_dist = expectation_from_bits(bit_thermal_dist, num_counting_qubits, num_shots, method)
+    thermal_dist = metrics.uniform_dist(num_counting_qubits)   
 
-    # use our polarization fidelity rescaling
+    # convert counts, expectation, and thermal_dist to app form for visibility
+    # app form of correct distribution is measuring the input a 100% of the time
+    # convert bit_counts into expectation values counts according to Quantum Risk Analysis paper
+    app_counts = expectation_from_bits(counts, num_counting_qubits, num_shots, method)
+    app_correct_dist = mc_utils.mc_dist(num_counting_qubits, exact, c_star, method)
+    app_thermal_dist = expectation_from_bits(thermal_dist, num_counting_qubits, num_shots, method)
+    
+    if verbose:
+        print(f"For expected value {exact}, expected: {correct_dist} measured: {counts}")
+        print(f"   ... For expected value {exact} thermal_dist: {thermal_dist}")
+        print(f"For expected value {exact}, app expected: {app_correct_dist} measured: {app_counts}")
+        print(f"   ... For expected value {exact} app_thermal_dist: {app_thermal_dist}")
+        
+    # use polarization fidelity with rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
-
+    #fidelity = metrics.polarization_fidelity(app_counts, app_correct_dist, app_thermal_dist)
+    
+    hf_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
+    
     ###########################################################################
     # NOTE: in this benchmark, we are testing how well the amplitude estimation routine
     #       works according to theory, and we do not measure the difference between
@@ -290,10 +302,24 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots, met
 
     if verbose: print(f"For expected value {exact} measured: {a}")
     ###########################################################################
-    
+
     if verbose: print(f"Solution counts: {counts}")
-        
+    
+    if verbose: print(f"  ... fidelity: {fidelity}  hf_fidelity: {hf_fidelity}")
+    
     return counts, fidelity
+
+def a_to_bitstring(a, num_counting_qubits):
+    m = num_counting_qubits
+
+    # solution 1
+    num1 = round(np.arcsin(np.sqrt(a)) / np.pi * 2**m)
+    num2 = round( (np.pi - np.arcsin(np.sqrt(a))) / np.pi * 2**m)
+    if num1 != num2 and num2 < 2**m and num1 < 2**m:
+        counts = {format(num1, "0"+str(m)+"b"): 0.5, format(num2, "0"+str(m)+"b"): 0.5}
+    else:
+        counts = {format(num1, "0"+str(m)+"b"): 1}
+    return counts
 
 def expectation_from_bits(bits, num_qubits, num_shots, method):
     amplitudes = {}
@@ -381,6 +407,9 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1):
+
+        # reset random seed
+        np.random.seed(0)
 
         input_size = num_qubits - 1 # TODO: keep using inputsize? only used in num_circuits
         

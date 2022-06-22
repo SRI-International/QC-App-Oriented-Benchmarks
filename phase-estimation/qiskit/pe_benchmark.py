@@ -84,25 +84,49 @@ def CPhase(angle, exponent):
     return phase_gate, qc
 
 # Analyze and print measured results
+# Expected result is always theta, so fidelity calc is simple
 def analyze_and_print_result(qc, result, num_counting_qubits, theta, num_shots):
 
-    # get results as times a particular theta was measured
-    counts = bitstring_to_theta(result.get_counts(qc), num_counting_qubits)    
+    # get results as measured counts
+    counts = result.get_counts(qc)  
+
+    # calculate expected output histogram
+    correct_dist = theta_to_bitstring(theta, num_counting_qubits)
     
-    if verbose: print(f"For theta value {theta}, measured: {counts}")
+    # generate thermal_dist to be comparable to correct_dist
+    thermal_dist = metrics.uniform_dist(num_counting_qubits)
 
-    # correct distribution is measuring theta 100% of the time
-    correct_dist = {theta: 1.0}
+    # convert counts, expectation, and thermal_dist to app form for visibility
+    # app form of correct distribution is measuring theta correctly 100% of the time
+    app_counts = bitstring_to_theta(counts, num_counting_qubits)
+    app_correct_dist = {theta: 1.0}
+    app_thermal_dist = bitstring_to_theta(thermal_dist, num_counting_qubits)
 
-    # generate thermal_dist with amplitudes instead, to be comparable to correct_dist
-    bit_thermal_dist = metrics.uniform_dist(num_counting_qubits)
-    thermal_dist = bitstring_to_theta(bit_thermal_dist, num_counting_qubits)
-
-    # use our polarization fidelity rescaling
+    if verbose:
+        print(f"For theta {theta}, expected: {correct_dist} measured: {counts}")
+        print(f"   ... For theta {theta} thermal_dist: {thermal_dist}")
+        print(f"For theta {theta}, app expected: {app_correct_dist} measured: {app_counts}")
+        print(f"   ... For theta {theta} app_thermal_dist: {app_thermal_dist}")
+        
+    # use polarization fidelity with rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
-
+    
+    # use polarization fidelity with rescaling
+    fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
+    #fidelity = metrics.polarization_fidelity(app_counts, app_correct_dist, app_thermal_dist)
+    
+    hf_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
+    
+    if verbose: print(f"  ... fidelity: {fidelity}  hf_fidelity: {hf_fidelity}")
+        
     return counts, fidelity
 
+# Convert theta to a bitstring distribution
+def theta_to_bitstring(theta, num_counting_qubits):
+    counts = {format( int(theta * (2**num_counting_qubits)), "0"+str(num_counting_qubits)+"b"): 1.0}
+    return counts
+
+# Convert bitstring to theta representation, useful for debugging
 def bitstring_to_theta(counts, num_counting_qubits):
     theta_counts = {}
     for key in counts.keys():
@@ -112,6 +136,7 @@ def bitstring_to_theta(counts, num_counting_qubits):
             theta_counts[theta] = 0
         theta_counts[theta] += r
     return theta_counts
+
 
 ################ Benchmark Loop
 
@@ -152,6 +177,9 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1):
         
+        # reset random seed
+        np.random.seed(0)
+
         # as circuit width grows, the number of counting qubits is increased
         num_counting_qubits = num_qubits - num_state_qubits - 1
 

@@ -2,21 +2,22 @@
 MaxCut Benchmark Program - Qiskit
 """
 
+import os
 import sys
 import time
 from collections import namedtuple
 
 import numpy as np
 from scipy.optimize import minimize
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
-from qiskit import Aer, execute # for computing expectation tables
 
-sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
+from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
+                    QuantumCircuit, QuantumRegister, execute)
+
+sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
+sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
+import common
 import execute as ex
 import metrics as metrics
-
-import common       # from lanl-ansi-max-cut
 
 np.random.seed(0)
 
@@ -60,23 +61,36 @@ def create_qaoa_circ(nqubits, edges, parameters):
 
     return qc
     
-# Create the benchmark program 
-def MaxCut (num_qubits, secret_int, edges, method = 1, rounds = 1, theta = None):
+# Create the benchmark program circuit
+# Accepts optional rounds and array of thetas (betas and gammas)
+def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array):
+
+    # if no thetas_array passed in, create defaults 
+    if thetas_array is None:
+        thetas_array = 2*rounds*[1.0]
     
-    # IF angles dict are given, then bypass method check;
-    # just retern the quantum circuit with those angles
+    #print(f"... incoming thetas_array={thetas_array} rounds={rounds}")
+       
+    # get number of qaoa rounds (p) from length of incoming array
+    p = len(thetas_array)//2 
     
-    if theta is None:
-        if method == 1:
-            # Set default angles
-            theta = 2*rounds*[1.0]
-        
-    # put parameters into the form expected by the ansatz generator
-    p = len(theta)//2  # number of qaoa rounds
-    beta = theta[:p]
-    gamma = theta[p:]
+    # if rounds passed in is less than p, truncate array
+    if rounds < p:
+        p = rounds
+        thetas_array = thetas_array[:2*rounds]
+    
+    # if more rounds requested than in thetas_array, give warning (can fill array later)
+    elif rounds > p:
+        rounds = p
+        print(f"WARNING: rounds is greater than length of thetas_array/2; using rounds={rounds}")
+    
+    #print(f"... actual thetas_array={thetas_array}")
+    
+    # create parameters in the form expected by the ansatz generator
+    beta = thetas_array[:p]
+    gamma = thetas_array[p:]
     parameters = [QAOA_Parameter(*t) for t in zip(beta,gamma)]
-        
+           
     # and create the circuit, without measurements
     qc = create_qaoa_circ(num_qubits, edges, parameters)   
 
@@ -86,7 +100,6 @@ def MaxCut (num_qubits, secret_int, edges, method = 1, rounds = 1, theta = None)
     # add the measure here
     qc.measure_all()
         
-
     # save small circuit example for display
     global QC_
     if QC_ == None or num_qubits <= 6:
@@ -184,6 +197,25 @@ def compute_objective(results, nodes, edges):
 
     return avg/sum_count
 
+# Modified objective function that only considers top N largest counts when 
+# calculating the average
+def compute_max_objective(results, nodes, edges, N):
+    counts = results.get_counts()
+
+    top_n = sorted(counts, key=counts.get, reverse=True)[:N]
+    
+    avg = 0
+    sum_count = 0
+    for solution, count in counts.items():
+        if solution in top_n:
+            obj = -1*common.eval_cut(nodes, edges, solution)
+
+            avg += obj * count
+            sum_count += count
+        else:
+            continue
+
+    return avg/sum_count
 
 ################ Benchmark Loop
 
@@ -194,24 +226,38 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1,
-        max_iter=15, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits',
-        fixed_metrics={}, num_x_bins=20, y_size=None, x_size=None,
+        method=1, rounds=1, degree=3, thetas_array=None, N=0, 
+        max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
+        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
-        
+    
+    global QC_
     global circuits_done
     global unique_circuit_index
     global opt_ts
     
     print("MaxCut Benchmark Program - Qiskit")
 
+    QC_ = None
+    
     # validate parameters (smallest circuit is 4 qubits)
     max_qubits = max(4, max_qubits)
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
     max_circuits = min(10, max_circuits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
+    
+    rounds = max(1, rounds)
+    
+    # if more rounds requested than in thetas_array, give warning (DEVNOTE: pad array with 1s)
+    if thetas_array != None and rounds > len(thetas_array)/2:
+        rounds = len(thetas_array)/2
+        print(f"WARNING: rounds is greater than length of thetas_array/2; using rounds={rounds}")
+        
+    # if no thetas_array passed in, create default array (required for minimizer function)
+    if thetas_array == None:
+        thetas_array = 2*rounds*[1.0]
     
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
@@ -238,7 +284,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
         
-        a_r = -1 * compute_objective(result, nodes, edges) / opt
+        if N:
+            a_r = -1 * compute_max_objective(result, nodes, edges, N) / opt
+        else:
+            a_r = -1 * compute_objective(result, nodes, edges) / opt
         metrics.store_metric(num_qubits, s_int, 'approx_ratio', a_r)
         
         saved_result = result
@@ -273,7 +322,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
         # loop over each of num_circuits
         # assume the solution files start with 3 and go up from there
-        for i in range(3, 3 + num_circuits):
+        if degree > 0: 
+            degree_range = range(degree, degree + num_circuits) 
+        else:
+            _start = max(3, (num_qubits + degree - max_circuits))
+            degree_range = range(_start, _start + max_circuits)
+
+        for i in degree_range:
         
             # create integer that represents the problem instance; use s_int as circuit id
             s_int = i
@@ -281,24 +336,26 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
             # create filename from num_qubits and circuit_id (s_int), then load the problem file
             global instance_filename
-            instance_filename = f"instance/mc_{str(num_qubits).zfill(3)}_{str(i).zfill(3)}_000.txt"
-            #print(f"... instance_filename = {instance_filename}")
+            instance_filename = os.path.join(os.path.dirname(__file__),
+                "..", "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt"
+            )
+            # print(f"... instance_filename = {instance_filename}")
             nodes, edges = common.read_maxcut_instance(instance_filename)
             #print(f"nodes = {nodes}")
             #print(f"edges = {edges}")
         
             # if the file does not exist, we are done with this number of qubits
             if nodes == None:
-                print(f"  ... problem {str(i).zfill(3)} not found, limiting to {circuits_complete} circuit(s).")
+                print(f"  ... problem {i:03d} not found, limiting to {circuits_complete} circuit(s).")
                 break;
         
             circuits_complete += 1
-            
+        
             if method != 2:
         
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                qc = MaxCut(num_qubits, s_int, edges, method, rounds)
+                qc = MaxCut(num_qubits, s_int, edges, rounds, thetas_array)
                 metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
@@ -313,13 +370,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 unique_circuit_index = 0 
                 start_iters_t = time.time()
                 
-                p_depth = 2
-                thetas_init = 2*p_depth*[1.0]
-            
-                # create variable for marking optimizer iteration times
-                #opt_ts = -1
-                
-                def expectation(theta):
+                def expectation(thetas_array):
                     global unique_circuit_index
                     global opt_ts
                     
@@ -334,11 +385,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 
                     # create the circuit for given qubit size and secret string, store time metric
                     ts = time.time()
-                    qc = MaxCut(num_qubits, unique_id, edges, method, rounds, theta)
+                    qc = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array)
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     
                     # also store the 'rounds' for each execution
-                    metrics.store_metric(num_qubits, unique_id, 'rounds', p_depth)
+                    metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
 
                     # collapse the sub-circuit levels used in this benchmark (for qiskit)
                     qc2 = qc.decompose()
@@ -353,12 +404,15 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
                     
-                    return compute_objective(saved_result, nodes, edges)
+                    if N:
+                        return compute_max_objective(saved_result, nodes, edges, N)
+                    else:
+                        return compute_objective(saved_result, nodes, edges)
             
                 opt_ts = time.time()
                 
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
-                res = minimize(expectation, thetas_init, method='COBYLA', options = { 'maxiter': max_iter} )
+                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter} )
                 
                 unique_circuit_index = 0
                 unique_id = s_int*1000 + unique_circuit_index
@@ -395,13 +449,21 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit")
+        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                options=dict(shots=num_shots))
     elif method == 2:
         #metrics.print_all_circuit_metrics()
-        metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric,
-                                  x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
-                                  num_x_bins=num_x_bins, x_size=x_size, y_size=y_size)
+        
+        # Generate area plot showing iterative evolution of metrics 
+        metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
+                num_x_bins=num_x_bins, x_size=x_size, y_size=y_size,
+                options=dict(shots=num_shots, rounds=rounds, degree=degree))
+                
+        # Generate bar chart showing optimality gaps in final results
+        metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                options=dict(shots=num_shots, rounds=rounds, degree=degree),
+                            suffix=f'-s{num_shots}_r{rounds}_d{rounds}')
 
 # if main, execute method
 if __name__ == '__main__': run()
-   
