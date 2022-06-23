@@ -1741,8 +1741,11 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
         axs = [ax]
         
     if do_depths:
-        if max(group_metrics["avg_tr_depths"]) < 20:
-            axs[axi].set_ylim([0, 20])  
+        # if max(group_metrics["avg_tr_depths"]) < 20:
+        #     axs[axi].set_ylim([0, 20])
+
+        # For the y axis, choose the limits to be at least [0,0.4].
+        axs[axi].set_ylim([0, max(0.4,max(group_metrics_2["optimality_gap"]))])
         axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
         #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
         #axs[axi].set_ylabel(known_score_labels['approx_ratio'])
@@ -2250,7 +2253,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     
     # round the max up to be divisible evenly (in multiples of 0.1) by num_xdivs 
     num_xdivs = 20
-    max_base = num_xdivs * 0.1
+    max_base = num_xdivs * 0.05
     x_max = max_base * int((x_max + max_base) / max_base)
     
     #print(f"... {x_min} {x_max} {max_base} {x_max}")
