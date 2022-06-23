@@ -7,6 +7,7 @@ import sys
 import time
 from collections import namedtuple
 
+import math
 import numpy as np
 from scipy.optimize import minimize
 
@@ -217,6 +218,90 @@ def compute_max_objective(results, nodes, edges, N):
 
     return avg/sum_count
 
+
+# CVaR objective function (Conditional Value at Risk)
+def compute_cvar_objective(results, nodes, edges, alpha=0.1):
+    """
+    Obtains the Confidence Value at Risk or CVaR for samples measured at the end of the variational circuit.
+    Reference: Barkoutsos, P. K., Nannicini, G., Robert, A., Tavernelli, I. & Woerner, S. Improving Variational Quantum Optimization using CVaR. Quantum 4, 256 (2020).
+
+    Parameters
+    ----------
+    results, nodes, edges : self explanatory
+    alpha : float, optional
+        Confidence interval value for CVaR. The default is 0.1.
+
+    Returns
+    -------
+    float
+        CVaR value
+
+    """
+
+    strings = np.array(list(results.get_counts().keys()))
+    counts = np.array(list(results.get_counts().values()))
+
+    # for each measurement outcome |ψ>, obtain <ψ|H|ψ> (i.e. negative of the weight of the cut)
+    cut_weights = np.array([-1 * common.eval_cut(nodes, edges, string) for string in strings])
+
+    # Sort cut_weights in a non-decreasing order.
+    # Sort counts and strings in the same order as cut_weights, so that i^th element of each correspond to each other
+    sort_inds = np.argsort(cut_weights)
+    cut_weights = cut_weights[sort_inds]
+    strings = strings[sort_inds]
+    counts = counts[sort_inds]
+    # Cumulative sum of counts
+    cumsum_counts = np.cumsum(counts)
+    num_shots = cumsum_counts[-1]
+
+    # Restrict to the first int(alpha * num_shots) number of samples in these arrays
+    num_averaged = math.ceil(alpha * num_shots)
+    final_index = np.digitize(num_averaged, cumsum_counts, right=True)
+    counts = counts[:final_index + 1]
+    cut_weights = cut_weights[:final_index + 1]
+    if final_index == 0:
+        counts[0] = min(counts[0], num_averaged)
+    elif cumsum_counts[final_index] != num_averaged: # can only be > or =. If >, then need to modify the last entry of counts
+        counts[-1] = num_averaged - cumsum_counts[final_index - 1]
+
+    assert num_averaged == int(np.sum(counts)), "number of samples to be averaged is different from cumsum of restricted counts"
+    return np.sum(counts * cut_weights) / num_averaged
+
+    # ## Version which avoids using numpy as much as possible
+    # # Has a problem that needs to be fixed for certain fringe cases
+    # strings = list(results.get_counts().keys())
+    # counts = list(results.get_counts().values())
+
+    # # for each measurement outcome |ψ>, obtain <ψ|H|ψ> (i.e. negative of the weight of the cut)
+    # cut_weights = [-1 * common.eval_cut(nodes, edges, string) for string in strings]
+
+    # # sort in non-decreasing order
+    # sort_inds = sorted(range(len(cut_weights)), key = cut_weights.__getitem__) #same as numpy.argsort
+    # cut_weights = [cut_weights[i] for i in sort_inds]
+    # strings = [strings[i] for i in sort_inds]
+    # counts = [counts[i] for i in sort_inds]
+
+    # cumsum_counts = np.cumsum(counts)
+    # num_shots = cumsum_counts[-1]
+
+    # # the samples to be averaged over for cvar are the smallest ceil(alpha*num_shots) number of measured strings
+    # num_averaged = math.ceil(alpha * num_shots)
+    # # Find the index of the first element of cumsum_counts that is greater than or equal to num_averaged
+    # final_index = cumsum_counts.tolist().index(min(x for x in cumsum_counts if x>= num_averaged))
+
+    # counts = counts[:final_index + 1]
+    # cut_weights = cut_weights[:final_index + 1]
+    # if final_index == 0:
+    #     counts[0] = min(counts[0], num_averaged)
+    # elif cumsum_counts[final_index] != num_averaged: # can only be > or =. If >, then need to modify the last entry of counts
+    #     counts[-1] = num_averaged - cumsum_counts[final_index - 1]
+
+    # assert num_averaged == sum(counts), "number of samples to be averaged is different from cumsum of restricted counts"
+
+    # return sum([i * j for (i,j) in zip(counts, cut_weights)]) / num_averaged
+
+
+
 ################ Benchmark Loop
 
 # Problem definitions only available for up to 10 qubits currently
@@ -226,7 +311,7 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1, degree=3, thetas_array=None, N=0, 
+        method=1, rounds=1, degree=3, thetas_array=None, N=0, alpha=None,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
@@ -284,7 +369,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
         
-        if N:
+        if alpha is not None:
+            a_r = -1 * compute_cvar_objective(result, nodes, edges, alpha=alpha) / opt
+        elif N:
             a_r = -1 * compute_max_objective(result, nodes, edges, N) / opt
         else:
             a_r = -1 * compute_objective(result, nodes, edges) / opt
@@ -404,7 +491,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
                     
-                    if N:
+                    if alpha is not None:
+                        return compute_cvar_objective(saved_result, nodes, edges, alpha)
+                    elif N:
                         return compute_max_objective(saved_result, nodes, edges, N)
                     else:
                         return compute_objective(saved_result, nodes, edges)
