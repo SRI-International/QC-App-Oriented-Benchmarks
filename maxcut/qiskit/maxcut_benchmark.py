@@ -13,6 +13,7 @@ from scipy.optimize import minimize
 
 from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
                     QuantumCircuit, QuantumRegister, execute)
+from qiskit.circuit import Parameter
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
@@ -24,8 +25,8 @@ np.random.seed(0)
 
 verbose = False
 
-# Variable for number of resets to perform after mid circuit measurements
-num_resets = 1
+# Indicates whether to perform the (expensive) pre compute of expectations
+do_compute_expectation = True
 
 # saved circuits for display
 QC_ = None
@@ -61,10 +62,13 @@ def create_qaoa_circ(nqubits, edges, parameters):
             qc.rx(2 * par.beta, i)
 
     return qc
-    
+   
 # Create the benchmark program circuit
 # Accepts optional rounds and array of thetas (betas and gammas)
-def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array):
+def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized):
+
+    if parameterized:
+        return MaxCut_param(num_qubits, secret_int, edges, rounds, thetas_array)
 
     # if no thetas_array passed in, create defaults 
     if thetas_array is None:
@@ -88,19 +92,128 @@ def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array):
     #print(f"... actual thetas_array={thetas_array}")
     
     # create parameters in the form expected by the ansatz generator
-    beta = thetas_array[:p]
-    gamma = thetas_array[p:]
-    parameters = [QAOA_Parameter(*t) for t in zip(beta,gamma)]
+    # this is an array of betas followed by array of gammas, each of length = rounds
+    betas = thetas_array[:p]
+    gammas = thetas_array[p:]
+    parameters = [QAOA_Parameter(*t) for t in zip(betas,gammas)]
            
     # and create the circuit, without measurements
     qc = create_qaoa_circ(num_qubits, edges, parameters)   
 
     # pre-compute and save an array of expected measurements
-    compute_expectation(qc, num_qubits, secret_int)
+    if do_compute_expectation:
+        compute_expectation(qc, num_qubits, secret_int)
         
     # add the measure here
     qc.measure_all()
         
+    # save small circuit example for display
+    global QC_
+    if QC_ == None or num_qubits <= 6:
+        if num_qubits < 9: QC_ = qc
+
+    # return a handle on the circuit
+    return qc
+
+
+############### Circuit Definition - Parameterized version
+  
+# Create ansatz specific to this problem, defined by G = nodes, edges, and the given parameters
+# Do not include the measure operation, so we can pre-compute statevector
+def create_qaoa_circ_param(nqubits, edges, parameters):
+
+    qc = QuantumCircuit(nqubits)
+
+    # initial_state
+    for i in range(0, nqubits):
+        qc.h(i)
+
+    for par in parameters:
+        #print(f"... par={par}  gamma, beta = {par.gamma} {par.beta}")
+        
+        # problem unitary
+        for i,j in edges:
+            qc.rzz(2 * par.gamma, i, j)
+
+        qc.barrier()
+        
+        # mixer unitary
+        for i in range(0, nqubits):
+            qc.rx(2 * par.beta, i)
+
+    return qc
+  
+_qc = None
+beta_params = []
+gamma_params = []
+        
+# Create the benchmark program circuit
+# Accepts optional rounds and array of thetas (betas and gammas)
+def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
+
+    global _qc, beta_params, gamma_params
+            
+    # if no thetas_array passed in, create defaults 
+    if thetas_array is None:
+        thetas_array = 2*rounds*[1.0]
+    
+    #print(f"... incoming thetas_array={thetas_array} rounds={rounds}")
+       
+    # get number of qaoa rounds (p) from length of incoming array
+    p = len(thetas_array)//2 
+    
+    # if rounds passed in is less than p, truncate array
+    if rounds < p:
+        p = rounds
+        thetas_array = thetas_array[:2*rounds]
+    
+    # if more rounds requested than in thetas_array, give warning (can fill array later)
+    elif rounds > p:
+        rounds = p
+        print(f"WARNING: rounds is greater than length of thetas_array/2; using rounds={rounds}")
+    
+    #print(f"... actual thetas_array={thetas_array}")
+    
+    # create parameters in the form expected by the ansatz generator
+    # this is an array of betas followed by array of gammas, each of length = rounds
+    betas = thetas_array[:p]
+    gammas = thetas_array[p:]
+    
+    # create the circuit the first time, add measurements
+    # first circuit in iterative step is a multiple of 1000
+    if secret_int % 1000 == 0 or secret_int < 1000:    # < 1000 is for method 1
+    
+        # create the named parameter objects used to define the circuit
+        beta_params = []
+        gamma_params = []
+        for i, beta in enumerate(betas):
+            beta_params.append(Parameter("beta" + str(i)))
+        for j, gamma in enumerate(gammas):
+            gamma_params.append(Parameter("gamma" + str(j)))
+        #print(f"... param names = {beta_params} {gamma_params}")
+        
+        parameters = [QAOA_Parameter(*t) for t in zip(beta_params,gamma_params)]
+    
+        _qc = create_qaoa_circ_param(num_qubits, edges, parameters)
+        
+        # add the measure here, only after circuit is created
+        _qc.measure_all()
+        
+        #print(f"... created circuit: \n {_qc}")
+    
+    params = {}
+    for i, beta_param in enumerate(beta_params):
+        params[beta_param] = thetas_array[i]
+    for j, gamma_param in enumerate(gamma_params):
+        params[gamma_param] = thetas_array[j + p]
+    #print(f"... params and values = {params}")
+    
+    qc = _qc.bind_parameters(params)
+    #print(qc)
+    
+    # pre-compute and save an array of expected measurements
+    ##compute_expectation(qc, num_qubits, secret_int)
+   
     # save small circuit example for display
     global QC_
     if QC_ == None or num_qubits <= 6:
@@ -174,6 +287,11 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # retrieve pre-computed expectation values for the circuit that just completed
     expected_dist = get_expectation(num_qubits, secret_int, num_shots)
+    
+    # if the expectation is not being calculated (only need if we want to compute fidelity)
+    # assume that the expectation is the same as measured counts, yielding fidelity = 1
+    if expected_dist == None:
+        expected_dist = counts
     
     if verbose: print(f"For width {num_qubits} problem {secret_int}\n  measured: {counts}\n  expected: {expected_dist}")
 
@@ -311,7 +429,7 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1, degree=3, thetas_array=None, N=0, alpha=None,
+        method=1, rounds=1, degree=3, thetas_array=None, N=0, alpha=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
@@ -332,6 +450,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     min_qubits = min(max(4, min_qubits), max_qubits)
     max_circuits = min(10, max_circuits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
+    
+    # don't compute exectation unless fidelity is is needed
+    global do_compute_expectation
+    do_compute_expectation = True
+    #if method == 2:
+    if do_fidelities == False:
+        do_compute_expectation = False
     
     rounds = max(1, rounds)
     
@@ -442,7 +567,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                qc = MaxCut(num_qubits, s_int, edges, rounds, thetas_array)
+                qc = MaxCut(num_qubits, s_int, edges, rounds, thetas_array, parameterized)
                 metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
@@ -472,7 +597,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 
                     # create the circuit for given qubit size and secret string, store time metric
                     ts = time.time()
-                    qc = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array)
+                    qc = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array, parameterized)
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     
                     # also store the 'rounds' for each execution
