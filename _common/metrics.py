@@ -156,8 +156,8 @@ def end_metrics():
     total_run_time = round(end_time - start_time, 3)
     print(f'... execution complete at {get_timestr()} in {total_run_time} secs')
     print("")
- 
- 
+
+
 # Store an individual metric associate with a group and circuit in the group
 def store_metric (group, circuit, metric, value):
     group = str(group)
@@ -1441,6 +1441,8 @@ known_y_labels = {
 # map known Score metrics to labels    
 known_score_labels = {
     'approx_ratio' : 'Avg Approximation Ratio',
+    'cvar_approx_ratio' : 'CVaR Approximation Ratio',
+    'Max_N_approx_ratio' : 'Max N counts Approximation Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
     'fidelity' : 'Avg Result Fidelity',
     'max_fidelity' : 'Max Result Fidelity',
@@ -1656,7 +1658,10 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
 
 # Plot bar charts for each metric over all groups
 def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", options=None):
-    
+    """
+    Currently only used for maxcut
+    """
+
     # get backend id for this set of circuits
     backend_id = get_backend_id()
     
@@ -1678,25 +1683,26 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
     do_depths = len(group_metrics["avg_depths"]) > 0
     
     # DEVNOTE: Add to group metrics here; this should be done during execute
-    group_metrics_2 = {}
-    group_metrics_2['approx_ratio'] = []
-    group_metrics_2['optimality_gap'] = []
+    group_metrics_2 = {'optimality_gap':[]} # optimality_gap':[], 'cvar_approx_ratio':[],'Max_N_approx_ratio':[]
+
     for group in circuit_metrics_detail_2:
         num_qubits = int(group)
         
         # Each problem instance at size num_qubits; need to collate across iterations
         i = 0
         for circuit_id in circuit_metrics_detail_2[group]:
-            
-        
+            # save the metric from the last iteration
             for it in circuit_metrics_detail_2[group][circuit_id]:
                 mets = circuit_metrics_detail_2[group][circuit_id][it]
-                
-            # save the metric from the last iteration
-            group_metrics_2['approx_ratio'].append(mets['approx_ratio'])
-            group_metrics_2['optimality_gap'].append(1.0 - mets['approx_ratio'])
-                
-            # and just break after the first circuit, since we aare not averaging
+            #the two lines above gets us the mets for the last circuit. Improve this later by removing the loop
+
+            for metric_type in ['approx_ratio', 'cvar_approx_ratio', 'Max_N_approx_ratio']:
+                # optgap will be computed using whichever of the above three has been computed
+                if metric_type in mets:
+                    group_metrics_2['optimality_gap'].append(1.0 - mets[metric_type])
+                    break
+
+            # and just break after the first circuit, since we are not averaging
             break
             
     #print(f"... group_metrics_2['approx_ratio'] = {group_metrics_2['approx_ratio']}")
@@ -1749,7 +1755,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
         axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
         #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
         #axs[axi].set_ylabel(known_score_labels['approx_ratio'])
-        axs[axi].set_ylabel('Optimality Gap (%)')
+        axs[axi].set_ylabel('Optimality Gap') #removed  (%)
         
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
