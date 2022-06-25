@@ -499,7 +499,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             metrics.store_metric(num_qubits, s_int, 'CVaR', a_r)
         elif N:
             a_r = -1 * compute_max_objective(result, nodes, edges, N) / opt
-            metrics.store_metric(num_qubits, s_int, 'max_N_cts', a_r)
+            metrics.store_metric(num_qubits, s_int, 'Max_N_cts', a_r)
         else:
             a_r = -1 * compute_objective(result, nodes, edges) / opt
             metrics.store_metric(num_qubits, s_int, 'approx_ratio', a_r)

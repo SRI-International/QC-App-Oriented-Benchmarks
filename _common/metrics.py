@@ -1442,7 +1442,7 @@ known_y_labels = {
 known_score_labels = {
     'approx_ratio' : 'Avg Approximation Ratio',
     'CVaR' : 'CVaR Approximation Ratio',
-    'max_N_cts' : 'Max N counts Approximation Ratio',
+    'Max_N_cts' : 'Max N counts Approximation Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
     'fidelity' : 'Avg Result Fidelity',
     'max_fidelity' : 'Max Result Fidelity',
@@ -1683,7 +1683,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
     do_depths = len(group_metrics["avg_depths"]) > 0
     
     # DEVNOTE: Add to group metrics here; this should be done during execute
-    group_metrics_2 = {'optimality_gap':[]} # optimality_gap':[], 'CVaR':[],'max_N_cts':[]
+    group_metrics_2 = {'optimality_gap':[]} # optimality_gap':[], 'CVaR':[],'Max_N_cts':[]
 
     for group in circuit_metrics_detail_2:
         num_qubits = int(group)
@@ -1698,12 +1698,12 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             #the two lines above gets us the mets for the last circuit. Improve this later by removing the loop
 
             # save the metric from the last iteration
-            for metric_type in ['approx_ratio', 'CVaR', 'max_N_cts']:
+            for metric_type in ['approx_ratio', 'CVaR', 'Max_N_cts']:
                 # optgap will be computed using whichever of the above three has been computed
                 if metric_type in mets:
                     group_metrics_2['optimality_gap'].append(1.0 - mets[metric_type])
                     break
-            
+
             # and just break after the first circuit, since we are not averaging
             break
             
@@ -1757,7 +1757,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
         axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
         #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
         #axs[axi].set_ylabel(known_score_labels['approx_ratio'])
-        axs[axi].set_ylabel('Optimality Gap (%)')
+        axs[axi].set_ylabel('Optimality Gap') #removed  (%)
         
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
