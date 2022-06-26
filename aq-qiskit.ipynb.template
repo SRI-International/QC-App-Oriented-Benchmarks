@@ -4,7 +4,7 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "### QED-C Prototype Benchmarks - Qiskit Version\n",
+    "### QED-C Prototype Benchmarks - Qiskit Version - with Algorithmix Qubits\n",
     "The notebook contains a suite of prototype application benchmarks for the IBM Qiskit API, along with the volumetric and the algorithmic qubit (AQ) measurement. \n",
     "Configure and run the cell below with the desired execution settings.\n",
     "Then execute the remaining cells, each containing one prototype benchmark program."
@@ -12,7 +12,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 1,
+   "execution_count": null,
    "metadata": {
     "scrolled": true
    },
@@ -63,6 +63,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Quantum Fourier Transform - Method 1"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {},
@@ -72,12 +79,17 @@
     "import sys\n",
     "sys.path.insert(1, \"quantum-fourier-transform/qiskit\")\n",
     "import qft_benchmark\n",
-    "min_qubits=6\n",
-    "max_qubits=15\n",
     "qft_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                method=1,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Phase Estimation"
    ]
   },
   {
@@ -90,11 +102,16 @@
     "import sys\n",
     "sys.path.insert(1, \"phase-estimation/qiskit\")\n",
     "import pe_benchmark\n",
-    "min_qubits=6\n",
-    "max_qubits=20\n",
     "pe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Amplitude Estimation"
    ]
   },
   {
@@ -107,11 +124,16 @@
     "import sys\n",
     "sys.path.insert(1, \"amplitude-estimation/qiskit\")\n",
     "import ae_benchmark\n",
-    "min_qubits=4\n",
-    "max_qubits=6\n",
     "ae_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Monte Carlo"
    ]
   },
   {
@@ -124,11 +146,16 @@
     "import sys\n",
     "sys.path.insert(1, \"monte-carlo/qiskit\")\n",
     "import mc_benchmark\n",
-    "min_qubits=4\n",
-    "max_qubits=6\n",
     "mc_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Hamiltonian Simulation"
    ]
   },
   {
@@ -141,12 +168,17 @@
     "import sys\n",
     "sys.path.insert(1, \"hamiltonian-simulation/qiskit\")\n",
     "import hamiltonian_simulation_benchmark\n",
-    "min_qubits=6\n",
-    "max_qubits=16\n",
     "hamiltonian_simulation_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits,\n",
     "                max_circuits=max_circuits, num_shots=num_shots,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### VQE Ansatz - Method 1"
    ]
   },
   {
@@ -160,12 +192,17 @@
     "sys.path.insert(1, \"vqe/qiskit\")\n",
     "import vqe_benchmark\n",
     "vqe_num_shots=4098\n",
-    "min_qubits=4\n",
-    "max_qubits=8\n",
     "vqe_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=vqe_num_shots,\n",
     "                method=1,\n",
     "                backend_id=backend_id, provider_backend=provider_backend,\n",
     "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### All Applications - Algorithmic Qubits - Hellinger Fidelity"
    ]
   },
   {
@@ -178,8 +215,39 @@
     "sys.path.insert(1, \"_common\")\n",
     "import metrics\n",
     "\n",
-    "metrics.plot_all_app_metrics(backend_id, do_all_plots=False, include_apps=None)"
+    "apps = [ \"Quantum Fourier Transform (1)\", \"Phase Estimation\", \"Amplitude Estimation\", \"Monte Carlo Sampling (2)\", \"VQE Simulation (1)\",  \"Hamiltonian Simulation\" ]\n",
+    "\n",
+    "metrics.plot_all_app_metrics(backend_id, do_all_plots=False, include_apps=apps)"
    ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### All Applications - Algorithmic Qubits - Normalized Result Fidelity"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"_common\")\n",
+    "import metrics\n",
+    "\n",
+    "apps = [ \"Quantum Fourier Transform (1)\", \"Phase Estimation\", \"Amplitude Estimation\", \"Monte Carlo Sampling (2)\", \"VQE Simulation (1)\",  \"Hamiltonian Simulation\" ]\n",
+    "\n",
+    "metrics.plot_all_app_metrics(backend_id, do_all_plots=False, include_apps=apps, score_metric='avg_fidelities')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
   }
  ],
  "metadata": {
