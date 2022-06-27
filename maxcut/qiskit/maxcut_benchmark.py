@@ -423,7 +423,7 @@ def compute_cvar_objective(results, nodes, edges, alpha=0.1):
 ################ Benchmark Loop
 
 # Problem definitions only available for up to 10 qubits currently
-MAX_QUBITS = 16
+MAX_QUBITS = 24
 saved_result = None
 instance_filename = None
 
