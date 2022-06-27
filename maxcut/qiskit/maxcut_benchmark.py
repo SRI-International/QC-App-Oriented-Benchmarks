@@ -187,9 +187,9 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
         beta_params = []
         gamma_params = []
         for i, beta in enumerate(betas):
-            beta_params.append(Parameter("beta" + str(i)))
+            beta_params.append(Parameter("𝞫" + str(i)))
         for j, gamma in enumerate(gammas):
-            gamma_params.append(Parameter("gamma" + str(j)))
+            gamma_params.append(Parameter("𝞬" + str(j)))
         #print(f"... param names = {beta_params} {gamma_params}")
         
         parameters = [QAOA_Parameter(*t) for t in zip(beta_params,gamma_params)]
