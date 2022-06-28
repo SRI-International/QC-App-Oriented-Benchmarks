@@ -7,6 +7,8 @@ import sys
 import time
 from collections import namedtuple
 
+import datetime
+
 import math
 import numpy as np
 from scipy.optimize import minimize
@@ -705,16 +707,21 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             method_name = 'Max_N_approx_ratio'
         else:
             method_name = 'approx_ratio'
+            
+        cur_time=datetime.datetime.now()
+        dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
+        suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={method_name}_{dt}'
         # Generate area plot showing iterative evolution of metrics 
         metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
                 num_x_bins=num_x_bins, x_size=x_size, y_size=y_size,
-                options=dict(shots=num_shots, rounds=rounds, degree=degree))
+                options=dict(shots=num_shots, rounds=rounds, degree=degree),
+                suffix=suffix)
                 
         # Generate bar chart showing optimality gaps in final results
         metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                 options=dict(shots=num_shots, rounds=rounds, degree=degree),
-                            suffix=f'-s{num_shots}_r{rounds}_d{rounds}_mi{max_iter}_method={method_name}')
+                            suffix=suffix)
 
 # if main, execute method
 if __name__ == '__main__': run()

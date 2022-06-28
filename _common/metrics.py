@@ -1451,7 +1451,7 @@ known_score_labels = {
 
  
 # Plot all the given "Score Metrics" against the given "X Metrics" and "Y Metrics" 
-def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None):
+def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None,suffix=''):
 
     if type(score_metric) == str:
         score_metric = [score_metric]
@@ -1464,10 +1464,10 @@ def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
-                plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size, options=options)
+                plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size, options=options,suffix=suffix)
        
 # Plot the given "Score Metric" against the given "X Metric" and "Y Metric"         
-def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None):
+def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None, suffix=''):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -1608,6 +1608,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
     plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
                         labelrot=0, type=1, fill=True, w_max=18, do_label=False,
                         x_size=xs, y_size=y_size)                         
+    save_plot_image(plt, f"{appname}-area-{score_metric}_x={x_metric}_y={y_metric}_"+suffix, backend_id)
         
 
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
