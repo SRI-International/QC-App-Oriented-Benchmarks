@@ -214,7 +214,8 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
     #print(qc)
     
     # pre-compute and save an array of expected measurements
-    ##compute_expectation(qc, num_qubits, secret_int)
+    if do_compute_expectation:
+        compute_expectation(qc, num_qubits, secret_int)
    
     # save small circuit example for display
     global QC_
