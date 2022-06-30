@@ -1709,7 +1709,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             # Also store the optimality gaps at the three quantiles values
             # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
             try:
-                group_metrics_2['quantile_optgaps'].append(mets["quantile_optgaps"] * 100)
+                group_metrics_2['quantile_optgaps'].append(np.array(mets["quantile_optgaps"]) * 100)
             except KeyError:
                 print("quantile_optgaps have not been stored")
             except Exception as e: print(e)
