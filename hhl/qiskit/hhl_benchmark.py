@@ -1,18 +1,8 @@
 """
 HHL Benchmark Program - Qiskit
 
-Issues:
-    - The QPE U gates are not implemented as exponentiated sub-circuit
-        since the current hard-coded U uses a CU gate which takes a global phase parameter.
-        Have not found a way to create a controlled version of a subcircuit that contains a U gate
-        with 4 parameters, like the CU gate.  The U gate only has 3, theta, phi, lambda. CU adds gamma.
-    - The clock qubits may be implemented in reverse of how QPE is normally done. The QPE and QFT code 
-        is written to assume a reverse order for the clock qubits.  Needs investigation to be like other BMs.
 TODO:
-    - Implement a way to create U from A
-    - Find proper way to calculate fidelity; currently compares number of correct answers, not expectation
-    - Find way to make input larger and initialize properly for larger input vectors; currently increase 
-         in num_qubits increases the clock qubits; should make input size larger too
+    - switch from total variation distance to Hellinger fidelity
 """
 
 import sys
@@ -484,7 +474,7 @@ def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
     return qc
 
 
-def make_circuit(A, b=0, num_clock_qubits=2):
+def make_circuit(A, b, num_clock_qubits):
     """ circuit for HHL algo A|x>=|b>
     
         A : sparse Hermitian matrix
@@ -579,29 +569,34 @@ def make_circuit(A, b=0, num_clock_qubits=2):
 
 
 
-def sim_circuit(qc, shots, post_select=True, return_probs=True):
+def sim_circuit(qc, shots):
     
     simulator = Aer.get_backend('qasm_simulator')
     result = execute(qc, simulator, shots=shots).result()
     outcomes = result.get_counts(qc)
+
+    return outcomes
+
+
+def postselect(outcomes, return_probs=True):
     
-    # post select
-    if post_select == True:
-        
-        mar_out = {}
-        for b_str in outcomes:
-            if b_str[0] == '1':
-                counts = outcomes[b_str]
-                mar_out[b_str[2:]] = counts
-                
-        outcomes = dict(mar_out)
+    mar_out = {}
+    for b_str in outcomes:
+        if b_str[0] == '1':
+            counts = outcomes[b_str]
+            mar_out[b_str[2:]] = counts
+            
+    # compute postselection rate
+    ps_shots = sum(mar_out.values())
+    shots = sum(outcomes.values())
+    rate = ps_shots/shots
     
     # convert to probability distribution
     if return_probs == True:
-        shots = sum(outcomes.values())
-        outcomes = {b_str:round(outcomes[b_str]/shots, 4) for b_str in outcomes}
-
-    return outcomes
+        mar_out = {b_str:round(mar_out[b_str]/ps_shots, 4) for b_str in mar_out}
+    
+    
+    return mar_out, rate
 
  
 ############### Result Data Analysis
@@ -609,84 +604,68 @@ def sim_circuit(qc, shots, post_select=True, return_probs=True):
 
 saved_result = None
 
-# Analyze and print measured results
-# Expected result is always the secret_int, so fidelity calc is simple
 
-# NOTE: for the hard-coded matrix A:  [ 1, -1/3, -1/3, 1 ]
-#       x - y/3 = 1 - beta
-#       -x/3 + y = beta
-#  ==
-#       x = 9/8 - 3*beta/4
-#       y = 3/8 + 3*beta/4
-#
-#   and beta is stored as secret_int / 10000
-#   This allows us to calculate the expected distribution
-#
-#   NOTE: we are not actually calculating the distribution, since it would have to include the ancilla
-#   For now, we just return a distribution of only the 01 and 11 counts
-#   Then we compare the ratios obtained with expected ratio to determine fidelity (incorrectly)
-
-def compute_expectation(A, b):
-    """
-    A (np.array) : NxN matrix in problem instance
-    b (np.array) : dim N vector in problem instance
-    """
+def true_distr(A, b=0):
     
-    n = int(np.log2(len(A)))
+    N = len(A)
+    n = int(np.log2(N))
+    b_vec = np.zeros(N); b_vec[b] = 1.0
+    #b = np.array([1,1])/np.sqrt(2)
     
-    # hard-code A for now
-    #A = np.array([[0.75, -0.25],[-0.25, 0.75]])
-    
-    # initial state |b>
-    #b = np.array([np.sqrt(1-beta**2),beta])
-    
-    # solution vector satisfying Ax=b
-    x = np.linalg.inv(A) @ b
+    x = np.linalg.inv(A) @ b_vec
     # normalize x
-    x = x/np.linalg.norm(x)
+    x_n = x/np.linalg.norm(x)
+    probs = np.array([np.abs(xj)**2 for xj in x_n])
     
-    # compute true distribution
-    true_dist = {}
-    for j, xj in enumerate(x):
-        j_bin = np.binary_repr(j, width=n)
-        true_dist[j_bin] = np.abs(xj)**2
+    distr = {}
+    for j, prob in enumerate(probs):
+        if prob > 1e-8:
+            j_bin = np.binary_repr(j, width=n)
+            distr[j_bin] = prob
+    
+    distr = {out:distr[out]/sum(distr.values()) for out in distr}
+    
+    return distr
 
-    return true_dist
+
+def TVD(distr1, distr2):  
+    """ compute total variation distance between distr1 and distr2
+        which are represented as dictionaries of bitstrings and probabilities
+    """
+    
+    tvd = 0.0
+    for out1 in distr1:
+        if out1 in distr2:
+            p1, p2 = distr1[out1], distr2[out1]
+            tvd += np.abs(p1-p2)/2
+        else:
+            p1 = distr1[out1]
+            tvd += p1/2
+    
+    for out2 in distr2:
+        if out2 not in distr1:
+            p2 = distr2[out2]
+            tvd += p2/2
+    
+    return tvd
 
 
-def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
+def analyze_and_print_result (qc, result, num_qubits, ideal_distr):
+    
     global saved_result
     saved_result = result
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
+    
     # post-select counts where ancilla was measured as |1>
-    post_counts = {}
-    for b_str in counts:
-        if b_str[-1] == '1':
-            post_counts[b_str[:-1]] = counts[b_str]
+    post_counts, rate = postselect(counts)
+    
     if verbose: 
-        #print(f"For secret int {secret_int} measured: {counts}")
-        anc_succ_ratio = sum(post_counts.values())/sum(counts.values())
-        print(f'Ratio of counts with ancilla measured |1> : {round(anc_succ_ratio, 4)}')
+        print(f'Ratio of counts with ancilla measured |1> : {round(rate, 4)}')
     
-    # compute beta from secret_int, and get expected distribution
-    #beta = secret_int / 10000
-    A = np.array([[0.75, -0.25],[-0.25, 0.75]])
-    b = np.array([1,0])
-    
-    shots = sum(post_counts.values())
-    true_dist = compute_expectation(A, b)
-    #expected_dist = {b_str:int(shots*true_dist[b_str]) for b_str in true_dist}
-    # compute Total Variation Distance
-    tvd = 0.0
-    for b_str in true_dist:
-        p0 = true_dist[b_str]
-        if b_str in post_counts:
-            p1 = post_counts[b_str]/shots
-        else:
-            p1 = 0.0
-        tvd += abs(p0-p1)/2
+    # compute total variation distance
+    tvd = TVD(ideal_distr, post_counts)
     
     # use TVD as infidelity
     fidelity = 1 - tvd
@@ -703,32 +682,36 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
         hub="ibm-q", group="open", project="main", exec_options=None):
 
     print("HHL Benchmark Program - Qiskit")
-    
-    # hard code A for now
-    #A = np.array([[0.75,-0.25],[-0.25,0.75]])
 
     # validate parameters (smallest circuit is 4 qubits, largest 6)
     #max_qubits = max(6, max_qubits)
     #min_qubits = min(max(4, min_qubits), max_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
-
-    # Variable for new qubit group ordering if using mid_circuit measurements
-    #mid_circuit_qubit_group = []
-
-    # If using mid_circuit measurements, set transform qubit group to true
-    #transform_qubit_group = True if method == 2 else False
     
     # Initialize metrics module
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler (qc, result, num_qubits, s_int, num_shots):  
+    def execution_handler (qc, result, num_qubits, ideal_distr):
+        
+        # set secret int to be integer corresponding to most likely outcome
+        s_int = 0
+        max_prob = max(ideal_distr.values())
+        for b_str in ideal_distr:
+            if ideal_distr[b_str] == max_prob:
+                s_int = int(b_str, 2)
+                break
      
         # determine fidelity of result set
-        num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, ideal_distr)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+    
+    # Variable for new qubit group ordering if using mid_circuit measurements
+    mid_circuit_qubit_group = []
 
+    # If using mid_circuit measurements, set transform qubit group to true
+    transform_qubit_group = False
+    
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
@@ -736,67 +719,55 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
 
     # for noiseless simulation, set noise model to be None
     ex.set_noise_model(None)
-
+    
+    # temporarily fix diag and off-diag matrix elements
+    diag_el = 0.5
+    off_diag_el = -0.25
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_input_qubits in range(1, int(max_qubits-2)):
+        N = 2**num_input_qubits # matrix size
         
-        # based on num_qubits, determine input and clock sizes
-        if method == 1:
-            num_input_qubits = 1
-            num_clock_qubits = num_qubits - num_input_qubits - 1  # need 1 for ancilla also
-        if method == 2:
-            # let both input and clock size scale
-            num_input_qubits = int(np.ceil((num_qubits-2)/3))
-            num_clock_qubits = num_qubits - 2*num_input_qubits - 1 # need 1 for ancilla also
+        for num_clock_qubits in range(2, int(max_qubits-2*num_input_qubits)):
+            
+            num_qubits = 2*num_input_qubits + num_clock_qubits + 1
+        
     
-        # determine number of circuits to execute for this group
-        num_circuits = min(2**(num_input_qubits)-1, max_circuits)
-        
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
-        
-        ''' 
-        #beta range not calculated dynamically yet
-        num_counting_qubits = 1
-        
-        # determine range of secret strings to loop over
-        if 2**(num_counting_qubits) <= max_circuits:
-            beta_range = [i/(2**(num_counting_qubits)) for i in list(range(num_circuits))]
-        else:
-            beta_range = [i/(2**(num_counting_qubits)) for i in np.random.choice(2**(num_counting_qubits), num_circuits, False)]
-        '''
-        
-        # supply hard-coded beta array (during initial testing)
-        #beta_range = [0.0]
-        #if max_circuits < len(beta_range): beta_range = beta_range[:max_circuits]
-        
-        # create array of indices labeling problem instances
-        instances = list(np.random.choice(range(1,2**num_input_qubits), size=num_circuits))
-        
-        # loop over limited # of inputs for this
-        for i in instances:
-            beta = 0
-            A = shs.generate_sparse_H(num_input_qubits, i)
+            # determine number of circuits to execute for this group
+            num_circuits = min(N*(N-1), max_circuits)
             
-            # create integer that represents beta to precision 4; use s_int as circuit id
-            # create integer that represents matrix size and index; use as circuit id
-            #s_int = int(beta * 10000)
-            s_int = int(i*num_input_qubits)
-            print(f"  ... i={i} s_int={s_int}  beta={beta}")
+            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
             
-            # create the circuit for given qubit size and secret string, store time metric
-            ts = time.time()
-            qc = HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=A, method=method)
-            metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
+            # loop over randomly generated problem instances
+            for i in range(num_circuits):
+                b = np.random.choice(range(N))
+                off_diag_index = np.random.choice(range(1,N))
+                A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
+                                          diag_el=diag_el, off_diag_el=off_diag_el)
+                
+                # compute true distribution and s_int
+                ideal_distr = true_distr(A, b)
+                # set secret int to be integer corresponding to most likely outcome
+                s_int = 0
+                max_prob = max(ideal_distr.values())
+                for b_str in ideal_distr:
+                    if ideal_distr[b_str] == max_prob:
+                        s_int = int(b_str, 2)
+                        break
+                
+                
+                # create the circuit for given qubit size and secret string, store time metric
+                ts = time.time()
+                qc = make_circuit(A, b, num_clock_qubits)
+                metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
-            # collapse the sub-circuit levels used in this benchmark (for qiskit)
-            qc2 = qc.decompose().decompose()
 
-            # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
+                # submit circuit for execution on target (simulator, cloud simulator, or hardware)
+                ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
         
-        # Wait for some active circuits to complete; report metrics when groups complete
-        ex.throttle_execution(metrics.finalize_group)
+            # Wait for some active circuits to complete; report metrics when groups complete
+            ex.throttle_execution(metrics.finalize_group)
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
@@ -810,8 +781,8 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
     #print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    #metrics.plot_metrics(f"Benchmark Results - HHL ({method}) - Qiskit",
-                         #transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
+    metrics.plot_metrics(f"Benchmark Results - HHL ({method}) - Qiskit",
+                         transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
 # if main, execute method
 if __name__ == '__main__': run()
