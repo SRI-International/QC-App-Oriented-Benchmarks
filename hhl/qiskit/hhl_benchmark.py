@@ -80,6 +80,56 @@ The QPE part of the algorithm should be using the inverse QFT, but the qubit ord
 The QFT as defined in the QFT benchmark operates on qubits in the opposite order from the HHL pattern.
 '''
 
+def initialize_state(qc, qreg, b):
+    """ b (int): initial basis state |b> """
+    
+    n = qreg.size
+    b_bin = np.binary_repr(b, width=n)
+    for q in range(n):
+        if b_bin[n-1-q] == '1':
+            qc.x(qreg[q])
+    
+    return qc
+
+
+def IQFT(qc, qreg):
+    """ inverse QFT
+          qc : QuantumCircuit
+        qreg : QuantumRegister belonging to qc
+        
+        does not include SWAP at end of the circuit
+    """
+    
+    n = int(qreg.size)
+    
+    for i in reversed(range(n)):
+        for j in range(i+1,n):
+            phase = -pi/2**(j-i)
+            qc.cp(phase, qreg[i], qreg[j])
+        qc.h(qreg[i])
+    
+    return qc
+
+
+def QFT(qc, qreg):
+    """   QFT
+          qc : QuantumCircuit
+        qreg : QuantumRegister belonging to qc
+        
+        does not include SWAP at end of circuit
+    """
+    
+    n = int(qreg.size)
+    
+    for i in range(n):
+        qc.h(qreg[i])
+        for j in reversed(range(i+1,n)):
+            phase = pi/2**(j-i)
+            qc.cp(phase, qreg[i], qreg[j])
+         
+    return qc
+
+
 def inv_qft_gate(input_size, method=1):
 #def qft_gate(input_size):
     #global QFT_
@@ -158,55 +208,6 @@ def qft_gate(input_size, method=1):
                 
     qc.barrier()   
         
-    return qc
-
-
-def IQFT(qc, qreg):
-    """ inverse QFT
-          qc : QuantumCircuit
-        qreg : QuantumRegister belonging to qc
-    """
-    
-    n = int(qreg.size)
-    
-    # apply IQFT to register
-    for i in range(n)[::-1]:
-        yi = qreg[i]
-        for j in range(i+1,n):
-            yj = qreg[j]
-            phase = -pi/2**(j-i)
-            qc.cp(phase, yi, yj)
-        qc.h(yi)
-    
-    return qc
-
-
-def QFT(qc, qreg):
-    """   QFT
-          qc : QuantumCircuit
-        qreg : QuantumRegister belonging to qc
-    """
-    
-    n = int(qreg.size)
-    
-    # apply QFT to register
-    for i in range(n):
-        yi = qreg[i]
-        qc.h(yi)
-        for j in range(i+1,n):
-            yj = qreg[j]
-            phase = pi/2**(j-i)
-            qc.cp(phase, yi, yj)
-        
-    
-    return qc
-
-
-def initialize_state(qc, qreg):
-    """ currently prepares |0...0> """
-    
-    #qc.h(qreg[0])
-    
     return qc
 
  
@@ -483,8 +484,12 @@ def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
     return qc
 
 
-def make_circuit(A, num_clock_qubits):
-    """ circuit for HHL algo A|x>=|b> """
+def make_circuit(A, b=0, num_clock_qubits=2):
+    """ circuit for HHL algo A|x>=|b>
+    
+        A : sparse Hermitian matrix
+        b (int): between 0,...,2^n-1. Initial basis state |b>
+    """
     
     # constant in inversion step, fixed for now
     #C = 0.25
@@ -492,7 +497,7 @@ def make_circuit(A, num_clock_qubits):
     # read in number of qubits
     N = len(A)
     n = int(np.log2(N))
-    n_t = int(num_clock_qubits) # number of qubits in clock register
+    n_t = num_clock_qubits # number of qubits in clock register
     
     #C = 1/2**n_t
     C = 1/4 # lower bound on eigenvalues of A
@@ -512,7 +517,7 @@ def make_circuit(A, num_clock_qubits):
     #qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr_t)
 
     # initialize the |b> state
-    qc = initialize_state(qc, qr)
+    qc = initialize_state(qc, qr, b)
     
     # Hadamard phase estimation register
     for q in range(n_t):
@@ -526,6 +531,7 @@ def make_circuit(A, num_clock_qubits):
     
     # inverse QFT
     qc = IQFT(qc, qr_t)
+    #qc = QFT(qc, qr_t)
     
     # reset ancilla
     qc.reset(qr_a[0])
@@ -538,7 +544,10 @@ def make_circuit(A, num_clock_qubits):
     for x in range(1,2**n_t):
         x_bin_rev = np.binary_repr(x, width=n_t)[::-1]
         lam = int(x_bin_rev,2)/(2**n_t)
-        alpha.append(2*np.arcsin(C/lam))
+        if lam < C:
+            alpha.append(0)
+        elif lam >= C:
+            alpha.append(2*np.arcsin(C/lam))
     theta = ucr.alpha2theta(alpha)
         
     # do inversion step and measure ancilla
@@ -552,10 +561,9 @@ def make_circuit(A, num_clock_qubits):
     
     # uncompute phase estimation
     # perform controlled e^(-i*A*t)
-    for j in range(n_t):
-        q = n_t - 1 - j
+    for q in reversed(range(n_t)):
         control = qr_t[q]
-        phase = (2*pi)*2**q   
+        phase = (2*pi)*2**q  
         qc = shs.control_Ham_sim(qc, A, phase, control, qr, qr_b, qr_a[0])
     
     # Hadamard phase estimation register
@@ -568,6 +576,7 @@ def make_circuit(A, num_clock_qubits):
     qc.measure(qr[0:], cr[0:])
     
     return qc
+
 
 
 def sim_circuit(qc, shots, post_select=True, return_probs=True):
