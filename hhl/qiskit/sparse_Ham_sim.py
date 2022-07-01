@@ -20,11 +20,18 @@ def Ham_sim(H, t):
         returns : QuantumCircuit for e^(-i*H*t)
     """
     
-    mat_el = 0.5
-    
     # read in number of qubits
     N = len(H)
     n = int(np.log2(N))
+    
+    # read in matrix elements
+    #diag_el = H[0,0]
+    for j in range(1,N):
+        if H[0,j] != 0:
+            off_diag_el = H[0,j]
+            break
+    j_bin = np.binary_repr(j, width=n)
+    sign = (-1)**((j_bin.count('1'))%2)
     
     # create registers
     qreg_a = QuantumRegister(n, name='q_a')
@@ -43,7 +50,7 @@ def Ham_sim(H, t):
         qc.ccx(qreg_a[q], qreg_b[q], anc_reg[0])
         
     # phase
-    qc.rz(2*t*mat_el, anc_reg[0])
+    qc.p(sign*2*t*off_diag_el, anc_reg[0])
     
     # uncompute
     for q in range(n):
@@ -81,13 +88,16 @@ def control_Ham_sim(qc, H, t, control, qreg, qreg_b, anc):
         if H[0,j] != 0:
             off_diag_el = H[0,j]
             break
+    j_bin = np.binary_repr(j, width=n)
+    sign = (-1)**((j_bin.count('1'))%2)
+    
+    # use ancilla for phase kickback to simulate diagonal part of H
+    qc.x(anc)
+    qc.cp(-t*(diag_el+sign*off_diag_el), control, anc)
+    qc.x(anc)
     
     # apply sparse H oracle gate
     qc = V_gate(qc, H, qreg, qreg_b)
-    
-    # use ancilla for phase kickback
-    #qc.crz(2*t*diag_el, con_reg[0], anc_reg[0])
-    qc.crz((2*t*diag_el)%(2*pi), control, anc)
     
     # apply W gate that diagonalizes SWAP operator and Toffoli
     for q in range(n):
@@ -96,7 +106,7 @@ def control_Ham_sim(qc, H, t, control, qreg, qreg_b, anc):
         qc.ccx(qreg[q], qreg_b[q], anc)
         
     # phase
-    qc.crz((2*t*off_diag_el)%(2*np.pi), control, anc)
+    qc.cp((sign*2*t*off_diag_el), control, anc)
     
     # uncompute
     for q in range(n):
@@ -177,7 +187,7 @@ def qc_unitary(qc):
     
     simulator = Aer.get_backend('unitary_simulator')
     result = execute(qc, simulator).result()
-    U = result.get_unitary(qc)
+    U = np.array(result.get_unitary(qc))
     
     return U
 
