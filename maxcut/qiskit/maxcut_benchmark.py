@@ -422,9 +422,9 @@ def compute_cvar_objective(results, nodes, edges, alpha=0.1):
     # return sum([i * j for (i,j) in zip(counts, cut_weights)]) / num_averaged
 
 
-def compute_quantiles_weights(results, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75):
+def compute_quantiles_cut_sizes(results, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75):
     """
-    Compute and return the weights of the cuts at the three quantile values specified in the parameters.
+    Compute and return the sizes of the cuts at the three quantile values specified in the parameters.
 
     Parameters
     ----------
@@ -438,14 +438,14 @@ def compute_quantiles_weights(results, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75
 
     Returns
     -------
-    q_weights : list of floats, of length 3
-        weights of cuts corresponding to the three quantile values.
+    q_sizes : list of floats, of length 3
+        sizes of cuts corresponding to the three quantile values.
     """
     strings = np.array(list(results.get_counts().keys())) # Measured cuts
-    cut_weights = np.array([common.eval_cut(nodes, edges, string) for string in strings]) #corresponding weights
+    cut_sizes = np.array([common.eval_cut(nodes, edges, string) for string in strings]) #corresponding weights
     q_arr = np.array([q_l, q_m, q_u])
-    q_weights = np.quantile(cut_weights, q_arr, method='closest_observation')
-    return q_weights # these will be in increasing order
+    q_sizes = np.quantile(cut_sizes, q_arr) #, method='closest_observation'
+    return q_sizes # these will be in increasing order
 
 
 ################ Benchmark Loop
@@ -543,8 +543,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             metrics.store_metric(num_qubits, s_int, 'approx_ratio', a_r)
         
         # Also compute and store the weights of cuts at three quantile values
-        q_weights = compute_quantiles_weights(result, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75)
-        metrics.store_metric(num_qubits, s_int, 'quantile_optgaps', (1 - q_weights / opt).tolist()) # need to storequantile_optgaps as a list instead of an array.
+        q_weights = compute_quantiles_cut_sizes(result, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75)
+        metrics.store_metric(num_qubits, s_int, 'quantile_optgaps', (1 - q_weights / opt).tolist()) # need to store quantile_optgaps as a list instead of an array.
 
         
         saved_result = result
