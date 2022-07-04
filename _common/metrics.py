@@ -65,6 +65,9 @@ save_metrics = True
 # Option to save plot images (all of them)
 save_plot_images = True
 
+# Option to show plot images. Useful if it is desired to not show plots while running scripts
+show_plot_images = True
+
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
 
@@ -892,7 +895,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         save_plot_image(plt, f"{appname}-metrics" + suffix, backend_id) 
             
     # show the plot for user to see
-    plt.show()
+    if show_plot_images:
+        plt.show()
     
     ###################### Volumetric Plot
         
@@ -968,7 +972,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             save_plot_image(plt, f"{appname}-vplot", backend_id) 
         
         #display plot
-        plt.show()       
+        if show_plot_images:
+            plt.show()
 
     # generate separate figure for volumetric positioning chart of depth metrics
     if aq_mode > 0 and {do_depths or do_2qs} and do_volumetric_plots and do_vbplot:
@@ -1015,7 +1020,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             save_plot_image(plt, f"{appname}-vplot-hf", backend_id) 
         
         #display plot
-        plt.show()       
+        if show_plot_images:
+            plt.show()
 
 
 #################################################
@@ -1103,7 +1109,8 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
         save_plot_image(plt, imagename, backend_id) 
     
     #display plot
-    plt.show()    
+    if show_plot_images:
+        plt.show()
 
 
 #################################################
@@ -1208,7 +1215,8 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
         save_plot_image(plt, imagename, backend_id)
 
     #display plot
-    plt.show()
+    if show_plot_images:
+        plt.show()
 
 
 # Plot filled but borderless rectangles based on merged gradations of result metrics
@@ -1709,7 +1717,9 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             # Also store the optimality gaps at the three quantiles values
             # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
             try:
-                group_metrics_2['quantile_optgaps'].append(mets["quantile_optgaps"] * 100)
+                q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
+                q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
+                group_metrics_2['quantile_optgaps'].append(q_vals)
             except KeyError:
                 print("quantile_optgaps have not been stored")
             except Exception as e: print(e)
@@ -1765,19 +1775,21 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
         # For the y axis, choose the limits to be at least [0,40].
         axs[axi].set_ylim([0, max(40,
                                   max(group_metrics_2["optimality_gap"]), 
-                                  max(np.concatenate(group_metrics_2["quantile_optgaps"]))
-                                  )*1.05])
+                                  max(max(group_metrics_2["quantile_optgaps"]))
+                                  ) * 1.1])
         axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
         
         # Plot the quantile optimality gaps as errorbars
         try:
-            q_vals = np.vstack(group_metrics_2['quantile_optgaps']).T # ndarray of shape (3, number of circuit widths). Indices =(quantile index, circuit width index)
-            center_optgaps = q_vals[1,:]
-            up_error = q_vals[0,:] - q_vals[1,:]
-            down_error = q_vals[1,:] - q_vals[2,:]
-            errors = np.vstack((up_error, down_error))
-            
-            axs[axi].errorbar(group_metrics["groups"], center_optgaps, yerr = errors, 
+            q_vals = group_metrics_2['quantile_optgaps'] # list of lists; shape (number of circuit widths, 3)
+            # Indices are of the form (circuit width index, quantile index)
+            print(q_vals)
+            center_optgaps = [q_vals[i][1] for i in range(len(q_vals))]
+            down_error = [q_vals[i][0] - q_vals[i][1] for i in range(len(q_vals))]
+            up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
+            errors = [up_error, down_error]
+
+            axs[axi].errorbar(group_metrics["groups"], center_optgaps, yerr = errors,
                               ecolor = 'k', elinewidth = 1,barsabove=False, capsize=3,
                               ls='',marker="D", markersize=5, mfc='c', mec='k', mew=0.5)
         except Exception as e: print(e)
@@ -1806,7 +1818,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
         save_plot_image(plt, f"{appname}-optgaps" + suffix, backend_id) 
             
     # show the plot for user to see
-    plt.show()
+    if show_plot_images:
+        plt.show()
 
 
 #############################################

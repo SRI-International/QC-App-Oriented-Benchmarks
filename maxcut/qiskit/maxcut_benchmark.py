@@ -8,7 +8,7 @@ import time
 from collections import namedtuple
 
 import datetime
-
+import json
 import math
 import numpy as np
 from scipy.optimize import minimize
@@ -422,9 +422,9 @@ def compute_cvar_objective(results, nodes, edges, alpha=0.1):
     # return sum([i * j for (i,j) in zip(counts, cut_weights)]) / num_averaged
 
 
-def compute_quantiles_weights(results, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75):
+def compute_quantiles_cut_sizes(results, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75):
     """
-    Compute and return the weights of the cuts at the three quantile values specified in the parameters.
+    Compute and return the sizes of the cuts at the three quantile values specified in the parameters.
 
     Parameters
     ----------
@@ -438,14 +438,14 @@ def compute_quantiles_weights(results, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75
 
     Returns
     -------
-    q_weights : list of floats, of length 3
-        weights of cuts corresponding to the three quantile values.
+    q_sizes : list of floats, of length 3
+        sizes of cuts corresponding to the three quantile values.
     """
     strings = np.array(list(results.get_counts().keys())) # Measured cuts
-    cut_weights = np.array([common.eval_cut(nodes, edges, string) for string in strings]) #corresponding weights
+    cut_sizes = np.array([common.eval_cut(nodes, edges, string) for string in strings]) #corresponding weights
     q_arr = np.array([q_l, q_m, q_u])
-    q_weights = np.quantile(cut_weights, q_arr, method='closest_observation')
-    return q_weights # these will be in increasing order
+    q_sizes = np.quantile(cut_sizes, q_arr) #, method='closest_observation'
+    return q_sizes # these will be in increasing order
 
 
 ################ Benchmark Loop
@@ -461,7 +461,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        print_res_to_file = True, save_final_counts = True):
     
     global QC_
     global circuits_done
@@ -471,6 +472,16 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     print("MaxCut Benchmark Program - Qiskit")
 
     QC_ = None
+    
+    # Create a folder where the results will be saved. Folder name=time of start of computation
+    # In particular, for every circuit width, the metrics will be stored the moment the results are obtained
+    # In addition to the metrics, the (beta,gamma) values obtained by the optimizer, as well as the counts
+    # measured for the final circuit will be stored.
+    if print_res_to_file:
+        start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        parent_folder_save = f'__results/{backend_id}/run_start={start_time_str}'
+        if not os.path.exists(parent_folder_save): os.makedirs(parent_folder_save)
+        
     
     # validate parameters (smallest circuit is 4 qubits)
     max_qubits = max(4, max_qubits)
@@ -532,8 +543,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             metrics.store_metric(num_qubits, s_int, 'approx_ratio', a_r)
         
         # Also compute and store the weights of cuts at three quantile values
-        q_weights = compute_quantiles_weights(result, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75)
-        metrics.store_metric(num_qubits, s_int, 'quantile_optgaps', 1 - q_weights / opt)
+        q_weights = compute_quantiles_cut_sizes(result, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75)
+        metrics.store_metric(num_qubits, s_int, 'quantile_optgaps', (1 - q_weights / opt).tolist()) # need to store quantile_optgaps as a list instead of an array.
 
         
         saved_result = result
@@ -666,6 +677,27 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 unique_id = s_int*1000 + unique_circuit_index
                 metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
                 
+                ########################################################
+                ####### Save results of (circuit width, degree) combination
+                # Store the results obtained for the current values of num_qubits and i (i.e. degree)
+                # This way, we store the results as they becomes available, 
+                # instead of storing everything all directly at the very end of run()
+                if print_res_to_file:
+                    store_loc = parent_folder_save + '/width={}_degree={}.json'.format(num_qubits,s_int)
+                    dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)].copy()}
+                    dict_to_store['general properties'] = {'num_shots' : num_shots,
+                                                           'rounds' : rounds,
+                                                           'max_iter' : max_iter,
+                                                           }
+                    dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
+                    # Also store the value of counts obtained for the final counts
+                    if save_final_counts:
+                        dict_to_store['final_counts'] = saved_result.get_counts()
+                    
+                    # Now save the output
+                    with open(store_loc, 'w') as outfile:
+                        json.dump(dict_to_store, outfile)
+                    
                 #read solution from file for this instance
                 opt, sol = common.read_maxcut_solution(instance_filename)
             
