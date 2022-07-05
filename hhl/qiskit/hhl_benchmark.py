@@ -650,7 +650,7 @@ def TVD(distr1, distr2):
     return tvd
 
 
-def analyze_and_print_result (qc, result, num_qubits, ideal_distr):
+def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     
     global saved_result
     saved_result = result
@@ -660,9 +660,30 @@ def analyze_and_print_result (qc, result, num_qubits, ideal_distr):
     
     # post-select counts where ancilla was measured as |1>
     post_counts, rate = postselect(counts)
+    num_input_qubits = len(list(post_counts.keys())[0])
     
     if verbose: 
         print(f'Ratio of counts with ancilla measured |1> : {round(rate, 4)}')
+    
+    # compute true distribution from secret int
+    off_diag_index = 0
+    b = 0
+    s_int_o = int(s_int)
+    s_int_b = int(s_int)
+    while (s_int_o % 2) == 0:
+        s_int_o = int(s_int_o/2)
+        off_diag_index += 1
+    while (s_int_b % 3) == 0:
+        s_int_b = int(s_int_o/3)
+        b += 1
+    
+    # temporarily fix diag and off-diag matrix elements
+    diag_el = 0.5
+    off_diag_el = -0.25
+    A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
+                              diag_el=diag_el, off_diag_el=off_diag_el)
+    ideal_distr = true_distr(A, b)
+    
     
     # compute total variation distance
     tvd = TVD(ideal_distr, post_counts)
@@ -692,18 +713,21 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler (qc, result, num_qubits, ideal_distr):
+    #def execution_handler(qc, result, num_qubits, ideal_distr):
+    def execution_handler(qc, result, num_qubits, s_int, num_shots):
         
         # set secret int to be integer corresponding to most likely outcome
-        s_int = 0
-        max_prob = max(ideal_distr.values())
-        for b_str in ideal_distr:
-            if ideal_distr[b_str] == max_prob:
-                s_int = int(b_str, 2)
-                break
+        #s_int = 0
+        #max_prob = max(ideal_distr.values())
+        #for b_str in ideal_distr:
+        #    if ideal_distr[b_str] == max_prob:
+        #        s_int = int(b_str, 2)
+        #        break
      
         # determine fidelity of result set
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, ideal_distr)
+        num_qubits = int(num_qubits)
+        #counts, fidelity = analyze_and_print_result(qc, result, num_qubits, ideal_distr)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
     
     # Variable for new qubit group ordering if using mid_circuit measurements
@@ -737,7 +761,7 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
             # determine number of circuits to execute for this group
             num_circuits = min(N*(N-1), max_circuits)
             
-            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+            print(f"************\nExecuting {num_circuits} circuits with num_qubits = {num_qubits}")
             
             # loop over randomly generated problem instances
             for i in range(num_circuits):
@@ -746,15 +770,18 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
                 A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
                                           diag_el=diag_el, off_diag_el=off_diag_el)
                 
+                # define secret_int
+                s_int = (2**off_diag_index)*(3**b)
+                
                 # compute true distribution and s_int
-                ideal_distr = true_distr(A, b)
+                #ideal_distr = true_distr(A, b)
                 # set secret int to be integer corresponding to most likely outcome
-                s_int = 0
-                max_prob = max(ideal_distr.values())
-                for b_str in ideal_distr:
-                    if ideal_distr[b_str] == max_prob:
-                        s_int = int(b_str, 2)
-                        break
+                #s_int = 0
+                #max_prob = max(ideal_distr.values())
+                #for b_str in ideal_distr:
+                #    if ideal_distr[b_str] == max_prob:
+                #        s_int = int(b_str, 2)
+                #        break
                 
                 
                 # create the circuit for given qubit size and secret string, store time metric
@@ -766,8 +793,8 @@ def run (min_qubits=5, max_qubits=6, max_circuits=3, num_shots=100,
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
                 ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
         
-            # Wait for some active circuits to complete; report metrics when groups complete
-            ex.throttle_execution(metrics.finalize_group)
+        # Wait for some active circuits to complete; report metrics when groups complete
+        ex.throttle_execution(metrics.finalize_group)
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
