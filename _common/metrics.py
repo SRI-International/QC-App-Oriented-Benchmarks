@@ -1480,15 +1480,15 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
     fixed_metrics: (dict) A dictionary mapping metric keywords to the values they are to be held at;
-                          for example: 
-                          
-                          fixed_metrics = {'rounds': 2}
-                              
-                              when the y-axis is num_qubits or 
-                          
-                          fixed_metrics = {'num_qubits': 4}
-                          
-                              when the y-axis is rounds.    
+        for example: 
+        
+        fixed_metrics = {'rounds': 2}
+            
+            when the y-axis is num_qubits or 
+        
+        fixed_metrics = {'num_qubits': 4}
+        
+            when the y-axis is rounds.    
     """
     # get backend id for this set of circuits
     backend_id = get_backend_id()
@@ -1666,7 +1666,7 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     
 
 # Plot bar charts for each metric over all groups
-def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", options=None):
+def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", objective_func_type = 'cvar_approx_ratio', options=None):
     """
     Currently only used for maxcut
     """
@@ -1706,14 +1706,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             #the two lines above gets us the mets for the last circuit. Improve this later by removing the loop
 
             # Save data for the optimality gap with quantiles
-            for metric_type in ['approx_ratio', 'cvar_approx_ratio', 'Max_N_approx_ratio']:
-                # optgap will be computed using whichever of the above three has been computed
-                if metric_type in mets:
-                    group_metrics_2['optimality_gap'].append((1.0 - mets[metric_type]) * 100)
-                    opt_method = metric_type
-                    # The optimality gap will be computed with only one type of objective function; hence break.
-                    break
-                
+            if objective_func_type in mets:
+                group_metrics_2['optimality_gap'].append((1.0 - mets[objective_func_type]) * 100)
+                opt_method = objective_func_type
+
             # Also store the optimality gaps at the three quantiles values
             # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
             try:
@@ -1804,7 +1800,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             
         # Replacing legend settings. Might need to modify later
         # axs[axi].legend(['Degree 3', 'Degree -3'], loc='upper left') 
-        axs[axi].legend(['Optimality gap: metric', 'Optimality gap: quartiles'], loc='center left',
+        axs[axi].legend(['Optimality gap: {}'.format(known_score_labels[objective_func_type]), 'Quartiles'], loc='center left',
                         bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
         axi += 1
     

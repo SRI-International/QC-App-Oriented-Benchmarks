@@ -305,50 +305,106 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     return counts, fidelity
 
-# Compute the objective function on a given sample
-def compute_objective(results, nodes, edges):
-    counts = results.get_counts()
-    
-    avg = 0
-    sum_count = 0
-    for solution, count in counts.items():
-        obj = -1*common.eval_cut(nodes, edges, solution)
 
-        avg += obj * count
-        sum_count += count
+##############################################################################
+#### Compute the objective function
+# Note: For each iteration of the minimization routine, first compute all the
+# sizes of measured cuts (i.e. measured bitstrings)
+# Next, use these cut sizes in order to compute the objective function values
 
-    return avg/sum_count
-
-# Modified objective function that only considers top N largest counts when 
-# calculating the average
-def compute_max_objective(results, nodes, edges, N):
-    counts = results.get_counts()
-
-    top_n = sorted(counts, key=counts.get, reverse=True)[:N]
-    
-    avg = 0
-    sum_count = 0
-    for solution, count in counts.items():
-        if solution in top_n:
-            obj = -1*common.eval_cut(nodes, edges, solution)
-
-            avg += obj * count
-            sum_count += count
-        else:
-            continue
-
-    return avg/sum_count
+# We intentionally compute all the cut weights for each iteration of the minimizer
+# This ensures that the classical computation time is always measured fairly across
+# the different iterations (otherwise later iterations will take less time compared
+# to the first few iterations).
 
 
-# CVaR objective function (Conditional Value at Risk)
-def compute_cvar_objective(results, nodes, edges, alpha=0.1):
+
+def compute_cutsizes(results, nodes, edges):
     """
-    Obtains the Confidence Value at Risk or CVaR for samples measured at the end of the variational circuit.
+    Given a result object, extract the values of meaasured cuts and the corresponding 
+    counts into ndarrays. Also compute and return the corresponding cut sizes.
+
+    Returns
+    -------
+    cuts : list of strings
+        each element is a bitstring denoting a cut
+    counts : ndarray of ints
+        measured counts corresponding to cuts
+    sizes : ndarray of ints
+        cut sizes (i.e. number of edges crossing the cut)
+    """
+    cuts = list(results.get_counts().keys())
+    counts = np.array(list(results.get_counts().values()))
+    sizes = np.array([common.eval_cut(nodes, edges, cut) for cut in cuts])
+
+    return cuts, counts, sizes
+
+
+# Compute the objective function on a given sample
+def compute_sample_mean(counts, sizes, **kwargs):
+    """
+    Compute the mean of cut sizes (i.e. the weighted average of sizes weighted by counts)
+    This approximates the expectation value of the state at the end of the circuit
+
+    Parameters
+    ----------
+    counts : ndarray of ints
+        measured counts corresponding to cuts
+    sizes : ndarray of ints
+        cut sizes (i.e. number of edges crossing the cut)
+    **kwargs : optional arguments
+        will be ignored
+
+    Returns
+    -------
+    float
+        
+
+    """
+
+    return - np.sum(counts * sizes) / np.sum(counts)
+
+
+def compute_maxN_mean(counts, sizes, N = 5, **kwargs):
+    """
+    Compute the average size of the N most frequently measured cuts\
+    The average is weighted by the corresponding counts
+
+    Parameters
+    ----------
+    counts : ndarray of ints
+        measured counts corresponding to cuts
+    sizes : ndarray of ints
+        cut sizes (i.e. number of edges crossing the cut)
+    N : int, optional
+        The default is 5.
+    **kwargs : optional arguments
+        will be ignored
+
+    Returns
+    -------
+    float
+    """
+
+    # Obtain the indices corresponding to the largest N values of counts
+    # Thereafter, sort the counts and sizes arrays in the order specified by sort_inds
+    sort_inds = np.argsort(counts)[-N:]
+    counts = counts[sort_inds]
+    sizes = sizes[sort_inds]
+
+    return - np.sum(counts * sizes) / np.sum(counts)
+
+def compute_cvar(counts, sizes, alpha = 0.1, **kwargs):
+    """
+    Obtains the Conditional Value at Risk or CVaR for samples measured at the end of the variational circuit.
     Reference: Barkoutsos, P. K., Nannicini, G., Robert, A., Tavernelli, I. & Woerner, S. Improving Variational Quantum Optimization using CVaR. Quantum 4, 256 (2020).
 
     Parameters
     ----------
-    results, nodes, edges : self explanatory
+    counts : ndarray of ints
+        measured counts corresponding to cuts
+    sizes : ndarray of ints
+        cut sizes (i.e. number of edges crossing the cut)
     alpha : float, optional
         Confidence interval value for CVaR. The default is 0.1.
 
@@ -358,94 +414,60 @@ def compute_cvar_objective(results, nodes, edges, alpha=0.1):
         CVaR value
 
     """
-
-    strings = np.array(list(results.get_counts().keys()))
-    counts = np.array(list(results.get_counts().values()))
-
-    # for each measurement outcome |ψ>, obtain <ψ|H|ψ> (i.e. negative of the weight of the cut)
-    cut_weights = np.array([-1 * common.eval_cut(nodes, edges, string) for string in strings])
-
-    # Sort cut_weights in a non-decreasing order.
-    # Sort counts and strings in the same order as cut_weights, so that i^th element of each correspond to each other
-    sort_inds = np.argsort(cut_weights)
-    cut_weights = cut_weights[sort_inds]
-    strings = strings[sort_inds]
+    # Sort the negative of the cut sizes in a non-decreasing order.
+    # Sort counts in the same order as sizes, so that i^th element of each correspond to each other
+    sort_inds = np.argsort(-sizes)
+    sizes = sizes[sort_inds]
     counts = counts[sort_inds]
-    # Cumulative sum of counts
-    cumsum_counts = np.cumsum(counts)
-    num_shots = cumsum_counts[-1]
 
-    # Restrict to the first int(alpha * num_shots) number of samples in these arrays
-    num_averaged = math.ceil(alpha * num_shots)
-    final_index = np.digitize(num_averaged, cumsum_counts, right=True)
-    counts = counts[:final_index + 1]
-    cut_weights = cut_weights[:final_index + 1]
-    if final_index == 0:
-        counts[0] = min(counts[0], num_averaged)
-    elif cumsum_counts[final_index] != num_averaged: # can only be > or =. If >, then need to modify the last entry of counts
-        counts[-1] = num_averaged - cumsum_counts[final_index - 1]
+    # Choose only the top num_avgd = ceil(alpha * num_shots) cuts. These will be averaged over.
+    num_avgd = math.ceil(alpha * np.sum(counts))
 
-    assert num_averaged == int(np.sum(counts)), "number of samples to be averaged is different from cumsum of restricted counts"
-    return np.sum(counts * cut_weights) / num_averaged
+    # Compute cvar
+    cvar_sum = 0
+    counts_so_far = 0
+    for c, s in zip(counts, sizes):
+        if counts_so_far + c >= num_avgd:
+            cts_to_consider = num_avgd - counts_so_far
+            cvar_sum += cts_to_consider * s
+            break
+        else:
+            counts_so_far += c
+            cvar_sum += c * s
 
-    # ## Version which avoids using numpy as much as possible
-    # # Has a problem that needs to be fixed for certain fringe cases
-    # strings = list(results.get_counts().keys())
-    # counts = list(results.get_counts().values())
-
-    # # for each measurement outcome |ψ>, obtain <ψ|H|ψ> (i.e. negative of the weight of the cut)
-    # cut_weights = [-1 * common.eval_cut(nodes, edges, string) for string in strings]
-
-    # # sort in non-decreasing order
-    # sort_inds = sorted(range(len(cut_weights)), key = cut_weights.__getitem__) #same as numpy.argsort
-    # cut_weights = [cut_weights[i] for i in sort_inds]
-    # strings = [strings[i] for i in sort_inds]
-    # counts = [counts[i] for i in sort_inds]
-
-    # cumsum_counts = np.cumsum(counts)
-    # num_shots = cumsum_counts[-1]
-
-    # # the samples to be averaged over for cvar are the smallest ceil(alpha*num_shots) number of measured strings
-    # num_averaged = math.ceil(alpha * num_shots)
-    # # Find the index of the first element of cumsum_counts that is greater than or equal to num_averaged
-    # final_index = cumsum_counts.tolist().index(min(x for x in cumsum_counts if x>= num_averaged))
-
-    # counts = counts[:final_index + 1]
-    # cut_weights = cut_weights[:final_index + 1]
-    # if final_index == 0:
-    #     counts[0] = min(counts[0], num_averaged)
-    # elif cumsum_counts[final_index] != num_averaged: # can only be > or =. If >, then need to modify the last entry of counts
-    #     counts[-1] = num_averaged - cumsum_counts[final_index - 1]
-
-    # assert num_averaged == sum(counts), "number of samples to be averaged is different from cumsum of restricted counts"
-
-    # return sum([i * j for (i,j) in zip(counts, cut_weights)]) / num_averaged
+    return - cvar_sum / num_avgd
 
 
-def compute_quantiles_cut_sizes(results, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75):
+def compute_quartiles(counts, sizes):
     """
-    Compute and return the sizes of the cuts at the three quantile values specified in the parameters.
+    Compute and return the sizes of the cuts at the three quartile values (i.e. 0.25, 0.5 and 0.75)
 
     Parameters
     ----------
-    results, nodes, edges : self explanatory
-    q_l : float, optional
-        Lower quantile (fraction) value of . The default is 0.25.
-    q_m : float, optional
-        Middle quantile fraction. The default is 0.5.
-    q_u : float, optional
-        Upper quantile fraction. The default is 0.75.
+    counts : ndarray of ints
+        measured counts corresponding to cuts
+    sizes : ndarray of ints
+        cut sizes (i.e. number of edges crossing the cut)
 
     Returns
     -------
-    q_sizes : list of floats, of length 3
-        sizes of cuts corresponding to the three quantile values.
+    quantile_sizes : ndarray of of 3 floats
+        sizes of cuts corresponding to the three quartile values.
     """
-    strings = np.array(list(results.get_counts().keys())) # Measured cuts
-    cut_sizes = np.array([common.eval_cut(nodes, edges, string) for string in strings]) #corresponding weights
-    q_arr = np.array([q_l, q_m, q_u])
-    q_sizes = np.quantile(cut_sizes, q_arr) #, method='closest_observation'
-    return q_sizes # these will be in increasing order
+
+    # Sort sizes and counts in the sequence of non-decreasing values of sizes
+    sort_inds = np.argsort(sizes)
+    sizes = sizes[sort_inds]
+    counts = counts[sort_inds]
+    num_shots = np.sum(counts)
+
+    q_vals = [0.25, 0.5, 0.75]
+    ct_vals = [math.floor(q * num_shots) for q in q_vals]
+
+    cumsum_counts = np.cumsum(counts)
+    locs = np.searchsorted(cumsum_counts, ct_vals)
+    quantile_sizes = sizes[locs]
+    return quantile_sizes
 
 
 ################ Benchmark Loop
@@ -457,11 +479,12 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1, degree=3, thetas_array=None, N=0, alpha=None, parameterized= False, do_fidelities=True,
+        method=1, rounds=1, degree=3, thetas_array=None, N=5, alpha=0.1, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
+        objective_func_type = 'cvar_approx_ratio',
         print_res_to_file = True, save_final_counts = True):
     
     global QC_
@@ -511,7 +534,19 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
         y_size = 1.5
-    
+
+    # Choose the objective function to minimize, based on values of the parameters
+    if objective_func_type == 'cvar_approx_ratio':
+        objective_function = compute_cvar
+    elif objective_func_type == 'Max_N_approx_ratio':
+        objective_function = compute_maxN_mean
+    elif objective_func_type == 'approx_ratio':
+        objective_function = compute_sample_mean
+    else:
+        print("{} is not an accepted value for objective_func_type. Setting it to cvar_approx_ratio".format(objective_func_type))
+        objective_func_type == 'cvar_approx_ratio'
+        objective_function = compute_cvar
+
     # Initialize metrics module
     metrics.init_metrics()
     # Define custom result handler
@@ -529,22 +564,29 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         nodes, edges = common.read_maxcut_instance(instance_filename)
         opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol')
         
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots) #consider changing this since cut sizes are counted elsewhere as well
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+
+        cuts, counts, sizes = compute_cutsizes(result, nodes, edges)
         
-        if alpha is not None:
-            a_r = -1 * compute_cvar_objective(result, nodes, edges, alpha=alpha) / opt
-            metrics.store_metric(num_qubits, s_int, 'cvar_approx_ratio', a_r)
-        elif N:
-            a_r = -1 * compute_max_objective(result, nodes, edges, N) / opt
-            metrics.store_metric(num_qubits, s_int, 'Max_N_approx_ratio', a_r)
-        else:
-            a_r = -1 * compute_objective(result, nodes, edges) / opt
-            metrics.store_metric(num_qubits, s_int, 'approx_ratio', a_r)
-        
+        # Compute and store all the 3 metric values (i.e. cvar, sample mean, max N counts mean)
+
+        # Sample mean metric
+        a_r_sm = -1 * compute_sample_mean(counts, sizes) / opt
+        metrics.store_metric(num_qubits, s_int, 'approx_ratio', a_r_sm)
+
+        # Max N counts mean metric
+        a_r_mN = -1 * compute_maxN_mean(counts, sizes, N = N) / opt
+        metrics.store_metric(num_qubits, s_int, 'Max_N_approx_ratio', a_r_mN)
+
+        # CVaR metric
+        a_r_cvar = -1 * compute_cvar(counts, sizes, alpha = alpha) / opt
+        metrics.store_metric(num_qubits, s_int, 'cvar_approx_ratio', a_r_cvar)
+
+
         # Also compute and store the weights of cuts at three quantile values
-        q_weights = compute_quantiles_cut_sizes(result, nodes, edges, q_l=0.25, q_m=0.5, q_u=0.75)
-        metrics.store_metric(num_qubits, s_int, 'quantile_optgaps', (1 - q_weights / opt).tolist()) # need to store quantile_optgaps as a list instead of an array.
+        quantile_sizes = compute_quartiles(counts, sizes)
+        metrics.store_metric(num_qubits, s_int, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) # need to store quantile_optgaps as a list instead of an array.
 
         
         saved_result = result
@@ -660,14 +702,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
-                    
-                    if alpha is not None:
-                        return compute_cvar_objective(saved_result, nodes, edges, alpha)
-                    elif N:
-                        return compute_max_objective(saved_result, nodes, edges, N)
-                    else:
-                        return compute_objective(saved_result, nodes, edges)
-            
+
+                    # Compute the objective function
+                    cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
+                    return objective_function(counts = counts, sizes = sizes, N = N, alpha = alpha)
+
                 opt_ts = time.time()
                 
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
@@ -734,16 +773,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     elif method == 2:
         #metrics.print_all_circuit_metrics()
         
-        if alpha is not None:
-            method_name = 'cvar_approx_ratio'
-        elif N:
-            method_name = 'Max_N_approx_ratio'
-        else:
-            method_name = 'approx_ratio'
+
             
         cur_time=datetime.datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
-        suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={method_name}_{dt}'
+        suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
         # Generate area plot showing iterative evolution of metrics 
         metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
@@ -753,8 +787,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 
         # Generate bar chart showing optimality gaps in final results
         metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                options=dict(shots=num_shots, rounds=rounds, degree=degree),
-                            suffix=suffix)
+                                     options=dict(shots=num_shots, rounds=rounds, degree=degree),
+                                     suffix=suffix, objective_func_type = objective_func_type)
 
 # if main, execute method
 if __name__ == '__main__': run()
