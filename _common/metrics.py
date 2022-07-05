@@ -1616,7 +1616,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
     plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
                         labelrot=0, type=1, fill=True, w_max=18, do_label=False,
                         x_size=xs, y_size=y_size)                         
-    save_plot_image(plt, f"{appname}-area-{score_metric}_x={x_metric}_y={y_metric}_"+suffix, backend_id)
+    save_plot_image(plt, os.path.join(f"{appname}-area-{score_metric}_x={x_metric}_y={y_metric}_" + suffix), backend_id)
         
 
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
@@ -1800,7 +1800,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             
         # Replacing legend settings. Might need to modify later
         # axs[axi].legend(['Degree 3', 'Degree -3'], loc='upper left') 
-        axs[axi].legend(['Optimality gap: {}'.format(known_score_labels[objective_func_type]), 'Quartiles'], loc='center left',
+        legend_dict = {'approx_ratio' : 'Exp. Value',
+                       'cvar_approx_ratio' : 'CVaR',
+                       'Max_N_approx_ratio' : 'Max counts'}
+        axs[axi].legend([legend_dict[objective_func_type], 'Quartiles'], loc='center left',
                         bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
         axi += 1
     
