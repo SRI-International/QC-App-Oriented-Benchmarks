@@ -367,7 +367,8 @@ def compute_sample_mean(counts, sizes, **kwargs):
 
 def compute_maxN_mean(counts, sizes, N = 5, **kwargs):
     """
-    Compute the average size of the N most frequently measured cuts\
+    Compute the average size of the top most frequently measured cuts
+    Choose N% of the cuts. 
     The average is weighted by the corresponding counts
 
     Parameters
@@ -386,9 +387,12 @@ def compute_maxN_mean(counts, sizes, N = 5, **kwargs):
     float
     """
 
-    # Obtain the indices corresponding to the largest N values of counts
+    # Obtain the indices corresponding to the largest N% values of counts
     # Thereafter, sort the counts and sizes arrays in the order specified by sort_inds
-    sort_inds = np.argsort(counts)[-N:]
+    num_cuts = counts.size
+    how_many_top_counts = min(math.ceil(N / 100 * num_cuts),
+                              num_cuts)
+    sort_inds = np.argsort(counts)[-how_many_top_counts:]
     counts = counts[sort_inds]
     sizes = sizes[sort_inds]
 
@@ -484,7 +488,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        objective_func_type = 'cvar_approx_ratio',
+        objective_func_type = 'approx_ratio',
         print_res_to_file = True, save_final_counts = True):
     
     global QC_
