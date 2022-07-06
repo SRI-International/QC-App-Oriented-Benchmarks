@@ -446,29 +446,6 @@ def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
         # measure the input, which now contains the answer
         qc.measure(input_qubits, measurement[1])
     
-    # sparse Hamiltonian simulation by quantum random walk
-    if method == 2:
-        
-        qc = make_circuit(A, num_clock_qubits)
-
-    
-    # save smaller circuit example for display
-    #global QC_, U_, UI_, QFT_, QFTI_
-    #if QC_ == None or num_qubits <= 6:
-    #    if num_qubits < 9: QC_ = qc
-    
-    #if U_ == None or num_qubits <= 6:    
-    #    _, U_ = ctrl_u(1)
-        #U_ = ctrl_u(np.pi/2, 2, 0, 1)
-        
-    #if UI_ == None or num_qubits <= 6:    
-    #    _, UI_ = ctrl_ui(1)
-        #UI_ = ctrl_ui(np.pi/2, 2, 0, 1)
-        
-    #if QFT_ == None or num_qubits <= 5:
-    #    if num_qubits < 9: QFT_ = qft_gate(len(clock))
-    #if QFTI_ == None or num_qubits <= 5:
-    #    if num_qubits < 9: QFTI_ = inv_qft_gate(len(clock))
 
     # return a handle on the circuit
     return qc
