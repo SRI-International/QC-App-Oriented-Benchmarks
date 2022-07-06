@@ -1,0 +1,8 @@
+lagrange parameter is working
+min_energy=-120 max_indset=4
+ising: 0 0 1 0 0 0 1 0 0 0 0 1 1 0 0 0 
+ising: 0 0 0 1 0 0 0 1 0 0 0 1 0 1 0 0 
+ising: 0 0 0 1 0 0 0 0 0 1 1 0 0 0 1 0 
+indset: 0 0 1 0 0 0 1 0 0 0 0 1 1 0 0 0 
+indset: 0 0 0 1 0 0 0 1 0 0 0 1 0 1 0 0 
+indset: 0 0 0 1 0 0 0 0 0 1 1 0 0 0 1 0 
