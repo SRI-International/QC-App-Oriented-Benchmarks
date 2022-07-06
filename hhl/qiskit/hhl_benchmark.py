@@ -659,8 +659,8 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2, max_clock_qubits=3,
-         max_circuits=3, num_shots=100, 
+def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2, 
+        max_clock_qubits=3, max_circuits=3, num_shots=100, 
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
 
@@ -698,18 +698,17 @@ def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2, max_clock_q
     
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
+    #for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
     for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
         N = 2**num_input_qubits # matrix size
         
-        for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1):
-            
+        for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1):      
             num_qubits = 2*num_input_qubits + num_clock_qubits + 1
         
-    
             # determine number of circuits to execute for this group
-            num_circuits = min(N*(N-1), max_circuits)
+            num_circuits = max_circuits
             
-            print(f"************\nExecuting {num_circuits} circuits with (num_input_qubits, num_clock_qubits) = {(num_input_qubits, num_clock_qubits)}")
+            print(f"************\nExecuting {num_circuits} circuits with {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
             
             # loop over randomly generated problem instances
             for i in range(num_circuits):
@@ -726,8 +725,8 @@ def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2, max_clock_q
                 ts = time.time()
                 qc = make_circuit(A, b, num_clock_qubits)
                 metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
-
-
+    
+    
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
                 ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
         
