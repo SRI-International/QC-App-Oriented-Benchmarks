@@ -1779,7 +1779,6 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
         try:
             q_vals = group_metrics_2['quantile_optgaps'] # list of lists; shape (number of circuit widths, 3)
             # Indices are of the form (circuit width index, quantile index)
-            print(q_vals)
             center_optgaps = [q_vals[i][1] for i in range(len(q_vals))]
             down_error = [q_vals[i][0] - q_vals[i][1] for i in range(len(q_vals))]
             up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]

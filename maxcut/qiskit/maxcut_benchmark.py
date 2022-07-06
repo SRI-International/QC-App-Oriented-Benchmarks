@@ -490,7 +490,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         hub="ibm-q", group="open", project="main", exec_options=None,
         objective_func_type = 'approx_ratio',
         print_res_to_file = True, save_final_counts = True):
-    
+
+    # If print_res_to_file is True, then store all the input parameters into a dictionary.
+    # This dictionary will later be stored in a json file
+    if print_res_to_file:
+        dict_of_inputs = locals()
+
     global QC_
     global circuits_done
     global unique_circuit_index
@@ -506,7 +511,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # measured for the final circuit will be stored.
     if print_res_to_file:
         start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        parent_folder_save = f'__results/{backend_id}/run_start={start_time_str}'
+        parent_folder_save = os.path.join('__results', objective_func_type,
+                                          f'{backend_id}/run_start={start_time_str}')
         if not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
         
     
@@ -728,10 +734,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 if print_res_to_file:
                     store_loc = os.path.join(parent_folder_save,'width={}_degree={}.json'.format(num_qubits,s_int))
                     dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)].copy()}
-                    dict_to_store['general properties'] = {'num_shots' : num_shots,
-                                                           'rounds' : rounds,
-                                                           'max_iter' : max_iter,
-                                                           }
+                    dict_to_store['general properties'] = dict_of_inputs
                     dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
                     # Also store the value of counts obtained for the final counts
                     if save_final_counts:
