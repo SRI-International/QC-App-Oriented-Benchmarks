@@ -417,9 +417,6 @@ def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
     
         # Create an empty circuit with the specified registers
         qc = QuantumCircuit(ancilla, clock, input_qubits, measurement)
-    
-        # size of input is one less than available qubits
-        input_size = num_qubits - 1
             
         # State preparation. (various initial values, done with initialize method)
         # intial_state = [0,1]
@@ -458,16 +455,13 @@ def make_circuit(A, b, num_clock_qubits):
         b (int): between 0,...,2^n-1. Initial basis state |b>
     """
     
-    # constant in inversion step, fixed for now
-    #C = 0.25
-    
     # read in number of qubits
     N = len(A)
     n = int(np.log2(N))
     n_t = num_clock_qubits # number of qubits in clock register
     
-    #C = 1/2**n_t
-    C = 1/4 # lower bound on eigenvalues of A
+    # lower bound on eigenvalues of A. Fixed for now
+    C = 1/4
     
     # create quantum registers
     qr = QuantumRegister(n)
@@ -477,11 +471,7 @@ def make_circuit(A, b, num_clock_qubits):
     qr_a = QuantumRegister(1) # ancilla qubit
     cr_a = ClassicalRegister(1)
     
-    # temporary measure phase estimation register
-    #cr_t = ClassicalRegister(num_t_qubits)
-    
     qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a)
-    #qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr_t)
 
     # initialize the |b> state
     qc = initialize_state(qc, qr, b)
@@ -498,13 +488,9 @@ def make_circuit(A, b, num_clock_qubits):
     
     # inverse QFT
     qc = IQFT(qc, qr_t)
-    #qc = QFT(qc, qr_t)
     
     # reset ancilla
     qc.reset(qr_a[0])
-    
-    # measure phase register
-    #qc.measure(qr_t[:], cr_t[:])
         
     # compute angles for inversion rotations
     alpha = [2*np.arcsin(C)]
@@ -539,7 +525,6 @@ def make_circuit(A, b, num_clock_qubits):
     
     # measure ancilla and main register
     qc.barrier()
-    #qc.measure(qr_a[0], cr_a[0])
     qc.measure(qr[0:], cr[0:])
     
     return qc
@@ -680,11 +665,6 @@ def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2, max_clock_q
         hub="ibm-q", group="open", project="main", exec_options=None):
 
     print("HHL Benchmark Program - Qiskit")
-
-    # validate parameters (smallest circuit is 4 qubits, largest 6)
-    #max_qubits = max(6, max_qubits)
-    #min_qubits = min(max(4, min_qubits), max_qubits)
-    #print(f"min, max qubits = {min_qubits} {max_qubits}")
     
     # Initialize metrics module
     metrics.init_metrics()
