@@ -65,6 +65,9 @@ save_metrics = True
 # Option to save plot images (all of them)
 save_plot_images = True
 
+# Option to show plot images. Useful if it is desired to not show plots while running scripts
+show_plot_images = True
+
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
 
@@ -892,7 +895,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         save_plot_image(plt, f"{appname}-metrics" + suffix, backend_id) 
             
     # show the plot for user to see
-    plt.show()
+    if show_plot_images:
+        plt.show()
     
     ###################### Volumetric Plot
         
@@ -968,7 +972,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             save_plot_image(plt, f"{appname}-vplot", backend_id) 
         
         #display plot
-        plt.show()       
+        if show_plot_images:
+            plt.show()
 
     # generate separate figure for volumetric positioning chart of depth metrics
     if aq_mode > 0 and {do_depths or do_2qs} and do_volumetric_plots and do_vbplot:
@@ -1015,7 +1020,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             save_plot_image(plt, f"{appname}-vplot-hf", backend_id) 
         
         #display plot
-        plt.show()       
+        if show_plot_images:
+            plt.show()
 
 
 #################################################
@@ -1103,7 +1109,8 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
         save_plot_image(plt, imagename, backend_id) 
     
     #display plot
-    plt.show()    
+    if show_plot_images:
+        plt.show()
 
 
 #################################################
@@ -1208,7 +1215,8 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
         save_plot_image(plt, imagename, backend_id)
 
     #display plot
-    plt.show()
+    if show_plot_images:
+        plt.show()
 
 
 # Plot filled but borderless rectangles based on merged gradations of result metrics
@@ -1451,7 +1459,7 @@ known_score_labels = {
 
  
 # Plot all the given "Score Metrics" against the given "X Metrics" and "Y Metrics" 
-def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None):
+def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None,suffix=''):
 
     if type(score_metric) == str:
         score_metric = [score_metric]
@@ -1464,23 +1472,23 @@ def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
-                plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size, options=options)
+                plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size, options=options,suffix=suffix)
        
 # Plot the given "Score Metric" against the given "X Metric" and "Y Metric"         
-def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None):
+def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None, suffix=''):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
     fixed_metrics: (dict) A dictionary mapping metric keywords to the values they are to be held at;
-                          for example: 
-                          
-                          fixed_metrics = {'rounds': 2}
-                              
-                              when the y-axis is num_qubits or 
-                          
-                          fixed_metrics = {'num_qubits': 4}
-                          
-                              when the y-axis is rounds.    
+        for example: 
+        
+        fixed_metrics = {'rounds': 2}
+            
+            when the y-axis is num_qubits or 
+        
+        fixed_metrics = {'num_qubits': 4}
+        
+            when the y-axis is rounds.    
     """
     # get backend id for this set of circuits
     backend_id = get_backend_id()
@@ -1608,6 +1616,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
     plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
                         labelrot=0, type=1, fill=True, w_max=18, do_label=False,
                         x_size=xs, y_size=y_size)                         
+    save_plot_image(plt, os.path.join(f"{appname}-area-{score_metric}_x={x_metric}_y={y_metric}_" + suffix), backend_id)
         
 
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
@@ -1657,7 +1666,7 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     
 
 # Plot bar charts for each metric over all groups
-def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", options=None):
+def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", objective_func_type = 'cvar_approx_ratio', options=None):
     """
     Currently only used for maxcut
     """
@@ -1683,7 +1692,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
     do_depths = len(group_metrics["avg_depths"]) > 0
     
     # DEVNOTE: Add to group metrics here; this should be done during execute
-    group_metrics_2 = {'optimality_gap':[]} # optimality_gap':[], 'cvar_approx_ratio':[],'Max_N_approx_ratio':[]
+    group_metrics_2 = {'optimality_gap':[], 'quantile_optgaps':[]} # optimality_gap':[], 'cvar_approx_ratio':[],'Max_N_approx_ratio':[]
 
     for group in circuit_metrics_detail_2:
         num_qubits = int(group)
@@ -1696,12 +1705,21 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
                 mets = circuit_metrics_detail_2[group][circuit_id][it]
             #the two lines above gets us the mets for the last circuit. Improve this later by removing the loop
 
-            for metric_type in ['approx_ratio', 'cvar_approx_ratio', 'Max_N_approx_ratio']:
-                # optgap will be computed using whichever of the above three has been computed
-                if metric_type in mets:
-                    group_metrics_2['optimality_gap'].append(1.0 - mets[metric_type])
-                    break
+            # Save data for the optimality gap with quantiles
+            if objective_func_type in mets:
+                group_metrics_2['optimality_gap'].append((1.0 - mets[objective_func_type]) * 100)
+                opt_method = objective_func_type
 
+            # Also store the optimality gaps at the three quantiles values
+            # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
+            try:
+                q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
+                q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
+                group_metrics_2['quantile_optgaps'].append(q_vals)
+            except KeyError:
+                print("quantile_optgaps have not been stored")
+            except Exception as e: print(e)
+            
             # and just break after the first circuit, since we are not averaging
             break
             
@@ -1750,18 +1768,43 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
         # if max(group_metrics["avg_tr_depths"]) < 20:
         #     axs[axi].set_ylim([0, 20])
 
-        # For the y axis, choose the limits to be at least [0,0.4].
-        axs[axi].set_ylim([0, max(0.4,max(group_metrics_2["optimality_gap"]))])
+        # For the y axis, choose the limits to be at least [0,40].
+        axs[axi].set_ylim([0, max(40,
+                                  max(group_metrics_2["optimality_gap"]), 
+                                  max(max(group_metrics_2["quantile_optgaps"]))
+                                  ) * 1.1])
         axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
+        
+        # Plot the quantile optimality gaps as errorbars
+        try:
+            q_vals = group_metrics_2['quantile_optgaps'] # list of lists; shape (number of circuit widths, 3)
+            # Indices are of the form (circuit width index, quantile index)
+            print(q_vals)
+            center_optgaps = [q_vals[i][1] for i in range(len(q_vals))]
+            down_error = [q_vals[i][0] - q_vals[i][1] for i in range(len(q_vals))]
+            up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
+            errors = [up_error, down_error]
+
+            axs[axi].errorbar(group_metrics["groups"], center_optgaps, yerr = errors,
+                              ecolor = 'k', elinewidth = 1,barsabove=False, capsize=3,
+                              ls='',marker="D", markersize=5, mfc='c', mec='k', mew=0.5)
+        except Exception as e: print(e)
+            
         #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
         #axs[axi].set_ylabel(known_score_labels['approx_ratio'])
-        axs[axi].set_ylabel('Optimality Gap') #removed  (%)
+        axs[axi].set_ylabel('Optimality Gap (%)')
         
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
             
-        axs[axi].legend(['Degree 3', 'Degree -3'], loc='upper left')
+        # Replacing legend settings. Might need to modify later
+        # axs[axi].legend(['Degree 3', 'Degree -3'], loc='upper left') 
+        legend_dict = {'approx_ratio' : 'Exp. Value',
+                       'cvar_approx_ratio' : 'CVaR',
+                       'Max_N_approx_ratio' : 'Max counts'}
+        axs[axi].legend([legend_dict[objective_func_type], 'Quartiles'], loc='center left',
+                        bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
         axi += 1
     
     # shared x axis label
@@ -1774,7 +1817,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
         save_plot_image(plt, f"{appname}-optgaps" + suffix, backend_id) 
             
     # show the plot for user to see
-    plt.show()
+    if show_plot_images:
+        plt.show()
 
 
 #############################################
