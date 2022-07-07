@@ -7,12 +7,14 @@
     "### QED-C Prototype Benchmarks - Qiskit Version - with Algorithmix Qubits\n",
     "The notebook contains a suite of prototype application benchmarks for the IBM Qiskit API, along with the volumetric and the algorithmic qubit (AQ) measurement. \n",
     "Configure and run the cell below with the desired execution settings.\n",
-    "Then execute the remaining cells, each containing one prototype benchmark program."
+    "Then execute the remaining cells, each containing one prototype benchmark program.\n",
+    "\n",
+    "Algorithmic qubits, #AQ = N, can be defined as a side of the largest box of width N and $N^2$ CX gates that can be drawn on the volumetric background, such that every circuit within this box meets the success criteria. In the new #AQ definition, only the number of CX gates in the circuit are tracked as single qubit gates are more accurate in most quantum computer hardware. The success probability of each circuit run on the quantum computer is measured by the Hellinger fidelity computed using the output probability distribution against the ideal output probability distribution. The circuit passes if the measured fidelity is greater than the threshold, which is 0.37. For more details, please visit: https://ionq.com/posts/february-23-2022-algorithmic-qubits"
    ]
   },
   {
    "cell_type": "code",
-   "execution_count": null,
+   "execution_count": 1,
    "metadata": {
     "scrolled": true
    },
@@ -155,6 +157,41 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
+    "## Difference between the Hellinger fidelity and the Polarization fidelity\n",
+    "\n",
+    "Note that there is a difference between Hellinger Fidelity and the \"Result Fidelity\", which is polarization fidelity,  especially in algorithms with output states that are not in the computatiobal basis (the output distribution does not concentrate on just one bitstring). In the current benchmark suite, such a difference is shown in the amplitude estimation and the Monte Carlo algorithms. This could be understand by looking at the definition of the Hellinger fidelity and the polarization fidelity. \n",
+    "\n",
+    "The Hellinger fidelity is defined as\n",
+    "\\begin{equation}\n",
+    "    F_s(P_{ideal}, P_{output})=\\left(\\sum_x{\\sqrt{P_{output}(x)P_{ideal}(x)}}\\right)^2\n",
+    "\\end{equation}\n",
+    "and the polarization fidelity is defined as\n",
+    "\\begin{equation}\n",
+    "    F(P_{ideal}, P_{output})=\\frac{F_s(P_{ideal}, P_{output})-F_s(P_{ideal}, P_{uni})}{1-F_s(P_{ideal}, P_{uni})}\n",
+    "\\end{equation}\n",
+    "in which $P_{uni}$ is the uniform distribution, and $P_{uni}(x)=1/2^n \\forall x$, in which $n$ is the total number of qubits being measured.  \n",
+    "\n",
+    "\n",
+    "As one could see, the polarization fidelity is defined as to subtract the uniform distribution from the Hellinger fidelity, and normalize it so that it is between 0 and 1. It is an open research question about which fidelity measures the algorithm performance more accurately. As the number of qubit increases, $F_s(P_{ideal}, P_{uni})$ becomes exponentially small so that these two fidelities agree with each other in the large qubit number limit. With a small number of qubits, the Hellinger fidelity is usually higer than the polarization fidelity, especially for circuits whose output states are not in the computational basis. This could be understood by the following example. \n",
+    "\n",
+    "Consider a circuit with 2 qubits and the ideal distribution is {'01':1.0}. In this case, the ideal output state is in the computational basis (all population in one bitstring). When using a depolarization noise model with error rate of 25%, the output distribution becomes {'00':0.0625, '01':0.8125, '10':0.0625, '11':0.0625}, and then the Helliger fidelity and the polarization fidelity are the same\n",
+    "\n",
+    "\\begin{equation}\n",
+    "    F_s=0.8125, F=0.8125\n",
+    "\\end{equation}\n",
+    "\n",
+    "Then consider another circuit with 2 qubits and the ideal distribution is {'01':0.5, '10':0.5}, in which the output state is not in the computational basis (population spreads out to multiple bitstrings). When using a depolarization noise model with error rate of 25%, the output distribution becomes {'00':0.0625, '01':0.4375, '10':0.4375, '11':0.0625}, and then the Helliger fidelity and the polarization fidelity are\n",
+    "\n",
+    "\\begin{equation}\n",
+    "    F_s=0.875, F=0.778\n",
+    "\\end{equation}\n",
+    "and in this case the Hellinger fidelity is higher than the polarization fidelity. "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
     "### Hamiltonian Simulation"
    ]
   },
@@ -267,6 +304,11 @@
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
    "version": "3.8.5"
+  },
+  "vscode": {
+   "interpreter": {
+    "hash": "aee8b7b246df8f9039afb4144a1f6fd8d2ca17a180786b69acc140d282b71a49"
+   }
   }
  },
  "nbformat": 4,
