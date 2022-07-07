@@ -1437,9 +1437,9 @@ def save_plot_image(plt, imagename, backend_id):
 
 # map known X metrics to labels    
 known_x_labels = {
-    'cumulative_create_time' : 'Cumulative Circuit Creation Time',
-    'cumulative_exec_time' : 'Cumulative Quantum Execution Time',
-    'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time',
+    'cumulative_create_time' : 'Cumulative Circuit Creation Time (s)',
+    'cumulative_exec_time' : 'Cumulative Quantum Execution Time (s)',
+    'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time (s)',
     'cumulative_depth' : 'Cumulative Circuit Depth'
 }
 # map known Y metrics to labels    
@@ -1692,19 +1692,22 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
     do_depths = len(group_metrics["avg_depths"]) > 0
     
     # DEVNOTE: Add to group metrics here; this should be done during execute
-    group_metrics_2 = {'optimality_gap':[], 'quantile_optgaps':[]} # optimality_gap':[], 'cvar_approx_ratio':[],'Max_N_approx_ratio':[]
+    num_widths = len(circuit_metrics_detail_2)
+    group_metrics_2 = {'optimality_gap':[], 
+                       'quantile_optgaps':[]} # optimality_gap':[], 'cvar_approx_ratio':[],'Max_N_approx_ratio':[]
 
+    
+    
     for group in circuit_metrics_detail_2:
         num_qubits = int(group)
         
         # Each problem instance at size num_qubits; need to collate across iterations
-        i = 0
+        # Note: Below, when we append the metrics, we are assuming that there circuit_metrics_detail_2[group] has only one element
         for circuit_id in circuit_metrics_detail_2[group]:
             # save the metric from the last iteration
-            for it in circuit_metrics_detail_2[group][circuit_id]:
-                mets = circuit_metrics_detail_2[group][circuit_id][it]
-            #the two lines above gets us the mets for the last circuit. Improve this later by removing the loop
-
+            last_ind = max(circuit_metrics_detail_2[group][circuit_id].keys())
+            mets = circuit_metrics_detail_2[group][circuit_id][last_ind]
+            
             # Save data for the optimality gap with quantiles
             if objective_func_type in mets:
                 group_metrics_2['optimality_gap'].append((1.0 - mets[objective_func_type]) * 100)
@@ -1722,9 +1725,14 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             
             # and just break after the first circuit, since we are not averaging
             break
-            
-    #print(f"... group_metrics_2['approx_ratio'] = {group_metrics_2['approx_ratio']}")
-    #print(f"... group_metrics_2['optimality_gap'] = {group_metrics_2['optimality_gap']}")       
+    
+    # circuit_metrics_detail_2.keys() may not be in an ascending order. Get argsort
+    groups = list(circuit_metrics_detail_2.keys())
+    groups = [int(i) for i in groups]
+    sort_inds = np.argsort(groups)
+    # Rearrange optimality_gap and quantile_optgaps using the same sequence
+    for optgap_quantity in group_metrics_2:
+        group_metrics_2[optgap_quantity] = [group_metrics_2[optgap_quantity][i] for i in sort_inds]
     
     # generate one-column figure with multiple bar charts, with shared X axis
     cols = 1

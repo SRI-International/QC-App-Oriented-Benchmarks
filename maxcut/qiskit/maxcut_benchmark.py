@@ -12,6 +12,7 @@ import json
 import math
 import numpy as np
 from scipy.optimize import minimize
+import re
 
 from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
                     QuantumCircuit, QuantumRegister, execute)
@@ -781,7 +782,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         #metrics.print_all_circuit_metrics()
         
 
-            
         cur_time=datetime.datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
         suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
@@ -796,6 +796,178 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                                      options=dict(shots=num_shots, rounds=rounds, degree=degree),
                                      suffix=suffix, objective_func_type = objective_func_type)
+
+
+#%% Function for loading and plotting data saved in json files
+
+def load_data_and_plot(folder):
+    """
+    The highest level function for loading stored data from a previous run
+    and plotting optgaps and area metrics
+
+    Parameters
+    ----------
+    folder : string
+        Directory where json files are saved.
+    """
+    gen_prop, thetas, fincounts = load_all_metrics(folder)
+    create_plots_from_loaded_data(gen_prop)
+
+
+def load_all_metrics(folder):
+    """
+    Load all data that was saved in a folder.
+    The saved data will be in json files in this folder
+
+    Parameters
+    ----------
+    folder : string
+        Directory where json files are saved.
+
+    Returns
+    -------
+    gen_prop : dict
+        of inputs that were used in maxcut_benchmark.run method
+    thetas : list of list of floats
+        
+    fincounts : TYPE
+        DESCRIPTION.
+
+    """
+    
+    metrics.init_metrics()
+    assert os.path.isdir(folder), f"Specified folder ({folder}) does not exist."
+    
+    list_of_files = os.listdir(folder)
+    width_degree_file_tuples = [(*get_width_degree_tuple_from_filename(fileName),fileName) 
+                           for (ind,fileName) in enumerate(list_of_files)] # list with elements that are tuples->(width,degree,filename)
+    
+    width_degree_file_tuples = sorted(width_degree_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by degree
+    list_of_files = [tup[2] for tup in width_degree_file_tuples]
+    
+    thetas = [0] * len(list_of_files) #list of lists of length 4 each
+    fincounts = [0] * len(list_of_files) # list of dictionaries
+    
+    for ind, fileName in enumerate(list_of_files):
+        gen_prop, thetas[ind], fincounts[ind] = load_from_width_degree_file(folder, fileName)
+    
+    return gen_prop, thetas, fincounts
+
+
+def load_from_width_degree_file(folder, fileName):
+    """
+    Given a folder name and a file in it, load all the stored data and store the values in metrics.circuit_metrics.
+    Also return the converged values of thetas, the final counts and general properties.
+
+    Parameters
+    ----------
+    folder : string
+        folder where the json file is located
+    fileName : string
+        name of the json file
+
+    Returns
+    -------
+    gen_prop : dict
+        of inputs that were used in maxcut_benchmark.run method
+    converged_thetas_list : list of floats
+        values of angles at the end of the algorithm
+    final_counts : dict
+        keys are bitstrings and values are measured counts
+    """
+    
+    # Extract num_qubits and s from file name
+    num_qubits, s_int = get_width_degree_tuple_from_filename(fileName)
+    print(f"Loading {fileName}, corresponding to {num_qubits} qubits and degree {s_int}")
+    with open(os.path.join(folder, fileName), 'r') as json_file:
+        data = json.load(json_file)
+        gen_prop = data['general properties']
+        converged_thetas_list = data['converged_thetas_list']
+        final_counts = data['final_counts']
+        
+        ex.set_execution_target(backend_id = gen_prop["backend_id"], 
+                                provider_backend = gen_prop["provider_backend"],
+                                hub = gen_prop["hub"], 
+                                group = gen_prop["group"], 
+                                project = gen_prop["project"],
+                                exec_options = gen_prop["exec_options"])
+        
+        # Update circuit metrics
+        for circuit_id in data['iterations']:
+            for metric, value in data['iterations'][circuit_id].items():
+                metrics.store_metric(num_qubits, circuit_id, metric, value)
+                
+        method = gen_prop['method']
+        if method == 2:
+            metrics.process_circuit_metrics_2_level(num_qubits)
+            metrics.finalize_group(str(num_qubits))
+
+    return gen_prop, converged_thetas_list, final_counts
+    
+
+def get_width_degree_tuple_from_filename(fileName):
+    """
+    Given a filename, extract the corresponding width and degree it corresponds to
+    For example the file "width=4_degree=3.json" corresponds to 4 qubits and degree 3
+
+    Parameters
+    ----------
+    fileName : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    num_qubits : int
+        circuit width
+    degree : int
+        graph degree.
+
+    """
+    pattern = 'width=([0-9]+)_degree=([0-9]+).json'
+    match = re.search(pattern, fileName)
+
+    num_qubits = int(match.groups()[0])
+    degree = int(match.groups()[1])
+    return (num_qubits,degree)
+
+def create_plots_from_loaded_data(gen_prop):
+    """
+    Once the metrics have been stored using load_all_metrics, 
+
+    Parameters
+    ----------
+    gen_prop : dict
+        of inputs that were used in maxcut_benchmark.run method
+
+    Returns
+    -------
+    None.
+
+    """
+    cur_time=datetime.datetime.now()
+    dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
+    method = gen_prop['method']
+    num_shots = gen_prop['num_shots']
+    degree = gen_prop['degree']
+    rounds = gen_prop['rounds']
+    max_iter = gen_prop['max_iter']
+    objective_func_type = gen_prop['objective_func_type']
+
+    suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
+    metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                                 options=dict(shots=num_shots, rounds=rounds,
+                                              degree=degree),
+                                 suffix=suffix, objective_func_type = objective_func_type)
+    
+    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+            score_metric=gen_prop['score_metric'], x_metric=gen_prop['x_metric'], 
+            y_metric=gen_prop['y_metric'], fixed_metrics=gen_prop['fixed_metrics'],
+            num_x_bins=gen_prop['num_x_bins'], x_size=gen_prop['x_size'], y_size=gen_prop['y_size'],
+            options=dict(shots=num_shots, rounds=rounds, degree=degree),
+            suffix=suffix)
+
+
+
 
 # if main, execute method
 if __name__ == '__main__': run()
