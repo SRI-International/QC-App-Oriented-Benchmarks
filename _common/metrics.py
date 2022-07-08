@@ -41,6 +41,8 @@ circuit_metrics = {  }
 circuit_metrics_detail = {  }    # for iterative algorithms
 circuit_metrics_detail_2 = {  }  # used to break down to 3rd dimension
 
+circuit_metrics_final_iter = {  } # used to store final results for the last circuit in iterative algorithms.
+
 group_metrics = { "groups": [],
     "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [], "avg_hf_fidelities": [],
     "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [], "avg_tr_n2qs": [],
@@ -127,6 +129,7 @@ def init_metrics ():
     circuit_metrics.clear()
     circuit_metrics_detail.clear()
     circuit_metrics_detail_2.clear()
+    circuit_metrics_final_iter.clear()
     
     # create empty arrays for group metrics
     group_metrics["groups"] = []
@@ -169,15 +172,31 @@ def store_metric (group, circuit, metric, value):
         circuit_metrics[group] = { }
     if circuit not in circuit_metrics[group]:
         circuit_metrics[group][circuit] = { }
-    circuit_metrics[group][circuit][metric] = value
-    #print(f'{group} {circuit} {metric} -> {value}')
-    
+        
     # if the value is a dict, store each metric provided
     if type(value) is dict:
         for key in value:
-            store_metric(group, circuit, key, value[key])
+            # If you want to store multiple metrics in one go,
+            # then simply provide these in the form of a dictionary under the value input
+            # In this case, the metric input will be ignored
+            store_metric(group, circuit, key, value[key]) 
+    else:
+        circuit_metrics[group][circuit][metric] = value
+    #print(f'{group} {circuit} {metric} -> {value}')
+    
+    
 
-
+def store_props_final_iter(group, circuit, metric, value):
+    group = str(group)
+    circuit = str(circuit)
+    if group not in circuit_metrics_final_iter: circuit_metrics_final_iter[group] = {}
+    if circuit not in circuit_metrics_final_iter[group]: circuit_metrics_final_iter[group][circuit] = { }
+    if type(value) is dict:
+        for key in value:
+            store_props_final_iter(group, circuit, key, value[key])
+    else:
+        circuit_metrics_final_iter[group][circuit][metric] = value
+    
 # Aggregate metrics for a specific group, creating average across circuits in group
 def aggregate_metrics_for_group (group):
     group = str(group)
