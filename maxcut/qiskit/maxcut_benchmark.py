@@ -362,6 +362,8 @@ def compute_sample_mean(counts, sizes, **kwargs):
         
 
     """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
 
     return - np.sum(counts * sizes) / np.sum(counts)
 
@@ -387,6 +389,8 @@ def compute_maxN_mean(counts, sizes, N = 5, **kwargs):
     -------
     float
     """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
 
     # Obtain the indices corresponding to the largest N% values of counts
     # Thereafter, sort the counts and sizes arrays in the order specified by sort_inds
@@ -419,6 +423,9 @@ def compute_cvar(counts, sizes, alpha = 0.1, **kwargs):
         CVaR value
 
     """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
+    
     # Sort the negative of the cut sizes in a non-decreasing order.
     # Sort counts in the same order as sizes, so that i^th element of each correspond to each other
     sort_inds = np.argsort(-sizes)
@@ -442,6 +449,11 @@ def compute_cvar(counts, sizes, alpha = 0.1, **kwargs):
 
     return - cvar_sum / num_avgd
 
+def compute_best_cut_from_measured(counts, sizes, **kwargs):
+    """From the measured cuts, return the size of the largest cut
+    """
+    return np.max(sizes)
+
 
 def compute_quartiles(counts, sizes):
     """
@@ -459,6 +471,8 @@ def compute_quartiles(counts, sizes):
     quantile_sizes : ndarray of of 3 floats
         sizes of cuts corresponding to the three quartile values.
     """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
 
     # Sort sizes and counts in the sequence of non-decreasing values of sizes
     sort_inds = np.argsort(sizes)
@@ -479,7 +493,7 @@ def compute_quartiles(counts, sizes):
 
 # Problem definitions only available for up to 10 qubits currently
 MAX_QUBITS = 24
-saved_result = None
+saved_result = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
 instance_filename = None
 
 # Execute program with default parameters
@@ -593,6 +607,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         # CVaR metric
         a_r_cvar = -1 * compute_cvar(counts, sizes, alpha = alpha) / opt
         metrics.store_metric(num_qubits, s_int, 'cvar_approx_ratio', a_r_cvar)
+        
+        # Max cut size among measured cuts
+        a_r_best = compute_best_cut_from_measured(counts, sizes) / opt
+        metrics.store_metric(num_qubits, s_int, 'bestCut_approx_ratio', a_r_best)
 
 
         # Also compute and store the weights of cuts at three quantile values
@@ -600,7 +618,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         metrics.store_metric(num_qubits, s_int, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) # need to store quantile_optgaps as a list instead of an array.
 
         
-        saved_result = result
+        saved_result = {'cuts' : cuts, 'counts' : counts.tolist(), 'sizes' : sizes.tolist()} # modified from result
      
     # Initialize execution module using the execution result handler above and specified backend_id
     # for method=2 we need to set max_jobs_active to 1, so each circuit completes before continuing
@@ -715,7 +733,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     opt_ts = time.time()
 
                     # Compute the objective function
-                    cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
+                    cuts, counts, sizes = saved_result['cuts'], saved_result['counts'], saved_result['sizes'] #compute_cutsizes(saved_result, nodes, edges)
                     return objective_function(counts = counts, sizes = sizes, N = N, alpha = alpha)
 
                 opt_ts = time.time()
@@ -727,6 +745,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 unique_id = s_int*1000 + unique_circuit_index
                 metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
                 
+                # Store also the final results, including (cuts, counts, sizes) as well as final values of 
+                metrics.store_props_final_iter(num_qubits, s_int, None, saved_result)
+                metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
+                print(metrics.circuit_metrics_final_iter)
                 ########################################################
                 ####### Save results of (circuit width, degree) combination
                 # Store the results obtained for the current values of num_qubits and i (i.e. degree)
@@ -739,8 +761,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
                     # Also store the value of counts obtained for the final counts
                     if save_final_counts:
-                        dict_to_store['final_counts'] = saved_result.get_counts()
-                    
+                        dict_to_store['final_counts'] = saved_result.copy()
+                                                        #saved_result.get_counts()
                     # Now save the output
                     with open(store_loc, 'w') as outfile:
                         json.dump(dict_to_store, outfile)
@@ -828,11 +850,6 @@ def load_all_metrics(folder):
     -------
     gen_prop : dict
         of inputs that were used in maxcut_benchmark.run method
-    thetas : list of list of floats
-        
-    fincounts : TYPE
-        DESCRIPTION.
-
     """
     
     metrics.init_metrics()
@@ -845,13 +862,10 @@ def load_all_metrics(folder):
     width_degree_file_tuples = sorted(width_degree_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by degree
     list_of_files = [tup[2] for tup in width_degree_file_tuples]
     
-    thetas = [0] * len(list_of_files) #list of lists of length 4 each
-    fincounts = [0] * len(list_of_files) # list of dictionaries
-    
     for ind, fileName in enumerate(list_of_files):
-        gen_prop, thetas[ind], fincounts[ind] = load_from_width_degree_file(folder, fileName)
+        gen_prop = load_from_width_degree_file(folder, fileName)
     
-    return gen_prop, thetas, fincounts
+    return gen_prop
 
 
 def load_from_width_degree_file(folder, fileName):
@@ -870,10 +884,6 @@ def load_from_width_degree_file(folder, fileName):
     -------
     gen_prop : dict
         of inputs that were used in maxcut_benchmark.run method
-    converged_thetas_list : list of floats
-        values of angles at the end of the algorithm
-    final_counts : dict
-        keys are bitstrings and values are measured counts
     """
     
     # Extract num_qubits and s from file name
@@ -883,7 +893,7 @@ def load_from_width_degree_file(folder, fileName):
         data = json.load(json_file)
         gen_prop = data['general properties']
         converged_thetas_list = data['converged_thetas_list']
-        final_counts = data['final_counts']
+        final_counts = data['final_counts'] # This is a 
         
         ex.set_execution_target(backend_id = gen_prop["backend_id"], 
                                 provider_backend = gen_prop["provider_backend"],
@@ -901,8 +911,10 @@ def load_from_width_degree_file(folder, fileName):
         if method == 2:
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
+            metrics.store_props_final_iter(num_qubits, s_int, None, final_counts)
+            metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', converged_thetas_list)
 
-    return gen_prop, converged_thetas_list, final_counts
+    return gen_prop
     
 
 def get_width_degree_tuple_from_filename(fileName):
