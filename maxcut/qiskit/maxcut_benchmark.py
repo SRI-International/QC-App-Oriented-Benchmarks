@@ -831,7 +831,7 @@ def load_data_and_plot(folder):
     folder : string
         Directory where json files are saved.
     """
-    gen_prop, thetas, fincounts = load_all_metrics(folder)
+    gen_prop = load_all_metrics(folder)
     create_plots_from_loaded_data(gen_prop)
 
 
