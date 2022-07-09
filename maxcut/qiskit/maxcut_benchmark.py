@@ -748,7 +748,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 # Store also the final results, including (cuts, counts, sizes) as well as final values of 
                 metrics.store_props_final_iter(num_qubits, s_int, None, saved_result)
                 metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
-                print(metrics.circuit_metrics_final_iter)
                 ########################################################
                 ####### Save results of (circuit width, degree) combination
                 # Store the results obtained for the current values of num_qubits and i (i.e. degree)
