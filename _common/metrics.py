@@ -41,6 +41,8 @@ circuit_metrics = {  }
 circuit_metrics_detail = {  }    # for iterative algorithms
 circuit_metrics_detail_2 = {  }  # used to break down to 3rd dimension
 
+circuit_metrics_final_iter = {  } # used to store final results for the last circuit in iterative algorithms.
+
 group_metrics = { "groups": [],
     "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [], "avg_hf_fidelities": [],
     "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [], "avg_tr_n2qs": [],
@@ -127,6 +129,7 @@ def init_metrics ():
     circuit_metrics.clear()
     circuit_metrics_detail.clear()
     circuit_metrics_detail_2.clear()
+    circuit_metrics_final_iter.clear()
     
     # create empty arrays for group metrics
     group_metrics["groups"] = []
@@ -169,15 +172,31 @@ def store_metric (group, circuit, metric, value):
         circuit_metrics[group] = { }
     if circuit not in circuit_metrics[group]:
         circuit_metrics[group][circuit] = { }
-    circuit_metrics[group][circuit][metric] = value
-    #print(f'{group} {circuit} {metric} -> {value}')
-    
+        
     # if the value is a dict, store each metric provided
     if type(value) is dict:
         for key in value:
-            store_metric(group, circuit, key, value[key])
+            # If you want to store multiple metrics in one go,
+            # then simply provide these in the form of a dictionary under the value input
+            # In this case, the metric input will be ignored
+            store_metric(group, circuit, key, value[key]) 
+    else:
+        circuit_metrics[group][circuit][metric] = value
+    #print(f'{group} {circuit} {metric} -> {value}')
+    
+    
 
-
+def store_props_final_iter(group, circuit, metric, value):
+    group = str(group)
+    circuit = str(circuit)
+    if group not in circuit_metrics_final_iter: circuit_metrics_final_iter[group] = {}
+    if circuit not in circuit_metrics_final_iter[group]: circuit_metrics_final_iter[group][circuit] = { }
+    if type(value) is dict:
+        for key in value:
+            store_props_final_iter(group, circuit, key, value[key])
+    else:
+        circuit_metrics_final_iter[group][circuit][metric] = value
+    
 # Aggregate metrics for a specific group, creating average across circuits in group
 def aggregate_metrics_for_group (group):
     group = str(group)
@@ -1437,9 +1456,9 @@ def save_plot_image(plt, imagename, backend_id):
 
 # map known X metrics to labels    
 known_x_labels = {
-    'cumulative_create_time' : 'Cumulative Circuit Creation Time',
-    'cumulative_exec_time' : 'Cumulative Quantum Execution Time',
-    'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time',
+    'cumulative_create_time' : 'Cumulative Circuit Creation Time (s)',
+    'cumulative_exec_time' : 'Cumulative Quantum Execution Time (s)',
+    'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time (s)',
     'cumulative_depth' : 'Cumulative Circuit Depth'
 }
 # map known Y metrics to labels    
@@ -1692,19 +1711,22 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
     do_depths = len(group_metrics["avg_depths"]) > 0
     
     # DEVNOTE: Add to group metrics here; this should be done during execute
-    group_metrics_2 = {'optimality_gap':[], 'quantile_optgaps':[]} # optimality_gap':[], 'cvar_approx_ratio':[],'Max_N_approx_ratio':[]
+    num_widths = len(circuit_metrics_detail_2)
+    group_metrics_2 = {'optimality_gap':[], 
+                       'quantile_optgaps':[]} # optimality_gap':[], 'cvar_approx_ratio':[],'Max_N_approx_ratio':[]
 
+    
+    
     for group in circuit_metrics_detail_2:
         num_qubits = int(group)
         
         # Each problem instance at size num_qubits; need to collate across iterations
-        i = 0
+        # Note: Below, when we append the metrics, we are assuming that there circuit_metrics_detail_2[group] has only one element
         for circuit_id in circuit_metrics_detail_2[group]:
             # save the metric from the last iteration
-            for it in circuit_metrics_detail_2[group][circuit_id]:
-                mets = circuit_metrics_detail_2[group][circuit_id][it]
-            #the two lines above gets us the mets for the last circuit. Improve this later by removing the loop
-
+            last_ind = max(circuit_metrics_detail_2[group][circuit_id].keys())
+            mets = circuit_metrics_detail_2[group][circuit_id][last_ind]
+            
             # Save data for the optimality gap with quantiles
             if objective_func_type in mets:
                 group_metrics_2['optimality_gap'].append((1.0 - mets[objective_func_type]) * 100)
@@ -1722,9 +1744,14 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             
             # and just break after the first circuit, since we are not averaging
             break
-            
-    #print(f"... group_metrics_2['approx_ratio'] = {group_metrics_2['approx_ratio']}")
-    #print(f"... group_metrics_2['optimality_gap'] = {group_metrics_2['optimality_gap']}")       
+    
+    # circuit_metrics_detail_2.keys() may not be in an ascending order. Get argsort
+    groups = list(circuit_metrics_detail_2.keys())
+    groups = [int(i) for i in groups]
+    sort_inds = np.argsort(groups)
+    # Rearrange optimality_gap and quantile_optgaps using the same sequence
+    for optgap_quantity in group_metrics_2:
+        group_metrics_2[optgap_quantity] = [group_metrics_2[optgap_quantity][i] for i in sort_inds]
     
     # generate one-column figure with multiple bar charts, with shared X axis
     cols = 1

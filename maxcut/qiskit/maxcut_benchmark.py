@@ -12,6 +12,7 @@ import json
 import math
 import numpy as np
 from scipy.optimize import minimize
+import re
 
 from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
                     QuantumCircuit, QuantumRegister, execute)
@@ -361,6 +362,8 @@ def compute_sample_mean(counts, sizes, **kwargs):
         
 
     """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
 
     return - np.sum(counts * sizes) / np.sum(counts)
 
@@ -386,6 +389,8 @@ def compute_maxN_mean(counts, sizes, N = 5, **kwargs):
     -------
     float
     """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
 
     # Obtain the indices corresponding to the largest N% values of counts
     # Thereafter, sort the counts and sizes arrays in the order specified by sort_inds
@@ -418,6 +423,9 @@ def compute_cvar(counts, sizes, alpha = 0.1, **kwargs):
         CVaR value
 
     """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
+    
     # Sort the negative of the cut sizes in a non-decreasing order.
     # Sort counts in the same order as sizes, so that i^th element of each correspond to each other
     sort_inds = np.argsort(-sizes)
@@ -441,6 +449,11 @@ def compute_cvar(counts, sizes, alpha = 0.1, **kwargs):
 
     return - cvar_sum / num_avgd
 
+def compute_best_cut_from_measured(counts, sizes, **kwargs):
+    """From the measured cuts, return the size of the largest cut
+    """
+    return np.max(sizes)
+
 
 def compute_quartiles(counts, sizes):
     """
@@ -458,6 +471,8 @@ def compute_quartiles(counts, sizes):
     quantile_sizes : ndarray of of 3 floats
         sizes of cuts corresponding to the three quartile values.
     """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
 
     # Sort sizes and counts in the sequence of non-decreasing values of sizes
     sort_inds = np.argsort(sizes)
@@ -478,7 +493,7 @@ def compute_quartiles(counts, sizes):
 
 # Problem definitions only available for up to 10 qubits currently
 MAX_QUBITS = 24
-saved_result = None
+saved_result = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
 instance_filename = None
 
 # Execute program with default parameters
@@ -592,6 +607,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         # CVaR metric
         a_r_cvar = -1 * compute_cvar(counts, sizes, alpha = alpha) / opt
         metrics.store_metric(num_qubits, s_int, 'cvar_approx_ratio', a_r_cvar)
+        
+        # Max cut size among measured cuts
+        a_r_best = compute_best_cut_from_measured(counts, sizes) / opt
+        metrics.store_metric(num_qubits, s_int, 'bestCut_approx_ratio', a_r_best)
 
 
         # Also compute and store the weights of cuts at three quantile values
@@ -599,7 +618,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         metrics.store_metric(num_qubits, s_int, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) # need to store quantile_optgaps as a list instead of an array.
 
         
-        saved_result = result
+        saved_result = {'cuts' : cuts, 'counts' : counts.tolist(), 'sizes' : sizes.tolist()} # modified from result
      
     # Initialize execution module using the execution result handler above and specified backend_id
     # for method=2 we need to set max_jobs_active to 1, so each circuit completes before continuing
@@ -714,7 +733,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     opt_ts = time.time()
 
                     # Compute the objective function
-                    cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
+                    cuts, counts, sizes = saved_result['cuts'], saved_result['counts'], saved_result['sizes'] #compute_cutsizes(saved_result, nodes, edges)
                     return objective_function(counts = counts, sizes = sizes, N = N, alpha = alpha)
 
                 opt_ts = time.time()
@@ -726,6 +745,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 unique_id = s_int*1000 + unique_circuit_index
                 metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
                 
+                # Store also the final results, including (cuts, counts, sizes) as well as final values of 
+                metrics.store_props_final_iter(num_qubits, s_int, None, saved_result)
+                metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
                 ########################################################
                 ####### Save results of (circuit width, degree) combination
                 # Store the results obtained for the current values of num_qubits and i (i.e. degree)
@@ -738,8 +760,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
                     # Also store the value of counts obtained for the final counts
                     if save_final_counts:
-                        dict_to_store['final_counts'] = saved_result.get_counts()
-                    
+                        dict_to_store['final_counts'] = saved_result.copy()
+                                                        #saved_result.get_counts()
                     # Now save the output
                     with open(store_loc, 'w') as outfile:
                         json.dump(dict_to_store, outfile)
@@ -781,7 +803,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         #metrics.print_all_circuit_metrics()
         
 
-            
         cur_time=datetime.datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
         suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
@@ -796,6 +817,168 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                                      options=dict(shots=num_shots, rounds=rounds, degree=degree),
                                      suffix=suffix, objective_func_type = objective_func_type)
+
+
+#%% Function for loading and plotting data saved in json files
+
+def load_data_and_plot(folder):
+    """
+    The highest level function for loading stored data from a previous run
+    and plotting optgaps and area metrics
+
+    Parameters
+    ----------
+    folder : string
+        Directory where json files are saved.
+    """
+    gen_prop, thetas, fincounts = load_all_metrics(folder)
+    create_plots_from_loaded_data(gen_prop)
+
+
+def load_all_metrics(folder):
+    """
+    Load all data that was saved in a folder.
+    The saved data will be in json files in this folder
+
+    Parameters
+    ----------
+    folder : string
+        Directory where json files are saved.
+
+    Returns
+    -------
+    gen_prop : dict
+        of inputs that were used in maxcut_benchmark.run method
+    """
+    
+    metrics.init_metrics()
+    assert os.path.isdir(folder), f"Specified folder ({folder}) does not exist."
+    
+    list_of_files = os.listdir(folder)
+    width_degree_file_tuples = [(*get_width_degree_tuple_from_filename(fileName),fileName) 
+                           for (ind,fileName) in enumerate(list_of_files)] # list with elements that are tuples->(width,degree,filename)
+    
+    width_degree_file_tuples = sorted(width_degree_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by degree
+    list_of_files = [tup[2] for tup in width_degree_file_tuples]
+    
+    for ind, fileName in enumerate(list_of_files):
+        gen_prop = load_from_width_degree_file(folder, fileName)
+    
+    return gen_prop
+
+
+def load_from_width_degree_file(folder, fileName):
+    """
+    Given a folder name and a file in it, load all the stored data and store the values in metrics.circuit_metrics.
+    Also return the converged values of thetas, the final counts and general properties.
+
+    Parameters
+    ----------
+    folder : string
+        folder where the json file is located
+    fileName : string
+        name of the json file
+
+    Returns
+    -------
+    gen_prop : dict
+        of inputs that were used in maxcut_benchmark.run method
+    """
+    
+    # Extract num_qubits and s from file name
+    num_qubits, s_int = get_width_degree_tuple_from_filename(fileName)
+    print(f"Loading {fileName}, corresponding to {num_qubits} qubits and degree {s_int}")
+    with open(os.path.join(folder, fileName), 'r') as json_file:
+        data = json.load(json_file)
+        gen_prop = data['general properties']
+        converged_thetas_list = data['converged_thetas_list']
+        final_counts = data['final_counts'] # This is a 
+        
+        ex.set_execution_target(backend_id = gen_prop["backend_id"], 
+                                provider_backend = gen_prop["provider_backend"],
+                                hub = gen_prop["hub"], 
+                                group = gen_prop["group"], 
+                                project = gen_prop["project"],
+                                exec_options = gen_prop["exec_options"])
+        
+        # Update circuit metrics
+        for circuit_id in data['iterations']:
+            for metric, value in data['iterations'][circuit_id].items():
+                metrics.store_metric(num_qubits, circuit_id, metric, value)
+                
+        method = gen_prop['method']
+        if method == 2:
+            metrics.process_circuit_metrics_2_level(num_qubits)
+            metrics.finalize_group(str(num_qubits))
+            metrics.store_props_final_iter(num_qubits, s_int, None, final_counts)
+            metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', converged_thetas_list)
+
+    return gen_prop
+    
+
+def get_width_degree_tuple_from_filename(fileName):
+    """
+    Given a filename, extract the corresponding width and degree it corresponds to
+    For example the file "width=4_degree=3.json" corresponds to 4 qubits and degree 3
+
+    Parameters
+    ----------
+    fileName : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    num_qubits : int
+        circuit width
+    degree : int
+        graph degree.
+
+    """
+    pattern = 'width=([0-9]+)_degree=([0-9]+).json'
+    match = re.search(pattern, fileName)
+
+    num_qubits = int(match.groups()[0])
+    degree = int(match.groups()[1])
+    return (num_qubits,degree)
+
+def create_plots_from_loaded_data(gen_prop):
+    """
+    Once the metrics have been stored using load_all_metrics, 
+
+    Parameters
+    ----------
+    gen_prop : dict
+        of inputs that were used in maxcut_benchmark.run method
+
+    Returns
+    -------
+    None.
+
+    """
+    cur_time=datetime.datetime.now()
+    dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
+    method = gen_prop['method']
+    num_shots = gen_prop['num_shots']
+    degree = gen_prop['degree']
+    rounds = gen_prop['rounds']
+    max_iter = gen_prop['max_iter']
+    objective_func_type = gen_prop['objective_func_type']
+
+    suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
+    metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                                 options=dict(shots=num_shots, rounds=rounds,
+                                              degree=degree),
+                                 suffix=suffix, objective_func_type = objective_func_type)
+    
+    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+            score_metric=gen_prop['score_metric'], x_metric=gen_prop['x_metric'], 
+            y_metric=gen_prop['y_metric'], fixed_metrics=gen_prop['fixed_metrics'],
+            num_x_bins=gen_prop['num_x_bins'], x_size=gen_prop['x_size'], y_size=gen_prop['y_size'],
+            options=dict(shots=num_shots, rounds=rounds, degree=degree),
+            suffix=suffix)
+
+
+
 
 # if main, execute method
 if __name__ == '__main__': run()
