@@ -1,0 +1,22 @@
+# Set x axis units
+xtick.direction : in
+ytick.direction : in
+
+# Set default figure size
+figure.figsize : 4,3
+
+# Save as 'tight'
+savefig.bbox : tight
+savefig.pad_inches : 0.05
+
+# Figure dpi
+figure.dpi : 300
+# default is 100
+
+# Use serif fonts
+font.family : sans-serif
+mathtext.fontset: dejavusans
+
+# Use LaTeX for math formatting
+text.usetex : True
+text.latex.preamble : \usepackage{amsmath} \usepackage{amssymb}
