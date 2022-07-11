@@ -1711,37 +1711,26 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
     do_depths = len(group_metrics["avg_depths"]) > 0
     
     # DEVNOTE: Add to group metrics here; this should be done during execute
-    num_widths = len(circuit_metrics_detail_2)
-    group_metrics_2 = {'optimality_gap':[], 
-                       'quantile_optgaps':[]} # optimality_gap':[], 'cvar_approx_ratio':[],'Max_N_approx_ratio':[]
+    group_metrics_2 = {'optimality_gap_cvar':[], 'optimality_gap_avg' :[], 'optimality_gap_maxN' : [],
+                       'quantile_optgaps':[]}
 
-    
-    
     for group in circuit_metrics_detail_2:
-        num_qubits = int(group)
-        
-        # Each problem instance at size num_qubits; need to collate across iterations
         # Note: Below, when we append the metrics, we are assuming that there circuit_metrics_detail_2[group] has only one element
         for circuit_id in circuit_metrics_detail_2[group]:
             # save the metric from the last iteration
             last_ind = max(circuit_metrics_detail_2[group][circuit_id].keys())
             mets = circuit_metrics_detail_2[group][circuit_id][last_ind]
             
-            # Save data for the optimality gap with quantiles
-            if objective_func_type in mets:
-                group_metrics_2['optimality_gap'].append((1.0 - mets[objective_func_type]) * 100)
-                opt_method = objective_func_type
+            # Compute optimality gaps for the three metrics
+            group_metrics_2['optimality_gap_avg'].append((1.0 - mets["approx_ratio"]) * 100)
+            group_metrics_2['optimality_gap_maxN'].append((1.0 - mets["Max_N_approx_ratio"]) * 100)
+            group_metrics_2['optimality_gap_cvar'].append((1.0 - mets["cvar_approx_ratio"]) * 100)
 
             # Also store the optimality gaps at the three quantiles values
             # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
-            try:
-                q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
-                q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
-                group_metrics_2['quantile_optgaps'].append(q_vals)
-            except KeyError:
-                print("quantile_optgaps have not been stored")
-            except Exception as e: print(e)
-            
+            q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
+            q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
+            group_metrics_2['quantile_optgaps'].append(q_vals)
             # and just break after the first circuit, since we are not averaging
             break
     
@@ -1752,7 +1741,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
     # Rearrange optimality_gap and quantile_optgaps using the same sequence
     for optgap_quantity in group_metrics_2:
         group_metrics_2[optgap_quantity] = [group_metrics_2[optgap_quantity][i] for i in sort_inds]
-    
+    group_metrics_2["groups"] = groups
     # generate one-column figure with multiple bar charts, with shared X axis
     cols = 1
     fig_w = 6.0
@@ -1797,10 +1786,29 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
 
         # For the y axis, choose the limits to be at least [0,40].
         axs[axi].set_ylim([0, max(40,
-                                  max(group_metrics_2["optimality_gap"]), 
+                                  max(group_metrics_2["optimality_gap_avg"]),
+                                  max(group_metrics_2["optimality_gap_maxN"]),
+                                  max(group_metrics_2["optimality_gap_cvar"]),
                                   max(max(group_metrics_2["quantile_optgaps"]))
                                   ) * 1.1])
-        axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
+
+        color_dict = {'optimality_gap_avg' : 'r',
+                      'optimality_gap_maxN' : 'b',
+                      'optimality_gap_cvar' : 'g'}
+        label_dict = {'optimality_gap_avg' : 'Exp. Value',
+                      'optimality_gap_maxN' : 'CVaR',
+                      'optimality_gap_cvar' : 'Max % counts'}
+        optgap_obj_str_map = {'optimality_gap_avg' : 'approx_ratio',
+                                  'optimality_gap_maxN' : 'cvar_approx_ratio',
+                                  'optimality_gap_cvar' : 'Max_N_approx_ratio'}
+        for metric_str in color_dict:
+            ls = '--'
+            if optgap_obj_str_map[metric_str] == objective_func_type:
+                ls = '-'
+            axs[axi].plot(groups, group_metrics_2[metric_str],marker='o', lw=1,
+                          ls=ls,color=color_dict[metric_str], label=label_dict[metric_str])
+        #
+        # axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
         
         # Plot the quantile optimality gaps as errorbars
         try:
@@ -1811,9 +1819,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
             errors = [up_error, down_error]
 
-            axs[axi].errorbar(group_metrics["groups"], center_optgaps, yerr = errors,
-                              ecolor = 'k', elinewidth = 1,barsabove=False, capsize=3,
-                              ls='',marker="D", markersize=5, mfc='c', mec='k', mew=0.5)
+            axs[axi].errorbar(group_metrics_2["groups"], center_optgaps, yerr = errors,
+                              ecolor = 'k', elinewidth = 1,barsabove=False, capsize=5,
+                              ls='',marker="D", markersize=8, mfc='c', mec='k', mew=0.5,
+                              label='Quartiles', alpha=0.75)
         except Exception as e: print(e)
             
         #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
@@ -1826,11 +1835,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", transform
             
         # Replacing legend settings. Might need to modify later
         # axs[axi].legend(['Degree 3', 'Degree -3'], loc='upper left') 
-        legend_dict = {'approx_ratio' : 'Exp. Value',
-                       'cvar_approx_ratio' : 'CVaR',
-                       'Max_N_approx_ratio' : 'Max counts'}
-        axs[axi].legend([legend_dict[objective_func_type], 'Quartiles'], loc='center left',
-                        bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
+        axs[axi].legend(loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
         axi += 1
     
     # shared x axis label
