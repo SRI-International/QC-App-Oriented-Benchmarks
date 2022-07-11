@@ -725,7 +725,6 @@ def get_appname_from_title(suptitle):
 
 import matplotlib.pyplot as plt
 plt.style.use('plots_template.mplstyle')
-
     
 # Plot bar charts for each metric over all groups
 def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", options=None):
@@ -1720,10 +1719,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     
     # DEVNOTE: Add to group metrics here; this should be done during execute
     # Create a dictionary, with keys specifying metric type, and values specifying corresponding optgap values
-    group_metrics_optgaps = {'approx_ratio' : {'color' : 'r', 'label': 'Exp. Value', 'gapvals' : []},
+    group_metrics_optgaps = {'approx_ratio' : {'color' : 'r', 'label': 'Approx. Ratio', 'gapvals' : []},
                              'Max_N_approx_ratio' : {'color' : 'b', 'label': 'Max % counts', 'gapvals' : []},
                              'cvar_approx_ratio' : {'color' : 'g', 'label': 'CVaR', 'gapvals' : []},
-                             'bestCut_approx_ratio' : {'color' : 'm', 'label': 'Best measurement', 'gapvals' : []},
+                             'bestCut_approx_ratio' : {'color' : 'm', 'label': 'Best Measurement', 'gapvals' : []},
                              'quantile_optgaps' : {'gapvals' : []}}
     
     if which_metrics_to_plot == 'all':
