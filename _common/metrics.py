@@ -1866,6 +1866,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
   
     rows = numplots
     
+    with plt.style.context(style_file):
         # DEVNOTE: this calculation is based on visual assessment of results and could be refined
         # compute height needed to draw same height plots, no matter how many there are
         # fig_h = 3.5 + 2.0 * (rows - 1) + 0.25 * (rows - 1)
