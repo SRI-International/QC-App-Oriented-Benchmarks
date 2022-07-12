@@ -725,7 +725,6 @@ def get_appname_from_title(suptitle):
 
 import matplotlib.pyplot as plt
 dir_path = os.path.dirname(os.path.realpath(__file__))
-print(dir_path)
 style_file = os.path.join(dir_path,'plots_template.mplstyle')
 # plt.style.use(style_file)
     
@@ -1625,7 +1624,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
     # plot the metrics background with its title
     ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                 y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
-    plt.tight_layout()
+    # plt.tight_layout()
     # no longer used, instead we pass the array of sizes
     #if x_size == None:
         #x_size=(max(x)-min(x))/num_x_bins
@@ -1766,19 +1765,20 @@ def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
                 cumul_counts = circuit_metrics_final_iter[group][deg]['cumul_counts']
                 unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
-                axs.plot(cumul_counts, unique_sizes / optimal_value, marker='o',
+                axs.plot(cumul_counts, np.array(unique_sizes) / optimal_value, marker='o',
                          ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
-                
-        axs.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        
+
         axs.set_xlabel('Cumulative Counts')
         axs.set_ylabel('Approximation Ratio')
-    
-        fig.tight_layout()
         axs.grid()
+
+        axs.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+        fig.tight_layout()
+
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-optgaps" + suffix, backend_id)
+            save_plot_image(plt, f"{appname}-cactusplot" + suffix, backend_id)
             
         # show the plot for user to see
         if show_plot_images:
@@ -1934,7 +1934,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                               color = group_metrics_optgaps[metric_str]['color'], 
                               label = group_metrics_optgaps[metric_str]['label'])
             
-            axs[axi].set_ylabel('Optimality Gap (%)')
+            axs[axi].set_ylabel(r'Optimality Gap (\%)')
             
             if rows > 0 and not xaxis_set:
                 axs[axi].sharex(axs[rows-1])
@@ -2429,8 +2429,8 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     if suptitle == None:
         suptitle = f"{ylabel} vs. {x_label}, Parameter Positioning of {score_label}"
     
-    # plot_width = 6.8
-    # plot_height = 5.0
+    plot_width = 6.8
+    plot_height = 5.0
     #print(f"... {plot_width} {plot_height}")
     
     # assume y max is the max of the y data 
@@ -2438,56 +2438,56 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     max_width = y_max + 3
     
     # define matplotlib figure and axis; use constrained layout to fit colorbar to right
-    with plt.style.context(style_file):
-        fig, ax = plt.subplots()#constrained_layout=True) #figsize=(plot_width, plot_height)
+    # with plt.style.context(style_file):
+    fig, ax = plt.subplots(constrained_layout=True, figsize=(plot_width, plot_height))
+
+    plt.suptitle(suptitle)
     
-        plt.suptitle(suptitle)
-        
-        # round the max up to be divisible evenly (in multiples of 0.1) by num_xdivs 
-        num_xdivs = 20
-        max_base = num_xdivs * 0.05
-        x_max = max_base * int((x_max + max_base) / max_base)
-        
-        #print(f"... {x_min} {x_max} {max_base} {x_max}")
-        if x_min < 0.1: x_min = 0
-        
-        step = (x_max - x_min) / num_xdivs
-        
-        plt.xlim(x_min - step/2, x_max + step/2)
-           
-        #plt.ylim(y_min*0.5, y_max*1.5)
-        plt.ylim(0, max_width)
+    # round the max up to be divisible evenly (in multiples of 0.1) by num_xdivs 
+    num_xdivs = 20
+    max_base = num_xdivs * 0.05
+    x_max = max_base * int((x_max + max_base) / max_base)
     
-        # circuit metrics (x axis)
-        xround = [step * x for x in range(num_xdivs + 1)]
-        
-        # format x labels > 1 to N decimal places, depending on total range
-        digits = 0
-        if x_max < 24: digits = 1
-        if x_max < 10: digits = 2
-        xlabels = [format_number(x, digits=digits) for x in xround]
-        
-        ax.set_xlabel(x_label)
-        ax.set_xticks(xround)  
-        plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
-        
-        # other label options
-        #plt.xticks(xbasis, xlabels, color='black', rotation=-60, ha='left')
-        #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
+    #print(f"... {x_min} {x_max} {max_base} {x_max}")
+    if x_min < 0.1: x_min = 0
     
-        # circuit metrics (y axis)
-        ybasis = [y for y in range(1, max_width)]
-        #yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]    # not used now, since we only do circuit width
-        #ylabels = [format_number(y) for y in yround]
-            
-        ax.set_ylabel(ylabel)
-        #ax.set_yticks(yround)
-        ax.set_yticks(ybasis)    
+    step = (x_max - x_min) / num_xdivs
+    
+    plt.xlim(x_min - step/2, x_max + step/2)
+       
+    #plt.ylim(y_min*0.5, y_max*1.5)
+    plt.ylim(0, max_width)
+
+    # circuit metrics (x axis)
+    xround = [step * x for x in range(num_xdivs + 1)]
+    
+    # format x labels > 1 to N decimal places, depending on total range
+    digits = 0
+    if x_max < 24: digits = 1
+    if x_max < 10: digits = 2
+    xlabels = [format_number(x, digits=digits) for x in xround]
+    
+    ax.set_xlabel(x_label)
+    ax.set_xticks(xround)  
+    plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
+    
+    # other label options
+    #plt.xticks(xbasis, xlabels, color='black', rotation=-60, ha='left')
+    #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
+
+    # circuit metrics (y axis)
+    ybasis = [y for y in range(1, max_width)]
+    #yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]    # not used now, since we only do circuit width
+    #ylabels = [format_number(y) for y in yround]
         
-        # add colorbar to right of plot
-        plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+    ax.set_ylabel(ylabel)
+    #ax.set_yticks(yround)
+    ax.set_yticks(ybasis)    
+    
+    # add colorbar to right of plot
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
         
-        return ax
+    return ax
 
 x_annos = []
 y_annos = []
