@@ -1620,27 +1620,28 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
             if len(options_str) > 0: options_str += ', '
             options_str += f"{key}={value}"
         fulltitle += f"\n{options_str}"
-    
+
+    with plt.style.context(style_file):
     # plot the metrics background with its title
-    ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
-                y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
-    # plt.tight_layout()
-    # no longer used, instead we pass the array of sizes
-    #if x_size == None:
-        #x_size=(max(x)-min(x))/num_x_bins
-        
-    if y_size == None:
-        y_size = 1.0
+        ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
+                    y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
+        # plt.tight_layout()
+        # no longer used, instead we pass the array of sizes
+        #if x_size == None:
+            #x_size=(max(x)-min(x))/num_x_bins
+            
+        if y_size == None:
+            y_size = 1.0
     
     #print(f"... num: {num_x_bins} {len(x)} {x_size} {x}")
     
     # plot all the bars, with width specified as an array that matches the array size of the x,y values
-    plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
-                        labelrot=0, type=1, fill=True, w_max=18, do_label=False,
-                        x_size=xs, y_size=y_size)                         
-    if save_plot_images:
-        save_plot_image(plt, os.path.join(f"{appname}-area-{score_metric}_x={x_metric}_y={y_metric}_" + suffix), backend_id)
-        
+        plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
+                            labelrot=0, type=1, fill=True, w_max=18, do_label=False,
+                            x_size=xs, y_size=y_size)                         
+        if save_plot_images:
+            save_plot_image(plt, os.path.join(f"{appname}-area-{score_metric}_x={x_metric}_y={y_metric}_" + suffix), backend_id)
+
 
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
 # DEVNOTE: this binning approach creates unevenly spaced bins, cannot use the delta between then for size
@@ -1818,7 +1819,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     # DEVNOTE: Add to group metrics here; this should be done during execute
     # Create a dictionary, with keys specifying metric type, and values specifying corresponding optgap values
     group_metrics_optgaps = {'approx_ratio' : {'color' : 'r', 'label': 'Approx. Ratio', 'gapvals' : []},
-                             'Max_N_approx_ratio' : {'color' : 'b', 'label': 'Max % counts', 'gapvals' : []},
+                             'Max_N_approx_ratio' : {'color' : 'b', 'label': r'Max \% counts', 'gapvals' : []},
                              'cvar_approx_ratio' : {'color' : 'g', 'label': 'CVaR', 'gapvals' : []},
                              'bestCut_approx_ratio' : {'color' : 'm', 'label': 'Best Measurement', 'gapvals' : []},
                              'quantile_optgaps' : {'gapvals' : []}}
@@ -2429,8 +2430,8 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     if suptitle == None:
         suptitle = f"{ylabel} vs. {x_label}, Parameter Positioning of {score_label}"
     
-    plot_width = 6.8
-    plot_height = 5.0
+    # plot_width = 6.8
+    # plot_height = 5.0
     #print(f"... {plot_width} {plot_height}")
     
     # assume y max is the max of the y data 
@@ -2439,7 +2440,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     
     # define matplotlib figure and axis; use constrained layout to fit colorbar to right
     # with plt.style.context(style_file):
-    fig, ax = plt.subplots(constrained_layout=True, figsize=(plot_width, plot_height))
+    fig, ax = plt.subplots()#constrained_layout=True, figsize=(plot_width, plot_height))
 
     plt.suptitle(suptitle)
     
