@@ -498,7 +498,7 @@ instance_filename = None
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method=1, rounds=1, degree=3, thetas_array=None, N=5, alpha=0.1, parameterized= False, do_fidelities=True,
+        method=1, rounds=1, degree=3, thetas_array=None, N=10, alpha=0.1, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         backend_id='qasm_simulator', provider_backend=None,
@@ -745,9 +745,15 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 unique_id = s_int*1000 + unique_circuit_index
                 metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
                 
+                #read solution from file for this instance
+                opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol')
+                fidelity = -1 * res.fun / opt #known optimum
+                # Store the known optimal value from the classical algorithm to metrics
+                metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
                 # Store also the final results, including (cuts, counts, sizes) as well as final values of 
                 metrics.store_props_final_iter(num_qubits, s_int, None, saved_result)
                 metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
+                
                 ########################################################
                 ####### Save results of (circuit width, degree) combination
                 # Store the results obtained for the current values of num_qubits and i (i.e. degree)
@@ -758,6 +764,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)].copy()}
                     dict_to_store['general properties'] = dict_of_inputs
                     dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
+                    dict_to_store['optimal_value'] = opt
                     # Also store the value of counts obtained for the final counts
                     if save_final_counts:
                         dict_to_store['final_counts'] = saved_result.copy()
@@ -766,19 +773,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     with open(store_loc, 'w') as outfile:
                         json.dump(dict_to_store, outfile)
                     
-                #read solution from file for this instance
-                opt, sol = common.read_maxcut_solution(instance_filename)
-            
-                num_qubits = int(num_qubits)
-                #counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
-                fidelity = -1 * res.fun / opt #known optimum
-            
-                '''
-                metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
-                metrics.store_metric(num_qubits, s_int, 'rounds', p_depth)
-                '''
-                #print(res)
-            
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
         if method == 2:                  
@@ -817,6 +811,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                                      options=dict(shots=num_shots, rounds=rounds, degree=degree),
                                      suffix=suffix, objective_func_type = objective_func_type)
+        
+        # Cactus plot
+        metrics.plot_cactus_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                                     options=None, suffix=suffix)
 
 
 #%% Function for loading and plotting data saved in json files
