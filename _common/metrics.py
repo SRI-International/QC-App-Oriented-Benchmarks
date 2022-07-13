@@ -1766,10 +1766,10 @@ def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
                 cumul_counts = circuit_metrics_final_iter[group][deg]['cumul_counts']
                 unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
-                axs.plot(cumul_counts, np.array(unique_sizes) / optimal_value, marker='o',
+                axs.plot(cumul_counts / cumul_counts[-1], np.array(unique_sizes) / optimal_value, marker='o',
                          ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
 
-        axs.set_xlabel('Cumulative Counts')
+        axs.set_xlabel('Fraction of Total Counts')
         axs.set_ylabel('Approximation Ratio')
         axs.grid()
 
@@ -1822,7 +1822,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                              'Max_N_approx_ratio' : {'color' : 'b', 'label': r'Max \% counts', 'gapvals' : []},
                              'cvar_approx_ratio' : {'color' : 'g', 'label': 'CVaR', 'gapvals' : []},
                              'bestCut_approx_ratio' : {'color' : 'm', 'label': 'Best Measurement', 'gapvals' : []},
-                             'quantile_optgaps' : {'gapvals' : []}}
+                             'quantile_optgaps' : {'gapvals' : []},
+                             'violin' : {'gapvals' : []}} # list of [xlist, ylist]
     
     if which_metrics_to_plot == 'all':
         which_metrics_to_plot = list(group_metrics_optgaps.keys())
@@ -1848,6 +1849,22 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
             q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
             group_metrics_optgaps['quantile_optgaps']['gapvals'].append(q_vals)
+
+            get_dist_from_measurements()
+            unique_sizes = circuit_metrics_final_iter[group][str(circuit_id)]['unique_sizes']
+            unique_counts = circuit_metrics_final_iter[group][str(circuit_id)]['unique_counts']
+            optimal_value = circuit_metrics_final_iter[group][str(circuit_id)]['optimal_value']
+
+            full_size_list = list(range(optimal_value + 1))
+            full_counts_list = [unique_counts[unique_sizes.index(s)] if s in unique_sizes else 0 for s in full_size_list]
+
+            # gap values for the violin plot will be 1 - unique_sizes / optimal size
+            violin_yvals = 100 * (1 - np.array(full_size_list) / optimal_value)
+            # Normalize the violin plot so that the max width will be 1 unit along horizontal axis
+            violin_xvals =  np.array(full_counts_list) / max(full_counts_list)
+
+            group_metrics_optgaps['violin']['gapvals'].append([violin_xvals, violin_yvals])
+
             # and just break after the first circuit, since we are not averaging
             break
     
@@ -1864,7 +1881,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     # fig_w = 6.0
     
     numplots = 1
-  
+
     rows = numplots
     
     with plt.style.context(style_file):
@@ -1904,11 +1921,23 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     
             # For the y axis, choose the limits to be at least [0,40].
             # Compare with the highest value in any of the metrics optgaps to be plotted
-            limopts = max([np.max(group_metrics_optgaps[metr]['gapvals']) for metr in which_metrics_to_plot])
-            axs[axi].set_ylim([0, max(40, limopts) * 1.1])
-            
+            # limopts = max([np.max(group_metrics_optgaps[metr]['gapvals']) for metr in which_metrics_to_plot])
+            # axs[axi].set_ylim([0, max(40, limopts) * 1.1])
+            axs[axi].set_ylim([0, 100])
+
+            # Plot violin plots
+            if 'violin' in which_metrics_to_plot:
+                list_of_violins = group_metrics_optgaps['violin']['gapvals']
+                # violinx_list = [x for [x,y] in list_of_violins]
+                # violiny_list = [y for [x,y] in list_of_violins]
+                violin_list_locs = group_metrics_optgaps['groups']
+                for loc, vxy in zip(violin_list_locs, list_of_violins):
+                    vy = vxy[1]
+                    vx = vxy[0]
+                    axs[axi].fill_betweenx(vy, loc, loc + vx, color='r', alpha=0.2,lw=0)
+
             # Plot the quantile optimality gaps as errorbars
-            if 'quantile_optgaps' in group_metrics_optgaps:
+            if 'quantile_optgaps' in which_metrics_to_plot:
                 q_vals = group_metrics_optgaps['quantile_optgaps']['gapvals'] # list of lists; shape (number of circuit widths, 3)
                 # Indices are of the form (circuit width index, quantile index)
                 center_optgaps = [q_vals[i][1] for i in range(len(q_vals))]
@@ -1921,13 +1950,12 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                                   ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,
                                   label = 'Quartiles', alpha = 0.75)
             # axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
-    
-            #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
+
+            #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9')
             
-            for metric_str in set(which_metrics_to_plot) - set(["quantile_optgaps"]):
-                # For all metrics to be plotted, except quantile optgaps, plot a line
-    
-                # Plot a solid line for the objective function
+            for metric_str in set(which_metrics_to_plot) - set(["quantile_optgaps", "violin"]):
+                # For all metrics to be plotted, except quantile optgaps and violin plots, plot a line
+                # Plot a solid line for the objective function, and dashed otherwise
                 ls = '-' if metric_str == objective_func_type else '--'
     
                 axs[axi].plot(groups, group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,

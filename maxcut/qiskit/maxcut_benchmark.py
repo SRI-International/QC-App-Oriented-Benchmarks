@@ -890,7 +890,8 @@ def load_from_width_degree_file(folder, fileName):
         data = json.load(json_file)
         gen_prop = data['general properties']
         converged_thetas_list = data['converged_thetas_list']
-        final_counts = data['final_counts'] # This is a 
+        opt = data['optimal_value']
+        final_counts = data['final_counts'] # This is a
         
         ex.set_execution_target(backend_id = gen_prop["backend_id"], 
                                 provider_backend = gen_prop["provider_backend"],
@@ -909,6 +910,7 @@ def load_from_width_degree_file(folder, fileName):
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
             metrics.store_props_final_iter(num_qubits, s_int, None, final_counts)
+            metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
             metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', converged_thetas_list)
 
     return gen_prop
@@ -975,8 +977,9 @@ def create_plots_from_loaded_data(gen_prop):
             options=dict(shots=num_shots, rounds=rounds, degree=degree),
             suffix=suffix)
 
-
-
+    # Cactus plot
+    metrics.plot_cactus_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                                 options=None, suffix=suffix)
 
 # if main, execute method
 if __name__ == '__main__': run()
