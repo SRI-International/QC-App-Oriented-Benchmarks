@@ -1625,7 +1625,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
     # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                     y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
-        # plt.tight_layout()
+
         # no longer used, instead we pass the array of sizes
         #if x_size == None:
             #x_size=(max(x)-min(x))/num_x_bins
@@ -1638,7 +1638,8 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
     # plot all the bars, with width specified as an array that matches the array size of the x,y values
         plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
                             labelrot=0, type=1, fill=True, w_max=18, do_label=False,
-                            x_size=xs, y_size=y_size)                         
+                            x_size=xs, y_size=y_size)
+        plt.tight_layout()
         if save_plot_images:
             save_plot_image(plt, os.path.join(f"{appname}-area-{score_metric}_x={x_metric}_y={y_metric}_" + suffix), backend_id)
 
