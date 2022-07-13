@@ -800,21 +800,27 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         cur_time=datetime.datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
         suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
+        obj_str = metrics.known_score_labels[objective_func_type]
+        options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree,
+                   'Objective Function' : obj_str}
+
+
         # Generate area plot showing iterative evolution of metrics 
         metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
                 num_x_bins=num_x_bins, x_size=x_size, y_size=y_size,
-                options=dict(shots=num_shots, rounds=rounds, degree=degree),
+                options=options,
                 suffix=suffix)
                 
         # Generate bar chart showing optimality gaps in final results
         metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                     options=dict(shots=num_shots, rounds=rounds, degree=degree),
+                                     options=options,
                                      suffix=suffix, objective_func_type = objective_func_type)
         
         # Cactus plot
         metrics.plot_cactus_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                     options=None, suffix=suffix)
+                                 options=options,
+                                 suffix=suffix)
 
 
 #%% Function for loading and plotting data saved in json files
@@ -965,21 +971,23 @@ def create_plots_from_loaded_data(gen_prop):
     objective_func_type = gen_prop['objective_func_type']
 
     suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
+    obj_str = metrics.known_score_labels[objective_func_type]
+    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree,
+               'Objective Function' : obj_str}
     metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                 options=dict(shots=num_shots, rounds=rounds,
-                                              degree=degree),
+                                 options=options,
                                  suffix=suffix, objective_func_type = objective_func_type)
     
     metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
             score_metric=gen_prop['score_metric'], x_metric=gen_prop['x_metric'], 
             y_metric=gen_prop['y_metric'], fixed_metrics=gen_prop['fixed_metrics'],
             num_x_bins=gen_prop['num_x_bins'], x_size=gen_prop['x_size'], y_size=gen_prop['y_size'],
-            options=dict(shots=num_shots, rounds=rounds, degree=degree),
+            options=options,
             suffix=suffix)
 
     # Cactus plot
     metrics.plot_cactus_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                 options=None, suffix=suffix)
+                                 options=options, suffix=suffix)
 
 # if main, execute method
 if __name__ == '__main__': run()
