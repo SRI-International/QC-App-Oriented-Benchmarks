@@ -8,6 +8,7 @@ ytick.direction : in
 # Save as 'tight'
 savefig.bbox : tight
 savefig.pad_inches : 0.05
+savefig.dpi : 300
 
 # Use serif fonts
 font.family : sans-serif
@@ -25,3 +26,4 @@ grid.color : 'k'
 grid.linestyle: -. 
 grid.alpha : 0.5
 grid.linewidth : 0.5
+

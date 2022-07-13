@@ -934,7 +934,7 @@ def get_width_degree_tuple_from_filename(fileName):
         graph degree.
 
     """
-    pattern = 'width=([0-9]+)_degree=([0-9]+).json'
+    pattern = 'width_([0-9]+)_degree_([0-9]+).json'
     match = re.search(pattern, fileName)
 
     num_qubits = int(match.groups()[0])
