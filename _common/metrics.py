@@ -725,7 +725,7 @@ def get_appname_from_title(suptitle):
 
 import matplotlib.pyplot as plt
 dir_path = os.path.dirname(os.path.realpath(__file__))
-style_file = os.path.join(dir_path,'plots_template.mplstyle')
+maxcut_style = os.path.join(dir_path,'maxcut.mplstyle')
 # plt.style.use(style_file)
     
 # Plot bar charts for each metric over all groups
@@ -1621,7 +1621,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
             options_str += f"{key}={value}"
         fulltitle += f"\n{options_str}"
 
-    with plt.style.context(style_file):
+    with plt.style.context(maxcut_style):
     # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                     y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
@@ -1743,7 +1743,7 @@ def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
     # Extract shorter app name from the title passed in by user   
     appname = get_appname_from_title(suptitle)
 
-    with plt.style.context(style_file):# #os.path.join(dir_path, 'science.mplstyle')
+    with plt.style.context(maxcut_style):# #os.path.join(dir_path, 'science.mplstyle')
         fig, axs = plt.subplots(1, 1)#, figsize=(6.4,4.8))#, constrained_layout=True, figsize=(6,4))#, sharex=True
     
         # Create more appropriate title
@@ -1884,7 +1884,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
     rows = numplots
     
-    with plt.style.context(style_file):
+    with plt.style.context(maxcut_style):
         # DEVNOTE: this calculation is based on visual assessment of results and could be refined
         # compute height needed to draw same height plots, no matter how many there are
         # fig_h = 3.5 + 2.0 * (rows - 1) + 0.25 * (rows - 1)
@@ -2460,14 +2460,11 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     
     # plot_width = 6.8
     # plot_height = 5.0
-    #print(f"... {plot_width} {plot_height}")
-    
+
     # assume y max is the max of the y data 
     # we only do circuit width for now, so show 3 qubits more than the max
     max_width = y_max + 3
     
-    # define matplotlib figure and axis; use constrained layout to fit colorbar to right
-    # with plt.style.context(style_file):
     fig, ax = plt.subplots()#constrained_layout=True, figsize=(plot_width, plot_height))
 
     plt.suptitle(suptitle)
@@ -2500,10 +2497,6 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     ax.set_xticks(xround)  
     plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
     
-    # other label options
-    #plt.xticks(xbasis, xlabels, color='black', rotation=-60, ha='left')
-    #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
-
     # circuit metrics (y axis)
     ybasis = [y for y in range(1, max_width)]
     #yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]    # not used now, since we only do circuit width
