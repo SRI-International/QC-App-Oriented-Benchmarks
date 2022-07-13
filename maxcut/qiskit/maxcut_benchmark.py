@@ -527,7 +527,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     if print_res_to_file:
         start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         parent_folder_save = os.path.join('__results', objective_func_type,
-                                          f'{backend_id}/run_start={start_time_str}')
+                                          f'{backend_id}/run_start_{start_time_str}')
         if not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
         
     
@@ -760,7 +760,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 # This way, we store the results as they becomes available, 
                 # instead of storing everything all directly at the very end of run()
                 if print_res_to_file:
-                    store_loc = os.path.join(parent_folder_save,'width={}_degree={}.json'.format(num_qubits,s_int))
+                    store_loc = os.path.join(parent_folder_save,'width_{}_degree_{}.json'.format(num_qubits,s_int))
                     dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)].copy()}
                     dict_to_store['general properties'] = dict_of_inputs
                     dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
