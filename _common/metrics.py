@@ -1926,7 +1926,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             # axs[axi].set_ylim([0, max(40, limopts) * 1.1])
             axs[axi].set_ylim([0, 100])
 
-            # Plot violin plots
+            
+            
             if 'violin' in which_metrics_to_plot:
                 list_of_violins = group_metrics_optgaps['violin']['gapvals']
                 # violinx_list = [x for [x,y] in list_of_violins]
@@ -1936,7 +1937,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                     vy = vxy[1]
                     vx = vxy[0]
                     axs[axi].fill_betweenx(vy, loc, loc + vx, color='r', alpha=0.2,lw=0)
-
+            
+            # Plot violin plots
+            plt_handles = dict()
+            
             # Plot the quantile optimality gaps as errorbars
             if 'quantile_optgaps' in which_metrics_to_plot:
                 q_vals = group_metrics_optgaps['quantile_optgaps']['gapvals'] # list of lists; shape (number of circuit widths, 3)
@@ -1946,23 +1950,24 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                 up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
                 errors = [up_error, down_error]
     
-                axs[axi].errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors,
-                                  ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,
-                                  ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,
-                                  label = 'Quartiles', alpha = 0.75)
+                plt_handles['quantile_optgaps'] = axs[axi].errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors,
+                                                                    ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,
+                                                                    ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,
+                                                                    label = 'Quartiles', alpha = 0.75)
             # axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
 
             #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9')
+            
             
             for metric_str in set(which_metrics_to_plot) - set(["quantile_optgaps", "violin"]):
                 # For all metrics to be plotted, except quantile optgaps and violin plots, plot a line
                 # Plot a solid line for the objective function, and dashed otherwise
                 ls = '-' if metric_str == objective_func_type else '--'
     
-                axs[axi].plot(groups, group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,
-                              ls = ls, 
-                              color = group_metrics_optgaps[metric_str]['color'], 
-                              label = group_metrics_optgaps[metric_str]['label'])
+                plt_handles[metric_str], = axs[axi].plot(groups, group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,
+                                                        ls = ls, 
+                                                        color = group_metrics_optgaps[metric_str]['color'], 
+                                                        label = group_metrics_optgaps[metric_str]['label'])
             
             axs[axi].set_ylabel(r'Optimality Gap (\%)')
             
@@ -1970,9 +1975,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                 axs[axi].sharex(axs[rows-1])
                 xaxis_set = True
                 
-            # Replacing legend settings. Might need to modify later
-            # axs[axi].legend(['Degree 3', 'Degree -3'], loc='upper left') 
-            axs[axi].legend(loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
+            # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
+            ideal_lgnd_seq = ['Max_N_approx_ratio', 'approx_ratio', 'cvar_approx_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
+            handles_list= [plt_handles[s] for s in ideal_lgnd_seq if s in plt_handles]
+            axs[axi].legend(handles=handles_list, loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
             
             # Set x ticks to be the same as the circuit widths
             axs[axi].set_xticks(group_metrics_optgaps["groups"])
