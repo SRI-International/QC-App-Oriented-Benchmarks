@@ -1721,12 +1721,12 @@ def get_dist_from_measurements():
             cumul_counts = np.cumsum(unique_counts)
             circuit_metrics_final_iter[group][deg]['cumul_counts'] = cumul_counts
 
-# For each circuit width and degree, plot a cactus plot
-def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
+
+def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
                      options=None, suffix=None
                      ):
     """
-    Plot the ECDF (Empirical Cumulative Distribution Function), or the cactus plot, 
+    Plot the ECDF (Empirical Cumulative Distribution Function)
     for each circuit width and degree
 
     Parameters
@@ -1748,7 +1748,7 @@ def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
         fig, axs = plt.subplots(1, 1)#, figsize=(6.4,4.8))#, constrained_layout=True, figsize=(6,4))#, sharex=True
     
         # Create more appropriate title
-        suptitle = "Cactus Plot/ECDF - " + appname
+        suptitle = "ECDF - " + appname
         
         # append key circuit metrics info to the title
         fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
@@ -1767,11 +1767,11 @@ def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
                 cumul_counts = circuit_metrics_final_iter[group][deg]['cumul_counts']
                 unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
-                axs.plot(cumul_counts / cumul_counts[-1], np.array(unique_sizes) / optimal_value, marker='o',
+                axs.plot(np.array(unique_sizes) / optimal_value, cumul_counts / cumul_counts[-1], marker='o',
                          ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
 
-        axs.set_xlabel('Fraction of Total Counts')
-        axs.set_ylabel('Approximation Ratio')
+        axs.set_ylabel('Fraction of Total Counts')
+        axs.set_xlabel('Approximation Ratio')
         axs.grid()
 
         axs.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -1780,7 +1780,7 @@ def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
 
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-cactusplot" + suffix, backend_id)
+            save_plot_image(plt, f"{appname}-ECDF" + suffix, backend_id)
             
         # show the plot for user to see
         if show_plot_images:
