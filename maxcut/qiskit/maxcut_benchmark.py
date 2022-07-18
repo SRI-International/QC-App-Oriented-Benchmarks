@@ -504,7 +504,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         objective_func_type = 'approx_ratio', plot_results = True,
-        print_res_to_file = True, save_final_counts = True):
+        save_res_to_file = False, save_final_counts = False):
     """
 
     Parameters
@@ -565,17 +565,17 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         Objective function to be used by the classical minimizer algorithm. The default is 'approx_ratio'.
     plot_results : bool, optional
         Plot results only if True. The default is True.
-    print_res_to_file : bool, optional
+    save_res_to_file : bool, optional
         Save results to json files. The default is True.
     save_final_counts : bool, optional
         If True, also save the counts from the final iteration for each problem in the json files. The default is True.
     
     """
 
-    # If print_res_to_file is True, then store all the input parameters into a dictionary.
+    # Store all the input parameters into a dictionary.
     # This dictionary will later be stored in a json file
-    if print_res_to_file:
-        dict_of_inputs = locals()
+    # It will also be used for sending parameters to the plotting function
+    dict_of_inputs = locals()
 
     global QC_
     global circuits_done
@@ -590,10 +590,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # In particular, for every circuit width, the metrics will be stored the moment the results are obtained
     # In addition to the metrics, the (beta,gamma) values obtained by the optimizer, as well as the counts
     # measured for the final circuit will be stored.
-    if print_res_to_file:
-        start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        parent_folder_save = os.path.join('__results', objective_func_type,
-                                          f'{backend_id}/run_start_{start_time_str}')
+    if save_res_to_file:
+        parent_folder_save = os.path.join('__results', 'objectiveFunction_' + objective_func_type)
         if not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
         
     
@@ -821,7 +819,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
                 
                 # Save results of (circuit width, degree) combination
-                if print_res_to_file:
+                if save_res_to_file:
                     dump_to_json(parent_folder_save, num_qubits, s_int, dict_of_inputs, res, opt, saved_result, save_final_counts=save_final_counts)
 
         # for method 2, need to aggregate the detail metrics appropriately for each group
