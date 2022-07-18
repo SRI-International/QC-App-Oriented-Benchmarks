@@ -501,10 +501,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         method=1, rounds=1, degree=3, thetas_array=None, N=10, alpha=0.1, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
-        backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None,
         objective_func_type = 'approx_ratio', plot_results = True,
-        save_res_to_file = False, save_final_counts = False):
+        save_res_to_file = False, save_final_counts = False, detailed_save_names = False,
+        backend_id='qasm_simulator', provider_backend=None,
+        hub="ibm-q", group="open", project="main", exec_options=None):
     """
 
     Parameters
@@ -569,7 +569,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         Save results to json files. The default is True.
     save_final_counts : bool, optional
         If True, also save the counts from the final iteration for each problem in the json files. The default is True.
-    
+    detailed_save_names : bool, optional
+        If true, the data and plots will be saved with more detailed names. Default is False
     """
 
     # Store all the input parameters into a dictionary.
@@ -591,9 +592,15 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # In addition to the metrics, the (beta,gamma) values obtained by the optimizer, as well as the counts
     # measured for the final circuit will be stored.
     if save_res_to_file:
-        parent_folder_save = os.path.join('__results', 'objectiveFunction_' + objective_func_type)
-        if not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
+        # Use the following parent folder, for a more detailed 
+        if detailed_save_names:
+            start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            parent_folder_save = os.path.join('__results', objective_func_type,
+                                              f'{backend_id}/run_start_{start_time_str}')
+        else:
+            parent_folder_save = os.path.join('__results', 'objectiveFunction_' + objective_func_type)
         
+        if not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
     
     # validate parameters (smallest circuit is 4 qubits)
     max_qubits = max(4, max_qubits)
@@ -868,13 +875,19 @@ def dump_to_json(parent_folder_save, num_qubits, s_int, dict_of_inputs, res, opt
 def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, 
                  objective_func_type='approx_ratio', method=2, score_metric='fidelity',
                  x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
-                 num_x_bins=15, y_size=None, x_size=None,**kwargs):
+                 num_x_bins=15, y_size=None, x_size=None,
+                 detailed_save_names=False, **kwargs):
     """
     Plot results
     """
-    cur_time=datetime.datetime.now()
-    dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
-    suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
+    if detailed_save_names:
+        # If detailed names are desired for saving plots, put date of creation, etc.
+        cur_time=datetime.datetime.now()
+        dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
+        suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
+    else:
+        suffix = objective_func_type
+        
     obj_str = metrics.known_score_labels[objective_func_type]
     options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree,
                'Objective Function' : obj_str}
