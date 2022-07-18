@@ -1472,8 +1472,9 @@ known_y_labels = {
 known_score_labels = {
     'approx_ratio' : 'Avg Approximation Ratio',
     'cvar_approx_ratio' : 'CVaR Approximation Ratio',
-    'Max_N_approx_ratio' : 'Max N counts Approximation Ratio',
+    'Max_N_approx_ratio' : 'Max N\% counts Approximation Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
+    'bestCut_approx_ratio' : 'Best Measurement Approximation Ratio',
     'fidelity' : 'Avg Result Fidelity',
     'max_fidelity' : 'Max Result Fidelity',
     'hf_fidelity' : 'Avg Hellinger Fidelity'
@@ -1641,7 +1642,7 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
                             x_size=xs, y_size=y_size)
         plt.tight_layout()
         if save_plot_images:
-            save_plot_image(plt, os.path.join(f"{appname}-area-{score_metric}_x={x_metric}_y={y_metric}_" + suffix), backend_id)
+            save_plot_image(plt, os.path.join(f"{appname}-area-" + suffix), backend_id)
 
 
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
@@ -1780,7 +1781,7 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
 
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-ECDF" + suffix, backend_id)
+            save_plot_image(plt, f"{appname}-ECDF-" + suffix, backend_id)
             
         # show the plot for user to see
         if show_plot_images:
@@ -1994,7 +1995,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-optgaps" + suffix, backend_id) 
+            save_plot_image(plt, f"{appname}-optgaps-" + suffix, backend_id) 
                 
         # show the plot for user to see
         if show_plot_images:
