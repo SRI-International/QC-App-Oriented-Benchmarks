@@ -725,7 +725,7 @@ def get_appname_from_title(suptitle):
 
 import matplotlib.pyplot as plt
 dir_path = os.path.dirname(os.path.realpath(__file__))
-style_file = os.path.join(dir_path,'plots_template.mplstyle')
+maxcut_style = os.path.join(dir_path,'maxcut.mplstyle')
 # plt.style.use(style_file)
     
 # Plot bar charts for each metric over all groups
@@ -1472,8 +1472,9 @@ known_y_labels = {
 known_score_labels = {
     'approx_ratio' : 'Avg Approximation Ratio',
     'cvar_approx_ratio' : 'CVaR Approximation Ratio',
-    'Max_N_approx_ratio' : 'Max N counts Approximation Ratio',
+    'Max_N_approx_ratio' : 'Max N\% counts Approximation Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
+    'bestCut_approx_ratio' : 'Best Measurement Approximation Ratio',
     'fidelity' : 'Avg Result Fidelity',
     'max_fidelity' : 'Max Result Fidelity',
     'hf_fidelity' : 'Avg Hellinger Fidelity'
@@ -1621,11 +1622,11 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
             options_str += f"{key}={value}"
         fulltitle += f"\n{options_str}"
 
-    with plt.style.context(style_file):
+    with plt.style.context(maxcut_style):
     # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                     y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
-        # plt.tight_layout()
+
         # no longer used, instead we pass the array of sizes
         #if x_size == None:
             #x_size=(max(x)-min(x))/num_x_bins
@@ -1638,9 +1639,10 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
     # plot all the bars, with width specified as an array that matches the array size of the x,y values
         plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
                             labelrot=0, type=1, fill=True, w_max=18, do_label=False,
-                            x_size=xs, y_size=y_size)                         
+                            x_size=xs, y_size=y_size)
+        plt.tight_layout()
         if save_plot_images:
-            save_plot_image(plt, os.path.join(f"{appname}-area-{score_metric}_x={x_metric}_y={y_metric}_" + suffix), backend_id)
+            save_plot_image(plt, os.path.join(f"{appname}-area-" + suffix), backend_id)
 
 
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
@@ -1720,12 +1722,12 @@ def get_dist_from_measurements():
             cumul_counts = np.cumsum(unique_counts)
             circuit_metrics_final_iter[group][deg]['cumul_counts'] = cumul_counts
 
-# For each circuit width and degree, plot a cactus plot
-def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
+
+def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
                      options=None, suffix=None
                      ):
     """
-    Plot the ECDF (Empirical Cumulative Distribution Function), or the cactus plot, 
+    Plot the ECDF (Empirical Cumulative Distribution Function)
     for each circuit width and degree
 
     Parameters
@@ -1743,11 +1745,11 @@ def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
     # Extract shorter app name from the title passed in by user   
     appname = get_appname_from_title(suptitle)
 
-    with plt.style.context(style_file):# #os.path.join(dir_path, 'science.mplstyle')
+    with plt.style.context(maxcut_style):# #os.path.join(dir_path, 'science.mplstyle')
         fig, axs = plt.subplots(1, 1)#, figsize=(6.4,4.8))#, constrained_layout=True, figsize=(6,4))#, sharex=True
     
         # Create more appropriate title
-        suptitle = "Cactus Plot/ECDF - " + appname
+        suptitle = "ECDF - " + appname
         
         # append key circuit metrics info to the title
         fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
@@ -1766,11 +1768,11 @@ def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
                 cumul_counts = circuit_metrics_final_iter[group][deg]['cumul_counts']
                 unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
-                axs.plot(cumul_counts, np.array(unique_sizes) / optimal_value, marker='o',
+                axs.plot(np.array(unique_sizes) / optimal_value, cumul_counts / cumul_counts[-1], marker='o',
                          ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
 
-        axs.set_xlabel('Cumulative Counts')
-        axs.set_ylabel('Approximation Ratio')
+        axs.set_ylabel('Fraction of Total Counts')
+        axs.set_xlabel('Approximation Ratio')
         axs.grid()
 
         axs.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -1779,7 +1781,7 @@ def plot_cactus_ECDF(suptitle="Circuit Width (Number of Qubits)",
 
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-cactusplot" + suffix, backend_id)
+            save_plot_image(plt, f"{appname}-ECDF-" + suffix, backend_id)
             
         # show the plot for user to see
         if show_plot_images:
@@ -1822,7 +1824,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                              'Max_N_approx_ratio' : {'color' : 'b', 'label': r'Max \% counts', 'gapvals' : []},
                              'cvar_approx_ratio' : {'color' : 'g', 'label': 'CVaR', 'gapvals' : []},
                              'bestCut_approx_ratio' : {'color' : 'm', 'label': 'Best Measurement', 'gapvals' : []},
-                             'quantile_optgaps' : {'gapvals' : []}}
+                             'quantile_optgaps' : {'gapvals' : []},
+                             'violin' : {'gapvals' : []}} # list of [xlist, ylist]
     
     if which_metrics_to_plot == 'all':
         which_metrics_to_plot = list(group_metrics_optgaps.keys())
@@ -1848,6 +1851,22 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
             q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
             group_metrics_optgaps['quantile_optgaps']['gapvals'].append(q_vals)
+
+            get_dist_from_measurements()
+            unique_sizes = circuit_metrics_final_iter[group][str(circuit_id)]['unique_sizes']
+            unique_counts = circuit_metrics_final_iter[group][str(circuit_id)]['unique_counts']
+            optimal_value = circuit_metrics_final_iter[group][str(circuit_id)]['optimal_value']
+
+            full_size_list = list(range(optimal_value + 1))
+            full_counts_list = [unique_counts[unique_sizes.index(s)] if s in unique_sizes else 0 for s in full_size_list]
+
+            # gap values for the violin plot will be 1 - unique_sizes / optimal size
+            violin_yvals = 100 * (1 - np.array(full_size_list) / optimal_value)
+            # Normalize the violin plot so that the max width will be 1 unit along horizontal axis
+            violin_xvals =  np.array(full_counts_list) / max(full_counts_list)
+
+            group_metrics_optgaps['violin']['gapvals'].append([violin_xvals, violin_yvals])
+
             # and just break after the first circuit, since we are not averaging
             break
     
@@ -1864,10 +1883,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     # fig_w = 6.0
     
     numplots = 1
-  
+
     rows = numplots
     
-    with plt.style.context(style_file):
+    with plt.style.context(maxcut_style):
         # DEVNOTE: this calculation is based on visual assessment of results and could be refined
         # compute height needed to draw same height plots, no matter how many there are
         # fig_h = 3.5 + 2.0 * (rows - 1) + 0.25 * (rows - 1)
@@ -1904,11 +1923,27 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     
             # For the y axis, choose the limits to be at least [0,40].
             # Compare with the highest value in any of the metrics optgaps to be plotted
-            limopts = max([np.max(group_metrics_optgaps[metr]['gapvals']) for metr in which_metrics_to_plot])
-            axs[axi].set_ylim([0, max(40, limopts) * 1.1])
+            # limopts = max([np.max(group_metrics_optgaps[metr]['gapvals']) for metr in which_metrics_to_plot])
+            # axs[axi].set_ylim([0, max(40, limopts) * 1.1])
+            axs[axi].set_ylim([0, 100])
+
+            
+            
+            if 'violin' in which_metrics_to_plot:
+                list_of_violins = group_metrics_optgaps['violin']['gapvals']
+                # violinx_list = [x for [x,y] in list_of_violins]
+                # violiny_list = [y for [x,y] in list_of_violins]
+                violin_list_locs = group_metrics_optgaps['groups']
+                for loc, vxy in zip(violin_list_locs, list_of_violins):
+                    vy = vxy[1]
+                    vx = vxy[0]
+                    axs[axi].fill_betweenx(vy, loc, loc + vx, color='r', alpha=0.2,lw=0)
+            
+            # Plot violin plots
+            plt_handles = dict()
             
             # Plot the quantile optimality gaps as errorbars
-            if 'quantile_optgaps' in group_metrics_optgaps:
+            if 'quantile_optgaps' in which_metrics_to_plot:
                 q_vals = group_metrics_optgaps['quantile_optgaps']['gapvals'] # list of lists; shape (number of circuit widths, 3)
                 # Indices are of the form (circuit width index, quantile index)
                 center_optgaps = [q_vals[i][1] for i in range(len(q_vals))]
@@ -1916,24 +1951,24 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                 up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
                 errors = [up_error, down_error]
     
-                axs[axi].errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors,
-                                  ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,
-                                  ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,
-                                  label = 'Quartiles', alpha = 0.75)
+                plt_handles['quantile_optgaps'] = axs[axi].errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors,
+                                                                    ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,
+                                                                    ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,
+                                                                    label = 'Quartiles', alpha = 0.75)
             # axs[axi].bar(group_metrics["groups"], group_metrics_2["optimality_gap"], 0.8)
-    
-            #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
+
+            #axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9')
             
-            for metric_str in set(which_metrics_to_plot) - set(["quantile_optgaps"]):
-                # For all metrics to be plotted, except quantile optgaps, plot a line
-    
-                # Plot a solid line for the objective function
+            
+            for metric_str in set(which_metrics_to_plot) - set(["quantile_optgaps", "violin"]):
+                # For all metrics to be plotted, except quantile optgaps and violin plots, plot a line
+                # Plot a solid line for the objective function, and dashed otherwise
                 ls = '-' if metric_str == objective_func_type else '--'
     
-                axs[axi].plot(groups, group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,
-                              ls = ls, 
-                              color = group_metrics_optgaps[metric_str]['color'], 
-                              label = group_metrics_optgaps[metric_str]['label'])
+                plt_handles[metric_str], = axs[axi].plot(groups, group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,
+                                                        ls = ls, 
+                                                        color = group_metrics_optgaps[metric_str]['color'], 
+                                                        label = group_metrics_optgaps[metric_str]['label'])
             
             axs[axi].set_ylabel(r'Optimality Gap (\%)')
             
@@ -1941,9 +1976,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                 axs[axi].sharex(axs[rows-1])
                 xaxis_set = True
                 
-            # Replacing legend settings. Might need to modify later
-            # axs[axi].legend(['Degree 3', 'Degree -3'], loc='upper left') 
-            axs[axi].legend(loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
+            # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
+            ideal_lgnd_seq = ['Max_N_approx_ratio', 'approx_ratio', 'cvar_approx_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
+            handles_list= [plt_handles[s] for s in ideal_lgnd_seq if s in plt_handles]
+            axs[axi].legend(handles=handles_list, loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
             
             # Set x ticks to be the same as the circuit widths
             axs[axi].set_xticks(group_metrics_optgaps["groups"])
@@ -1959,7 +1995,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-optgaps" + suffix, backend_id) 
+            save_plot_image(plt, f"{appname}-optgaps-" + suffix, backend_id) 
                 
         # show the plot for user to see
         if show_plot_images:
@@ -2432,14 +2468,11 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     
     # plot_width = 6.8
     # plot_height = 5.0
-    #print(f"... {plot_width} {plot_height}")
-    
+
     # assume y max is the max of the y data 
     # we only do circuit width for now, so show 3 qubits more than the max
     max_width = y_max + 3
     
-    # define matplotlib figure and axis; use constrained layout to fit colorbar to right
-    # with plt.style.context(style_file):
     fig, ax = plt.subplots()#constrained_layout=True, figsize=(plot_width, plot_height))
 
     plt.suptitle(suptitle)
@@ -2472,10 +2505,6 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     ax.set_xticks(xround)  
     plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
     
-    # other label options
-    #plt.xticks(xbasis, xlabels, color='black', rotation=-60, ha='left')
-    #plt.xticks(xbasis, xlabels, color='black', rotation=-45, ha='left', va='center', rotation_mode="anchor")
-
     # circuit metrics (y axis)
     ybasis = [y for y in range(1, max_width)]
     #yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]    # not used now, since we only do circuit width

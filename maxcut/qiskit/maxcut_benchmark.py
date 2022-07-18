@@ -501,15 +501,82 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         method=1, rounds=1, degree=3, thetas_array=None, N=10, alpha=0.1, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
+        objective_func_type = 'approx_ratio', plot_results = True,
+        save_res_to_file = False, save_final_counts = False, detailed_save_names = False,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None,
-        objective_func_type = 'approx_ratio',
-        print_res_to_file = True, save_final_counts = True):
+        hub="ibm-q", group="open", project="main", exec_options=None):
+    """
 
-    # If print_res_to_file is True, then store all the input parameters into a dictionary.
+    Parameters
+    ----------
+    min_qubits : int, optional
+        The smallest circuit width for which benchmarking will be done The default is 3.
+    max_qubits : int, optional
+        The largest circuit width for which benchmarking will be done. The default is 6.
+    max_circuits : int, optional
+        Number of problems to solve for each circuit width. The default is 3.
+    num_shots : int, optional
+        Number of times the circut will be measured, for each iteration. The default is 100.
+    method : int, optional
+        If 1, then do standard metrics, if 2, implement iterative algo metrics. The default is 1.
+    rounds : int, optional
+        number of QAOA rounds. The default is 1.
+    degree : int, optional
+        degree of graph. The default is 3.
+    thetas_array : list, optional
+        list or ndarray of beta and gamma values. The default is None.
+    N : int, optional
+        For the max % counts metric, choose the highest N% counts. The default is 10.
+    alpha : float, optional
+        Value between 0 and 1. The default is 0.1.
+    parameterized : bool, optional
+        Whether to use parametrized circuits or not. The default is False.
+    do_fidelities : bool, optional
+        Compute circuit fidelity. The default is True.
+    max_iter : int, optional
+        Number of iterations for the minimizer routine. The default is 30.
+    score_metric : list or string, optional
+        Which metrics are to be plotted in area metrics plots. The default is 'fidelity'.
+    x_metric : list or string, optional
+        Horizontal axis for area plots. The default is 'cumulative_exec_time'.
+    y_metric : list or string, optional
+        Vertical axis for area plots. The default is 'num_qubits'.
+    fixed_metrics : TYPE, optional
+        DESCRIPTION. The default is {}.
+    num_x_bins : int, optional
+        DESCRIPTION. The default is 15.
+    y_size : TYPint, optional
+        DESCRIPTION. The default is None.
+    x_size : string, optional
+        DESCRIPTION. The default is None.
+    backend_id : string, optional
+        DESCRIPTION. The default is 'qasm_simulator'.
+    provider_backend : string, optional
+        DESCRIPTION. The default is None.
+    hub : string, optional
+        DESCRIPTION. The default is "ibm-q".
+    group : string, optional
+        DESCRIPTION. The default is "open".
+    project : string, optional
+        DESCRIPTION. The default is "main".
+    exec_options : string, optional
+        DESCRIPTION. The default is None.
+    objective_func_type : string, optional
+        Objective function to be used by the classical minimizer algorithm. The default is 'approx_ratio'.
+    plot_results : bool, optional
+        Plot results only if True. The default is True.
+    save_res_to_file : bool, optional
+        Save results to json files. The default is True.
+    save_final_counts : bool, optional
+        If True, also save the counts from the final iteration for each problem in the json files. The default is True.
+    detailed_save_names : bool, optional
+        If true, the data and plots will be saved with more detailed names. Default is False
+    """
+
+    # Store all the input parameters into a dictionary.
     # This dictionary will later be stored in a json file
-    if print_res_to_file:
-        dict_of_inputs = locals()
+    # It will also be used for sending parameters to the plotting function
+    dict_of_inputs = locals()
 
     global QC_
     global circuits_done
@@ -524,12 +591,16 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # In particular, for every circuit width, the metrics will be stored the moment the results are obtained
     # In addition to the metrics, the (beta,gamma) values obtained by the optimizer, as well as the counts
     # measured for the final circuit will be stored.
-    if print_res_to_file:
-        start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        parent_folder_save = os.path.join('__results', objective_func_type,
-                                          f'{backend_id}/run_start={start_time_str}')
-        if not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
+    if save_res_to_file:
+        # Use the following parent folder, for a more detailed 
+        if detailed_save_names:
+            start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            parent_folder_save = os.path.join('__results', objective_func_type,
+                                              f'{backend_id}/run_start_{start_time_str}')
+        else:
+            parent_folder_save = os.path.join('__results', 'objectiveFunction_' + objective_func_type)
         
+        if not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
     
     # validate parameters (smallest circuit is 4 qubits)
     max_qubits = max(4, max_qubits)
@@ -754,25 +825,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 metrics.store_props_final_iter(num_qubits, s_int, None, saved_result)
                 metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
                 
-                ########################################################
-                ####### Save results of (circuit width, degree) combination
-                # Store the results obtained for the current values of num_qubits and i (i.e. degree)
-                # This way, we store the results as they becomes available, 
-                # instead of storing everything all directly at the very end of run()
-                if print_res_to_file:
-                    store_loc = os.path.join(parent_folder_save,'width={}_degree={}.json'.format(num_qubits,s_int))
-                    dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)].copy()}
-                    dict_to_store['general properties'] = dict_of_inputs
-                    dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
-                    dict_to_store['optimal_value'] = opt
-                    # Also store the value of counts obtained for the final counts
-                    if save_final_counts:
-                        dict_to_store['final_counts'] = saved_result.copy()
-                                                        #saved_result.get_counts()
-                    # Now save the output
-                    with open(store_loc, 'w') as outfile:
-                        json.dump(dict_to_store, outfile)
-                    
+                # Save results of (circuit width, degree) combination
+                if save_res_to_file:
+                    dump_to_json(parent_folder_save, num_qubits, s_int, dict_of_inputs, res, opt, saved_result, save_final_counts=save_final_counts)
+
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
         if method == 2:                  
@@ -795,28 +851,59 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 options=dict(shots=num_shots))
     elif method == 2:
         #metrics.print_all_circuit_metrics()
-        
+        if plot_results:
+            plot_results_from_data(**dict_of_inputs)
 
+def dump_to_json(parent_folder_save, num_qubits, s_int, dict_of_inputs, res, opt, saved_result, save_final_counts=True):
+    """
+    For a given problem (i.e. circuit width and degree), save the results to a json file
+    """
+    store_loc = os.path.join(parent_folder_save,'width_{}_degree_{}.json'.format(num_qubits,s_int))
+    dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)].copy()}
+    dict_to_store['general properties'] = dict_of_inputs
+    dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
+    dict_to_store['optimal_value'] = opt
+    # Also store the value of counts obtained for the final counts
+    if save_final_counts:
+        dict_to_store['final_counts'] = saved_result.copy()
+                                        #saved_result.get_counts()
+    # Now save the output
+    with open(store_loc, 'w') as outfile:
+        json.dump(dict_to_store, outfile)
+    
+
+def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, 
+                 objective_func_type='approx_ratio', method=2, score_metric='fidelity',
+                 x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
+                 num_x_bins=15, y_size=None, x_size=None,
+                 detailed_save_names=False, **kwargs):
+    """
+    Plot results
+    """
+    if detailed_save_names:
+        # If detailed names are desired for saving plots, put date of creation, etc.
         cur_time=datetime.datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
         suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
-        # Generate area plot showing iterative evolution of metrics 
-        metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics,
-                num_x_bins=num_x_bins, x_size=x_size, y_size=y_size,
-                options=dict(shots=num_shots, rounds=rounds, degree=degree),
-                suffix=suffix)
-                
-        # Generate bar chart showing optimality gaps in final results
-        metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                     options=dict(shots=num_shots, rounds=rounds, degree=degree),
-                                     suffix=suffix, objective_func_type = objective_func_type)
+    else:
+        suffix = objective_func_type
         
-        # Cactus plot
-        metrics.plot_cactus_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                     options=None, suffix=suffix)
+    obj_str = metrics.known_score_labels[objective_func_type]
+    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree,
+               'Objective Function' : obj_str}
 
+    metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                                 options=options,
+                                 suffix=suffix, objective_func_type = objective_func_type)
+    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+            score_metric=score_metric, x_metric=x_metric, 
+            y_metric=y_metric, fixed_metrics=fixed_metrics,
+            num_x_bins=num_x_bins, x_size=x_size, y_size=y_size,
+            options=options,
+            suffix=suffix)
 
+    metrics.plot_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                                 options=options, suffix=suffix)
 #%% Function for loading and plotting data saved in json files
 
 def load_data_and_plot(folder):
@@ -830,7 +917,7 @@ def load_data_and_plot(folder):
         Directory where json files are saved.
     """
     gen_prop = load_all_metrics(folder)
-    create_plots_from_loaded_data(gen_prop)
+    plot_results_from_data(**gen_prop)
 
 
 def load_all_metrics(folder):
@@ -890,7 +977,8 @@ def load_from_width_degree_file(folder, fileName):
         data = json.load(json_file)
         gen_prop = data['general properties']
         converged_thetas_list = data['converged_thetas_list']
-        final_counts = data['final_counts'] # This is a 
+        opt = data['optimal_value']
+        final_counts = data['final_counts'] # This is a
         
         ex.set_execution_target(backend_id = gen_prop["backend_id"], 
                                 provider_backend = gen_prop["provider_backend"],
@@ -909,6 +997,7 @@ def load_from_width_degree_file(folder, fileName):
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
             metrics.store_props_final_iter(num_qubits, s_int, None, final_counts)
+            metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
             metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', converged_thetas_list)
 
     return gen_prop
@@ -932,49 +1021,12 @@ def get_width_degree_tuple_from_filename(fileName):
         graph degree.
 
     """
-    pattern = 'width=([0-9]+)_degree=([0-9]+).json'
+    pattern = 'width_([0-9]+)_degree_([0-9]+).json'
     match = re.search(pattern, fileName)
 
     num_qubits = int(match.groups()[0])
     degree = int(match.groups()[1])
     return (num_qubits,degree)
-
-def create_plots_from_loaded_data(gen_prop):
-    """
-    Once the metrics have been stored using load_all_metrics, 
-
-    Parameters
-    ----------
-    gen_prop : dict
-        of inputs that were used in maxcut_benchmark.run method
-
-    Returns
-    -------
-    None.
-
-    """
-    cur_time=datetime.datetime.now()
-    dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
-    method = gen_prop['method']
-    num_shots = gen_prop['num_shots']
-    degree = gen_prop['degree']
-    rounds = gen_prop['rounds']
-    max_iter = gen_prop['max_iter']
-    objective_func_type = gen_prop['objective_func_type']
-
-    suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
-    metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                 options=dict(shots=num_shots, rounds=rounds,
-                                              degree=degree),
-                                 suffix=suffix, objective_func_type = objective_func_type)
-    
-    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-            score_metric=gen_prop['score_metric'], x_metric=gen_prop['x_metric'], 
-            y_metric=gen_prop['y_metric'], fixed_metrics=gen_prop['fixed_metrics'],
-            num_x_bins=gen_prop['num_x_bins'], x_size=gen_prop['x_size'], y_size=gen_prop['y_size'],
-            options=dict(shots=num_shots, rounds=rounds, degree=degree),
-            suffix=suffix)
-
 
 
 
