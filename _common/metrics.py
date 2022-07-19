@@ -1472,7 +1472,7 @@ known_y_labels = {
 known_score_labels = {
     'approx_ratio' : 'Avg Approximation Ratio',
     'cvar_approx_ratio' : 'CVaR Approximation Ratio',
-    'Max_N_approx_ratio' : 'Max N\% counts Approximation Ratio',
+    'Max_N_approx_ratio' : 'Max N$\%$ counts Approximation Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
     'bestCut_approx_ratio' : 'Best Measurement Approximation Ratio',
     'fidelity' : 'Avg Result Fidelity',
@@ -1821,7 +1821,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     # DEVNOTE: Add to group metrics here; this should be done during execute
     # Create a dictionary, with keys specifying metric type, and values specifying corresponding optgap values
     group_metrics_optgaps = {'approx_ratio' : {'color' : 'r', 'label': 'Approx. Ratio', 'gapvals' : []},
-                             'Max_N_approx_ratio' : {'color' : 'b', 'label': r'Max \% counts', 'gapvals' : []},
+                             'Max_N_approx_ratio' : {'color' : 'b', 'label': r'Max $\%$ counts', 'gapvals' : []},
                              'cvar_approx_ratio' : {'color' : 'g', 'label': 'CVaR', 'gapvals' : []},
                              'bestCut_approx_ratio' : {'color' : 'm', 'label': 'Best Measurement', 'gapvals' : []},
                              'quantile_optgaps' : {'gapvals' : []},
@@ -1970,7 +1970,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                                                         color = group_metrics_optgaps[metric_str]['color'], 
                                                         label = group_metrics_optgaps[metric_str]['label'])
             
-            axs[axi].set_ylabel(r'Optimality Gap (\%)')
+            axs[axi].set_ylabel(r'Optimality Gap ($\%$)')
             
             if rows > 0 and not xaxis_set:
                 axs[axi].sharex(axs[rows-1])
