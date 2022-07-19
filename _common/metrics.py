@@ -1749,7 +1749,7 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
         fig, axs = plt.subplots(1, 1)#, figsize=(6.4,4.8))#, constrained_layout=True, figsize=(6,4))#, sharex=True
     
         # Create more appropriate title
-        suptitle = "ECDF - " + appname
+        suptitle = "Cumulative Distribution (ECDF) - " + appname
         
         # append key circuit metrics info to the title
         fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
@@ -1977,7 +1977,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                 xaxis_set = True
                 
             # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
-            ideal_lgnd_seq = ['Max_N_approx_ratio', 'approx_ratio', 'cvar_approx_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
+            ideal_lgnd_seq = ['approx_ratio', 'Max_N_approx_ratio', 'cvar_approx_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
             handles_list= [plt_handles[s] for s in ideal_lgnd_seq if s in plt_handles]
             axs[axi].legend(handles=handles_list, loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
             

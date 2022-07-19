@@ -892,15 +892,16 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
     options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree,
                'Objective Function' : obj_str}
 
-    metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                 options=options,
-                                 suffix=suffix, objective_func_type = objective_func_type)
     metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
             score_metric=score_metric, x_metric=x_metric, 
             y_metric=y_metric, fixed_metrics=fixed_metrics,
             num_x_bins=num_x_bins, x_size=x_size, y_size=y_size,
             options=options,
             suffix=suffix)
+    
+    metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                                 options=options,
+                                 suffix=suffix, objective_func_type = objective_func_type)
 
     metrics.plot_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
                                  options=options, suffix=suffix)
