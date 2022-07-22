@@ -1772,7 +1772,7 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
                          ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
 
         axs.set_ylabel('Fraction of Total Counts')
-        axs.set_xlabel('Approximation Ratio')
+        axs.set_xlabel(r'$\frac{\mathrm{Cut\ Size}}{\mathrm{Max\ Cut\ Size}}$')
         axs.grid()
 
         axs.legend(loc='center left', bbox_to_anchor=(1, 0.5))
