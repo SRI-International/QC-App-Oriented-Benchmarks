@@ -1692,35 +1692,53 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     
 
 def get_dist_from_measurements():
-    """
-    For each circuit width (group) and 'circuit' key, obtain the empirical probability distribution.
-    """
-
+    # For each circuit width (group) and 'circuit' key, obtain the empirical probability distribution.
+    # Do this for 1. The final iteration measurements from the iterative algorithm,
+    # as well as 2. Uniform random sampling
+    
+    def get_size_dist(counts, sizes):
+        # For given measurement outcomes, i.e. combinations of cuts, counts and sizes,
+        # return counts corresponding to each cut size.
+        unique_sizes = list(set(sizes))
+        unique_counts = [0] * len(unique_sizes)
+        
+        for i, size in enumerate(unique_sizes):
+            corresp_counts = [counts[ind] for ind,s in enumerate(sizes) if s == size]
+            unique_counts[i] = sum(corresp_counts)
+        
+        # Make sure that the scores are in ascending order
+        s_and_c_list = [[a,b] for (a,b) in zip(unique_sizes, unique_counts)]
+        s_and_c_list = sorted(s_and_c_list, key = lambda x : x[0])
+        unique_sizes = [x[0] for x in s_and_c_list]
+        unique_counts = [x[1] for x in s_and_c_list]
+        cumul_counts = np.cumsum(unique_counts)
+        return unique_counts, unique_sizes, cumul_counts
+    
+    
     for group in circuit_metrics_final_iter:
         for deg in circuit_metrics_final_iter[group]:
             # deg = degree of graph for maxcut
+            
+            # Obtain distribution corresponding to the final iteration of the iterative algorithm
             counts = circuit_metrics_final_iter[group][deg]['counts']
             sizes = circuit_metrics_final_iter[group][deg]['sizes']
-
-            unique_sizes = list(set(sizes))
-            unique_counts = [0] * len(unique_sizes)
-        
-            for i, size in enumerate(unique_sizes):
-                corresp_counts = [counts[ind] for ind,s in enumerate(sizes) if s == size]
-                unique_counts[i] = sum(corresp_counts)
-        
-            # Make sure that the scores are in ascending order
-            s_and_c_list = [[a,b] for (a,b) in zip(unique_sizes, unique_counts)]
-            s_and_c_list = sorted(s_and_c_list, key = lambda x : x[0])
-            unique_sizes = [x[0] for x in s_and_c_list]
-            unique_counts = [x[1] for x in s_and_c_list]
-
+            
+            unique_counts, unique_sizes, cumul_counts = get_size_dist(counts, sizes)
             # Store the sizes, counts and cumulative counts in metrics
             circuit_metrics_final_iter[group][deg]['unique_sizes'] = unique_sizes
             circuit_metrics_final_iter[group][deg]['unique_counts'] = unique_counts
-
-            cumul_counts = np.cumsum(unique_counts)
             circuit_metrics_final_iter[group][deg]['cumul_counts'] = cumul_counts
+            
+            # Obtain the distribution corresponding to uniform random sampling
+            # 'unif_cuts', 'unif_counts', 'unif_sizes'
+            unif_counts = circuit_metrics_final_iter[group][deg]['unif_counts']
+            unif_sizes = circuit_metrics_final_iter[group][deg]['unif_sizes']
+            
+            unique_counts_unif, unique_sizes_unif, cumul_counts_unif = get_size_dist(unif_counts, unif_sizes)
+            # Store the sizes, counts and cumulative counts in metrics
+            circuit_metrics_final_iter[group][deg]['unique_sizes_unif'] = unique_sizes_unif
+            circuit_metrics_final_iter[group][deg]['unique_counts_unif'] = unique_counts_unif
+            circuit_metrics_final_iter[group][deg]['cumul_counts_unif'] = cumul_counts_unif
 
 
 def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
