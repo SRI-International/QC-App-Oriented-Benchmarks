@@ -535,7 +535,7 @@ def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
     # Also store uniform cut sampling results
     opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol')
     metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
-    metrics.store_props_final_iter(num_qubits, s_int, None, saved_result)
+    metrics.store_props_final_iter(num_qubits, s_int, None, iter_dist)
     metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
     metrics.store_props_final_iter(num_qubits, s_int, None, unif_dict)
     
@@ -559,8 +559,8 @@ def dump_to_json(parent_folder_save, num_qubits, s_int,
     dict_to_store['unif_dict'] = unif_dict
     # Also store the value of counts obtained for the final counts
     if save_final_counts:
-        dict_to_store['final_counts'] = saved_result.copy()
-                                        #saved_result.get_counts()
+        dict_to_store['final_counts'] = iter_dist.copy()
+                                        #iter_dist.get_counts()
     # Now save the output
     with open(store_loc, 'w') as outfile:
         json.dump(dict_to_store, outfile)
@@ -694,7 +694,8 @@ def get_width_degree_tuple_from_filename(fileName):
 #%% Run method: Benchmarking loop
 
 MAX_QUBITS = 24
-saved_result = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
+iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
+saved_result = {  }
 instance_filename = None
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         method=1, rounds=1, degree=3, thetas_array=None, N=10, alpha=0.1, parameterized= False, do_fidelities=True,
@@ -829,18 +830,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
         y_size = 1.5
-
+        
     # Choose the objective function to minimize, based on values of the parameters
-    if objective_func_type == 'cvar_approx_ratio':
-        objective_function = compute_cvar
-    elif objective_func_type == 'Max_N_approx_ratio':
-        objective_function = compute_maxN_mean
-    elif objective_func_type == 'approx_ratio':
-        objective_function = compute_sample_mean
-    else:
-        print("{} is not an accepted value for objective_func_type. Setting it to cvar_approx_ratio".format(objective_func_type))
-        objective_func_type == 'cvar_approx_ratio'
-        objective_function = compute_cvar
+    possible_approx_ratios = {'cvar_approx_ratio', 'Max_N_approx_ratio', 'approx_ratio'}
+    non_objFunc_ratios = possible_approx_ratios - { objective_func_type }
+    function_mapper = {'cvar_approx_ratio' : compute_cvar, 
+                       'Max_N_approx_ratio' : compute_maxN_mean,
+                       'approx_ratio' : compute_sample_mean}
 
     # Initialize metrics module
     metrics.init_metrics()
@@ -853,44 +849,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
 
     def execution_handler2 (qc, result, num_qubits, s_int, num_shots):
+        # Stores the results to the global saved_result variable
         global saved_result
-        global instance_filename
-        
-        nodes, edges = common.read_maxcut_instance(instance_filename)
-        opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol')
-        
-        #consider changing this since cut sizes are counted elsewhere as well
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots) 
-        metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
-
-        cuts, counts, sizes = compute_cutsizes(result, nodes, edges)
-        
-        # Compute and store all the 3 metric values (i.e. cvar, sample mean, max N counts mean)
-
-        # Sample mean metric
-        a_r_sm = -1 * compute_sample_mean(counts, sizes) / opt
-        metrics.store_metric(num_qubits, s_int, 'approx_ratio', a_r_sm)
-
-        # Max N % counts mean metric
-        a_r_mN = -1 * compute_maxN_mean(counts, sizes, N = N) / opt
-        metrics.store_metric(num_qubits, s_int, 'Max_N_approx_ratio', a_r_mN)
-
-        # CVaR metric
-        a_r_cvar = -1 * compute_cvar(counts, sizes, alpha = alpha) / opt
-        metrics.store_metric(num_qubits, s_int, 'cvar_approx_ratio', a_r_cvar)
-        
-        # Max cut size among measured cuts
-        a_r_best = compute_best_cut_from_measured(counts, sizes) / opt
-        metrics.store_metric(num_qubits, s_int, 'bestCut_approx_ratio', a_r_best)
-
-
-        # Also compute and store the weights of cuts at three quantile values
-        quantile_sizes = compute_quartiles(counts, sizes)
-        # need to store quantile_optgaps as a list instead of an array, for storing in json format
-        metrics.store_metric(num_qubits, s_int, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) 
-
-        
-        saved_result = {'cuts' : cuts, 'counts' : counts.tolist(), 'sizes' : sizes.tolist()} # modified from result
+        saved_result = result
      
     # Initialize execution module using the execution result handler above and specified backend_id
     # for method=2 we need to set max_jobs_active to 1, so each circuit completes before continuing
@@ -933,13 +894,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             # create integer that represents the problem instance; use s_int as circuit id
             s_int = i
             
-            # create filename from num_qubits and circuit_id (s_int), then load the problem file
+            # Load the problem and its solution
             global instance_filename
             instance_filename = os.path.join(os.path.dirname(__file__),
-                "..", "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt"
-            )
-            
+                "..", "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt")
             nodes, edges = common.read_maxcut_instance(instance_filename)
+            opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol')
             
             # if the file does not exist, we are done with this number of qubits
             if nodes == None:
@@ -948,8 +908,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
             circuits_complete += 1
         
-            if method != 2:
-        
+            if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
                 qc = MaxCut(num_qubits, s_int, edges, rounds, thetas_array, parameterized)
@@ -960,55 +919,95 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
                 ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
-                 
+
             if method == 2:
-                      
-                # a unique circuit index used inside the inner minimizer loop as identifier         
+                # a unique circuit index used inside the inner minimizer loop as identifier
                 unique_circuit_index = 0 
                 start_iters_t = time.time()
                 
                 def expectation(thetas_array):
-                    global unique_circuit_index
-                    global opt_ts
                     
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
-                    unique_id = s_int*1000 + unique_circuit_index
+                    global unique_circuit_index
+                    unique_id = s_int * 1000 + unique_circuit_index
                     
-                    # store the optimizer execution time of last cycle
-                    # NOTE: the first time it is stored it is just the initialization time for optimizer
-                    metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
-                    
-                    unique_circuit_index += 1
-                
+                    #************************************************
+                    #*** Circuit Creation and Decomposition start ***
                     # create the circuit for given qubit size and secret string, store time metric
                     ts = time.time()
                     qc = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array, parameterized)
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
-                    
                     # also store the 'rounds' for each execution
                     metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
-
                     # collapse the sub-circuit levels used in this benchmark (for qiskit)
                     qc2 = qc.decompose()
-
+                    # Circuit Creation and Decomposition end
+                    #************************************************
+                    
+                    
+                    #************************************************
+                    #*** Quantum Part: Execution of Circuits ***
                     # submit circuit for execution on target (simulator, cloud simulator, or hardware)
                     ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots)
-                
                     # Must wait for circuit to complete
                     #ex.throttle_execution(metrics.finalize_group)
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
-                
+                    #************************************************
+                    
+                    
+                    global saved_result
+                    # Fidelity Calculation and Storage
+                    counts, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, int(s_int), num_shots) 
+                    metrics.store_metric(num_qubits, unique_id, 'fidelity', fidelity)
+                    
+                    
+                    #************************************************
+                    #*** Classical Processing of Results - essential to optimizer ***
+                    global opt_ts
+                    dict_of_vals = dict()
+                    # Start counting classical optimizer time here again
+                    tc1 = time.time()
+                    cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
+                    # Compute the value corresponding to the objective function first
+                    dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha, N = N)
+                    # Store the optimizer time as current time- tc1 + ts - opt_ts, since the time between tc1 and ts is not time used by the classical optimizer.
+                    metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
+                    # Note: the first time it is stored it is just the initialization time for optimizer
+                    #************************************************
+                    
+                    
+                    #************************************************
+                    #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
+                    # Compute and the other two metrics (eg. cvar and max N % if the obj function was set to approx ratio)
+                    for s in non_objFunc_ratios:
+                        dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha, N = N)
+                    # Store the ratios
+                    dict_of_ratios = { key : -1 * val / opt for (key, val) in dict_of_vals.items()}
+                    metrics.store_metric(num_qubits, unique_id, None, dict_of_ratios)
+                    # Get the best measurement and store it
+                    best = compute_best_cut_from_measured(counts, sizes)
+                    metrics.store_metric(num_qubits, unique_id, 'bestCut_approx_ratio', best / opt)
+                    # Also compute and store the weights of cuts at three quantile values
+                    quantile_sizes = compute_quartiles(counts, sizes)
+                    # Store quantile_optgaps as a list (allows storing in json files)
+                    metrics.store_metric(num_qubits, unique_id, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) 
+                    
+                    # Also store the cuts, counts and sizes, in a global variable, to allow access elsewhere
+                    global iter_dist
+                    iter_dist = {'cuts' : cuts, 'counts' : counts.tolist(), 'sizes' : sizes.tolist()}
+                    unique_circuit_index += 1
+                    #************************************************
+                    
+                    
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
-
-                    # Compute the objective function
-                    cuts, counts, sizes = saved_result['cuts'], saved_result['counts'], saved_result['sizes'] #compute_cutsizes(saved_result, nodes, edges)
-                    return objective_function(counts = counts, sizes = sizes, N = N, alpha = alpha)
+                    
+                    return dict_of_vals[objective_func_type]
 
                 opt_ts = time.time()
-                
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
-                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter} )
+                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter})
+                # To-do: Set bounds for the minimizer
                 
                 unique_circuit_index = 0
                 unique_id = s_int*1000 + unique_circuit_index
