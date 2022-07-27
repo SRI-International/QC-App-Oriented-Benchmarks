@@ -791,16 +791,15 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # In particular, for every circuit width, the metrics will be stored the moment the results are obtained
     # In addition to the metrics, the (beta,gamma) values obtained by the optimizer, as well as the counts
     # measured for the final circuit will be stored.
-    if save_res_to_file:
-        # Use the following parent folder, for a more detailed 
-        if detailed_save_names:
-            start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            parent_folder_save = os.path.join('__results', objective_func_type,
-                                              f'{backend_id}/run_start_{start_time_str}')
-        else:
-            parent_folder_save = os.path.join('__results', 'objectiveFunction_' + objective_func_type)
-        
-        if not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
+    # Use the following parent folder, for a more detailed 
+    if detailed_save_names:
+        start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        parent_folder_save = os.path.join('__results', objective_func_type,
+                                          f'{backend_id}/run_start_{start_time_str}')
+    else:
+        parent_folder_save = os.path.join('__results', 'objectiveFunction_' + objective_func_type)
+    
+    if save_res_to_file and not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
     
     # validate parameters (smallest circuit is 4 qubits)
     max_qubits = max(4, max_qubits)
@@ -1081,7 +1080,7 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
 
     all_widths = list(metrics.circuit_metrics_final_iter.keys())
     all_widths = [int(ii) for ii in all_widths]
-    list_of_widths = all_widths#[-2:]
+    list_of_widths = [all_widths[-1]]
     metrics.plot_cutsize_distribution(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
                                   options=options, suffix=suffix, list_of_widths = list_of_widths)
 

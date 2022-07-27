@@ -1825,7 +1825,6 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
         list_of_widths = list(circuit_metrics_final_iter.keys())
     # Convert list_of_widths elements to string
     list_of_widths = [str(width) for width in list_of_widths]
-    print(list_of_widths)
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
     
@@ -1859,7 +1858,6 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
                 unique_counts = circuit_metrics_final_iter[group][deg]['unique_counts']
                 unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
-                print(colors[list_of_widths.index(group)])
                 axs.plot(np.array(unique_sizes) / optimal_value, np.array(unique_counts) / sum(unique_counts), marker='o',
                          ls = '-', c = colors[list_of_widths.index(group)], ms=2, mec = 'k', mew=0.2,
                          label = f"From QAOA. Width={group}")#" degree={deg}") # lw=1,
