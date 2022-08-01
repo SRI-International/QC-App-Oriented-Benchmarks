@@ -1692,40 +1692,57 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     
 
 def get_dist_from_measurements():
-    """
-    For each circuit width (group) and 'circuit' key, obtain the empirical probability distribution.
-    """
-
+    # For each circuit width (group) and 'circuit' key, obtain the empirical probability distribution.
+    # Do this for 1. The final iteration measurements from the iterative algorithm,
+    # as well as 2. Uniform random sampling
+    
+    def get_size_dist(counts, sizes):
+        # For given measurement outcomes, i.e. combinations of cuts, counts and sizes,
+        # return counts corresponding to each cut size.
+        unique_sizes = list(set(sizes))
+        unique_counts = [0] * len(unique_sizes)
+        
+        for i, size in enumerate(unique_sizes):
+            corresp_counts = [counts[ind] for ind,s in enumerate(sizes) if s == size]
+            unique_counts[i] = sum(corresp_counts)
+        
+        # Make sure that the scores are in ascending order
+        s_and_c_list = [[a,b] for (a,b) in zip(unique_sizes, unique_counts)]
+        s_and_c_list = sorted(s_and_c_list, key = lambda x : x[0])
+        unique_sizes = [x[0] for x in s_and_c_list]
+        unique_counts = [x[1] for x in s_and_c_list]
+        cumul_counts = np.cumsum(unique_counts)
+        return unique_counts, unique_sizes, cumul_counts
+    
+    
     for group in circuit_metrics_final_iter:
         for deg in circuit_metrics_final_iter[group]:
             # deg = degree of graph for maxcut
+            
+            # Obtain distribution corresponding to the final iteration of the iterative algorithm
             counts = circuit_metrics_final_iter[group][deg]['counts']
             sizes = circuit_metrics_final_iter[group][deg]['sizes']
-
-            unique_sizes = list(set(sizes))
-            unique_counts = [0] * len(unique_sizes)
-        
-            for i, size in enumerate(unique_sizes):
-                corresp_counts = [counts[ind] for ind,s in enumerate(sizes) if s == size]
-                unique_counts[i] = sum(corresp_counts)
-        
-            # Make sure that the scores are in ascending order
-            s_and_c_list = [[a,b] for (a,b) in zip(unique_sizes, unique_counts)]
-            s_and_c_list = sorted(s_and_c_list, key = lambda x : x[0])
-            unique_sizes = [x[0] for x in s_and_c_list]
-            unique_counts = [x[1] for x in s_and_c_list]
-
+            
+            unique_counts, unique_sizes, cumul_counts = get_size_dist(counts, sizes)
             # Store the sizes, counts and cumulative counts in metrics
             circuit_metrics_final_iter[group][deg]['unique_sizes'] = unique_sizes
             circuit_metrics_final_iter[group][deg]['unique_counts'] = unique_counts
-
-            cumul_counts = np.cumsum(unique_counts)
             circuit_metrics_final_iter[group][deg]['cumul_counts'] = cumul_counts
+            
+            # Obtain the distribution corresponding to uniform random sampling
+            # 'unif_cuts', 'unif_counts', 'unif_sizes'
+            unif_counts = circuit_metrics_final_iter[group][deg]['unif_counts']
+            unif_sizes = circuit_metrics_final_iter[group][deg]['unif_sizes']
+            
+            unique_counts_unif, unique_sizes_unif, cumul_counts_unif = get_size_dist(unif_counts, unif_sizes)
+            # Store the sizes, counts and cumulative counts in metrics
+            circuit_metrics_final_iter[group][deg]['unique_sizes_unif'] = unique_sizes_unif
+            circuit_metrics_final_iter[group][deg]['unique_counts_unif'] = unique_counts_unif
+            circuit_metrics_final_iter[group][deg]['cumul_counts_unif'] = cumul_counts_unif
 
 
 def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
-                     options=None, suffix=None
-                     ):
+              options=None, suffix=None):
     """
     Plot the ECDF (Empirical Cumulative Distribution Function)
     for each circuit width and degree
@@ -1745,7 +1762,7 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
     # Extract shorter app name from the title passed in by user   
     appname = get_appname_from_title(suptitle)
 
-    with plt.style.context(maxcut_style):# #os.path.join(dir_path, 'science.mplstyle')
+    with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)#, figsize=(6.4,4.8))#, constrained_layout=True, figsize=(6,4))#, sharex=True
     
         # Create more appropriate title
@@ -1786,6 +1803,90 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
         # show the plot for user to see
         if show_plot_images:
             plt.show()
+
+def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
+                              list_of_widths = [],
+                              options=None, suffix=None):
+    """
+    For each circuit size and degree, plot the measured distribution of cutsizes
+    corresponding to the last optimizer iteration, as well as uniform random sampling
+    """
+    # Get empirical probability distributions for cut sizes.
+    get_dist_from_measurements()
+    
+    # get backend id for this set of circuits
+    backend_id = get_backend_id()
+    
+    # Extract shorter app name from the title passed in by user   
+    appname = get_appname_from_title(suptitle)
+
+    if not list_of_widths:
+        # If list_of_widths is emply, set it to contain all widths
+        list_of_widths = list(circuit_metrics_final_iter.keys())
+    # Convert list_of_widths elements to string
+    list_of_widths = [str(width) for width in list_of_widths]
+    with plt.style.context(maxcut_style):
+        fig, axs = plt.subplots(1, 1)
+    
+        # Create more appropriate title
+        suptitle = "Empirical Distribution of cut sizes - " + appname
+        
+        # append key circuit metrics info to the title
+        fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+        if options != None:
+            options_str = ''
+            for key, value in options.items():
+                if len(options_str) > 0: options_str += ', '
+                options_str += f"{key}={value}"
+            fulltitle += f"\n{options_str}"
+
+
+
+        # Get colors for lines
+        cmap = cm.get_cmap('Dark2')
+        colors = [cmap(ij) for ij in np.linspace(0.1,0.9,len(list_of_widths))]
+
+        # and add the title to the plot
+        plt.suptitle(fulltitle)
+
+        for group in circuit_metrics_final_iter:
+            if group not in list_of_widths:
+                # Skip if width is not to be plotted
+                continue
+
+            for deg in circuit_metrics_final_iter[group]:
+                unique_counts = circuit_metrics_final_iter[group][deg]['unique_counts']
+                unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
+                optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
+                axs.plot(np.array(unique_sizes) / optimal_value, np.array(unique_counts) / sum(unique_counts), marker='o',
+                         ls = '-', c = colors[list_of_widths.index(group)], ms=2, mec = 'k', mew=0.2,
+                         label = f"From QAOA. Width={group}")#" degree={deg}") # lw=1,
+                
+                # Also plot the distribution obtained from uniform random sampling
+                unique_counts_unif = circuit_metrics_final_iter[group][deg]['unique_counts_unif']
+                unique_sizes_unif = circuit_metrics_final_iter[group][deg]['unique_sizes_unif']
+                optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
+                axs.plot(np.array(unique_sizes_unif) / optimal_value, np.array(unique_counts_unif) / sum(unique_counts_unif),
+                         marker='o', c = colors[list_of_widths.index(group)], ms=1, mec = 'k',mew=0.2,
+                         ls = 'dotted', label = f"Uniform Sampling. Width={group}")#" degree={deg}") # lw=1,
+                
+
+        axs.set_ylabel('Fraction of Total Counts')
+        axs.set_xlabel(r'$\frac{\mathrm{Cut\ Size}}{\mathrm{Max\ Cut\ Size}}$')
+        axs.grid()
+
+        axs.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+        fig.tight_layout()
+
+        # save plot image to file
+        if save_plot_images:
+            save_plot_image(plt, f"{appname}-EDF-" + suffix, backend_id)
+            
+        # show the plot for user to see
+        if show_plot_images:
+            plt.show()
+    
 
 # Plot bar charts for each metric over all groups
 def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", 
