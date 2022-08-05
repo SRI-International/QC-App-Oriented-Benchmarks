@@ -20,6 +20,7 @@ Within each application directory, there is a second level directory, one for ea
 The directory names and the currently supported environments are:
 ```
     qiskit      -- IBM Qiskit
+    fireopal    -- Q-CTRL Fire Opal
     cirq        -- Google Cirq
     braket      -- Amazon Braket
 ```  

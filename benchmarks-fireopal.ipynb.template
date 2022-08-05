@@ -1,0 +1,416 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### QED-C Prototype Benchmarks - Fire Opal Version\n",
+    "The notebook contains a suite of prototype application benchmarks for the Q-CTRL Fire Opal API.\n",
+    "In the following cell, specify user credentials for the IBM backend.\n",
+    "Then each remaining cell specifies settings and runs a single benchmark."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "# If you are part of an IBMQ group, set your token, hub, group, and project name here\n",
+    "# device_credentials = {\n",
+    "#    \"token\": \"YOUR-API-TOKEN\",\n",
+    "#    \"hub\": \"YOUR-HUB-NAME\",\n",
+    "#    \"group\": \"YOUR-GROUP-NAME\",\n",
+    "#    \"project\": \"YOUR-PROJECT-NAME\"\n",
+    "# }\n",
+    "device_credentials = None\n",
+    "backend_id = None"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Deutsch-Jozsa"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"deutsch-jozsa/fireopal\")\n",
+    "import dj_benchmark\n",
+    "\n",
+    "dj_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=16,\n",
+    "    max_circuits=30,\n",
+    "    num_shots=32000,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Bernstein-Vazirani (Method 1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"bernstein-vazirani/fireopal\")\n",
+    "import bv_benchmark\n",
+    "\n",
+    "bv_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=16,\n",
+    "    max_circuits=30,\n",
+    "    num_shots=32000,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Bernstein-Vazirani (Method 2)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"bernstein-vazirani/fireopal\")\n",
+    "import bv_benchmark\n",
+    "\n",
+    "bv_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=16,\n",
+    "    max_circuits=30,\n",
+    "    num_shots=32000,\n",
+    "    method=2,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Hidden Shift"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"hidden-shift/fireopal\")\n",
+    "import hs_benchmark\n",
+    "\n",
+    "hs_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=16,\n",
+    "    max_circuits=30,\n",
+    "    num_shots=32000,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Quantum Fourier Transform - Method 1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"quantum-fourier-transform/fireopal\")\n",
+    "import qft_benchmark\n",
+    "\n",
+    "qft_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=13,\n",
+    "    max_circuits=1,\n",
+    "    num_shots=32000,\n",
+    "    method=1,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Quantum Fourier Transform - Method 2"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"quantum-fourier-transform/fireopal\")\n",
+    "import qft_benchmark\n",
+    "\n",
+    "qft_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=13,\n",
+    "    max_circuits=1,\n",
+    "    num_shots=32000,\n",
+    "    method=2,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Grover"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"grovers/fireopal\")\n",
+    "import grovers_benchmark\n",
+    "\n",
+    "grovers_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=7,\n",
+    "    max_circuits=3,\n",
+    "    num_shots=32000,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Phase Estimation"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"phase-estimation/fireopal\")\n",
+    "import pe_benchmark\n",
+    "\n",
+    "pe_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=14,\n",
+    "    max_circuits=10,\n",
+    "    num_shots=32000,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Amplitude Estimation"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"amplitude-estimation/fireopal\")\n",
+    "import ae_benchmark\n",
+    "\n",
+    "ae_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=8,\n",
+    "    max_circuits=3,\n",
+    "    num_shots=32000,\n",
+    "    backend_id=backend_id, \n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Hamiltonian Simulation"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"hamiltonian-simulation/fireopal\")\n",
+    "import hamiltonian_simulation_benchmark\n",
+    "\n",
+    "hamiltonian_simulation_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=14,\n",
+    "    max_circuits=10,\n",
+    "    num_shots=32000,\n",
+    "    use_XX_YY_ZZ_gates=False,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### VQE - Method 1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"vqe/fireopal\")\n",
+    "import vqe_benchmark\n",
+    "\n",
+    "vqe_benchmark.run(\n",
+    "    min_qubits=2,\n",
+    "    max_qubits=10,\n",
+    "    max_circuits=10,\n",
+    "    num_shots=32000,\n",
+    "    method=1,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Shor - Method 1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"shors/fireopal\")\n",
+    "import shors_benchmark\n",
+    "\n",
+    "shors_benchmark.run(\n",
+    "    min_qubits=3,\n",
+    "    max_qubits=14,\n",
+    "    max_circuits=3,\n",
+    "    num_shots=32000,\n",
+    "    method=1,\n",
+    "    backend_id=backend_id,\n",
+    "    device_credentials=device_credentials\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Combined Benchmark Results"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"_common\")\n",
+    "import metrics\n",
+    "\n",
+    "# metrics.depth_base = 2\n",
+    "# metrics.QV = 64\n",
+    "# apps = [ \"Hidden Shift\", \"Grover's Search\", \"Quantum Fourier Transform (1)\", \"Hamiltonian Simulation\" ]\n",
+    "# backend_id='qasm_simulator'\n",
+    "\n",
+    "metrics.plot_all_app_metrics(backend_id, do_all_plots=False, include_apps=None)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3.8.13 ('fire38')",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.13"
+  },
+  "vscode": {
+   "interpreter": {
+    "hash": "4127be8b1e3ad9de80269ff8628fc79a76e5e381ccc9e9742d0269d3e1d1ca52"
+   }
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
