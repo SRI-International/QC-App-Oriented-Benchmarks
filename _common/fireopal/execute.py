@@ -32,9 +32,7 @@ from qiskit.qobj import QobjExperimentHeader
 from qiskit.result import Result
 from qiskit.result.models import ExperimentResult, ExperimentResultData
 
-# TODO: Change internal API endpoint to external endpoint
-# from qctrl import Qctrl
-from qctrlfireopalcore.workflows.testing import FireOpal as Qctrl
+from qctrl import Qctrl
 
 # Use Aer qasm_simulator by default
 simulator_backend = Aer.get_backend("qasm_simulator")
