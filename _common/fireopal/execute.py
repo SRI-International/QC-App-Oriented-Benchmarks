@@ -71,26 +71,23 @@ def set_execution_target(backend_id="simulator", credentials=None):
     :credentials:  credentials for accessing a real device
 
     example usage.
-    set_execution_target(backend_id=TODO)
+    set_execution_target(backend_id)
     """
     global use_real_device, device_backend_name, qctrl, device_credentials
 
-    # TODO: remove simulator eventually
-    if (backend_id != "simulator") and backend_id.startswith("fire_opal_"):
+    if backend_id.startswith("fire_opal_"):
         possible_backend_name = backend_id.split("fire_opal_")[1]
         if possible_backend_name in [
             "ibmq_jakarta", "ibm_lagos", "ibmq_guadalupe",
-            "fake_jakarta", "fake_lagos", "fake_guadalupe"
         ]:
             device_backend_name = possible_backend_name
             device_credentials = credentials
             use_real_device = True
             qctrl = Qctrl()
         else:
-            print(f"ERROR: Cannot use {possible_backend_name} as a backend device, defaulting to simulator")
-    # nothing else is supported yet, default to simulator
+            print(f"ERROR: Cannot use {possible_backend_name} as a backend device.")
     else:
-        print(f"ERROR: Unknown backend_id: {backend_id}, defaulting to simulator")
+        raise ValueError(f"ERROR: Unknown backend_id: {backend_id}")
 
     # create an informative device name
     device_name = backend_id
