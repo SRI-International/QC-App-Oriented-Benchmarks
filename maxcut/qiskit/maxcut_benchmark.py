@@ -943,7 +943,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     # Circuit Creation and Decomposition end
                     #************************************************
                     
-                    
                     #************************************************
                     #*** Quantum Part: Execution of Circuits ***
                     # submit circuit for execution on target (simulator, cloud simulator, or hardware)
@@ -953,12 +952,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                     #************************************************
                     
-                    
                     global saved_result
                     # Fidelity Calculation and Storage
                     counts, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, int(s_int), num_shots) 
                     metrics.store_metric(num_qubits, unique_id, 'fidelity', fidelity)
-                    
                     
                     #************************************************
                     #*** Classical Processing of Results - essential to optimizer ***
@@ -973,7 +970,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
                     # Note: the first time it is stored it is just the initialization time for optimizer
                     #************************************************
-                    
                     
                     #************************************************
                     #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
@@ -1074,6 +1070,10 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
     metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                                  options=options,
                                  suffix=suffix, objective_func_type = objective_func_type)
+    
+    metrics.plot_metrics_optgaps_bars(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                                      options=options,
+                                      suffix=suffix, objective_func_type = objective_func_type)
 
     metrics.plot_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
                                  options=options, suffix=suffix)
