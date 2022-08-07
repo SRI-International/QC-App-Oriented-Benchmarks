@@ -1071,10 +1071,6 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
                                  options=options,
                                  suffix=suffix, objective_func_type = objective_func_type)
     
-    metrics.plot_metrics_optgaps_bars(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                      options=options,
-                                      suffix=suffix, objective_func_type = objective_func_type)
-
     metrics.plot_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
                                  options=options, suffix=suffix)
 
