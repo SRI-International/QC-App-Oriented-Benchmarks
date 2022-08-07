@@ -1889,6 +1889,109 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
     
 
 # Plot bar charts for each metric over all groups
+def plot_metrics_optgaps_bars (suptitle="Circuit Width (Number of Qubits)", 
+                               transform_qubit_group = False, 
+                               new_qubit_group = None, filters=None, 
+                               suffix="", objective_func_type = 'cvar_approx_ratio',
+                               which_metrics_to_plot = "all",
+                               options=None):
+    """
+    Currently only used for maxcut
+    """
+
+    # get backend id for this set of circuits
+    backend_id = get_backend_id()
+    
+    # Extract shorter app name from the title passed in by user   
+    appname = get_appname_from_title(suptitle)
+        
+    if len(group_metrics["groups"]) == 0:
+        print(f"\n{suptitle}")
+        print("     ****** NO RESULTS ****** ")
+        return
+    
+    # sort the group metrics (in case they weren't sorted when collected)
+    sort_group_metrics()
+    
+    # flags for charts to show
+    do_depths = True
+    
+    # check if we have depth metrics to show
+    do_depths = len(group_metrics["avg_depths"]) > 0
+    
+    # Create a list of optimality gap in terms of the approximation ratio for each circuit width
+    optgap_list = [] #[0] * len(group_metrics["groups"])
+    
+    for group in circuit_metrics_detail_2:
+        # Note: Below, when we append the metrics, we are assuming that there circuit_metrics_detail_2[group] has only one element
+        for circuit_id in circuit_metrics_detail_2[group]:
+            # save the metric from the last iteration
+            last_ind = max(circuit_metrics_detail_2[group][circuit_id].keys())
+            ar = circuit_metrics_detail_2[group][circuit_id][last_ind]["approx_ratio"]
+            optgap_list.append( (1.0 - ar) * 100 )
+
+            # break after one circuit.
+            break
+    
+    # circuit_metrics_detail_2.keys() may not be in an ascending order. Get argsort
+    # Rearrange optimality_gap and groups
+    groups = list(circuit_metrics_detail_2.keys())
+    groups = [int(i) for i in groups]
+    sort_inds = np.argsort(groups)
+    optgap_list = [optgap_list[i] for i in sort_inds]
+    groups = [groups[i] for i in sort_inds]
+    
+    
+    with plt.style.context(maxcut_style):
+        
+        # create the figure into which plots will be placed
+        fig, axs = plt.subplots(1, 1)
+        
+        # Create more appropriate title
+        suptitle = "Optimality Gaps - " + appname
+        
+        # append key circuit metrics info to the title
+        fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+        if options != None:
+            options_str = ''
+            for key, value in options.items():
+                if len(options_str) > 0: options_str += ', '
+                options_str += f"{key}={value}"
+            fulltitle += f"\n{options_str}"
+    
+        # and add the title to the plot
+        plt.suptitle(fulltitle)
+        
+        
+        
+        if do_depths:
+            # if max(group_metrics["avg_tr_depths"]) < 20:
+            #     axs[axi].set_ylim([0, 20])
+    
+            # For the y axis, choose the limits to be at least [0,40].
+            # Compare with the highest value in any of the metrics optgaps to be plotted
+            limopts = max(optgap_list)
+            axs.set_ylim([0, max(40, limopts) * 1.1])
+            axs.bar(groups, optgap_list, 0.8)
+            axs.set_ylabel(r'Optimality Gap ($\%$)')
+            
+            # Set x ticks to be the same as the circuit widths
+            axs.set_xticks(groups)
+        
+            axs.set_xlabel('Circuit Width (Number of Qubits)')
+        
+        fig.tight_layout() 
+        
+        # save plot image to file
+        if save_plot_images:
+            save_plot_image(plt, f"{appname}-optgaps-bar" + suffix, backend_id) 
+                
+        # show the plot for user to see
+        if show_plot_images:
+            plt.show()
+
+
+# Plot detailed optgaps
 def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", 
                           transform_qubit_group = False, 
                           new_qubit_group = None, filters=None, 
@@ -1975,6 +2078,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     groups = list(circuit_metrics_detail_2.keys())
     groups = [int(i) for i in groups]
     sort_inds = np.argsort(groups)
+    groups = [groups[i] for i in sort_inds]
     # Rearrange optimality_gap and quantile_optgaps using the same sequence
     for optgap_quantity in group_metrics_optgaps:
         group_metrics_optgaps[optgap_quantity]['gapvals'] = [group_metrics_optgaps[optgap_quantity]['gapvals'][i] for i in sort_inds]
