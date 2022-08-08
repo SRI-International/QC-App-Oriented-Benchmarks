@@ -1464,20 +1464,31 @@ known_x_labels = {
     'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time (s)',
     'cumulative_depth' : 'Cumulative Circuit Depth'
 }
-# map known Y metrics to labels    
+
+# map known Y metrics to labels
 known_y_labels = {
     'num_qubits' : 'Circuit Width'
 }
 # map known Score metrics to labels    
 known_score_labels = {
     'approx_ratio' : 'Avg Approximation Ratio',
-    'cvar_approx_ratio' : 'CVaR Approximation Ratio',
-    'Max_N_approx_ratio' : 'Max N$\%$ counts Approximation Ratio',
+    'cvar_approx_ratio' : 'CVaR Ratio',
+    'Max_N_approx_ratio' : 'Max N$\%$ counts Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
-    'bestCut_approx_ratio' : 'Best Measurement Approximation Ratio',
+    'bestCut_approx_ratio' : 'Best Measurement Ratio',
     'fidelity' : 'Avg Result Fidelity',
     'max_fidelity' : 'Max Result Fidelity',
     'hf_fidelity' : 'Avg Hellinger Fidelity'
+}
+
+# string that will go into the name of the figure when saved
+score_label_save_str = {
+    'approx_ratio' : 'AR',
+    'cvar_approx_ratio' : 'CVaR',
+    'Max_N_approx_ratio' : 'MaxN',
+    'bestCut_approx_ratio' : 'bestcut',
+    'fidelity' : 'fidelity',
+    'hf_fidelity' : 'hf'
 }
 
  
@@ -1496,8 +1507,8 @@ def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec
         for x_m in x_metric:
             for y_m in y_metric:
                 plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size, options=options,suffix=suffix)
-       
-# Plot the given "Score Metric" against the given "X Metric" and "Y Metric"         
+
+# Plot the given "Score Metric" against the given "X Metric" and "Y Metric"
 def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None, suffix=''):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
@@ -1642,7 +1653,10 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
                             x_size=xs, y_size=y_size)
         plt.tight_layout()
         if save_plot_images:
-            save_plot_image(plt, os.path.join(f"{appname}-area-" + suffix), backend_id)
+            save_plot_image(plt, os.path.join(f"{appname}-area-"
+                                              + x_metric + '-'
+                                              + score_label_save_str[score_metric] + '-'
+                                              + suffix), backend_id)
 
 
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits

@@ -17,9 +17,6 @@ savefig.dpi : 300
 # Use LaTeX for math formatting
 # text.usetex : True
 # text.latex.preamble : \usepackage{amsmath} \usepackage{amssymb}
-# axes.titlesize :medium
-
-axes.linewidth : 0.5
 
 # Grid properties
 grid.color : 'k'
