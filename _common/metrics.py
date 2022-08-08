@@ -1465,6 +1465,14 @@ known_x_labels = {
     'cumulative_depth' : 'Cumulative Circuit Depth'
 }
 
+x_label_save_str = {
+    'create_time' : 'createTime',
+    'exec_time' : 'execTime',
+    'opt_exec_time' : 'optTime',
+    'depth' : 'depth'
+}
+
+
 # map known Y metrics to labels
 known_y_labels = {
     'num_qubits' : 'Circuit Width'
@@ -1483,10 +1491,10 @@ known_score_labels = {
 
 # string that will go into the name of the figure when saved
 score_label_save_str = {
-    'approx_ratio' : 'AR',
+    'approx_ratio' : 'apprRatio',
     'cvar_approx_ratio' : 'CVaR',
-    'Max_N_approx_ratio' : 'MaxN',
-    'bestCut_approx_ratio' : 'bestcut',
+    'Max_N_approx_ratio' : 'maxN',
+    'bestCut_approx_ratio' : 'bestCut',
     'fidelity' : 'fidelity',
     'hf_fidelity' : 'hf'
 }
@@ -1654,8 +1662,8 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
         plt.tight_layout()
         if save_plot_images:
             save_plot_image(plt, os.path.join(f"{appname}-area-"
-                                              + x_metric + '-'
                                               + score_label_save_str[score_metric] + '-'
+                                              + x_label_save_str[x_metric] + '-'
                                               + suffix), backend_id)
 
 

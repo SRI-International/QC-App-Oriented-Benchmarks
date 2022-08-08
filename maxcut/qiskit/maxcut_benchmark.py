@@ -797,7 +797,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         parent_folder_save = os.path.join('__results', objective_func_type,
                                           f'{backend_id}/run_start_{start_time_str}')
     else:
-        parent_folder_save = os.path.join('__results', 'objectiveFunction_' + objective_func_type)
+        parent_folder_save = os.path.join('__results', objective_func_type, f'{backend_id}')
     
     if save_res_to_file and not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
     
@@ -1052,9 +1052,11 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
         # If detailed names are desired for saving plots, put date of creation, etc.
         cur_time=datetime.datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
-        suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_method={objective_func_type}_{dt}'
+        short_obj_func_str = metrics.score_label_save_str[objective_func_type]
+        suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_of-{short_obj_func_str}_{dt}' #of=objective function
     else:
-        suffix = objective_func_type
+        short_obj_func_str = metrics.score_label_save_str[objective_func_type]
+        suffix = f'of-{short_obj_func_str}' #of=objective function
         
     obj_str = metrics.known_score_labels[objective_func_type]
     options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree,
