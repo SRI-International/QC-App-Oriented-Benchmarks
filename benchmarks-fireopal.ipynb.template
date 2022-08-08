@@ -33,35 +33,6 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "### Deutsch-Jozsa"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {
-    "tags": []
-   },
-   "outputs": [],
-   "source": [
-    "import sys\n",
-    "sys.path.insert(1, \"deutsch-jozsa/fireopal\")\n",
-    "import dj_benchmark\n",
-    "\n",
-    "dj_benchmark.run(\n",
-    "    min_qubits=2,\n",
-    "    max_qubits=16,\n",
-    "    max_circuits=30,\n",
-    "    num_shots=32000,\n",
-    "    backend_id=backend_id,\n",
-    "    device_credentials=device_credentials\n",
-    ")"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": [
     "### Bernstein-Vazirani (Method 1)"
    ]
   },
