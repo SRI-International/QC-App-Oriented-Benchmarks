@@ -473,7 +473,7 @@ def compute_quartiles(counts, sizes):
     quantile_sizes = sizes[locs]
     return quantile_sizes
 
-def uniform_cut_sampling(num_qubits, degree, num_shots):
+def uniform_cut_sampling(num_qubits, degree, num_shots, _instances=None):
     """
     For a given problem, i.e. num_qubits and degree values, sample cuts uniformly
     at random from all possible cuts, num_shots number of times. Return the corresponding
@@ -484,7 +484,7 @@ def uniform_cut_sampling(num_qubits, degree, num_shots):
     instance_filename = os.path.join(os.path.dirname(__file__),
                                      "..", "_common", common.INSTANCE_DIR, 
                                      f"mc_{num_qubits:03d}_{degree:03d}_000.txt")
-    nodes, edges = common.read_maxcut_instance(instance_filename)
+    nodes, edges = common.read_maxcut_instance(instance_filename, _instances)
     
     # Obtain num_shots number of uniform random samples between 0 and 2 ** num_qubits
     unif_cuts = np.random.randint(2 ** num_qubits, size=num_shots).tolist()
@@ -511,7 +511,7 @@ def uniform_cut_sampling(num_qubits, degree, num_shots):
 
 def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
                                      parent_folder_save, dict_of_inputs, save_final_counts,
-                                     save_res_to_file):
+                                     save_res_to_file, _instances=None):
     """
     Store various results from the last iteration a problem, i.e. graph of size=num_qubits
     and degree=s_int, into metrics. Store the data also in a json file
@@ -524,7 +524,7 @@ def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
         save_res_to_file: bool. If False, do not save data to json file.
     """
     # In order to compare with uniform random sampling, get some samples
-    unif_cuts, unif_counts, unif_sizes = uniform_cut_sampling(num_qubits, s_int, num_shots)
+    unif_cuts, unif_counts, unif_sizes = uniform_cut_sampling(num_qubits, s_int, num_shots, _instances)
     unif_dict = {'unif_cuts' : unif_cuts,
                  'unif_counts' : unif_counts,
                  'unif_sizes' : unif_sizes}
@@ -533,7 +533,7 @@ def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
     # the converged theta values, as well as the known optimal value for 
     # the current problem, in metrics.circuit_metrics_final_iter
     # Also store uniform cut sampling results
-    opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol')
+    opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol', _instances)
     metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
     metrics.store_props_final_iter(num_qubits, s_int, None, iter_dist)
     metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
@@ -704,7 +704,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None, _instances=None):
     """
 
     Parameters
@@ -897,8 +897,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             global instance_filename
             instance_filename = os.path.join(os.path.dirname(__file__),
                 "..", "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt")
-            nodes, edges = common.read_maxcut_instance(instance_filename)
-            opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol')
+            nodes, edges = common.read_maxcut_instance(instance_filename, _instances)
+            opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol', _instances)
             
             # if the file does not exist, we are done with this number of qubits
             if nodes == None:
@@ -1013,7 +1013,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
                                                  parent_folder_save=parent_folder_save,
                                                  dict_of_inputs=dict_of_inputs,save_final_counts=save_final_counts,
-                                                 save_res_to_file=save_res_to_file)
+                                                 save_res_to_file=save_res_to_file, _instances=_instances)
 
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point

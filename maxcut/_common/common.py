@@ -4,7 +4,10 @@ import os
 INSTANCE_DIR = 'instances'
 RESULTS_DIR = 'results'
 
-def read_maxcut_instance(file_path):
+def read_maxcut_instance(file_path, _instances=None):
+    if isinstance(_instances, dict):
+        inst = os.path.splitext(os.path.basename(file_path))[0]
+        return _instances.get(inst, {}).get("instance", (None, None))
     if os.path.exists(file_path) and os.path.isfile(file_path):
         with open(file_path, 'r') as file:
             nodes = int(file.readline())
@@ -18,7 +21,10 @@ def read_maxcut_instance(file_path):
     else:
         return None, None
 
-def read_maxcut_solution(file_path):
+def read_maxcut_solution(file_path, _instances=None):
+    if isinstance(_instances, dict):
+        inst = os.path.splitext(os.path.basename(file_path))[0]
+        return _instances.get(inst, {}).get("instance", (None, None))
     if os.path.exists(file_path) and os.path.isfile(file_path):
         with open(file_path, 'r') as file:
             objective = int(file.readline())
