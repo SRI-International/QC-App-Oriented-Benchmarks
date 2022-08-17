@@ -50,12 +50,19 @@ def local_rc(circuit, backend, n_compilations=20):
 ################################################################################################
 def split(circuit):
     new_circuit = tq.Circuit()
-    for cycle in circuit.cycles:
+    for cycle in circuit.cycles[:-1]:
         if len(cycle.gates_single) > 0 and len(cycle.gates_multi) > 0:
             new_circuit.append(cycle.gates_single)
             new_circuit.append(cycle.gates_multi)
         else:
             new_circuit.append(cycle)
+    
+    if len(circuit.cycles[-1].gates) > 0 and len(circuit.cycles[-1].meas) > 0:
+            new_circuit.append(circuit.cycles[-1].gates)
+            new_circuit.append(circuit.cycles[-1].meas)
+    else:
+            new_circuit.append(circuit.cycles[-1])
+            
     new_circuit = tq.compilation.UnmarkCycles().apply(new_circuit)
     return new_circuit
 
@@ -93,7 +100,9 @@ compiler = tq.Compiler(
         tqc.Native2Q(factories),
         tqc.UnmarkCycles(),
         tqc.Merge(),
-        tqc.RemoveId()
+        tqc.RemoveId(),
+        tqc.Justify(),
+        tqc.RemoveEmptyCycle()
     ]
 )
 
