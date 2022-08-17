@@ -434,6 +434,34 @@ def compute_cvar(counts, sizes, alpha = 0.1, **kwargs):
 
     return - cvar_sum / num_avgd
 
+def compute_gibbs(counts, sizes, eta = 0.5, **kwargs):
+    """
+    Compute the Gibbs objective function for given measurements
+
+    Parameters
+    ----------
+    counts : ndarray of ints
+        measured counts corresponding to cuts
+    sizes : ndarray of ints
+        cut sizes (i.e. number of edges crossing the cut)
+    eta : float, optional
+        Inverse Temperature
+    Returns
+    -------
+    float
+        - Gibbs objective function value / optimal value
+
+    """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
+    ls = max(sizes)#largest size
+    shifted_sizes = sizes - ls
+    
+    # gibbs = - np.log( np.sum(counts * np.exp(eta * sizes)) / np.sum(counts))
+    gibbs = - eta * ls - np.log(np.sum (counts / np.sum(counts) * np.exp(eta * shifted_sizes)))
+    return gibbs
+
+
 def compute_best_cut_from_measured(counts, sizes, **kwargs):
     """From the measured cuts, return the size of the largest cut
     """
@@ -703,10 +731,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False,
-        backend_id='qasm_simulator', provider_backend=None,
+        backend_id='qasm_simulator', provider_backend=None, eta=0.5,
         hub="ibm-q", group="open", project="main", exec_options=None, _instances=None):
     """
-
     Parameters
     ----------
     min_qubits : int, optional
@@ -831,11 +858,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         y_size = 1.5
         
     # Choose the objective function to minimize, based on values of the parameters
-    possible_approx_ratios = {'cvar_approx_ratio', 'Max_N_approx_ratio', 'approx_ratio'}
+    possible_approx_ratios = {'cvar_approx_ratio', 'Max_N_approx_ratio', 'approx_ratio', 'gibbs_ratio'}
     non_objFunc_ratios = possible_approx_ratios - { objective_func_type }
     function_mapper = {'cvar_approx_ratio' : compute_cvar, 
                        'Max_N_approx_ratio' : compute_maxN_mean,
-                       'approx_ratio' : compute_sample_mean}
+                       'approx_ratio' : compute_sample_mean,
+                       'gibbs_ratio' : compute_gibbs}
 
     # Initialize metrics module
     metrics.init_metrics()
@@ -978,6 +1006,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                         dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha, N = N)
                     # Store the ratios
                     dict_of_ratios = { key : -1 * val / opt for (key, val) in dict_of_vals.items()}
+                    dict_of_ratios['gibbs_ratio'] = dict_of_ratios.get('gibbs_ratio') / eta 
                     metrics.store_metric(num_qubits, unique_id, None, dict_of_ratios)
                     # Get the best measurement and store it
                     best = compute_best_cut_from_measured(counts, sizes)

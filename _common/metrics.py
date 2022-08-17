@@ -1483,6 +1483,7 @@ known_score_labels = {
     'cvar_approx_ratio' : 'CVaR Ratio',
     'Max_N_approx_ratio' : 'Max N$\%$ counts Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
+    'gibbs_ratio' : 'Gibbs Objective Function',
     'bestCut_approx_ratio' : 'Best Measurement Ratio',
     'fidelity' : 'Avg Result Fidelity',
     'max_fidelity' : 'Max Result Fidelity',
@@ -1495,6 +1496,7 @@ score_label_save_str = {
     'cvar_approx_ratio' : 'CVaR',
     'Max_N_approx_ratio' : 'maxN',
     'bestCut_approx_ratio' : 'bestCut',
+    'gibbs_ratio' : 'gibbs',
     'fidelity' : 'fidelity',
     'hf_fidelity' : 'hf'
 }
@@ -1946,6 +1948,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                              'Max_N_approx_ratio' : {'color' : 'b', 'label': r'Max $\%$ counts', 'gapvals' : []},
                              'cvar_approx_ratio' : {'color' : 'g', 'label': 'CVaR', 'gapvals' : []},
                              'bestCut_approx_ratio' : {'color' : 'm', 'label': 'Best Measurement', 'gapvals' : []},
+                             'gibbs_ratio' : {'color' : 'y', 'label' : 'Gibbs', 'gapvals' : []},
                              'quantile_optgaps' : {'gapvals' : []},
                              'violin' : {'gapvals' : []}} # list of [xlist, ylist]
     
@@ -1967,6 +1970,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             group_metrics_optgaps['Max_N_approx_ratio']['gapvals'].append((1.0 - mets["Max_N_approx_ratio"]) * 100)
             group_metrics_optgaps['cvar_approx_ratio']['gapvals'].append((1.0 - mets["cvar_approx_ratio"]) * 100)
             group_metrics_optgaps['bestCut_approx_ratio']['gapvals'].append((1.0 - mets["bestCut_approx_ratio"]) * 100)
+            group_metrics_optgaps['gibbs_ratio']['gapvals'].append((1.0 - mets["gibbs_ratio"]) * 100)
 
             # Also store the optimality gaps at the three quantiles values
             # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
@@ -2097,7 +2101,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
 
         # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
-        ideal_lgnd_seq = ['approx_ratio', 'Max_N_approx_ratio', 'cvar_approx_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
+        ideal_lgnd_seq = ['approx_ratio', 'Max_N_approx_ratio', 'cvar_approx_ratio', 'gibbs_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
         handles_list= [plt_handles[s] for s in ideal_lgnd_seq if s in plt_handles]
         axs.legend(handles=handles_list, loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
         
