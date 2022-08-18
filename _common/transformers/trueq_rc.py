@@ -21,7 +21,7 @@ def full_rc(circuit, backend, n_compilations=20):
         c = compiler.compile(circuit_tq)
         c = split(c)
         c = mark_measurements(c)
-        c = compiler_full_RC.compile(circuit_tq)
+        c = compiler_full_RC.compile(c)
         rc_collection += [tq.interface.qiskit.from_trueq_circ(c, metadata=metadata)]
     
     return rc_collection
@@ -40,7 +40,7 @@ def local_rc(circuit, backend, n_compilations=20):
         c = compiler.compile(circuit_tq)
         c = split(c)
         c = mark_measurements(c)
-        c = compiler_local_RC.compile(circuit_tq)
+        c = compiler_local_RC.compile(c)
         rc_collection += [tq.interface.qiskit.from_trueq_circ(c, metadata=metadata)]
     
     return rc_collection
