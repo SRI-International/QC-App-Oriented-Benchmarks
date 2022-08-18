@@ -1974,7 +1974,7 @@ def plot_angles_polar(suptitle = '', options=None, suffix = ''):
 
         ax.set_rmax(maxRadius+1)
         ax.set_rticks(radii, labels=widths)
-        ax.set_xticks(np.pi/2 * np.arange(4), labels=[r'$0$', r'$\pi/2$', r'$\pi$', r'$\frac{3\pi}{2}$'], fontsize=15)
+        ax.set_xticks(np.pi/2 * np.arange(4), labels=[r'$0$', r'$\frac{\pi}{2}$', r'$\pi$', r'$\frac{3\pi}{2}$'], fontsize=15)
         ax.set_rlabel_position(0)
         ax.grid(True)
         fig.tight_layout()
