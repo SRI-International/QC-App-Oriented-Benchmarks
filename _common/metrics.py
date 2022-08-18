@@ -34,6 +34,7 @@ import time
 from time import gmtime, strftime
 from datetime import datetime
 import traceback
+import matplotlib.cm as cm
 
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
@@ -1912,6 +1913,85 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
             plt.show()
     
 
+def get_full_title(suptitle = '', options = dict()):
+    """
+    Return title for figure
+    """
+    # get backend id for this set of circuits
+    backend_id = get_backend_id()
+    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    if options != None:
+        options_str = ''
+        for key, value in options.items():
+            if len(options_str) > 0: options_str += ', '
+            options_str += f"{key}={value}"
+        fulltitle += f"\n{options_str}"
+    return fulltitle
+
+# Plot angles
+def plot_angles_polar(suptitle = '', options=None, suffix = ''):
+    """
+    Create a polar angle plot, showing the beta and gamma angles
+    Parameters
+    ----------
+    options : TYPE, optional
+        DESCRIPTION. The default is None.
+
+    Returns
+    -------
+    None.
+
+    """
+    widths = group_metrics['groups']
+    num_widths = len(widths)
+    maxRadius = 10
+    minRadius = 2
+    radii = np.linspace(minRadius, maxRadius,num_widths)
+    deg = list(circuit_metrics[widths[0]].keys())[0]
+    angles_arr = []
+    for ind, width_str in enumerate(widths):
+        angles = circuit_metrics_final_iter[width_str][str(deg)]['converged_thetas_list']
+        angles_arr.append(angles)
+    rounds = len(angles_arr[0]) // 2
+    
+    fulltitle = get_full_title(suptitle=suptitle, options=options)
+    cmap_beta = cm.get_cmap('autumn')
+    cmap_gamma = cm.get_cmap('winter')
+    colors = np.linspace(0.05,0.95, rounds)
+    colors_beta = [cmap_beta(i) for i in colors]
+    colors_gamma = [cmap_gamma(i) for i in colors]
+    with plt.style.context(maxcut_style):
+        fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+        plt.suptitle(fulltitle)
+        for i in range(rounds):
+            # plot betas
+            betas = [angles_arr[rind][i] for rind in range(num_widths)]
+            ax.plot(betas, radii, marker='o', ms=7, ls = 'None', mec = 'k', mew=0.5,alpha=0.7, c=colors_beta[i], label=r'$\beta_{}$'.format(i+1))
+        for i in range(rounds):
+            # plot gammas
+            gammas = [angles_arr[rind][i+rounds] for rind in range(num_widths)]
+            ax.plot(gammas, radii, marker='s', ms=7, ls = 'None', mec = 'k', mew=0.5, alpha=0.7, c=colors_gamma[i], label=r'$\gamma_{}$'.format(i+1))
+
+        ax.set_rmax(maxRadius+1)
+        ax.set_rticks(radii, labels=widths)
+        ax.set_xticks(np.pi/2 * np.arange(4), labels=[r'$0$', r'$\pi/2$', r'$\pi$', r'$\frac{3\pi}{2}$'], fontsize=15)
+        ax.set_rlabel_position(0)
+        ax.grid(True)
+        fig.tight_layout()
+        ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.5))
+        
+        # save plot image to file
+        if save_plot_images:
+            backend_id = get_backend_id()
+            appname = get_appname_from_title(suptitle)
+            save_plot_image(plt, f"{appname}-angles-" + suffix, backend_id) 
+                
+        # show the plot for user to see
+        if show_plot_images:
+            plt.show()
+        
+
+
 # Plot detailed optgaps
 def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", 
                           transform_qubit_group = False, 
@@ -2008,16 +2088,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
 
     # Create title for the plots
-    suptitle = "Optimality Gaps - " + appname
-    
-    # append key circuit metrics info to the title
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
-    if options != None:
-        options_str = ''
-        for key, value in options.items():
-            if len(options_str) > 0: options_str += ', '
-            options_str += f"{key}={value}"
-        fulltitle += f"\n{options_str}"
+    fulltitle = get_full_title(suptitle=suptitle, options=options)
 
     ############################################################
     ##### Optimality gaps bar plot

@@ -957,6 +957,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                     global unique_circuit_index
                     unique_id = s_int * 1000 + unique_circuit_index
+                    # store thetas_array
+                    metrics.store_metric(num_qubits, unique_id, 'thetas_array', thetas_array.tolist())
                     
                     #************************************************
                     #*** Circuit Creation and Decomposition start ***
@@ -1088,28 +1090,21 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
         suffix = f'of-{short_obj_func_str}' #of=objective function
         
     obj_str = metrics.known_score_labels[objective_func_type]
-    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree,
-               'Objective Function' : obj_str}
-
-    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-            score_metric=score_metric, x_metric=x_metric, 
-            y_metric=y_metric, fixed_metrics=fixed_metrics,
-            num_x_bins=num_x_bins, x_size=x_size, y_size=y_size,
-            options=options,
-            suffix=suffix)
+    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, '\nObjective Function' : obj_str}
+    suptitle= f"Benchmark Results - MaxCut ({method}) - Qiskit"
     
-    metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                 options=options,
-                                 suffix=suffix, objective_func_type = objective_func_type)
+    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics, num_x_bins=num_x_bins, x_size=x_size, y_size=y_size, options=options, suffix=suffix)
     
-    metrics.plot_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                 options=options, suffix=suffix)
+    metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type)
+    
+    metrics.plot_ECDF(suptitle=suptitle, options=options, suffix=suffix)
 
     all_widths = list(metrics.circuit_metrics_final_iter.keys())
     all_widths = [int(ii) for ii in all_widths]
     list_of_widths = [all_widths[-1]]
-    metrics.plot_cutsize_distribution(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                  options=options, suffix=suffix, list_of_widths = list_of_widths)
+    metrics.plot_cutsize_distribution(suptitle=suptitle,options=options, suffix=suffix, list_of_widths = list_of_widths)
+    
+    metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
 # if main, execute method
 if __name__ == '__main__': run()
