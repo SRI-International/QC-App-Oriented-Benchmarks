@@ -1716,56 +1716,6 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     return new_xs, new_x, new_y, new_s
     
 
-def get_dist_from_measurements():
-    # For each circuit width (group) and 'circuit' key, obtain the empirical probability distribution.
-    # Do this for 1. The final iteration measurements from the iterative algorithm,
-    # as well as 2. Uniform random sampling
-    
-    def get_size_dist(counts, sizes):
-        # For given measurement outcomes, i.e. combinations of cuts, counts and sizes,
-        # return counts corresponding to each cut size.
-        unique_sizes = list(set(sizes))
-        unique_counts = [0] * len(unique_sizes)
-        
-        for i, size in enumerate(unique_sizes):
-            corresp_counts = [counts[ind] for ind,s in enumerate(sizes) if s == size]
-            unique_counts[i] = sum(corresp_counts)
-        
-        # Make sure that the scores are in ascending order
-        s_and_c_list = [[a,b] for (a,b) in zip(unique_sizes, unique_counts)]
-        s_and_c_list = sorted(s_and_c_list, key = lambda x : x[0])
-        unique_sizes = [x[0] for x in s_and_c_list]
-        unique_counts = [x[1] for x in s_and_c_list]
-        cumul_counts = np.cumsum(unique_counts)
-        return unique_counts, unique_sizes, cumul_counts
-    
-    
-    for group in circuit_metrics_final_iter:
-        for deg in circuit_metrics_final_iter[group]:
-            # deg = degree of graph for maxcut
-            
-            # Obtain distribution corresponding to the final iteration of the iterative algorithm
-            counts = circuit_metrics_final_iter[group][deg]['counts']
-            sizes = circuit_metrics_final_iter[group][deg]['sizes']
-            
-            unique_counts, unique_sizes, cumul_counts = get_size_dist(counts, sizes)
-            # Store the sizes, counts and cumulative counts in metrics
-            circuit_metrics_final_iter[group][deg]['unique_sizes'] = unique_sizes
-            circuit_metrics_final_iter[group][deg]['unique_counts'] = unique_counts
-            circuit_metrics_final_iter[group][deg]['cumul_counts'] = cumul_counts
-            
-            # Obtain the distribution corresponding to uniform random sampling
-            # 'unif_cuts', 'unif_counts', 'unif_sizes'
-            unif_counts = circuit_metrics_final_iter[group][deg]['unif_counts']
-            unif_sizes = circuit_metrics_final_iter[group][deg]['unif_sizes']
-            
-            unique_counts_unif, unique_sizes_unif, cumul_counts_unif = get_size_dist(unif_counts, unif_sizes)
-            # Store the sizes, counts and cumulative counts in metrics
-            circuit_metrics_final_iter[group][deg]['unique_sizes_unif'] = unique_sizes_unif
-            circuit_metrics_final_iter[group][deg]['unique_counts_unif'] = unique_counts_unif
-            circuit_metrics_final_iter[group][deg]['cumul_counts_unif'] = cumul_counts_unif
-
-
 def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
               options=None, suffix=None):
     """
@@ -1778,9 +1728,6 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
     options : 
     suffix :
     """
-    
-    get_dist_from_measurements()
-    
     # get backend id for this set of circuits
     backend_id = get_backend_id()
     
@@ -1810,7 +1757,7 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
                 cumul_counts = circuit_metrics_final_iter[group][deg]['cumul_counts']
                 unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
-                axs.plot(np.array(unique_sizes) / optimal_value, cumul_counts / cumul_counts[-1], marker='o',
+                axs.plot(np.array(unique_sizes) / optimal_value, np.array(cumul_counts) / cumul_counts[-1], marker='o',
                          ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
 
         axs.set_ylabel('Fraction of Total Counts')
@@ -1836,9 +1783,6 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
     For each circuit size and degree, plot the measured distribution of cutsizes
     corresponding to the last optimizer iteration, as well as uniform random sampling
     """
-    # Get empirical probability distributions for cut sizes.
-    get_dist_from_measurements()
-    
     # get backend id for this set of circuits
     backend_id = get_backend_id()
     
@@ -2058,7 +2002,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
             group_metrics_optgaps['quantile_optgaps']['gapvals'].append(q_vals)
 
-            get_dist_from_measurements()
+            # get_dist_from_measurements()
             unique_sizes = circuit_metrics_final_iter[group][str(circuit_id)]['unique_sizes']
             unique_counts = circuit_metrics_final_iter[group][str(circuit_id)]['unique_counts']
             optimal_value = circuit_metrics_final_iter[group][str(circuit_id)]['optimal_value']
