@@ -54,7 +54,8 @@ def create_qaoa_circ(nqubits, edges, parameters):
         
         # problem unitary
         for i,j in edges:
-            qc.rzz(2 * par.gamma, i, j)
+            qc.rzz(- par.gamma, i, j)
+            # qc.rzz(2 * par.gamma, i, j)
 
         qc.barrier()
         
@@ -320,10 +321,27 @@ def compute_cutsizes(results, nodes, edges):
         cut sizes (i.e. number of edges crossing the cut)
     """
     cuts = list(results.get_counts().keys())
-    counts = np.array(list(results.get_counts().values()))
-    sizes = np.array([common.eval_cut(nodes, edges, cut) for cut in cuts])
-
+    counts = list(results.get_counts().values())
+    sizes = [common.eval_cut(nodes, edges, cut) for cut in cuts]
     return cuts, counts, sizes
+
+def get_size_dist(counts, sizes):
+    """ For given measurement outcomes, i.e. combinations of cuts, counts and sizes, return counts corresponding to each cut size.
+    """
+    unique_sizes = list(set(sizes))
+    unique_counts = [0] * len(unique_sizes)
+    
+    for i, size in enumerate(unique_sizes):
+        corresp_counts = [counts[ind] for ind,s in enumerate(sizes) if s == size]
+        unique_counts[i] = sum(corresp_counts)
+    
+    # Make sure that the scores are in ascending order
+    s_and_c_list = [[a,b] for (a,b) in zip(unique_sizes, unique_counts)]
+    s_and_c_list = sorted(s_and_c_list, key = lambda x : x[0])
+    unique_sizes = [x[0] for x in s_and_c_list]
+    unique_counts = [x[1] for x in s_and_c_list]
+    cumul_counts = np.cumsum(unique_counts)
+    return unique_counts, unique_sizes, cumul_counts.tolist()
 
 
 # Compute the objective function on a given sample
@@ -434,10 +452,38 @@ def compute_cvar(counts, sizes, alpha = 0.1, **kwargs):
 
     return - cvar_sum / num_avgd
 
+def compute_gibbs(counts, sizes, eta = 0.5, **kwargs):
+    """
+    Compute the Gibbs objective function for given measurements
+
+    Parameters
+    ----------
+    counts : ndarray of ints
+        measured counts corresponding to cuts
+    sizes : ndarray of ints
+        cut sizes (i.e. number of edges crossing the cut)
+    eta : float, optional
+        Inverse Temperature
+    Returns
+    -------
+    float
+        - Gibbs objective function value / optimal value
+
+    """
+    # Convert counts and sizes to ndarrays, if they are lists
+    counts, sizes = np.array(counts), np.array(sizes)
+    ls = max(sizes)#largest size
+    shifted_sizes = sizes - ls
+    
+    # gibbs = - np.log( np.sum(counts * np.exp(eta * sizes)) / np.sum(counts))
+    gibbs = - eta * ls - np.log(np.sum (counts / np.sum(counts) * np.exp(eta * shifted_sizes)))
+    return gibbs
+
+
 def compute_best_cut_from_measured(counts, sizes, **kwargs):
     """From the measured cuts, return the size of the largest cut
     """
-    return np.max(sizes)
+    return - np.max(sizes)
 
 
 def compute_quartiles(counts, sizes):
@@ -494,7 +540,6 @@ def uniform_cut_sampling(num_qubits, degree, num_shots, _instances=None):
     unif_counts = [unif_cuts.count(cut) for cut in unif_cuts_uniq]
     unif_cuts = list(set(unif_cuts))
 
-
     def int_to_bs(numb):
         # Function for converting from an integer to (bit)strings of length num_qubits
         strr = format(numb, "b") #convert to binary
@@ -504,7 +549,10 @@ def uniform_cut_sampling(num_qubits, degree, num_shots, _instances=None):
     unif_cuts = [int_to_bs(i) for i in unif_cuts]
     unif_sizes = [common.eval_cut(nodes, edges, cut) for cut in unif_cuts]
 
-    return unif_cuts, unif_counts, unif_sizes
+    # Also get the corresponding distribution of cut sizes
+    unique_counts_unif, unique_sizes_unif, cumul_counts_unif = get_size_dist(unif_counts, unif_sizes)
+
+    return unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif
 
 
 #%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
@@ -524,18 +572,19 @@ def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
         save_res_to_file: bool. If False, do not save data to json file.
     """
     # In order to compare with uniform random sampling, get some samples
-    unif_cuts, unif_counts, unif_sizes = uniform_cut_sampling(num_qubits, s_int, num_shots, _instances)
-    unif_dict = {'unif_cuts' : unif_cuts,
-                 'unif_counts' : unif_counts,
-                 'unif_sizes' : unif_sizes}
-    
+    unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif = uniform_cut_sampling(num_qubits, s_int, num_shots, _instances)
+    unif_dict = {'unique_counts_unif' : unique_counts_unif,
+                 'unique_sizes_unif' : unique_sizes_unif,
+                 'cumul_counts_unif' : cumul_counts_unif} # store only the distribution of cut sizes, and not the cuts themselvess
+
     # Store properties such as (cuts, counts, sizes) of the final iteration,
     # the converged theta values, as well as the known optimal value for 
     # the current problem, in metrics.circuit_metrics_final_iter
     # Also store uniform cut sampling results
     opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol', _instances)
     metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
-    metrics.store_props_final_iter(num_qubits, s_int, None, iter_dist)
+    # metrics.store_props_final_iter(num_qubits, s_int, None, iter_dist) # do not store iter_dist, since it takes a lot of memory for larger widths, instead, store just iter_size_dist
+    metrics.store_props_final_iter(num_qubits, s_int, None, iter_size_dist)
     metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
     metrics.store_props_final_iter(num_qubits, s_int, None, unif_dict)
     
@@ -546,20 +595,23 @@ def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
                      save_final_counts=save_final_counts)
 
 def dump_to_json(parent_folder_save, num_qubits, s_int, 
-                 dict_of_inputs, res, opt, unif_dict, save_final_counts=True):
+                 dict_of_inputs, res, opt, unif_dict, save_final_counts=False):
     """
     Save the results to a json file (corresponding to a given regular graph,
     specified by number of nodes and degree)
+    Items stored in the json file: Data from all iterations (iterations), inputs to run program ('general properties'), converged theta values ('converged_thetas_list'), max cut size for the graph (optimal_value), distribution of cut sizes for random uniform sampling (unif_dict), and distribution of cut sizes for the final iteration (final_size_dist)
+    if save_final_counts is True, then also store the distribution of cuts 
     """
     store_loc = os.path.join(parent_folder_save,'width_{}_degree_{}.json'.format(num_qubits,s_int))
-    dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)].copy()}
+    dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)]}
     dict_to_store['general properties'] = dict_of_inputs
     dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
     dict_to_store['optimal_value'] = opt
     dict_to_store['unif_dict'] = unif_dict
+    dict_to_store['final_size_dist'] = iter_size_dist
     # Also store the value of counts obtained for the final counts
     if save_final_counts:
-        dict_to_store['final_counts'] = iter_dist.copy()
+        dict_to_store['final_counts'] = iter_dist
                                         #iter_dist.get_counts()
     # Now save the output
     with open(store_loc, 'w') as outfile:
@@ -640,7 +692,10 @@ def load_from_width_degree_file(folder, fileName):
         converged_thetas_list = data['converged_thetas_list']
         unif_dict = data['unif_dict']
         opt = data['optimal_value']
-        final_counts = data['final_counts'] # This is a
+        if gen_prop['save_final_counts']:
+            # Distribution of measured cuts
+            final_counts = data['final_counts']
+        final_size_dist = data['final_size_dist']
         
         ex.set_execution_target(backend_id = gen_prop["backend_id"], 
                                 provider_backend = gen_prop["provider_backend"],
@@ -658,10 +713,12 @@ def load_from_width_degree_file(folder, fileName):
         if method == 2:
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
-            metrics.store_props_final_iter(num_qubits, s_int, None, final_counts)
+            metrics.store_props_final_iter(num_qubits, s_int, None, final_size_dist) # Distribution of cut sizes
+            if gen_prop['save_final_counts']:
+                metrics.store_props_final_iter(num_qubits, s_int, None, final_counts)
             metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
             metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', converged_thetas_list)
-            metrics.store_props_final_iter(num_qubits, s_int, None, unif_dict)
+            metrics.store_props_final_iter(num_qubits, s_int, None, unif_dict) #these are the cut size distribution values for uniform random sampling of cuts
 
     return gen_prop
     
@@ -695,6 +752,7 @@ def get_width_degree_tuple_from_filename(fileName):
 
 MAX_QUBITS = 24
 iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
+iter_size_dist = {'unique_cuts' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 saved_result = {  }
 instance_filename = None
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
@@ -703,10 +761,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False,
-        backend_id='qasm_simulator', provider_backend=None,
+        backend_id='qasm_simulator', provider_backend=None, eta=0.5,
         hub="ibm-q", group="open", project="main", exec_options=None, _instances=None):
     """
-
     Parameters
     ----------
     min_qubits : int, optional
@@ -831,11 +888,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         y_size = 1.5
         
     # Choose the objective function to minimize, based on values of the parameters
-    possible_approx_ratios = {'cvar_approx_ratio', 'Max_N_approx_ratio', 'approx_ratio'}
+    possible_approx_ratios = {'cvar_approx_ratio', 'Max_N_approx_ratio', 'approx_ratio', 'gibbs_ratio', 'bestCut_approx_ratio'}
     non_objFunc_ratios = possible_approx_ratios - { objective_func_type }
     function_mapper = {'cvar_approx_ratio' : compute_cvar, 
                        'Max_N_approx_ratio' : compute_maxN_mean,
-                       'approx_ratio' : compute_sample_mean}
+                       'approx_ratio' : compute_sample_mean,
+                       'gibbs_ratio' : compute_gibbs,
+                       'bestCut_approx_ratio' : compute_best_cut_from_measured}
 
     # Initialize metrics module
     metrics.init_metrics()
@@ -929,6 +988,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                     global unique_circuit_index
                     unique_id = s_int * 1000 + unique_circuit_index
+                    # store thetas_array
+                    metrics.store_metric(num_qubits, unique_id, 'thetas_array', thetas_array.tolist())
                     
                     #************************************************
                     #*** Circuit Creation and Decomposition start ***
@@ -973,14 +1034,21 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     
                     #************************************************
                     #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
-                    # Compute and the other two metrics (eg. cvar and max N % if the obj function was set to approx ratio)
+                    # Compute the distribution of cut sizes; store them under metrics
+                    unique_counts, unique_sizes, cumul_counts = get_size_dist(counts, sizes)
+                    global iter_size_dist
+                    iter_size_dist = {'unique_sizes' : unique_sizes, 'unique_counts' : unique_counts, 'cumul_counts' : cumul_counts}
+                    metrics.store_metric(num_qubits, unique_id, None, iter_size_dist)
+
+                    # Compute and the other metrics (eg. cvar, gibbs and max N % if the obj function was set to approx ratio)
                     for s in non_objFunc_ratios:
                         dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha, N = N)
                     # Store the ratios
                     dict_of_ratios = { key : -1 * val / opt for (key, val) in dict_of_vals.items()}
+                    dict_of_ratios['gibbs_ratio'] = dict_of_ratios.get('gibbs_ratio') / eta 
                     metrics.store_metric(num_qubits, unique_id, None, dict_of_ratios)
                     # Get the best measurement and store it
-                    best = compute_best_cut_from_measured(counts, sizes)
+                    best = - compute_best_cut_from_measured(counts, sizes)
                     metrics.store_metric(num_qubits, unique_id, 'bestCut_approx_ratio', best / opt)
                     # Also compute and store the weights of cuts at three quantile values
                     quantile_sizes = compute_quartiles(counts, sizes)
@@ -989,7 +1057,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     
                     # Also store the cuts, counts and sizes, in a global variable, to allow access elsewhere
                     global iter_dist
-                    iter_dist = {'cuts' : cuts, 'counts' : counts.tolist(), 'sizes' : sizes.tolist()}
+                    iter_dist = {'cuts' : cuts, 'counts' : counts, 'sizes' : sizes}
                     unique_circuit_index += 1
                     #************************************************
                     
@@ -1059,28 +1127,21 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
         suffix = f'of-{short_obj_func_str}' #of=objective function
         
     obj_str = metrics.known_score_labels[objective_func_type]
-    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree,
-               'Objective Function' : obj_str}
-
-    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-            score_metric=score_metric, x_metric=x_metric, 
-            y_metric=y_metric, fixed_metrics=fixed_metrics,
-            num_x_bins=num_x_bins, x_size=x_size, y_size=y_size,
-            options=options,
-            suffix=suffix)
+    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, '\nObjective Function' : obj_str}
+    suptitle= f"Benchmark Results - MaxCut ({method}) - Qiskit"
     
-    metrics.plot_metrics_optgaps(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                 options=options,
-                                 suffix=suffix, objective_func_type = objective_func_type)
+    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics, num_x_bins=num_x_bins, x_size=x_size, y_size=y_size, options=options, suffix=suffix)
     
-    metrics.plot_ECDF(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                 options=options, suffix=suffix)
+    metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type)
+    
+    metrics.plot_ECDF(suptitle=suptitle, options=options, suffix=suffix)
 
     all_widths = list(metrics.circuit_metrics_final_iter.keys())
     all_widths = [int(ii) for ii in all_widths]
     list_of_widths = [all_widths[-1]]
-    metrics.plot_cutsize_distribution(suptitle=f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                                  options=options, suffix=suffix, list_of_widths = list_of_widths)
+    metrics.plot_cutsize_distribution(suptitle=suptitle,options=options, suffix=suffix, list_of_widths = list_of_widths)
+    
+    metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
 # if main, execute method
 if __name__ == '__main__': run()

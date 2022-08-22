@@ -34,6 +34,7 @@ import time
 from time import gmtime, strftime
 from datetime import datetime
 import traceback
+import matplotlib.cm as cm
 
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
@@ -1483,6 +1484,7 @@ known_score_labels = {
     'cvar_approx_ratio' : 'CVaR Ratio',
     'Max_N_approx_ratio' : 'Max N$\%$ counts Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
+    'gibbs_ratio' : 'Gibbs Objective Function',
     'bestCut_approx_ratio' : 'Best Measurement Ratio',
     'fidelity' : 'Avg Result Fidelity',
     'max_fidelity' : 'Max Result Fidelity',
@@ -1495,6 +1497,7 @@ score_label_save_str = {
     'cvar_approx_ratio' : 'CVaR',
     'Max_N_approx_ratio' : 'maxN',
     'bestCut_approx_ratio' : 'bestCut',
+    'gibbs_ratio' : 'gibbs',
     'fidelity' : 'fidelity',
     'hf_fidelity' : 'hf'
 }
@@ -1713,56 +1716,6 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     return new_xs, new_x, new_y, new_s
     
 
-def get_dist_from_measurements():
-    # For each circuit width (group) and 'circuit' key, obtain the empirical probability distribution.
-    # Do this for 1. The final iteration measurements from the iterative algorithm,
-    # as well as 2. Uniform random sampling
-    
-    def get_size_dist(counts, sizes):
-        # For given measurement outcomes, i.e. combinations of cuts, counts and sizes,
-        # return counts corresponding to each cut size.
-        unique_sizes = list(set(sizes))
-        unique_counts = [0] * len(unique_sizes)
-        
-        for i, size in enumerate(unique_sizes):
-            corresp_counts = [counts[ind] for ind,s in enumerate(sizes) if s == size]
-            unique_counts[i] = sum(corresp_counts)
-        
-        # Make sure that the scores are in ascending order
-        s_and_c_list = [[a,b] for (a,b) in zip(unique_sizes, unique_counts)]
-        s_and_c_list = sorted(s_and_c_list, key = lambda x : x[0])
-        unique_sizes = [x[0] for x in s_and_c_list]
-        unique_counts = [x[1] for x in s_and_c_list]
-        cumul_counts = np.cumsum(unique_counts)
-        return unique_counts, unique_sizes, cumul_counts
-    
-    
-    for group in circuit_metrics_final_iter:
-        for deg in circuit_metrics_final_iter[group]:
-            # deg = degree of graph for maxcut
-            
-            # Obtain distribution corresponding to the final iteration of the iterative algorithm
-            counts = circuit_metrics_final_iter[group][deg]['counts']
-            sizes = circuit_metrics_final_iter[group][deg]['sizes']
-            
-            unique_counts, unique_sizes, cumul_counts = get_size_dist(counts, sizes)
-            # Store the sizes, counts and cumulative counts in metrics
-            circuit_metrics_final_iter[group][deg]['unique_sizes'] = unique_sizes
-            circuit_metrics_final_iter[group][deg]['unique_counts'] = unique_counts
-            circuit_metrics_final_iter[group][deg]['cumul_counts'] = cumul_counts
-            
-            # Obtain the distribution corresponding to uniform random sampling
-            # 'unif_cuts', 'unif_counts', 'unif_sizes'
-            unif_counts = circuit_metrics_final_iter[group][deg]['unif_counts']
-            unif_sizes = circuit_metrics_final_iter[group][deg]['unif_sizes']
-            
-            unique_counts_unif, unique_sizes_unif, cumul_counts_unif = get_size_dist(unif_counts, unif_sizes)
-            # Store the sizes, counts and cumulative counts in metrics
-            circuit_metrics_final_iter[group][deg]['unique_sizes_unif'] = unique_sizes_unif
-            circuit_metrics_final_iter[group][deg]['unique_counts_unif'] = unique_counts_unif
-            circuit_metrics_final_iter[group][deg]['cumul_counts_unif'] = cumul_counts_unif
-
-
 def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
               options=None, suffix=None):
     """
@@ -1775,9 +1728,6 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
     options : 
     suffix :
     """
-    
-    get_dist_from_measurements()
-    
     # get backend id for this set of circuits
     backend_id = get_backend_id()
     
@@ -1807,7 +1757,7 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
                 cumul_counts = circuit_metrics_final_iter[group][deg]['cumul_counts']
                 unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
-                axs.plot(np.array(unique_sizes) / optimal_value, cumul_counts / cumul_counts[-1], marker='o',
+                axs.plot(np.array(unique_sizes) / optimal_value, np.array(cumul_counts) / cumul_counts[-1], marker='o',
                          ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
 
         axs.set_ylabel('Fraction of Total Counts')
@@ -1833,9 +1783,6 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
     For each circuit size and degree, plot the measured distribution of cutsizes
     corresponding to the last optimizer iteration, as well as uniform random sampling
     """
-    # Get empirical probability distributions for cut sizes.
-    get_dist_from_measurements()
-    
     # get backend id for this set of circuits
     backend_id = get_backend_id()
     
@@ -1910,6 +1857,86 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
             plt.show()
     
 
+def get_full_title(suptitle = '', options = dict()):
+    """
+    Return title for figure
+    """
+    # get backend id for this set of circuits
+    backend_id = get_backend_id()
+    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    if options != None:
+        options_str = ''
+        for key, value in options.items():
+            if len(options_str) > 0: options_str += ', '
+            options_str += f"{key}={value}"
+        fulltitle += f"\n{options_str}"
+    return fulltitle
+
+# Plot angles
+def plot_angles_polar(suptitle = '', options=None, suffix = ''):
+    """
+    Create a polar angle plot, showing the beta and gamma angles
+    Parameters
+    ----------
+    options : dictionary
+
+    Returns
+    -------
+    None.
+
+    """
+    widths = group_metrics['groups']
+    num_widths = len(widths)
+    maxRadius = 10
+    minRadius = 2
+    radii = np.linspace(minRadius, maxRadius,num_widths)
+    deg = list(circuit_metrics[widths[0]].keys())[0]
+    angles_arr = []
+    for ind, width_str in enumerate(widths):
+        angles = circuit_metrics_final_iter[width_str][str(deg)]['converged_thetas_list']
+        angles_arr.append(angles)
+    rounds = len(angles_arr[0]) // 2
+    
+    fulltitle = get_full_title(suptitle=suptitle, options=options)
+    cmap_beta = cm.get_cmap('autumn')
+    cmap_gamma = cm.get_cmap('winter')
+    colors = np.linspace(0.05,0.95, rounds)
+    colors_beta = [cmap_beta(i) for i in colors]
+    colors_gamma = [cmap_gamma(i) for i in colors]
+    with plt.style.context(maxcut_style):
+        fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
+        plt.suptitle(fulltitle)
+        for i in range(rounds):
+            # plot betas
+            # Note: Betas go from 0 to pi, while gammas go from 0 to 2pi
+            # Hence, plot 2*beta and 1*gamma to cover the entire circle
+            betas = [2 * angles_arr[rind][i] for rind in range(num_widths)]
+            ax.plot(betas, radii, marker='o', ms=7, ls = 'None', mec = 'k', mew=0.5,alpha=0.7, c=colors_beta[i], label=r'$\beta_{}$'.format(i+1))
+        for i in range(rounds):
+            # plot gammas
+            gammas = [angles_arr[rind][i+rounds] for rind in range(num_widths)]
+            ax.plot(gammas, radii, marker='s', ms=7, ls = 'None', mec = 'k', mew=0.5, alpha=0.7, c=colors_gamma[i], label=r'$\gamma_{}$'.format(i+1))
+
+        ax.set_rmax(maxRadius+1)
+        ax.set_rticks(radii, labels=widths)
+        ax.set_xticks(np.pi/2 * np.arange(4), labels=[r'$0$', r'$\frac{\pi}{2}$', r'$\pi$', r'$\frac{3\pi}{2}$'], fontsize=15)
+        ax.set_rlabel_position(0)
+        ax.grid(True)
+        fig.tight_layout()
+        ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.5))
+        
+        # save plot image to file
+        if save_plot_images:
+            backend_id = get_backend_id()
+            appname = get_appname_from_title(suptitle)
+            save_plot_image(plt, f"{appname}-angles-" + suffix, backend_id) 
+                
+        # show the plot for user to see
+        if show_plot_images:
+            plt.show()
+        
+
+
 # Plot detailed optgaps
 def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", 
                           transform_qubit_group = False, 
@@ -1946,6 +1973,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
                              'Max_N_approx_ratio' : {'color' : 'b', 'label': r'Max $\%$ counts', 'gapvals' : []},
                              'cvar_approx_ratio' : {'color' : 'g', 'label': 'CVaR', 'gapvals' : []},
                              'bestCut_approx_ratio' : {'color' : 'm', 'label': 'Best Measurement', 'gapvals' : []},
+                             'gibbs_ratio' : {'color' : 'y', 'label' : 'Gibbs', 'gapvals' : []},
                              'quantile_optgaps' : {'gapvals' : []},
                              'violin' : {'gapvals' : []}} # list of [xlist, ylist]
     
@@ -1967,6 +1995,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             group_metrics_optgaps['Max_N_approx_ratio']['gapvals'].append((1.0 - mets["Max_N_approx_ratio"]) * 100)
             group_metrics_optgaps['cvar_approx_ratio']['gapvals'].append((1.0 - mets["cvar_approx_ratio"]) * 100)
             group_metrics_optgaps['bestCut_approx_ratio']['gapvals'].append((1.0 - mets["bestCut_approx_ratio"]) * 100)
+            group_metrics_optgaps['gibbs_ratio']['gapvals'].append((1.0 - mets["gibbs_ratio"]) * 100)
 
             # Also store the optimality gaps at the three quantiles values
             # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
@@ -1974,7 +2003,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
             group_metrics_optgaps['quantile_optgaps']['gapvals'].append(q_vals)
 
-            get_dist_from_measurements()
+            # get_dist_from_measurements()
             unique_sizes = circuit_metrics_final_iter[group][str(circuit_id)]['unique_sizes']
             unique_counts = circuit_metrics_final_iter[group][str(circuit_id)]['unique_counts']
             optimal_value = circuit_metrics_final_iter[group][str(circuit_id)]['optimal_value']
@@ -2004,16 +2033,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
 
     # Create title for the plots
-    suptitle = "Optimality Gaps - " + appname
-    
-    # append key circuit metrics info to the title
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
-    if options != None:
-        options_str = ''
-        for key, value in options.items():
-            if len(options_str) > 0: options_str += ', '
-            options_str += f"{key}={value}"
-        fulltitle += f"\n{options_str}"
+    fulltitle = get_full_title(suptitle=suptitle, options=options)
 
     ############################################################
     ##### Optimality gaps bar plot
@@ -2097,7 +2117,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
 
         # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
-        ideal_lgnd_seq = ['approx_ratio', 'Max_N_approx_ratio', 'cvar_approx_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
+        ideal_lgnd_seq = ['approx_ratio', 'Max_N_approx_ratio', 'cvar_approx_ratio', 'gibbs_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
         handles_list= [plt_handles[s] for s in ideal_lgnd_seq if s in plt_handles]
         axs.legend(handles=handles_list, loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
         
