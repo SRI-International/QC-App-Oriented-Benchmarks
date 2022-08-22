@@ -1878,8 +1878,7 @@ def plot_angles_polar(suptitle = '', options=None, suffix = ''):
     Create a polar angle plot, showing the beta and gamma angles
     Parameters
     ----------
-    options : TYPE, optional
-        DESCRIPTION. The default is None.
+    options : dictionary
 
     Returns
     -------
@@ -1909,7 +1908,9 @@ def plot_angles_polar(suptitle = '', options=None, suffix = ''):
         plt.suptitle(fulltitle)
         for i in range(rounds):
             # plot betas
-            betas = [angles_arr[rind][i] for rind in range(num_widths)]
+            # Note: Betas go from 0 to pi, while gammas go from 0 to 2pi
+            # Hence, plot 2*beta and 1*gamma to cover the entire circle
+            betas = [2 * angles_arr[rind][i] for rind in range(num_widths)]
             ax.plot(betas, radii, marker='o', ms=7, ls = 'None', mec = 'k', mew=0.5,alpha=0.7, c=colors_beta[i], label=r'$\beta_{}$'.format(i+1))
         for i in range(rounds):
             # plot gammas
