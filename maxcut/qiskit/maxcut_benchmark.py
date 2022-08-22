@@ -483,7 +483,7 @@ def compute_gibbs(counts, sizes, eta = 0.5, **kwargs):
 def compute_best_cut_from_measured(counts, sizes, **kwargs):
     """From the measured cuts, return the size of the largest cut
     """
-    return np.max(sizes)
+    return - np.max(sizes)
 
 
 def compute_quartiles(counts, sizes):
@@ -888,12 +888,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         y_size = 1.5
         
     # Choose the objective function to minimize, based on values of the parameters
-    possible_approx_ratios = {'cvar_approx_ratio', 'Max_N_approx_ratio', 'approx_ratio', 'gibbs_ratio'}
+    possible_approx_ratios = {'cvar_approx_ratio', 'Max_N_approx_ratio', 'approx_ratio', 'gibbs_ratio', 'bestCut_approx_ratio'}
     non_objFunc_ratios = possible_approx_ratios - { objective_func_type }
     function_mapper = {'cvar_approx_ratio' : compute_cvar, 
                        'Max_N_approx_ratio' : compute_maxN_mean,
                        'approx_ratio' : compute_sample_mean,
-                       'gibbs_ratio' : compute_gibbs}
+                       'gibbs_ratio' : compute_gibbs,
+                       'bestCut_approx_ratio' : compute_best_cut_from_measured}
 
     # Initialize metrics module
     metrics.init_metrics()
@@ -1047,7 +1048,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     dict_of_ratios['gibbs_ratio'] = dict_of_ratios.get('gibbs_ratio') / eta 
                     metrics.store_metric(num_qubits, unique_id, None, dict_of_ratios)
                     # Get the best measurement and store it
-                    best = compute_best_cut_from_measured(counts, sizes)
+                    best = - compute_best_cut_from_measured(counts, sizes)
                     metrics.store_metric(num_qubits, unique_id, 'bestCut_approx_ratio', best / opt)
                     # Also compute and store the weights of cuts at three quantile values
                     quantile_sizes = compute_quartiles(counts, sizes)
