@@ -555,13 +555,14 @@ def uniform_cut_sampling(num_qubits, degree, num_shots, _instances=None):
     return unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif
 
 
+#%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
+
 def save_runtime_data(result_dict):
     cm = result_dict.get('circuit_metrics')
     detail = result_dict.get('circuit_metrics_detail', None)
     detail_2 = result_dict.get('circuit_metrics_detail_2', None)
     benchmark_inputs = result_dict.get('benchmark_inputs', None)
     final_iter_metrics = result_dict.get('circuit_metrics_final_iter')
-    print(f'{final_iter_metrics = }')
 
     metrics.circuit_metrics_detail_2 = detail_2
     
@@ -571,25 +572,33 @@ def save_runtime_data(result_dict):
                 "..", "_common", common.INSTANCE_DIR, f"mc_{int(width):03d}_{int(degree):03d}_000.txt")
             metrics.circuit_metrics[width] = detail.get(width)
             metrics.circuit_metrics['subtitle'] = cm.get('subtitle')
+            finIterDict = result_dict['circuit_metrics_final_iter'][width][degree]
+            if result_dict['benchmark_inputs']['save_final_counts']:
+                # if the final iteration cut counts were stored, retrieve them
+                iter_dist = iter_dist = {'cuts' : finIterDict['cuts'], 'counts' : finIterDict['counts'], 'sizes' : finIterDict['sizes']}
+            # Retrieve the distribution of cut sizes for the final iteration for this width and degree
+            iter_size_dist = iter_size_dist = {'unique_sizes' : finIterDict['unique_sizes'], 'unique_counts' : finIterDict['unique_counts'], 'cumul_counts' : finIterDict['cumul_counts']}
+
             iter_dist = final_iter_metrics.get(width)
             res = iter_dist.get(degree).get('converged_thetas_list')
 
             store_final_iter_to_metrics_json(
                 num_qubits=int(width),
                 s_int=int(degree),
-                iter_size_dist=iter_size_dist,
-                dict_of_inputs=benchmark_inputs,
                 num_shots=int(benchmark_inputs['num_shots']),
                 res=res,
                 instance_filename=instance_filename,
+                iter_size_dist=iter_size_dist,
+                iter_dist = iter_dist,
+                dict_of_inputs=benchmark_inputs,
                 parent_folder_save='__data',
-                save_final_counts=True,
+                save_final_counts=False,
                 save_res_to_file=True,
                 _instances=None
             )
-#%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
 
-def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res, instance_filename, iter_size_dist,
+
+def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res, instance_filename, iter_size_dist, iter_dist,
                                      parent_folder_save, dict_of_inputs, save_final_counts,
                                      save_res_to_file, _instances=None):
     """
@@ -609,10 +618,7 @@ def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res, instance
                  'unique_sizes_unif' : unique_sizes_unif,
                  'cumul_counts_unif' : cumul_counts_unif} # store only the distribution of cut sizes, and not the cuts themselvess
 
-    # Store properties such as (cuts, counts, sizes) of the final iteration,
-    # the converged theta values, as well as the known optimal value for 
-    # the current problem, in metrics.circuit_metrics_final_iter
-    # Also store uniform cut sampling results
+    # Store properties such as (cuts, counts, sizes) of the final iteration, the converged theta values, as well as the known optimal value for the current problem, in metrics.circuit_metrics_final_iter. Also store uniform cut sampling results
     opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol', _instances)
     metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
     # metrics.store_props_final_iter(num_qubits, s_int, None, iter_dist) # do not store iter_dist, since it takes a lot of memory for larger widths, instead, store just iter_size_dist
@@ -623,10 +629,10 @@ def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res, instance
     if save_res_to_file:
         # Save data to a json file
         dump_to_json(parent_folder_save, num_qubits,
-                     s_int, iter_size_dist, dict_of_inputs, res, opt, unif_dict,
+                     s_int, iter_size_dist, iter_dist, dict_of_inputs, res, opt, unif_dict,
                      save_final_counts=save_final_counts)
 
-def dump_to_json(parent_folder_save, num_qubits, s_int, iter_size_dist, 
+def dump_to_json(parent_folder_save, num_qubits, s_int, iter_size_dist, iter_dist,
                  dict_of_inputs, res, opt, unif_dict, save_final_counts=False):
     """
     Save the results to a json file (corresponding to a given regular graph,
@@ -634,6 +640,7 @@ def dump_to_json(parent_folder_save, num_qubits, s_int, iter_size_dist,
     Items stored in the json file: Data from all iterations (iterations), inputs to run program ('general properties'), converged theta values ('converged_thetas_list'), max cut size for the graph (optimal_value), distribution of cut sizes for random uniform sampling (unif_dict), and distribution of cut sizes for the final iteration (final_size_dist)
     if save_final_counts is True, then also store the distribution of cuts 
     """
+    if not os.path.exists(parent_folder_save): os.makedirs(parent_folder_save)
     store_loc = os.path.join(parent_folder_save,'width_{}_degree_{}.json'.format(num_qubits,s_int))
     dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)]}
     dict_to_store['general_properties'] = dict_of_inputs
@@ -784,7 +791,7 @@ def get_width_degree_tuple_from_filename(fileName):
 
 MAX_QUBITS = 24
 iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
-iter_size_dist = {'unique_cuts' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
+iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 saved_result = {  }
 instance_filename = None
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
@@ -1111,7 +1118,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 # Save final iteration data to metrics.circuit_metrics_final_iter
                 # This data includes final counts, cuts, etc.
                 store_final_iter_to_metrics_json(num_qubits=num_qubits, s_int=s_int, num_shots=num_shots, res=res.x.tolist(), instance_filename=instance_filename,
-                                                 iter_size_dist=iter_size_dist, parent_folder_save=parent_folder_save,
+                                                 iter_size_dist=iter_size_dist, iter_dist = iter_dist, parent_folder_save=parent_folder_save,
                                                  dict_of_inputs=dict_of_inputs,save_final_counts=save_final_counts,
                                                  save_res_to_file=save_res_to_file, _instances=_instances)
 
