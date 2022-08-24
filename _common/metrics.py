@@ -1918,8 +1918,10 @@ def plot_angles_polar(suptitle = '', options=None, suffix = ''):
             ax.plot(gammas, radii, marker='s', ms=7, ls = 'None', mec = 'k', mew=0.5, alpha=0.7, c=colors_gamma[i], label=r'$\gamma_{}$'.format(i+1))
 
         ax.set_rmax(maxRadius+1)
-        ax.set_rticks(radii, labels=widths)
-        ax.set_xticks(np.pi/2 * np.arange(4), labels=[r'$0$', r'$\frac{\pi}{2}$', r'$\pi$', r'$\frac{3\pi}{2}$'], fontsize=15)
+        ax.set_rticks(radii)
+        ax.set_yticklabels(labels=widths)
+        ax.set_xticks(np.pi/2 * np.arange(4), fontsize=15)
+        ax.set_xticklabels(labels=[r'$0$', r'$\frac{\pi}{2}$', r'$\pi$', r'$\frac{3\pi}{2}$'])
         ax.set_rlabel_position(0)
         ax.grid(True)
         fig.tight_layout()
