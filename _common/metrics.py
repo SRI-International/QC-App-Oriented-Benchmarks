@@ -1890,9 +1890,9 @@ def plot_angles_polar(suptitle = '', options=None, suffix = ''):
     maxRadius = 10
     minRadius = 2
     radii = np.linspace(minRadius, maxRadius,num_widths)
-    deg = list(circuit_metrics[widths[0]].keys())[0]
     angles_arr = []
     for ind, width_str in enumerate(widths):
+        deg = list(circuit_metrics[width_str].keys())[0]
         angles = circuit_metrics_final_iter[width_str][str(deg)]['converged_thetas_list']
         angles_arr.append(angles)
     rounds = len(angles_arr[0]) // 2
@@ -1911,7 +1911,7 @@ def plot_angles_polar(suptitle = '', options=None, suffix = ''):
             # Note: Betas go from 0 to pi, while gammas go from 0 to 2pi
             # Hence, plot 2*beta and 1*gamma to cover the entire circle
             betas = [2 * angles_arr[rind][i] for rind in range(num_widths)]
-            ax.plot(betas, radii, marker='o', ms=7, ls = 'None', mec = 'k', mew=0.5,alpha=0.7, c=colors_beta[i], label=r'$\beta_{}$'.format(i+1))
+            ax.plot(betas, radii, marker='o', ms=7, ls = 'None', mec = 'k', mew=0.5,alpha=0.7, c=colors_beta[i], label=r'$2\beta_{}$'.format(i+1))
         for i in range(rounds):
             # plot gammas
             gammas = [angles_arr[rind][i+rounds] for rind in range(num_widths)]
