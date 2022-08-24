@@ -555,9 +555,41 @@ def uniform_cut_sampling(num_qubits, degree, num_shots, _instances=None):
     return unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif
 
 
+def save_runtime_data(result_dict):
+    cm = result_dict.get('circuit_metrics')
+    detail = result_dict.get('circuit_metrics_detail', None)
+    detail_2 = result_dict.get('circuit_metrics_detail_2', None)
+    benchmark_inputs = result_dict.get('benchmark_inputs', None)
+    final_iter_metrics = result_dict.get('circuit_metrics_final_iter')
+    print(f'{final_iter_metrics = }')
+
+    metrics.circuit_metrics_detail_2 = detail_2
+    
+    for width in detail_2:
+        for degree in detail_2.get(width):
+            instance_filename = os.path.join(os.path.dirname(__file__),
+                "..", "_common", common.INSTANCE_DIR, f"mc_{int(width):03d}_{int(degree):03d}_000.txt")
+            metrics.circuit_metrics[width] = detail.get(width)
+            metrics.circuit_metrics['subtitle'] = cm.get('subtitle')
+            iter_dist = final_iter_metrics.get(width)
+            res = iter_dist.get(degree).get('converged_thetas_list')
+
+            store_final_iter_to_metrics_json(
+                num_qubits=int(width),
+                s_int=int(degree),
+                iter_size_dist=iter_size_dist,
+                dict_of_inputs=benchmark_inputs,
+                num_shots=int(benchmark_inputs['num_shots']),
+                res=res,
+                instance_filename=instance_filename,
+                parent_folder_save='__data',
+                save_final_counts=True,
+                save_res_to_file=True,
+                _instances=None
+            )
 #%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
 
-def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
+def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res, instance_filename, iter_size_dist,
                                      parent_folder_save, dict_of_inputs, save_final_counts,
                                      save_res_to_file, _instances=None):
     """
@@ -585,16 +617,16 @@ def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
     metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
     # metrics.store_props_final_iter(num_qubits, s_int, None, iter_dist) # do not store iter_dist, since it takes a lot of memory for larger widths, instead, store just iter_size_dist
     metrics.store_props_final_iter(num_qubits, s_int, None, iter_size_dist)
-    metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res.x.tolist())
+    metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res)
     metrics.store_props_final_iter(num_qubits, s_int, None, unif_dict)
     
     if save_res_to_file:
         # Save data to a json file
         dump_to_json(parent_folder_save, num_qubits,
-                     s_int, dict_of_inputs, res, opt, unif_dict,
+                     s_int, iter_size_dist, dict_of_inputs, res, opt, unif_dict,
                      save_final_counts=save_final_counts)
 
-def dump_to_json(parent_folder_save, num_qubits, s_int, 
+def dump_to_json(parent_folder_save, num_qubits, s_int, iter_size_dist, 
                  dict_of_inputs, res, opt, unif_dict, save_final_counts=False):
     """
     Save the results to a json file (corresponding to a given regular graph,
@@ -604,8 +636,8 @@ def dump_to_json(parent_folder_save, num_qubits, s_int,
     """
     store_loc = os.path.join(parent_folder_save,'width_{}_degree_{}.json'.format(num_qubits,s_int))
     dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)]}
-    dict_to_store['general properties'] = dict_of_inputs
-    dict_to_store['converged_thetas_list'] = res.x.tolist() #save as list instead of array: this allows us to store in the json file
+    dict_to_store['general_properties'] = dict_of_inputs
+    dict_to_store['converged_thetas_list'] = res #save as list instead of array: this allows us to store in the json file
     dict_to_store['optimal_value'] = opt
     dict_to_store['unif_dict'] = unif_dict
     dict_to_store['final_size_dist'] = iter_size_dist
@@ -688,7 +720,7 @@ def load_from_width_degree_file(folder, fileName):
     print(f"Loading {fileName}, corresponding to {num_qubits} qubits and degree {s_int}")
     with open(os.path.join(folder, fileName), 'r') as json_file:
         data = json.load(json_file)
-        gen_prop = data['general properties']
+        gen_prop = data['general_properties']
         converged_thetas_list = data['converged_thetas_list']
         unif_dict = data['unif_dict']
         opt = data['optimal_value']
@@ -1078,8 +1110,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 
                 # Save final iteration data to metrics.circuit_metrics_final_iter
                 # This data includes final counts, cuts, etc.
-                store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res,
-                                                 parent_folder_save=parent_folder_save,
+                store_final_iter_to_metrics_json(num_qubits=num_qubits, s_int=s_int, num_shots=num_shots, res=res.x.tolist(), instance_filename=instance_filename,
+                                                 iter_size_dist=iter_size_dist, parent_folder_save=parent_folder_save,
                                                  dict_of_inputs=dict_of_inputs,save_final_counts=save_final_counts,
                                                  save_res_to_file=save_res_to_file, _instances=_instances)
 
@@ -1144,4 +1176,4 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
     metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
 # if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__': run(method=2)
