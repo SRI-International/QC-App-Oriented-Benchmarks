@@ -37,7 +37,7 @@ for path in instance_files:
 
     objective = int(m.ObjVal)
     solution = [0 if variables[i].X <= 0.5 else 1 for i in range(nodes)]
-   
+
     #print(m.display())
     #print(nodes) 
     #print(edges)
@@ -50,4 +50,3 @@ for path in instance_files:
         for v in solution:
             file.write('{} '.format(v))
         file.write('\n')
-    #break

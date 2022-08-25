@@ -2,7 +2,6 @@
 import os
 
 INSTANCE_DIR = 'instances'
-RESULTS_DIR = 'results'
 
 def read_maxcut_instance(file_path, _instances=None):
     if isinstance(_instances, dict):
