@@ -1,5 +1,7 @@
 import os
 
+INSTANCE_DIR = 'instances'
+
 def read_maxcut_instance(file_path, _instances=None):
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
