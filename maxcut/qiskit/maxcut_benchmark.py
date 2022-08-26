@@ -66,7 +66,7 @@ def create_qaoa_circ(nqubits, edges, parameters):
     return qc
    
 
-def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized):
+def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized, measured = True):
 
     if parameterized:
         return MaxCut_param(num_qubits, secret_int, edges, rounds, thetas_array)
@@ -90,8 +90,6 @@ def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized):
         rounds = p
         print(f"WARNING: rounds is greater than length of thetas_array/2; using rounds={rounds}")
     
-    #print(f"... actual thetas_array={thetas_array}")
-    
     # create parameters in the form expected by the ansatz generator
     # this is an array of betas followed by array of gammas, each of length = rounds
     betas = thetas_array[:p]
@@ -106,7 +104,7 @@ def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized):
         compute_expectation(qc, num_qubits, secret_int)
         
     # add the measure here
-    qc.measure_all()
+    if measured: qc.measure_all()
         
     # save small circuit example for display
     global QC_
@@ -983,7 +981,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         if degree > 0: 
             degree_range = range(degree, degree + num_circuits) 
         else:
-            _start = max(3, (num_qubits + degree - max_circuits + 1))
+            _start = max(3, (num_qubits + degree - max_circuits))
             degree_range = range(_start, _start + max_circuits)
 
         for i in degree_range:
