@@ -981,7 +981,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         if degree > 0: 
             degree_range = range(degree, degree + num_circuits) 
         else:
-            _start = max(3, (num_qubits + degree - max_circuits))
+            _start = max(3, (num_qubits + degree - max_circuits + 1))
             degree_range = range(_start, _start + max_circuits)
 
         for i in degree_range:
