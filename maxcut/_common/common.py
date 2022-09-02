@@ -35,7 +35,7 @@ def read_maxcut_solution(file_path, _instances=None):
 
 def eval_cut(nodes, edges, solution, reverseStep = 1):
     assert(nodes == len(solution))
-    solution = solution[::reverseStep] # If reverseStep is -1, the solution string is reversed
+    solution = solution[::reverseStep] # If reverseStep is -1, the solution string is reversed before evaluating the cut size
     cut_size = 0
     for i,j in edges:
         if solution[i] != solution[j]:
