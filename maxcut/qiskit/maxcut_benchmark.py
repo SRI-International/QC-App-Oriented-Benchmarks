@@ -5,6 +5,7 @@ MaxCut Benchmark Program - Qiskit
 import os
 import sys
 import time
+import logging
 from collections import namedtuple
 
 import datetime
@@ -15,14 +16,24 @@ from scipy.optimize import minimize
 import re
 
 from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
-                    QuantumCircuit, QuantumRegister, execute)
-from qiskit.circuit import Parameter
+                    QuantumCircuit, QuantumRegister, execute, transpile)
+from qiskit.circuit import ParameterVector
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
 import common
 import execute as ex
 import metrics as metrics
+
+logger = logging.getLogger(__name__)
+fname, _, ext = os.path.basename(__file__).partition(".")
+logging.basicConfig(
+    filename=f"{fname}_{datetime.datetime.now().strftime('%Y_%m_%d_%s')}.log",
+    filemode='w',
+    encoding='utf-8',
+    level=logging.INFO,
+    format='%(asctime)s %(name)s - %(levelname)s:%(message)s'
+)
 
 np.random.seed(0)
 
@@ -37,8 +48,6 @@ Uf_ = None
 
 # based on examples from https://qiskit.org/textbook/ch-applications/qaoa.html
 QAOA_Parameter  = namedtuple('QAOA_Parameter', ['beta', 'gamma'])
-
-
 
 #%% MaxCut circuit creation and fidelity analaysis functions
 def create_qaoa_circ(nqubits, edges, parameters):
@@ -119,7 +128,7 @@ def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized, 
   
 # Create ansatz specific to this problem, defined by G = nodes, edges, and the given parameters
 # Do not include the measure operation, so we can pre-compute statevector
-def create_qaoa_circ_param(nqubits, edges, parameters):
+def create_qaoa_circ_param(nqubits, edges, betas, gammas):
 
     qc = QuantumCircuit(nqubits)
 
@@ -127,18 +136,18 @@ def create_qaoa_circ_param(nqubits, edges, parameters):
     for i in range(0, nqubits):
         qc.h(i)
 
-    for par in parameters:
+    for beta, gamma in zip(betas, gammas):
         #print(f"... par={par}  gamma, beta = {par.gamma} {par.beta}")
         
         # problem unitary
         for i,j in edges:
-            qc.rzz(2 * par.gamma, i, j)
+            qc.rzz(2 * gamma, i, j)
 
         qc.barrier()
         
         # mixer unitary
         for i in range(0, nqubits):
-            qc.rx(2 * par.beta, i)
+            qc.rx(2 * beta, i)
 
     return qc
   
@@ -149,9 +158,6 @@ gamma_params = []
 # Create the benchmark program circuit
 # Accepts optional rounds and array of thetas (betas and gammas)
 def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
-
-    global _qc, beta_params, gamma_params
-            
     # if no thetas_array passed in, create defaults 
     if thetas_array is None:
         thetas_array = 2*rounds*[1.0]
@@ -175,43 +181,29 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
     
     # create parameters in the form expected by the ansatz generator
     # this is an array of betas followed by array of gammas, each of length = rounds
-    betas = thetas_array[:p]
-    gammas = thetas_array[p:]
+    global _qc
+    global betas
+    global gammas
     
     # create the circuit the first time, add measurements
-    # first circuit in iterative step is a multiple of 1000
-    if secret_int % 1000 == 0 or secret_int < 1000:    # < 1000 is for method 1
+    if ex.do_transpile_for_execute:
+        logger.info(f'Constructing circuit for {num_qubits = }')
+        betas = ParameterVector("𝞫", p)
+        gammas = ParameterVector("𝞬", p)
     
-        # create the named parameter objects used to define the circuit
-        beta_params = []
-        gamma_params = []
-        for i, beta in enumerate(betas):
-            beta_params.append(Parameter("𝞫" + str(i)))
-        for j, gamma in enumerate(gammas):
-            gamma_params.append(Parameter("𝞬" + str(j)))
-        #print(f"... param names = {beta_params} {gamma_params}")
-        
-        parameters = [QAOA_Parameter(*t) for t in zip(beta_params,gamma_params)]
-    
-        _qc = create_qaoa_circ_param(num_qubits, edges, parameters)
+        _qc = create_qaoa_circ_param(num_qubits, edges, betas, gammas)
         
         # add the measure here, only after circuit is created
         _qc.measure_all()
-        
-        #print(f"... created circuit: \n {_qc}")
     
-    params = {}
-    for i, beta_param in enumerate(beta_params):
-        params[beta_param] = thetas_array[i]
-    for j, gamma_param in enumerate(gamma_params):
-        params[gamma_param] = thetas_array[j + p]
-    #print(f"... params and values = {params}")
-    
+    params = {betas: thetas_array[:p], gammas: thetas_array[p:]}   
+    logger.info(f"Binding parameters {params = }")
     qc = _qc.bind_parameters(params)
     #print(qc)
     
     # pre-compute and save an array of expected measurements
     if do_compute_expectation:
+        logger.info('Computing expectation')
         compute_expectation(qc, num_qubits, secret_int)
    
     # save small circuit example for display
@@ -1019,6 +1011,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 # a unique circuit index used inside the inner minimizer loop as identifier
                 unique_circuit_index = 0 
                 start_iters_t = time.time()
+
+                if parameterized:
+                    ex.do_transpile_for_execute = True
                 
                 def expectation(thetas_array):
                     
@@ -1103,10 +1098,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     opt_ts = time.time()
                     
                     return dict_of_vals[objective_func_type]
+                
+                def callback(xk):
+                    if parameterized:
+                        ex.do_transpile_for_execute = False
 
                 opt_ts = time.time()
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
-                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter})
+                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
                 # To-do: Set bounds for the minimizer
                 
                 unique_circuit_index = 0
@@ -1181,4 +1180,4 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
     metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
 # if main, execute method
-if __name__ == '__main__': run(method=2)
+if __name__ == '__main__': run()
