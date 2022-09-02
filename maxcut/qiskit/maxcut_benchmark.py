@@ -2,18 +2,18 @@
 MaxCut Benchmark Program - Qiskit
 """
 
-import os
-import sys
-import time
-import logging
-from collections import namedtuple
-
 import datetime
 import json
+import logging
 import math
+import os
+import re
+import sys
+import time
+from collections import namedtuple
+
 import numpy as np
 from scipy.optimize import minimize
-import re
 
 from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
                     QuantumCircuit, QuantumRegister, execute, transpile)
@@ -49,6 +49,9 @@ Uf_ = None
 # based on examples from https://qiskit.org/textbook/ch-applications/qaoa.html
 QAOA_Parameter  = namedtuple('QAOA_Parameter', ['beta', 'gamma'])
 
+# Qiskit uses the little-Endian convention. Hence, measured bit-strings need to be reversed while evaluating cut sizes
+reverseStep = -1
+
 #%% MaxCut circuit creation and fidelity analaysis functions
 def create_qaoa_circ(nqubits, edges, parameters):
 
@@ -63,8 +66,7 @@ def create_qaoa_circ(nqubits, edges, parameters):
         
         # problem unitary
         for i,j in edges:
-            qc.rzz(- par.gamma, nqubits - i - 1, nqubits - j - 1)
-            # qc.rzz(- par.gamma, i, j)
+            qc.rzz(- par.gamma, i, j)
 
         qc.barrier()
         
@@ -141,7 +143,7 @@ def create_qaoa_circ_param(nqubits, edges, betas, gammas):
         
         # problem unitary
         for i,j in edges:
-            qc.rzz(- gamma, nqubits - i - 1, nqubits - j - 1)
+            qc.rzz(- gamma, i, j)
 
         qc.barrier()
         
@@ -312,7 +314,7 @@ def compute_cutsizes(results, nodes, edges):
     """
     cuts = list(results.get_counts().keys())
     counts = list(results.get_counts().values())
-    sizes = [common.eval_cut(nodes, edges, cut) for cut in cuts]
+    sizes = [common.eval_cut(nodes, edges, cut, reverseStep) for cut in cuts]
     return cuts, counts, sizes
 
 def get_size_dist(counts, sizes):
@@ -537,7 +539,7 @@ def uniform_cut_sampling(num_qubits, degree, num_shots, _instances=None):
         return strr
 
     unif_cuts = [int_to_bs(i) for i in unif_cuts]
-    unif_sizes = [common.eval_cut(nodes, edges, cut) for cut in unif_cuts]
+    unif_sizes = [common.eval_cut(nodes, edges, cut, reverseStep) for cut in unif_cuts]
 
     # Also get the corresponding distribution of cut sizes
     unique_counts_unif, unique_sizes_unif, cumul_counts_unif = get_size_dist(unif_counts, unif_sizes)

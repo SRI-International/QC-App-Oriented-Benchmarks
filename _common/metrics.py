@@ -2122,7 +2122,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         ideal_lgnd_seq = ['approx_ratio', 'Max_N_approx_ratio', 'cvar_approx_ratio', 'gibbs_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
         handles_list= [plt_handles[s] for s in ideal_lgnd_seq if s in plt_handles]
         axs.legend(handles=handles_list, loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
-        
+        axs.set_ylim([0, 60])
 
         # Add grid
         plt.grid()
