@@ -63,8 +63,8 @@ def create_qaoa_circ(nqubits, edges, parameters):
         
         # problem unitary
         for i,j in edges:
-            qc.rzz(- par.gamma, i, j)
-            # qc.rzz(2 * par.gamma, i, j)
+            qc.rzz(- par.gamma, nqubits - i - 1, nqubits - j - 1)
+            # qc.rzz(- par.gamma, i, j)
 
         qc.barrier()
         
@@ -141,7 +141,7 @@ def create_qaoa_circ_param(nqubits, edges, betas, gammas):
         
         # problem unitary
         for i,j in edges:
-            qc.rzz(2 * gamma, i, j)
+            qc.rzz(- gamma, nqubits - i - 1, nqubits - j - 1)
 
         qc.barrier()
         
