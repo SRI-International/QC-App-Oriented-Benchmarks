@@ -336,11 +336,11 @@ def execute_circuit(circuit):
 
         '''
         # if 'executor' provided, perform all execution there and return
-        if backend_exec_options != None:
-            executor = backend_exec_options.pop("executor", None)     
+        if backend_exec_options_copy != None:
+            executor = backend_exec_options_copy.pop("executor", None)     
             if executor:
                 st = time.time()
-                executor(circuit["qc"], shots=shots, backend=backend, result_handler=result_handler, **backend_exec_options)            
+                executor(circuit["qc"], shots=shots, backend=backend, result_handler=result_handler, **backend_exec_options_copy)            
                 if verbose_time:
                     print(f"  *** executor() time = {time.time() - st}")   
                     
@@ -460,7 +460,7 @@ def execute_circuit(circuit):
                 transformer = backend_exec_options_copy.pop("transformer", None)
                 if transformer:
                     st = time.time()
-                    print("... applying transformer!")
+                    #print("... applying transformer!")
                     trans_qc2 = transformer(trans_qc, backend=backend)
                     trans_qc = trans_qc2
                 
