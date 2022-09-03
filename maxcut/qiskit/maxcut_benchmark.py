@@ -25,12 +25,15 @@ import common
 import execute as ex
 import metrics as metrics
 
+
 logger = logging.getLogger(__name__)
+
 fname, _, ext = os.path.basename(__file__).partition(".")
 logging.basicConfig(
-    filename=f"{fname}_{datetime.datetime.now().strftime('%Y_%m_%d_%s')}.log",
+    #filename=f"{fname}_{datetime.datetime.now().strftime('%y%m%d_%H%M%S')}.log",
+    filename=f"{fname}.log",
     filemode='w',
-    encoding='utf-8',
+    #encoding='utf-8',
     level=logging.INFO,
     format='%(asctime)s %(name)s - %(levelname)s:%(message)s'
 )
