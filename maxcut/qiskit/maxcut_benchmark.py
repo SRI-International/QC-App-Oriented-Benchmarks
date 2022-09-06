@@ -25,18 +25,21 @@ import common
 import execute as ex
 import metrics as metrics
 
-
 logger = logging.getLogger(__name__)
 
 fname, _, ext = os.path.basename(__file__).partition(".")
-logging.basicConfig(
-    #filename=f"{fname}_{datetime.datetime.now().strftime('%y%m%d_%H%M%S')}.log",
-    filename=f"{fname}.log",
-    filemode='w',
-    #encoding='utf-8',
-    level=logging.INFO,
-    format='%(asctime)s %(name)s - %(levelname)s:%(message)s'
-)
+try:
+    logging.basicConfig(
+        # filename=f"{fname}_{datetime.datetime.now().strftime('%Y_%m_%d_%S')}.log",
+        filename=f"{fname}.log",
+        filemode='w',
+        encoding='utf-8',
+        level=logging.INFO,
+        format='%(asctime)s %(name)s - %(levelname)s:%(message)s'
+    )
+except Exception as e:
+    print(f'Exception {e} occured while configuring logger: bypassing logger config to prevent data loss')
+    pass
 
 np.random.seed(0)
 
@@ -142,7 +145,7 @@ def create_qaoa_circ_param(nqubits, edges, betas, gammas):
         qc.h(i)
 
     for beta, gamma in zip(betas, gammas):
-        #print(f"... par={par}  gamma, beta = {par.gamma} {par.beta}")
+        #print(f"... gamma, beta = {gammas}, {betas}")
         
         # problem unitary
         for i,j in edges:
@@ -653,7 +656,7 @@ def dump_to_json(parent_folder_save, num_qubits, s_int, iter_size_dist, iter_dis
 
 #%% Loading saved data (from json files)
 
-def load_data_and_plot(folder):
+def load_data_and_plot(folder, **kwargs):
     """
     The highest level function for loading stored data from a previous run
     and plotting optgaps and area metrics
@@ -663,7 +666,8 @@ def load_data_and_plot(folder):
     folder : string
         Directory where json files are saved.
     """
-    gen_prop = load_all_metrics(folder)
+    _gen_prop = load_all_metrics(folder)
+    gen_prop = {**_gen_prop, **kwargs}
     plot_results_from_data(**gen_prop)
 
 
