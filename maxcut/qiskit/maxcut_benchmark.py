@@ -692,7 +692,7 @@ def load_all_metrics(folder):
     
     list_of_files = os.listdir(folder)
     width_degree_file_tuples = [(*get_width_degree_tuple_from_filename(fileName),fileName) 
-                           for (ind,fileName) in enumerate(list_of_files)] # list with elements that are tuples->(width,degree,filename)
+                           for (ind,fileName) in enumerate(list_of_files) if fileName.startswith('width')] # list with elements that are tuples->(width,degree,filename)
     
     width_degree_file_tuples = sorted(width_degree_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by degree
     list_of_files = [tup[2] for tup in width_degree_file_tuples]
