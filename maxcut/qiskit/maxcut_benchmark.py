@@ -616,24 +616,34 @@ def save_runtime_data(result_dict): # This function will need changes, since cir
     detail_2 = result_dict.get('circuit_metrics_detail_2', None)
     benchmark_inputs = result_dict.get('benchmark_inputs', None)
     final_iter_metrics = result_dict.get('circuit_metrics_final_iter')
-
+    backend_id = result_dict.get('benchmark_inputs').get('backend_id')
+    
     metrics.circuit_metrics_detail_2 = detail_2
     
     for width in detail_2:
-        for degree in detail_2.get(width):
+        # unique_id = restart_ind * 1000 + minimizer_iter_ind
+        
+        restart_ind_list = list(detail_2.get(width).keys())
+        for restart_ind in restart_ind_list:
+            degree = cm[width]['1']['degree']
+            opt = final_iter_metrics[width]['1']['optimal_value']
             instance_filename = os.path.join(os.path.dirname(__file__),
                 "..", "_common", common.INSTANCE_DIR, f"mc_{int(width):03d}_{int(degree):03d}_000.txt")
             metrics.circuit_metrics[width] = detail.get(width)
             metrics.circuit_metrics['subtitle'] = cm.get('subtitle')
-            finIterDict = result_dict['circuit_metrics_final_iter'][width][degree]
-            if result_dict['benchmark_inputs']['save_final_counts']:
+            
+            finIterDict = final_iter_metrics[width][restart_ind]
+            if benchmark_inputs['save_final_counts']:
                 # if the final iteration cut counts were stored, retrieve them
-                iter_dist = iter_dist = {'cuts' : finIterDict['cuts'], 'counts' : finIterDict['counts'], 'sizes' : finIterDict['sizes']}
+                iter_dist = {'cuts' : finIterDict['cuts'], 'counts' : finIterDict['counts'], 'sizes' : finIterDict['sizes']}
+            else:
+                # The value of iter_dist does not matter otherwise
+                iter_dist = None
             # Retrieve the distribution of cut sizes for the final iteration for this width and degree
-            iter_size_dist = iter_size_dist = {'unique_sizes' : finIterDict['unique_sizes'], 'unique_counts' : finIterDict['unique_counts'], 'cumul_counts' : finIterDict['cumul_counts']}
+            iter_size_dist = {'unique_sizes' : finIterDict['unique_sizes'], 'unique_counts' : finIterDict['unique_counts'], 'cumul_counts' : finIterDict['cumul_counts']}
 
-            iter_dist = final_iter_metrics.get(width)
-            converged_thetas_list = iter_dist.get(degree).get('converged_thetas_list')
+            
+            converged_thetas_list = finIterDict.get('converged_thetas_list')
             parent_folder_save = os.path.join('__data', f'{backend_id}')
             store_final_iter_to_metrics_json(
                 num_qubits=int(width),
