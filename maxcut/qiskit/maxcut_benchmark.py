@@ -254,10 +254,10 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simu
     #print(f"  ... time to execute statevector simulator: {time.time() - ts}")
     
 # Return expected measurement array scaled to number of shots executed
-def get_expectation(num_qubits, secret_int, num_shots):
+def get_expectation(num_qubits, degree, num_shots):
 
     # find expectation counts for the given circuit 
-    id = f"_{num_qubits}_{secret_int}"
+    id = f"_{num_qubits}_{degree}"
     if id in expectations:
         counts = expectations[id]
         
@@ -553,9 +553,64 @@ def uniform_cut_sampling(num_qubits, degree, num_shots, _instances=None):
     return unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif
 
 
+
+def get_random_angles(rounds, restarts):
+    """Create max_circuit number of random initial conditions
+
+    Args:
+        rounds (int): number of rounds in QAOA
+        restarts (int): number of random initial conditions 
+
+    Returns:
+        restarts (list of lists of floats): list of length restarts. Each list element is a list of angles
+    """
+    restarts = min(10, restarts)
+    # Create random angles
+    np.random.seed(0)
+    theta_min = [0] * 2 * rounds
+    # Upper limit for betas=pi; upper limit for gammas=2pi
+    theta_max = [np.pi] * rounds + [2 * np.pi] * rounds
+    thetas = np.random.uniform(
+        low=theta_min, high=theta_max, size=(restarts, 2 * rounds)
+    )
+    thetas = thetas.tolist()
+    return thetas
+        
+
+
+def get_restart_angles(thetas_array, rounds, restarts):
+    """Create random initial conditions for the restart loop
+
+    Args:
+        thetas_array (list of lists of floats): list of initial angles.
+        restarts (int): number of random initial conditions
+        rounds (int): of QAOA
+
+    Returns:
+        thetas (ndarray of shape (max_circuits, 2 * rounds)): Random initial conditions
+    """
+    thetas = [[None for i in range(2 * rounds)] for j in range(restarts)]
+    if thetas_array is None:
+        # If thetas_array has not been provided by the user
+        thetas = get_random_angles(rounds, restarts)
+    else:
+        # If thetas_array has been provided by the user
+        assert type(thetas_array) == list, "thetas_array needs to be a list"
+        
+        if rounds == 1 and type(thetas_array[0]) != list:
+            # If thetas_array is a list of floats/numbers, convert it to a list of lists
+            thetas = [thetas_array]
+        elif len(thetas_array) != restarts:
+            # Check if thetas_array is a list of lists. 
+            thetas = get_random_angles(rounds, restarts)
+    
+    return thetas
+    
+    
+    
 #%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
 
-def save_runtime_data(result_dict):
+def save_runtime_data(result_dict): # This function will need changes, since circuit metrics dictionaries are now different
     cm = result_dict.get('circuit_metrics')
     detail = result_dict.get('circuit_metrics_detail', None)
     detail_2 = result_dict.get('circuit_metrics_detail_2', None)
@@ -578,71 +633,92 @@ def save_runtime_data(result_dict):
             iter_size_dist = iter_size_dist = {'unique_sizes' : finIterDict['unique_sizes'], 'unique_counts' : finIterDict['unique_counts'], 'cumul_counts' : finIterDict['cumul_counts']}
 
             iter_dist = final_iter_metrics.get(width)
-            res = iter_dist.get(degree).get('converged_thetas_list')
-
+            converged_thetas_list = iter_dist.get(degree).get('converged_thetas_list')
+            parent_folder_save = os.path.join('__data', f'{backend_id}')
             store_final_iter_to_metrics_json(
                 num_qubits=int(width),
-                s_int=int(degree),
+                degree = int(degree),
+                restart_ind=int(restart_ind),
                 num_shots=int(benchmark_inputs['num_shots']),
-                res=res,
-                instance_filename=instance_filename,
+                converged_thetas_list=converged_thetas_list,
+                opt=opt,
                 iter_size_dist=iter_size_dist,
                 iter_dist = iter_dist,
                 dict_of_inputs=benchmark_inputs,
-                parent_folder_save='__data',
+                parent_folder_save=parent_folder_save,
                 save_final_counts=False,
                 save_res_to_file=True,
                 _instances=None
             )
 
 
-def store_final_iter_to_metrics_json(num_qubits, s_int, num_shots, res, instance_filename, iter_size_dist, iter_dist,
-                                     parent_folder_save, dict_of_inputs, save_final_counts,
-                                     save_res_to_file, _instances=None):
+def store_final_iter_to_metrics_json(num_qubits,
+                                     degree,
+                                     restart_ind,
+                                     num_shots,
+                                     converged_thetas_list,
+                                     opt,
+                                     iter_size_dist,
+                                     iter_dist,
+                                     parent_folder_save,
+                                     dict_of_inputs,
+                                     save_final_counts,
+                                     save_res_to_file,
+                                     _instances=None):
     """
-    Store various results from the last iteration a problem, i.e. graph of size=num_qubits
-    and degree=s_int, into metrics. Store the data also in a json file
+    For a given graph (specified by num_qubits and degree),
+    1. For a given restart, store properties of the final minimizer iteration to metrics.circuit_metrics_final_iter, and
+    2. Store various properties for all minimizer iterations for each restart to a json file.
     Parameters
     ----------
-        num_qubits, s_int, num_shots : ints
+        num_qubits, degree, restarts, num_shots : ints
         parent_folder_save : string (location where json file will be stored)
         dict_of_inputs : dictionary of inputs that were given to run()
         save_final_counts: bool. If true, save counts, cuts and sizes for last iteration to json file.
         save_res_to_file: bool. If False, do not save data to json file.
+        iter_size_dist : dictionary containing distribution of cut sizes.  Keys are 'unique_sizes', 'unique_counts' and         'cumul_counts'
+        opt (int) : Max Cut value
     """
     # In order to compare with uniform random sampling, get some samples
-    unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif = uniform_cut_sampling(num_qubits, s_int, num_shots, _instances)
-    unif_dict = {'unique_counts_unif' : unique_counts_unif,
-                 'unique_sizes_unif' : unique_sizes_unif,
-                 'cumul_counts_unif' : cumul_counts_unif} # store only the distribution of cut sizes, and not the cuts themselvess
+    unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif = uniform_cut_sampling(
+        num_qubits, degree, num_shots, _instances)
+    unif_dict = {'unique_counts_unif': unique_counts_unif,
+                 'unique_sizes_unif': unique_sizes_unif,
+                 'cumul_counts_unif': cumul_counts_unif}  # store only the distribution of cut sizes, and not the cuts themselves
 
     # Store properties such as (cuts, counts, sizes) of the final iteration, the converged theta values, as well as the known optimal value for the current problem, in metrics.circuit_metrics_final_iter. Also store uniform cut sampling results
-    opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol', _instances)
-    metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
-    # metrics.store_props_final_iter(num_qubits, s_int, None, iter_dist) # do not store iter_dist, since it takes a lot of memory for larger widths, instead, store just iter_size_dist
-    metrics.store_props_final_iter(num_qubits, s_int, None, iter_size_dist)
-    metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', res)
-    metrics.store_props_final_iter(num_qubits, s_int, None, unif_dict)
-    
+    metrics.store_props_final_iter(num_qubits, restart_ind, 'optimal_value', opt)
+    metrics.store_props_final_iter(num_qubits, restart_ind, None, iter_size_dist)
+    metrics.store_props_final_iter(num_qubits, restart_ind, 'converged_thetas_list', converged_thetas_list)
+    metrics.store_props_final_iter(num_qubits, restart_ind, None, unif_dict)
+    # metrics.store_props_final_iter(num_qubits, restart_ind, None, iter_dist) # do not store iter_dist, since it takes a lot of memory for larger widths, instead, store just iter_size_dist
+
+
     if save_res_to_file:
         # Save data to a json file
         dump_to_json(parent_folder_save, num_qubits,
-                     s_int, iter_size_dist, iter_dist, dict_of_inputs, res, opt, unif_dict,
+                     degree, restart_ind, iter_size_dist, iter_dist, dict_of_inputs, converged_thetas_list, opt, unif_dict,
                      save_final_counts=save_final_counts)
 
-def dump_to_json(parent_folder_save, num_qubits, s_int, iter_size_dist, iter_dist,
-                 dict_of_inputs, res, opt, unif_dict, save_final_counts=False):
+def dump_to_json(parent_folder_save, num_qubits, degree, restart_ind, iter_size_dist, iter_dist,
+                 dict_of_inputs, converged_thetas_list, opt, unif_dict, save_final_counts=False):
     """
-    Save the results to a json file (corresponding to a given regular graph,
-    specified by number of nodes and degree)
+    For a given problem (specified by number of qubits and graph degree) and restart_index, 
+    save the evolution of various properties in a json file.
     Items stored in the json file: Data from all iterations (iterations), inputs to run program ('general properties'), converged theta values ('converged_thetas_list'), max cut size for the graph (optimal_value), distribution of cut sizes for random uniform sampling (unif_dict), and distribution of cut sizes for the final iteration (final_size_dist)
     if save_final_counts is True, then also store the distribution of cuts 
     """
     if not os.path.exists(parent_folder_save): os.makedirs(parent_folder_save)
-    store_loc = os.path.join(parent_folder_save,'width_{}_degree_{}.json'.format(num_qubits,s_int))
-    dict_to_store = {'iterations' : metrics.circuit_metrics[str(num_qubits)]}
+    store_loc = os.path.join(parent_folder_save,'width_{}_restartInd_{}.json'.format(num_qubits, restart_ind))
+    
+    # Obtain dictionary with iterations data corresponding to given restart_ind 
+    all_restart_ids = list(metrics.circuit_metrics[str(num_qubits)].keys())
+    ids_this_restart = [r_id for r_id in all_restart_ids if int(r_id) // 1000 == restart_ind]
+    iterations_dict_this_restart =  {r_id : metrics.circuit_metrics[str(num_qubits)][r_id] for r_id in ids_this_restart}
+    # Values to be stored in json file
+    dict_to_store = {'iterations' : iterations_dict_this_restart}
     dict_to_store['general_properties'] = dict_of_inputs
-    dict_to_store['converged_thetas_list'] = res #save as list instead of array: this allows us to store in the json file
+    dict_to_store['converged_thetas_list'] = converged_thetas_list
     dict_to_store['optimal_value'] = opt
     dict_to_store['unif_dict'] = unif_dict
     dict_to_store['final_size_dist'] = iter_size_dist
@@ -686,24 +762,37 @@ def load_all_metrics(folder):
     gen_prop : dict
         of inputs that were used in maxcut_benchmark.run method
     """
-    
-    metrics.init_metrics()
+    # Note: folder here should be the folder where only the width=... files are stored, and not a folder higher up in the directory
     assert os.path.isdir(folder), f"Specified folder ({folder}) does not exist."
     
+    metrics.init_metrics()
+    
     list_of_files = os.listdir(folder)
-    width_degree_file_tuples = [(*get_width_degree_tuple_from_filename(fileName),fileName) 
-                           for (ind,fileName) in enumerate(list_of_files) if fileName.startswith('width')] # list with elements that are tuples->(width,degree,filename)
+    width_restart_file_tuples = [(*get_width_restart_tuple_from_filename(fileName), fileName)
+                                 for (ind, fileName) in enumerate(list_of_files)]  # list with elements that are tuples->(width,restartInd,filename)
+
+    width_restart_file_tuples = sorted(width_restart_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by restartInd
+    distinct_widths = list(set(it[0] for it in width_restart_file_tuples)) 
+    list_of_files = [
+        [tup[2] for tup in width_restart_file_tuples if tup[0] == width] for width in distinct_widths
+        ]
     
-    width_degree_file_tuples = sorted(width_degree_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by degree
-    list_of_files = [tup[2] for tup in width_degree_file_tuples]
-    
-    for ind, fileName in enumerate(list_of_files):
-        gen_prop = load_from_width_degree_file(folder, fileName)
-    
+    for width_files in list_of_files:
+        # For each width, first load all the restart files
+        for fileName in width_files:
+            gen_prop = load_from_width_restart_file(folder, fileName)
+        
+        # next, do processing for the width
+        method = gen_prop['method']
+        if method == 2:
+            num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
+            metrics.process_circuit_metrics_2_level(num_qubits)
+            metrics.finalize_group(str(num_qubits))
+            
     return gen_prop
 
 
-def load_from_width_degree_file(folder, fileName):
+def load_from_width_restart_file(folder, fileName):
     """
     Given a folder name and a file in it, load all the stored data and store the values in metrics.circuit_metrics.
     Also return the converged values of thetas, the final counts and general properties.
@@ -722,8 +811,8 @@ def load_from_width_degree_file(folder, fileName):
     """
     
     # Extract num_qubits and s from file name
-    num_qubits, s_int = get_width_degree_tuple_from_filename(fileName)
-    print(f"Loading {fileName}, corresponding to {num_qubits} qubits and degree {s_int}")
+    num_qubits, restart_ind = get_width_restart_tuple_from_filename(fileName)
+    print(f"Loading from {fileName}, corresponding to {num_qubits} qubits and restart index {restart_ind}")
     with open(os.path.join(folder, fileName), 'r') as json_file:
         data = json.load(json_file)
         gen_prop = data['general_properties']
@@ -744,24 +833,23 @@ def load_from_width_degree_file(folder, fileName):
         
         # Update circuit metrics
         for circuit_id in data['iterations']:
+            # circuit_id = restart_ind * 1000 + minimizer_loop_ind
             for metric, value in data['iterations'][circuit_id].items():
                 metrics.store_metric(num_qubits, circuit_id, metric, value)
                 
         method = gen_prop['method']
         if method == 2:
-            metrics.process_circuit_metrics_2_level(num_qubits)
-            metrics.finalize_group(str(num_qubits))
-            metrics.store_props_final_iter(num_qubits, s_int, None, final_size_dist) # Distribution of cut sizes
+            metrics.store_props_final_iter(num_qubits, restart_ind, 'optimal_value', opt)
+            metrics.store_props_final_iter(num_qubits, restart_ind, None, final_size_dist)
+            metrics.store_props_final_iter(num_qubits, restart_ind, 'converged_thetas_list', converged_thetas_list)
+            metrics.store_props_final_iter(num_qubits, restart_ind, None, unif_dict)
             if gen_prop['save_final_counts']:
-                metrics.store_props_final_iter(num_qubits, s_int, None, final_counts)
-            metrics.store_props_final_iter(num_qubits, s_int, 'optimal_value', opt)
-            metrics.store_props_final_iter(num_qubits, s_int, 'converged_thetas_list', converged_thetas_list)
-            metrics.store_props_final_iter(num_qubits, s_int, None, unif_dict) #these are the cut size distribution values for uniform random sampling of cuts
+                metrics.store_props_final_iter(num_qubits, restart_ind, None, final_counts)
 
     return gen_prop
     
 
-def get_width_degree_tuple_from_filename(fileName):
+def get_width_restart_tuple_from_filename(fileName):
     """
     Given a filename, extract the corresponding width and degree it corresponds to
     For example the file "width=4_degree=3.json" corresponds to 4 qubits and degree 3
@@ -779,9 +867,10 @@ def get_width_degree_tuple_from_filename(fileName):
         graph degree.
 
     """
-    pattern = 'width_([0-9]+)_degree_([0-9]+).json'
+    pattern = 'width_([0-9]+)_restartInd_([0-9]+).json'
     match = re.search(pattern, fileName)
 
+    assert match is not None, f"File {fileName} found inside folder. All files inside specified folder must be named in the format 'width_int_restartInd_int.json"
     num_qubits = int(match.groups()[0])
     degree = int(match.groups()[1])
     return (num_qubits,degree)
@@ -809,7 +898,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     max_qubits : int, optional
         The largest circuit width for which benchmarking will be done. The default is 6.
     max_circuits : int, optional
-        Number of problems to solve for each circuit width. The default is 3.
+        Number of restarts. The default is 3.
     num_shots : int, optional
         Number of times the circut will be measured, for each iteration. The default is 100.
     method : int, optional
@@ -875,7 +964,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
     global QC_
     global circuits_done
-    global unique_circuit_index
+    global minimizer_loop_index
     global opt_ts
     
     print("MaxCut Benchmark Program - Qiskit")
@@ -889,10 +978,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # Use the following parent folder, for a more detailed 
     if detailed_save_names:
         start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        parent_folder_save = os.path.join('__results', objective_func_type,
-                                          f'{backend_id}/run_start_{start_time_str}')
+        parent_folder_save = os.path.join('__results', f'{backend_id}', objective_func_type, f'run_start_{start_time_str}')
     else:
-        parent_folder_save = os.path.join('__results', objective_func_type, f'{backend_id}')
+        parent_folder_save = os.path.join('__results', f'{backend_id}', objective_func_type)
     
     if save_res_to_file and not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
     
@@ -912,15 +1000,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     
     rounds = max(1, rounds)
     
-    # if more rounds requested than in thetas_array, give warning (DEVNOTE: pad array with 1s)
-    if thetas_array != None and rounds > len(thetas_array)/2:
-        rounds = len(thetas_array)/2
-        print(f"WARNING: rounds is greater than length of thetas_array/2; using rounds={rounds}")
-        
-    # if no thetas_array passed in, create default array (required for minimizer function)
-    if thetas_array == None:
-        thetas_array = 2*rounds*[1.0]
-    
+    # Get angles for restarts. Thetas = list of lists. Lengths are max_circuits and 2*rounds
+    thetas = get_restart_angles(thetas_array, rounds, max_circuits)
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
         y_size = 1.5
@@ -968,57 +1049,51 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # DEVNOTE: increment by 2 to match the collection of problems in 'instance' folder
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
         
-        # determine number of circuits to execute for this group
-        #num_circuits = min(2**(num_qubits), max_circuits)
-        num_circuits = max_circuits
-    
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
-      
-        # how many of the num_circuits have we completed
-        circuits_complete = 0
+        print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
         
-        # loop over each of num_circuits
-        # assume the solution files start with 3 and go up from there
-        if degree > 0: 
-            degree_range = range(degree, degree + num_circuits) 
-        else:
-            _start = max(3, (num_qubits + degree - max_circuits + 1))
-            degree_range = range(_start, _start + max_circuits)
-
-        for i in degree_range:
-        
-            # create integer that represents the problem instance; use s_int as circuit id
-            s_int = i
+        # If degree is negative, 
+        if degree < 0 :
+            degree = max(3, (num_qubits + degree))
             
-            # Load the problem and its solution
-            global instance_filename
-            instance_filename = os.path.join(os.path.dirname(__file__),
-                "..", "_common", common.INSTANCE_DIR, f"mc_{num_qubits:03d}_{i:03d}_000.txt")
-            nodes, edges = common.read_maxcut_instance(instance_filename, _instances)
-            opt, _ = common.read_maxcut_solution(instance_filename[:-4]+'.sol', _instances)
-            
-            # if the file does not exist, we are done with this number of qubits
-            if nodes == None:
-                print(f"  ... problem {i:03d} not found, limiting to {circuits_complete} circuit(s).")
-                break;
-
-            circuits_complete += 1
+        # Load the problem and its solution
+        global instance_filename
+        instance_filename = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "_common",
+            common.INSTANCE_DIR,
+            f"mc_{num_qubits:03d}_{degree:03d}_000.txt",
+        )
+        nodes, edges = common.read_maxcut_instance(instance_filename, _instances)
+        opt, _ = common.read_maxcut_solution(
+            instance_filename[:-4] + ".sol", _instances
+        )
         
+        # if the file does not exist, we are done with this number of qubits
+        if nodes == None:
+            print(f"  ... problem not found.")
+            break
+        
+
+        for restart_ind in range(1, max_circuits + 1):
+            # restart index should start from 1
+            # Loop over restarts for a given graph
+            thetas_array = thetas[restart_ind - 1]
             if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                qc = MaxCut(num_qubits, s_int, edges, rounds, thetas_array, parameterized)
-                metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
+                qc = MaxCut(num_qubits, restart_ind, edges, rounds, thetas_array, parameterized)
+                metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
                 qc2 = qc.decompose()
 
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
+                ex.submit_circuit(qc2, num_qubits, restart_ind, shots=num_shots)
 
             if method == 2:
                 # a unique circuit index used inside the inner minimizer loop as identifier
-                unique_circuit_index = 0 
+                minimizer_loop_index = 0 # Value of 0 corresponds to the 0th iteration of the minimizer
                 start_iters_t = time.time()
 
                 if parameterized:
@@ -1027,8 +1102,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 def expectation(thetas_array):
                     
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
-                    global unique_circuit_index
-                    unique_id = s_int * 1000 + unique_circuit_index
+                    global minimizer_loop_index
+                    unique_id = restart_ind * 1000 + minimizer_loop_index
                     # store thetas_array
                     metrics.store_metric(num_qubits, unique_id, 'thetas_array', thetas_array.tolist())
                     
@@ -1038,8 +1113,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     ts = time.time()
                     qc = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array, parameterized)
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
-                    # also store the 'rounds' for each execution
+                    # also store the 'rounds' and 'degree' for each execution
+                    # DEVNOTE: Currently, this is stored for each iteration. Reduce this redundancy
                     metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
+                    metrics.store_metric(num_qubits, unique_id, 'degree', degree)
                     # collapse the sub-circuit levels used in this benchmark (for qiskit)
                     qc2 = qc.decompose()
                     # Circuit Creation and Decomposition end
@@ -1056,7 +1133,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     
                     global saved_result
                     # Fidelity Calculation and Storage
-                    counts, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, int(s_int), num_shots) 
+                    _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, unique_id, num_shots) 
                     metrics.store_metric(num_qubits, unique_id, 'fidelity', fidelity)
                     
                     #************************************************
@@ -1086,7 +1163,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                         dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha, N = N)
                     # Store the ratios
                     dict_of_ratios = { key : -1 * val / opt for (key, val) in dict_of_vals.items()}
-                    dict_of_ratios['gibbs_ratio'] = dict_of_ratios.get('gibbs_ratio') / eta 
+                    dict_of_ratios['gibbs_ratio'] = dict_of_ratios['gibbs_ratio'] / eta 
                     metrics.store_metric(num_qubits, unique_id, None, dict_of_ratios)
                     # Get the best measurement and store it
                     best = - compute_best_cut_from_measured(counts, sizes)
@@ -1096,10 +1173,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                     # Store quantile_optgaps as a list (allows storing in json files)
                     metrics.store_metric(num_qubits, unique_id, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) 
                     
-                    # Also store the cuts, counts and sizes, in a global variable, to allow access elsewhere
+                    # Also store the cuts, counts and sizes in a global variable, to allow access elsewhere
                     global iter_dist
                     iter_dist = {'cuts' : cuts, 'counts' : counts, 'sizes' : sizes}
-                    unique_circuit_index += 1
+                    minimizer_loop_index += 1
                     #************************************************
                     
                     
@@ -1117,15 +1194,19 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
                 res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
                 # To-do: Set bounds for the minimizer
                 
-                unique_circuit_index = 0
-                unique_id = s_int*1000 + unique_circuit_index
+                unique_id = restart_ind * 1000 + 0
                 metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
                 
                 # Save final iteration data to metrics.circuit_metrics_final_iter
                 # This data includes final counts, cuts, etc.
-                store_final_iter_to_metrics_json(num_qubits=num_qubits, s_int=s_int, num_shots=num_shots, res=res.x.tolist(), instance_filename=instance_filename,
-                                                 iter_size_dist=iter_size_dist, iter_dist = iter_dist, parent_folder_save=parent_folder_save,
-                                                 dict_of_inputs=dict_of_inputs,save_final_counts=save_final_counts,
+                store_final_iter_to_metrics_json(num_qubits=num_qubits, 
+                                                 degree=degree, 
+                                                 restart_ind=restart_ind,
+                                                 num_shots=num_shots, 
+                                                 converged_thetas_list=res.x.tolist(),
+                                                 opt=opt,
+                                                 iter_size_dist=iter_size_dist, iter_dist=iter_dist, parent_folder_save=parent_folder_save,
+                                                 dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
                                                  save_res_to_file=save_res_to_file, _instances=_instances)
 
         # for method 2, need to aggregate the detail metrics appropriately for each group
