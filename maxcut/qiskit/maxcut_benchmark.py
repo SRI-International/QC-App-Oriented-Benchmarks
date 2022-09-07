@@ -561,7 +561,7 @@ def save_runtime_data(result_dict):
     detail_2 = result_dict.get('circuit_metrics_detail_2', None)
     benchmark_inputs = result_dict.get('benchmark_inputs', None)
     final_iter_metrics = result_dict.get('circuit_metrics_final_iter')
-
+    backend_id = result_dict.get('benchmark_inputs').get('backend_id')
     metrics.circuit_metrics_detail_2 = detail_2
     
     for width in detail_2:
@@ -579,7 +579,7 @@ def save_runtime_data(result_dict):
 
             iter_dist = final_iter_metrics.get(width)
             res = iter_dist.get(degree).get('converged_thetas_list')
-
+            parent_folder_save = os.path.join('__data', f'{backend_id}')
             store_final_iter_to_metrics_json(
                 num_qubits=int(width),
                 s_int=int(degree),
@@ -589,7 +589,7 @@ def save_runtime_data(result_dict):
                 iter_size_dist=iter_size_dist,
                 iter_dist = iter_dist,
                 dict_of_inputs=benchmark_inputs,
-                parent_folder_save='__data',
+                parent_folder_save=parent_folder_save,
                 save_final_counts=False,
                 save_res_to_file=True,
                 _instances=None
