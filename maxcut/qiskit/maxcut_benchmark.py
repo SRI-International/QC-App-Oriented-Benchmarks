@@ -587,26 +587,37 @@ def get_restart_angles(thetas_array, rounds, restarts):
         rounds (int): of QAOA
 
     Returns:
-        thetas (ndarray of shape (max_circuits, 2 * rounds)): Random initial conditions
+        thetas (list of lists. Shape = (max_circuits, 2 * rounds))
     """
-    thetas = [[None for i in range(2 * rounds)] for j in range(restarts)]
+    
+    random_angles = get_random_angles(rounds, restarts)
+    
     if thetas_array is None:
-        # If thetas_array has not been provided by the user
-        thetas = get_random_angles(rounds, restarts)
-    else:
-        # If thetas_array has been provided by the user
-        assert type(thetas_array) == list, "thetas_array needs to be a list"
-        
-        if rounds == 1 and type(thetas_array[0]) != list:
-            # If thetas_array is a list of floats/numbers, convert it to a list of lists
-            thetas = [thetas_array]
-        elif len(thetas_array) != restarts:
-            # Check if thetas_array is a list of lists. 
-            thetas = get_random_angles(rounds, restarts)
+        # None is used as a flag to indicate that random angles are to be used
+        return random_angles   
     
-    return thetas
+    if type(thetas_array) != list:
+        # must be a list.
+        print("thetas_array is not a list. Using random angles")
+        return random_angles
     
+    # If yes, check if thetas_array is a list of lists
+    if not all([type(item) == list for item in thetas_array]):
+        # if every list element is not a list, return random angles
+        print("thetas_array is not a list of lists. Using random angles")
+        return random_angles  
     
+    if not all([len(item) == 2 * rounds for item in thetas_array]):
+        # If not all list elements are lists of the correct length...
+        print("Each element of thetas_array must be a list of length 2 * rounds. Using random angles.")
+        return random_angles  
+    
+    if not len(thetas_array) == restarts:
+        print("thetas_array is not of the correct length. Using random angles")
+        return random_angles
+    
+    # If everyhing seems right, just return the inputted list of angles
+    return thetas_array
     
 #%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
 
