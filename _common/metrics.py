@@ -1504,7 +1504,7 @@ score_label_save_str = {
 
  
 # Plot all the given "Score Metrics" against the given "X Metrics" and "Y Metrics" 
-def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None,suffix=''):
+def plot_all_area_metrics(suptitle='', score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None,suffix=''):
 
     if type(score_metric) == str:
         score_metric = [score_metric]
@@ -1517,10 +1517,28 @@ def plot_all_area_metrics(suptitle=None, score_metric='fidelity', x_metric='exec
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
-                plot_area_metrics(suptitle, s_m, x_m, y_m, average_over_x_axis, fixed_metrics, num_x_bins, y_size, x_size, options=options,suffix=suffix)
+                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, options=options,suffix=suffix)
+
+def get_best_restart_ind(group, which_metric = 'approx_ratio'):
+    """
+    From all the restarts, obtain the restart index for which the final iteration has the highest value of the specified metric
+
+    Args:
+        group (str): circuit width
+        which_metric (str, optional): Defaults to 'approx_ratio'. Other valid options are 'Max_N_approx_ratio', 'gibbs_ratio', 'cvar_approx_ratio', 'bestCut_approx_ratio'
+    """
+    restart_indices = list(circuit_metrics_detail_2[group].keys())
+    fin_AR_restarts = []
+    for restart_ind in restart_indices:
+        iter_inds = list(circuit_metrics_detail_2[group][restart_ind].keys())
+        fin_AR = circuit_metrics_detail_2[group][restart_ind][max(iter_inds)][which_metric]
+        fin_AR_restarts.append(fin_AR)
+    best_index = fin_AR_restarts.index(max(fin_AR_restarts))
+    
+    return restart_indices[best_index]
 
 # Plot the given "Score Metric" against the given "X Metric" and "Y Metric"
-def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', average_over_x_axis=True, fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None, suffix=''):
+def plot_area_metrics(suptitle='', score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None, suffix=''):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -1567,9 +1585,12 @@ def plot_area_metrics(suptitle=None, score_metric='fidelity', x_metric='cumulati
         
         x_size_groups, x_groups, y_groups, score_groups = [], [], [], []
         
+        # Get the best AR index
+        restart_index = get_best_restart_ind(group, which_metric = 'approx_ratio')
+        
         # Each problem instance at size num_qubits; need to collate across iterations
-        i = 0
-        for circuit_id in circuit_metrics_detail_2[group]:
+        for circuit_id in [restart_index]:#circuit_metrics_detail_2[group]:
+            # circuit_id here denotes the restart index
                 
             x_last, score_last = 0, 0
             x_sizes, x_points, y_points, score_points = [], [], [], []            
@@ -1753,10 +1774,12 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
         plt.suptitle(fulltitle)
     
         for group in circuit_metrics_final_iter:
-            for deg in circuit_metrics_final_iter[group]:
-                cumul_counts = circuit_metrics_final_iter[group][deg]['cumul_counts']
-                unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
-                optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
+            best_restart_ind = str(get_best_restart_ind(group))
+            for restart_ind in [best_restart_ind]:#circuit_metrics_final_iter[group]:
+                
+                cumul_counts = circuit_metrics_final_iter[group][restart_ind]['cumul_counts']
+                unique_sizes = circuit_metrics_final_iter[group][restart_ind]['unique_sizes']
+                optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
                 axs.plot(np.array(unique_sizes) / optimal_value, np.array(cumul_counts) / cumul_counts[-1], marker='o',
                          ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
 
@@ -1822,19 +1845,19 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
             if group not in list_of_widths:
                 # Skip if width is not to be plotted
                 continue
-
-            for deg in circuit_metrics_final_iter[group]:
-                unique_counts = circuit_metrics_final_iter[group][deg]['unique_counts']
-                unique_sizes = circuit_metrics_final_iter[group][deg]['unique_sizes']
-                optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
+            best_restart_ind = str(get_best_restart_ind(group))
+            for restart_ind in [best_restart_ind]:#circuit_metrics_final_iter[group]:
+                unique_counts = circuit_metrics_final_iter[group][restart_ind]['unique_counts']
+                unique_sizes = circuit_metrics_final_iter[group][restart_ind]['unique_sizes']
+                optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
                 axs.plot(np.array(unique_sizes) / optimal_value, np.array(unique_counts) / sum(unique_counts), marker='o',
                          ls = '-', c = colors[list_of_widths.index(group)], ms=2, mec = 'k', mew=0.2,
                          label = f"From QAOA. Width={group}")#" degree={deg}") # lw=1,
                 
                 # Also plot the distribution obtained from uniform random sampling
-                unique_counts_unif = circuit_metrics_final_iter[group][deg]['unique_counts_unif']
-                unique_sizes_unif = circuit_metrics_final_iter[group][deg]['unique_sizes_unif']
-                optimal_value = circuit_metrics_final_iter[group][deg]['optimal_value']
+                unique_counts_unif = circuit_metrics_final_iter[group][restart_ind]['unique_counts_unif']
+                unique_sizes_unif = circuit_metrics_final_iter[group][restart_ind]['unique_sizes_unif']
+                optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
                 axs.plot(np.array(unique_sizes_unif) / optimal_value, np.array(unique_counts_unif) / sum(unique_counts_unif),
                          marker='o', c = colors[list_of_widths.index(group)], ms=1, mec = 'k',mew=0.2,
                          ls = 'dotted', label = f"Uniform Sampling. Width={group}")#" degree={deg}") # lw=1,
@@ -1986,8 +2009,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         which_metrics_to_plot == list(which_metrics_to_plot.keys())
 
     for group in circuit_metrics_detail_2:
-        # Note: Below, when we append the metrics, we are assuming that there circuit_metrics_detail_2[group] has only one element
-        for circuit_id in circuit_metrics_detail_2[group]:
+        best_restart_ind = get_best_restart_ind(group)
+        for circuit_id in [best_restart_ind]:#circuit_metrics_detail_2[group]:
             # save the metric from the last iteration
             last_ind = max(circuit_metrics_detail_2[group][circuit_id].keys())
             mets = circuit_metrics_detail_2[group][circuit_id][last_ind]
