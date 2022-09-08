@@ -22,7 +22,7 @@ def read_maxcut_instance(file_path, _instances=None):
 def read_maxcut_solution(file_path, _instances=None):
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
-        return _instances.get(inst, {}).get("instance", (None, None))
+        return _instances.get(inst, {}).get("sol", (None, None))
     if os.path.exists(file_path) and os.path.isfile(file_path):
         with open(file_path, 'r') as file:
             objective = int(file.readline())
