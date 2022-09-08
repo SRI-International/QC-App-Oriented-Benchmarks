@@ -53,3 +53,23 @@ def create_runtime_script(file_name="maxcut_runtime.py"):
     all_catted_string += "\n" + data
     with open(file_name, "w", encoding="utf8") as text_file:
         text_file.write(all_catted_string)
+
+def prepare_instances():
+    instance_dir = os.path.join("..", "_common", "instances")
+    files = list(filter(lambda x: x.startswith("mc"), os.listdir(instance_dir)))
+    insts = {}
+
+    for f in files:
+        p = os.path.join(instance_dir, f"{f}")
+        k, _, _ = f.partition('.')
+        insts[k] = {'instance': None, 'sol': None}
+
+    for f in files:
+        p = os.path.join(instance_dir, f"{f}")
+        k, _, _ = f.partition('.')
+        if 'txt' in f:
+            insts[k]['instance'] = common.read_maxcut_instance(p)
+        if 'sol' in f:
+            insts[k]['sol'] = common.read_maxcut_solution(p)
+    
+    return insts
