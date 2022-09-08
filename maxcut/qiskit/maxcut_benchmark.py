@@ -566,7 +566,6 @@ def get_random_angles(rounds, restarts):
     """
     restarts = min(10, restarts)
     # Create random angles
-    np.random.seed(0)
     theta_min = [0] * 2 * rounds
     # Upper limit for betas=pi; upper limit for gammas=2pi
     theta_max = [np.pi] * rounds + [2 * np.pi] * rounds
@@ -590,31 +589,29 @@ def get_restart_angles(thetas_array, rounds, restarts):
         thetas (list of lists. Shape = (max_circuits, 2 * rounds))
     """
     
-    random_angles = get_random_angles(rounds, restarts)
-    
     if thetas_array is None:
         # None is used as a flag to indicate that random angles are to be used
-        return random_angles   
+        return get_random_angles(rounds, restarts) 
     
     if type(thetas_array) != list:
         # must be a list.
-        print("thetas_array is not a list. Using random angles")
-        return random_angles
+        print("thetas_array is not a list. Using random angles.")
+        return get_random_angles(rounds, restarts)
     
     # If yes, check if thetas_array is a list of lists
     if not all([type(item) == list for item in thetas_array]):
         # if every list element is not a list, return random angles
-        print("thetas_array is not a list of lists. Using random angles")
-        return random_angles  
-    
+        print("thetas_array is not a list of lists. Using random angles.")
+        return get_random_angles(rounds, restarts)
+        
     if not all([len(item) == 2 * rounds for item in thetas_array]):
         # If not all list elements are lists of the correct length...
         print("Each element of thetas_array must be a list of length 2 * rounds. Using random angles.")
-        return random_angles  
+        return get_random_angles(rounds, restarts)  
     
     if not len(thetas_array) == restarts:
-        print("thetas_array is not of the correct length. Using random angles")
-        return random_angles
+        print("thetas_array is not of list with a length equal to the specified value of restarts. Using random angles.")
+        return get_random_angles(rounds, restarts)
     
     # If everyhing seems right, just return the inputted list of angles
     return thetas_array
