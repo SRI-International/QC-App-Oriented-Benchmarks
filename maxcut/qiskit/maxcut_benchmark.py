@@ -578,7 +578,12 @@ def get_random_angles(rounds, restarts):
 
 
 def get_restart_angles(thetas_array, rounds, restarts):
-    """Create random initial conditions for the restart loop
+    """
+    Create random initial conditions for the restart loop.
+    thetas_array takes precedence over restarts.
+    If the user inputs valid thetas_array, restarts will be inferred accordingly.
+    If thetas_array and restarts are both None, return all 1's as initial angles.
+    If thetas_array is None, generate restarts number of random initial conditions
 
     Args:
         thetas_array (list of lists of floats): list of initial angles.
@@ -587,34 +592,43 @@ def get_restart_angles(thetas_array, rounds, restarts):
 
     Returns:
         thetas (list of lists. Shape = (max_circuits, 2 * rounds))
+        restarts : int
     """
-    
+    default_angles = [[1] * 2 * rounds]
+    default_restarts = 1
     if thetas_array is None:
-        # None is used as a flag to indicate that random angles are to be used
-        return get_random_angles(rounds, restarts) 
+        if restarts is None:
+            # if neither the angles, nor the restarts are specified, use default of all 1's
+            return default_angles, default_restarts
+        elif type(restarts) == int:
+            # If restarts is provided
+            return get_random_angles(rounds, restarts), restarts
+        else:
+            print("restarts is not of type int. Setting it to 1, and using all 1's as initial angles")
+            return default_angles, default_restarts
     
+    if restarts is None:
+        restarts = default_restarts
+        
     if type(thetas_array) != list:
-        # must be a list.
+        # thetas_array is not None, but is also not a list.
         print("thetas_array is not a list. Using random angles.")
-        return get_random_angles(rounds, restarts)
+        return get_random_angles(rounds, restarts), restarts
     
-    # If yes, check if thetas_array is a list of lists
+    # At this point, thetas_array is a list. check if thetas_array is a list of lists
     if not all([type(item) == list for item in thetas_array]):
         # if every list element is not a list, return random angles
         print("thetas_array is not a list of lists. Using random angles.")
-        return get_random_angles(rounds, restarts)
+        return get_random_angles(rounds, restarts), restarts
         
     if not all([len(item) == 2 * rounds for item in thetas_array]):
         # If not all list elements are lists of the correct length...
         print("Each element of thetas_array must be a list of length 2 * rounds. Using random angles.")
-        return get_random_angles(rounds, restarts)  
+        return get_random_angles(rounds, restarts), restarts
     
-    if not len(thetas_array) == restarts:
-        print("thetas_array is not of list with a length equal to the specified value of restarts. Using random angles.")
-        return get_random_angles(rounds, restarts)
+    # At this point, thetas_array is a list of lists of length 2*rounds. All conditions are satisfied. Return inputted angles.
+    return thetas_array, len(thetas_array)
     
-    # If everyhing seems right, just return the inputted list of angles
-    return thetas_array
     
 #%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
 
@@ -842,12 +856,8 @@ def load_from_width_restart_file(folder, fileName):
             final_counts = data['final_counts']
         final_size_dist = data['final_size_dist']
         
-        ex.set_execution_target(backend_id = gen_prop["backend_id"], 
-                                provider_backend = gen_prop["provider_backend"],
-                                hub = gen_prop["hub"], 
-                                group = gen_prop["group"], 
-                                project = gen_prop["project"],
-                                exec_options = gen_prop["exec_options"])
+        backend_id = gen_prop.get('backend_id')
+        metrics.set_plot_subtitle(f"Device = {backend_id}")
         
         # Update circuit metrics
         for circuit_id in data['iterations']:
@@ -900,7 +910,7 @@ iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitst
 iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 saved_result = {  }
 instance_filename = None
-def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
+def run (min_qubits=3, max_qubits=6, max_circuits=None, num_shots=100,
         method=1, rounds=1, degree=3, thetas_array=None, N=10, alpha=0.1, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
@@ -916,7 +926,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     max_qubits : int, optional
         The largest circuit width for which benchmarking will be done. The default is 6.
     max_circuits : int, optional
-        Number of restarts. The default is 3.
+        Number of restarts. The default is None.
     num_shots : int, optional
         Number of times the circut will be measured, for each iteration. The default is 100.
     method : int, optional
@@ -979,6 +989,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # This dictionary will later be stored in a json file
     # It will also be used for sending parameters to the plotting function
     dict_of_inputs = locals()
+    # Get angles for restarts. Thetas = list of lists. Lengths are max_circuits and 2*rounds
+    thetas, max_circuits = get_restart_angles(thetas_array, rounds, max_circuits)
+    
+    # Update the dictionary of inputs
+    dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
 
     global QC_
     global circuits_done
@@ -1006,7 +1021,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     max_qubits = max(4, max_qubits)
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
-    max_circuits = min(10, max_circuits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
     
     # don't compute exectation unless fidelity is is needed
@@ -1018,8 +1032,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     
     rounds = max(1, rounds)
     
-    # Get angles for restarts. Thetas = list of lists. Lengths are max_circuits and 2*rounds
-    thetas = get_restart_angles(thetas_array, rounds, max_circuits)
+    
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
         y_size = 1.5
@@ -1252,7 +1265,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
-def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, 
+def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_circuits = 1,
                  objective_func_type='approx_ratio', method=2, score_metric='fidelity',
                  x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
                  num_x_bins=15, y_size=None, x_size=None,
@@ -1271,7 +1284,7 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30,
         suffix = f'of-{short_obj_func_str}' #of=objective function
         
     obj_str = metrics.known_score_labels[objective_func_type]
-    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, '\nObjective Function' : obj_str}
+    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
     suptitle= f"Benchmark Results - MaxCut ({method}) - Qiskit"
     
     metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics, num_x_bins=num_x_bins, x_size=x_size, y_size=y_size, options=options, suffix=suffix)

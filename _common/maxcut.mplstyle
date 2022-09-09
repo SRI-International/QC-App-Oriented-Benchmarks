@@ -9,7 +9,7 @@ ytick.direction : in
 savefig.bbox : tight
 savefig.pad_inches : 0.05
 savefig.dpi : 300
-
+savefig.facecolor: white
 # Use serif fonts
 # font.family : sans-serif
 # mathtext.fontset: dejavusans
