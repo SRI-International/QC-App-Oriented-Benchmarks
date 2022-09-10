@@ -43,8 +43,9 @@ except Exception as e:
 
 np.random.seed(0)
 
+maxcut_inputs = dict() #inputs to the run method
 verbose = False
-
+print_sample_circuit = True
 # Indicates whether to perform the (expensive) pre compute of expectations
 do_compute_expectation = True
 
@@ -582,8 +583,9 @@ def get_restart_angles(thetas_array, rounds, restarts):
     Create random initial conditions for the restart loop.
     thetas_array takes precedence over restarts.
     If the user inputs valid thetas_array, restarts will be inferred accordingly.
-    If thetas_array and restarts are both None, return all 1's as initial angles.
-    If thetas_array is None, generate restarts number of random initial conditions
+    If thetas_array is None and restarts is 1, return all 1's as initial angles.
+    If thetas_array is None and restarts >1, generate restarts number of random initial conditions
+    If only one set of random angles are desired, then the user needs to create them and send as thetas_array 
 
     Args:
         thetas_array (list of lists of floats): list of initial angles.
@@ -594,21 +596,16 @@ def get_restart_angles(thetas_array, rounds, restarts):
         thetas (list of lists. Shape = (max_circuits, 2 * rounds))
         restarts : int
     """
+    assert type(restarts) == int and restarts > 0, "max_circuits must be an integer greater than 0"
     default_angles = [[1] * 2 * rounds]
     default_restarts = 1
     if thetas_array is None:
-        if restarts is None:
-            # if neither the angles, nor the restarts are specified, use default of all 1's
+        if restarts == 1:
+            # if the angles are none, but restarts equals 1, use default of all 1's
             return default_angles, default_restarts
-        elif type(restarts) == int:
-            # If restarts is provided
-            return get_random_angles(rounds, restarts), restarts
         else:
-            print("restarts is not of type int. Setting it to 1, and using all 1's as initial angles")
-            return default_angles, default_restarts
-    
-    if restarts is None:
-        restarts = default_restarts
+            # restarts can only be greater than 1.
+            return get_random_angles(rounds, restarts), restarts
         
     if type(thetas_array) != list:
         # thetas_array is not None, but is also not a list.
@@ -910,8 +907,8 @@ iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitst
 iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 saved_result = {  }
 instance_filename = None
-def run (min_qubits=3, max_qubits=6, max_circuits=None, num_shots=100,
-        method=1, rounds=1, degree=3, thetas_array=None, N=10, alpha=0.1, parameterized= False, do_fidelities=True,
+def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
+        method=1, rounds=1, degree=3, N=10, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
@@ -994,7 +991,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=None, num_shots=100,
     
     # Update the dictionary of inputs
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
-
+    
+    global maxcut_inputs
+    maxcut_inputs = dict_of_inputs
+    
     global QC_
     global circuits_done
     global minimizer_loop_index
@@ -1017,21 +1017,16 @@ def run (min_qubits=3, max_qubits=6, max_circuits=None, num_shots=100,
     
     if save_res_to_file and not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
     
-    # validate parameters (smallest circuit is 4 qubits)
+    # validate parameters
     max_qubits = max(4, max_qubits)
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
-    #print(f"min, max qubits = {min_qubits} {max_qubits}")
     
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
-    do_compute_expectation = True
-    #if method == 2:
-    if do_fidelities == False:
-        do_compute_expectation = False
+    do_compute_expectation = do_fidelities
     
     rounds = max(1, rounds)
-    
     
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
@@ -1252,8 +1247,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=None, num_shots=100,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
              
-    # print a sample circuit
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+    global print_sample_circuit
+    if print_sample_circuit:
+        # print a sample circuit
+        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes

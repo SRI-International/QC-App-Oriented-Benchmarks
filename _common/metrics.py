@@ -41,7 +41,6 @@ circuit_metrics = {  }
 
 circuit_metrics_detail = {  }    # for iterative algorithms
 circuit_metrics_detail_2 = {  }  # used to break down to 3rd dimension
-
 circuit_metrics_final_iter = {  } # used to store final results for the last circuit in iterative algorithms.
 
 group_metrics = { "groups": [],
