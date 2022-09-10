@@ -67,7 +67,7 @@ def plot_AR_histogram(final_AR_list):
 
 def get_title(suptitle, options):
     # append key circuit metrics info to the title
-    maxcut_inputs = metrics.maxcut_inputs
+    maxcut_inputs = maxcut_benchmark.maxcut_inputs
     backend_id = maxcut_inputs.get('backend_id') 
     fulltitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}"
     if options != None:

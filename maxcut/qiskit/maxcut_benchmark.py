@@ -43,6 +43,7 @@ except Exception as e:
 
 np.random.seed(0)
 
+maxcut_inputs = dict() #inputs to the run method
 verbose = False
 print_sample_circuit = True
 # Indicates whether to perform the (expensive) pre compute of expectations
@@ -595,21 +596,16 @@ def get_restart_angles(thetas_array, rounds, restarts):
         thetas (list of lists. Shape = (max_circuits, 2 * rounds))
         restarts : int
     """
+    assert type(restarts) == int and restarts > 0, "max_circuits must be an integer greater than 0"
     default_angles = [[1] * 2 * rounds]
     default_restarts = 1
     if thetas_array is None:
         if restarts == 1:
             # if the angles are none, but restarts equals 1, use default of all 1's
             return default_angles, default_restarts
-        elif type(restarts) == int and restarts > 1:
-            # If restarts is provided
-            return get_random_angles(rounds, restarts), restarts
         else:
-            print("Enter valid value for max_circuits. Setting it to 1, and using all 1's as initial angles")
-            return default_angles, default_restarts
-    
-    if restarts is None:
-        restarts = default_restarts
+            # restarts can only be greater than 1.
+            return get_random_angles(rounds, restarts), restarts
         
     if type(thetas_array) != list:
         # thetas_array is not None, but is also not a list.
@@ -995,7 +991,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     
     # Update the dictionary of inputs
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
-    metrics.maxcut_inputs = dict_of_inputs
+    
+    global maxcut_inputs
+    maxcut_inputs = dict_of_inputs
     
     global QC_
     global circuits_done
