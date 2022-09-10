@@ -995,7 +995,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     
     # Update the dictionary of inputs
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
-
+    metrics.maxcut_inputs = dict_of_inputs
+    
     global QC_
     global circuits_done
     global minimizer_loop_index

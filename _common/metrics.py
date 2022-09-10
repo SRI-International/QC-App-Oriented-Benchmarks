@@ -41,8 +41,8 @@ circuit_metrics = {  }
 
 circuit_metrics_detail = {  }    # for iterative algorithms
 circuit_metrics_detail_2 = {  }  # used to break down to 3rd dimension
-
 circuit_metrics_final_iter = {  } # used to store final results for the last circuit in iterative algorithms.
+maxcut_inputs = dict() #inputs to the run method
 
 group_metrics = { "groups": [],
     "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [], "avg_hf_fidelities": [],
