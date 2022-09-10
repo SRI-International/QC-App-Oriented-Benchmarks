@@ -801,7 +801,7 @@ def load_all_metrics(folder):
     
     list_of_files = os.listdir(folder)
     width_restart_file_tuples = [(*get_width_restart_tuple_from_filename(fileName), fileName)
-                                 for (ind, fileName) in enumerate(list_of_files)]  # list with elements that are tuples->(width,restartInd,filename)
+                                 for (ind, fileName) in enumerate(list_of_files) if fileName.startswith("width")]  # list with elements that are tuples->(width,restartInd,filename)
 
     width_restart_file_tuples = sorted(width_restart_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by restartInd
     distinct_widths = list(set(it[0] for it in width_restart_file_tuples)) 
@@ -898,7 +898,7 @@ def get_width_restart_tuple_from_filename(fileName):
     pattern = 'width_([0-9]+)_restartInd_([0-9]+).json'
     match = re.search(pattern, fileName)
 
-    assert match is not None, f"File {fileName} found inside folder. All files inside specified folder must be named in the format 'width_int_restartInd_int.json"
+    # assert match is not None, f"File {fileName} found inside folder. All files inside specified folder must be named in the format 'width_int_restartInd_int.json"
     num_qubits = int(match.groups()[0])
     degree = int(match.groups()[1])
     return (num_qubits,degree)

@@ -11,6 +11,9 @@ import execute
 import metrics
 import maxcut_benchmark
 
+from qiskit_ibm_runtime import QiskitRuntimeService
+
+
 def remove_imports_calls(string):
     pattern_list = [
         "sys.*]\n",
@@ -54,6 +57,7 @@ def create_runtime_script(file_name="maxcut_runtime.py"):
     with open(file_name, "w", encoding="utf8") as text_file:
         text_file.write(all_catted_string)
 
+
 def prepare_instances():
     instance_dir = os.path.join("..", "_common", "instances")
     files = list(filter(lambda x: x.startswith("mc"), os.listdir(instance_dir)))
@@ -73,3 +77,117 @@ def prepare_instances():
             insts[k]['sol'] = common.read_maxcut_solution(p)
     
     return insts
+
+
+def get_status(service, job_id):
+    return service.job(job_id=job_id).status().name
+
+
+def get_id(path):
+    if not os.path.exists(path):
+        return None
+
+    with open(path, "r") as file:
+        data = file.read()
+
+    job_id, prev_status = data.split(",")
+
+    return job_id
+
+
+def get_response(service, path):
+    if not os.path.exists(path):
+        return "continue"
+
+    job_id = get_id(path)
+    status = get_status(service, job_id)
+    print(
+        f"WARNING: Job file already exists! Job {job_id} is {status}"
+    )
+    response = input(
+        f"Would you like to continue and overwrite your previous data in {os.path.dirname(path)}? (y/n)"
+    )
+
+    return response
+
+
+def process_results(job_id, backend_id, service):
+    path = os.path.join("__data", f"{backend_id}")
+    # Will wait for job to finish
+    result = service.job(job_id).result()
+    maxcut_benchmark.save_runtime_data(result)
+    maxcut_benchmark.load_data_and_plot(path)
+
+
+def run(**kwargs):
+    service = QiskitRuntimeService()
+
+    options = {
+        'backend_name': kwargs['backend_id']
+    }
+
+    runtime_inputs = {
+        "backend_id": kwargs['backend_id'],
+        "method": 2,
+        "_instances": kwargs['_instances'],
+        "min_qubits": kwargs['min_qubits'],
+        "max_qubits": kwargs['max_qubits'],
+        "max_circuits": kwargs['max_circuits'],
+        "num_shots": kwargs['num_shots'],
+
+        "degree": kwargs['degree'],
+        "rounds": kwargs['rounds'],
+        "max_iter": kwargs['max_iter'],
+        "parameterized": kwargs['parameterized'],
+        "do_fidelities": False,
+
+        # To keep plots consistent
+        "hub": kwargs['hub'],
+        "group": kwargs['group'],
+        "project": kwargs['project']
+    }
+
+    job_file_path = os.path.join(
+        "__data", f"{kwargs['backend_id']}", "job.txt"
+    )
+    if os.path.exists(job_file_path):
+        response = get_response(service, job_file_path)
+        job_id = get_id(job_file_path)
+
+        if response.strip().lower() == "n":
+            print("Aborting without executing any procedures.")
+            return
+
+        status = get_status(service, job_id)
+        if status != 'ERROR' or status != 'CANCELLED':
+            print("Fetching previously submitted job:")
+            process_results(job_id, kwargs["backend_id"], service)
+            os.remove(job_file_path)
+            return 
+
+    RUNTIME_FILENAME = 'maxcut_runtime.py'
+    create_runtime_script(file_name=RUNTIME_FILENAME)
+    program = service.upload_program(
+        data=RUNTIME_FILENAME, metadata=kwargs["meta"]
+    )
+    ## Uses previously uploaded program instead of uploading a new one.
+    # program = list(
+    #     filter(
+    #         lambda x: x.program_id.startswith("qedc"), 
+    #         service.programs()
+    #     )
+    # )[0]
+
+    job = service.run(
+        program_id=program.program_id,
+        options=options,
+        inputs=runtime_inputs,
+        instance=f'{kwargs["hub"]}/{kwargs["group"]}/{kwargs["project"]}'
+    )
+
+    with open(job_file_path, "w+") as file:
+        file.write(f"{job.job_id},{job.status().name}")
+
+    process_results(job.job_id, kwargs["backend_id"], service)
+
+    return job
