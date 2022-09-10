@@ -44,7 +44,7 @@ except Exception as e:
 np.random.seed(0)
 
 verbose = False
-
+print_sample_circuit = True
 # Indicates whether to perform the (expensive) pre compute of expectations
 do_compute_expectation = True
 
@@ -1249,8 +1249,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
              
-    # print a sample circuit
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+    global print_sample_circuit
+    if print_sample_circuit:
+        # print a sample circuit
+        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
