@@ -1849,7 +1849,13 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
                 unique_counts = circuit_metrics_final_iter[group][restart_ind]['unique_counts']
                 unique_sizes = circuit_metrics_final_iter[group][restart_ind]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
-                axs.plot(np.array(unique_sizes) / optimal_value, np.array(unique_counts) / sum(unique_counts), marker='o',
+                
+                sizes_array = np.arange(optimal_value + 1)
+                counts_array = [unique_counts[unique_sizes.index(s)] if s in unique_sizes else 0 for s in sizes_array]
+                counts_array = np.array(counts_array)
+
+
+                axs.plot(sizes_array / optimal_value, counts_array / np.sum(counts_array), marker='o',
                          ls = '-', c = colors[list_of_widths.index(group)], ms=2, mec = 'k', mew=0.2,
                          label = f"From QAOA. Width={group}")#" degree={deg}") # lw=1,
                 
@@ -1857,7 +1863,12 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
                 unique_counts_unif = circuit_metrics_final_iter[group][restart_ind]['unique_counts_unif']
                 unique_sizes_unif = circuit_metrics_final_iter[group][restart_ind]['unique_sizes_unif']
                 optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
-                axs.plot(np.array(unique_sizes_unif) / optimal_value, np.array(unique_counts_unif) / sum(unique_counts_unif),
+                
+                sizes_array = np.arange(optimal_value + 1)
+                unif_counts_array = [unique_counts_unif[unique_sizes_unif.index(s)] if s in unique_sizes_unif else 0 for s in sizes_array]
+                unif_counts_array = np.array(unif_counts_array)
+                
+                axs.plot(sizes_array / optimal_value, unif_counts_array / np.sum(unif_counts_array),
                          marker='o', c = colors[list_of_widths.index(group)], ms=1, mec = 'k',mew=0.2,
                          ls = 'dotted', label = f"Uniform Sampling. Width={group}")#" degree={deg}") # lw=1,
                 
@@ -2015,11 +2026,11 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             mets = circuit_metrics_detail_2[group][circuit_id][last_ind]
             
             # Compute optimality gaps for the objective function types
-            group_metrics_optgaps['approx_ratio']['gapvals'].append((1.0 - mets["approx_ratio"]) * 100)
-            group_metrics_optgaps['Max_N_approx_ratio']['gapvals'].append((1.0 - mets["Max_N_approx_ratio"]) * 100)
-            group_metrics_optgaps['cvar_approx_ratio']['gapvals'].append((1.0 - mets["cvar_approx_ratio"]) * 100)
-            group_metrics_optgaps['bestCut_approx_ratio']['gapvals'].append((1.0 - mets["bestCut_approx_ratio"]) * 100)
-            group_metrics_optgaps['gibbs_ratio']['gapvals'].append((1.0 - mets["gibbs_ratio"]) * 100)
+            group_metrics_optgaps['approx_ratio']['gapvals'].append(abs(1.0 - mets["approx_ratio"]) * 100)
+            group_metrics_optgaps['Max_N_approx_ratio']['gapvals'].append(abs(1.0 - mets["Max_N_approx_ratio"]) * 100)
+            group_metrics_optgaps['cvar_approx_ratio']['gapvals'].append(abs(1.0 - mets["cvar_approx_ratio"]) * 100)
+            group_metrics_optgaps['bestCut_approx_ratio']['gapvals'].append(abs(1.0 - mets["bestCut_approx_ratio"]) * 100)
+            group_metrics_optgaps['gibbs_ratio']['gapvals'].append(abs(1.0 - mets["gibbs_ratio"]) * 100)
 
             # Also store the optimality gaps at the three quantiles values
             # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
@@ -2144,7 +2155,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         ideal_lgnd_seq = ['approx_ratio', 'Max_N_approx_ratio', 'cvar_approx_ratio', 'gibbs_ratio', 'bestCut_approx_ratio', 'quantile_optgaps']
         handles_list= [plt_handles[s] for s in ideal_lgnd_seq if s in plt_handles]
         axs.legend(handles=handles_list, loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
-        axs.set_ylim([0, 60])
+        axs.set_ylim(bottom=0,top=100)
 
         # Add grid
         plt.grid()
