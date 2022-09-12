@@ -3,6 +3,7 @@
 import re
 import sys
 import os
+from collections import defaultdict
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
@@ -23,7 +24,7 @@ def remove_imports_calls(string):
         "common\.",
         "ex\.",
         "(?<!_)metrics\.",
-        "# print a sample circuit.*\n.*\n",
+        # "# print a sample circuit.*\n.*\n"
         "# if main, execute method",
         "if __name__ == '__main__':.*$",
     ]  # remove the printing of sample circuit
@@ -59,14 +60,9 @@ def create_runtime_script(file_name="maxcut_runtime.py"):
 
 
 def prepare_instances():
+    insts = defaultdict(dict)
     instance_dir = os.path.join("..", "_common", "instances")
-    files = list(filter(lambda x: x.startswith("mc"), os.listdir(instance_dir)))
-    insts = {}
-
-    for f in files:
-        p = os.path.join(instance_dir, f"{f}")
-        k, _, _ = f.partition('.')
-        insts[k] = {'instance': None, 'sol': None}
+    files = (file for file in os.listdir(instance_dir) if file.startswith("mc"))
 
     for f in files:
         p = os.path.join(instance_dir, f"{f}")
@@ -167,26 +163,31 @@ def run(**kwargs):
 
     RUNTIME_FILENAME = 'maxcut_runtime.py'
     create_runtime_script(file_name=RUNTIME_FILENAME)
-    program = service.upload_program(
+    program_id = service.upload_program(
         data=RUNTIME_FILENAME, metadata=kwargs["meta"]
     )
     ## Uses previously uploaded program instead of uploading a new one.
-    # program = list(
+    # program_id = list(
     #     filter(
     #         lambda x: x.program_id.startswith("qedc"), 
     #         service.programs()
     #     )
-    # )[0]
+    # )[0].program_id
 
     job = service.run(
-        program_id=program.program_id,
+        program_id=program_id,
         options=options,
         inputs=runtime_inputs,
         instance=f'{kwargs["hub"]}/{kwargs["group"]}/{kwargs["project"]}'
     )
 
-    with open(job_file_path, "w+") as file:
-        file.write(f"{job.job_id},{job.status().name}")
+    try:
+        with open(job_file_path, "w+") as file:
+            file.write(f"{job.job_id},{job.status().name}")
+    except FileNotFoundError:
+        os.mkdir(os.path.join('__data', f"{kwargs['backend_id']}"))
+        with open(job_file_path, "w+") as file:
+            file.write(f"{job.job_id},{job.status().name}")
 
     process_results(job.job_id, kwargs["backend_id"], service)
 
