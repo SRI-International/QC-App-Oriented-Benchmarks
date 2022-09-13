@@ -116,11 +116,13 @@ def get_jobinfo(backend_id):
     path = os.path.join("__data", backend_id, "jobs.txt")
     try:
         with open(path, "r") as file:
-            data = file.readlines()
-    except:
+            data = file.read()
+    except FileNotFoundError:
         return [None, None]
     
-    return data[-1].strip().split(",")
+    job_id, status = data.strip().split(",")
+    job = QiskitRuntimeService().job(job_id=job_id)
+    return job, status
 
 
 def get_id(path):
