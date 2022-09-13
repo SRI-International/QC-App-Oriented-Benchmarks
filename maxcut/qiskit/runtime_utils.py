@@ -81,6 +81,15 @@ def get_status(service, job_id):
 
 def save_jobinfo(backend_id, job_id, job_status):
     path = os.path.join("__data", backend_id)
+    line = f"{job_id},{job_status}"
+
+    os.makedirs(path, exist_ok=True)
+    with open(os.path.join(path, "jobs.txt"), "w+") as file:
+        file.write(line)
+ 
+''' 
+def save_jobinfo(backend_id, job_id, job_status):
+    path = os.path.join("__data", backend_id)
     line = f"{job_id},{job_status}\n"
 
     os.makedirs(path, exist_ok=True)
@@ -101,6 +110,7 @@ def save_jobinfo(backend_id, job_id, job_status):
             data.append(line)
 
         file.write("".join(data))
+'''
 
 def get_jobinfo(backend_id):
     path = os.path.join("__data", backend_id, "jobs.txt")
