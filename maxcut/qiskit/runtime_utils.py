@@ -3,7 +3,8 @@
 import re
 import sys
 import os
-from collections import defaultdict
+import json
+from collections import defaultdict 
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
@@ -78,6 +79,39 @@ def prepare_instances():
 def get_status(service, job_id):
     return service.job(job_id=job_id).status().name
 
+def save_jobinfo(backend_id, job_id, job_status):
+    path = os.path.join("__data", backend_id)
+    line = f"{job_id},{job_status}\n"
+
+    os.makedirs(path, exist_ok=True)
+    try:
+        with open(os.path.join(path, "jobs.txt"), "r+") as file:
+            data = file.readlines()
+    except FileNotFoundError:
+        with open(os.path.join(path, "jobs.txt"), "w+") as file:
+            data = file.readlines()
+
+    if line in data:
+        return
+
+    with open(os.path.join(path, "jobs.txt"), "w+") as file:
+        if job_status == "DONE":
+            data[-1] = data[-1].replace("RUNNING", job_status)
+        else:
+            data.append(line)
+
+        file.write("".join(data))
+
+def get_jobinfo(backend_id):
+    path = os.path.join("__data", backend_id, "jobs.txt")
+    try:
+        with open(path, "r") as file:
+            data = file.readlines()
+    except:
+        return [None, None]
+    
+    return data[-1].strip().split(",")
+
 
 def get_id(path):
     if not os.path.exists(path):
@@ -86,9 +120,9 @@ def get_id(path):
     with open(path, "r") as file:
         data = file.read()
 
-    job_id, prev_status = data.split(",")
+    job_id, status = data.split(",")
 
-    return job_id
+    return job_id, status
 
 
 def get_response(service, path):
