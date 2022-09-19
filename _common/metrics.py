@@ -1785,7 +1785,7 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
         axs.set_xlabel(r'$\frac{\mathrm{Cut\ Size}}{\mathrm{Max\ Cut\ Size}}$')
         axs.grid()
 
-        axs.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        axs.legend(loc='upper left')#loc='center left', bbox_to_anchor=(1, 0.5))
 
         fig.tight_layout()
 
@@ -1856,7 +1856,7 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
 
                 axs.plot(sizes_array / optimal_value, counts_array / np.sum(counts_array), marker='o',
                          ls = '-', c = colors[list_of_widths.index(group)], ms=2, mec = 'k', mew=0.2,
-                         label = f"From QAOA. Width={group}")#" degree={deg}") # lw=1,
+                         label = f"Width={group}: QAOA")#" degree={deg}") # lw=1,
                 
                 # Also plot the distribution obtained from uniform random sampling
                 unique_counts_unif = circuit_metrics_final_iter[group][restart_ind]['unique_counts_unif']
@@ -1869,20 +1869,20 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
                 
                 axs.plot(sizes_array / optimal_value, unif_counts_array / np.sum(unif_counts_array),
                          marker='o', c = colors[list_of_widths.index(group)], ms=1, mec = 'k',mew=0.2,
-                         ls = 'dotted', label = f"Uniform Sampling. Width={group}")#" degree={deg}") # lw=1,
+                         ls = 'dotted', label = f"Width={group}: Uniform Sampling")#" degree={deg}") # lw=1,
                 
 
         axs.set_ylabel('Fraction of Total Counts')
         axs.set_xlabel(r'$\frac{\mathrm{Cut\ Size}}{\mathrm{Max\ Cut\ Size}}$')
         axs.grid()
-
-        axs.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        axs.set_xlim(left=0, right=1)
+        axs.legend(loc='upper left')
 
         fig.tight_layout()
 
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-EDF-" + suffix, backend_id)
+            save_plot_image(plt, f"{appname}-cursize_dist-" + suffix, backend_id)
             
         # show the plot for user to see
         if show_plot_images:
@@ -2003,6 +2003,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     # Note: This can be moved to a separate function
     # DEVNOTE: Add to group metrics here; this should be done during execute
     # Create a dictionary, with keys specifying metric type, and values specifying corresponding optgap values
+    cmap = cm.get_cmap('jet')
+    colors = [cmap(i) for i in np.linspace(0.05,0.95,4, endpoint=True)]
     group_metrics_optgaps = {'approx_ratio' : {'color' : 'r', 'label': 'Approx. Ratio', 'gapvals' : []},
                              'cvar_ratio' : {'color' : 'g', 'label': 'CVaR Ratio', 'gapvals' : []},
                              'bestcut_ratio' : {'color' : 'm', 'label': 'Best Measurement Ratio', 'gapvals' : []},
@@ -2063,7 +2065,6 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         group_metrics_optgaps[optgap_quantity]['gapvals'] = [group_metrics_optgaps[optgap_quantity]['gapvals'][i] for i in sort_inds]
     group_metrics_optgaps["groups"] = groups
 
-
     # Create title for the plots
     fulltitle = get_full_title(suptitle=suptitle, options=options)
 
@@ -2110,7 +2111,6 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
         plt.suptitle(fulltitle)
-        axs.set_ylim([0, 100])
         axs.set_ylabel(r'Optimality Gap ($\%$)')
         axs.set_xlabel('Circuit Width (Number of Qubits)')
         axs.set_xticks(group_metrics_optgaps["groups"])
@@ -2151,8 +2151,19 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
         ideal_lgnd_seq = ['approx_ratio', 'cvar_ratio', 'gibbs_ratio', 'bestcut_ratio', 'quantile_optgaps']
         handles_list= [plt_handles[s] for s in ideal_lgnd_seq if s in plt_handles]
-        axs.legend(handles=handles_list, loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
-        axs.set_ylim(bottom=0,top=100)
+        axs.legend(handles=handles_list, ncol=2, loc='upper right')# loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
+        
+        # Set y limits
+        ylim_top = 0
+        for o_f in ['approx_ratio', 'cvar_ratio', 'bestcut_ratio', 'gibbs_ratio']:
+            ylim_top = max(ylim_top, max(group_metrics_optgaps[o_f]['gapvals']))
+        ylim_top = max(ylim_top, max(map(max, group_metrics_optgaps['quantile_optgaps']['gapvals'])))
+        if ylim_top > 60: 
+            ylim_top = 100
+        else:
+            ylim_top = 60
+        axs.set_ylim(bottom = 0 - 3, top = ylim_top + 3)
+        # axs.set_ylim(bottom=0,top=100)
 
         # Add grid
         plt.grid()
