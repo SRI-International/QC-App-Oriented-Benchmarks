@@ -1481,13 +1481,13 @@ known_y_labels = {
 }
 # map known Score metrics to labels    
 known_score_labels = {
-    'approx_ratio' : 'Avg. Approximation Ratio',
+    'approx_ratio' : 'Approximation Ratio',
     'cvar_ratio' : 'CVaR Ratio',
     'gibbs_ratio' : 'Gibbs Objective Function',
     'bestcut_ratio' : 'Best Measurement Ratio',
-    'fidelity' : 'Avg. Result Fidelity',
+    'fidelity' : 'Result Fidelity',
     'max_fidelity' : 'Max. Result Fidelity',
-    'hf_fidelity' : 'Avg. Hellinger Fidelity'
+    'hf_fidelity' : 'Hellinger Fidelity'
 }
 
 # string that will go into the name of the figure when saved
