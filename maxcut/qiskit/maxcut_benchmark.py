@@ -369,42 +369,6 @@ def compute_sample_mean(counts, sizes, **kwargs):
 
     return - np.sum(counts * sizes) / np.sum(counts)
 
-
-def compute_maxN_mean(counts, sizes, N = 5, **kwargs):
-    """
-    Compute the average size of the top most frequently measured cuts
-    Choose N% of the cuts. 
-    The average is weighted by the corresponding counts
-
-    Parameters
-    ----------
-    counts : ndarray of ints
-        measured counts corresponding to cuts
-    sizes : ndarray of ints
-        cut sizes (i.e. number of edges crossing the cut)
-    N : int, optional
-        The default is 5.
-    **kwargs : optional arguments
-        will be ignored
-
-    Returns
-    -------
-    float
-    """
-    # Convert counts and sizes to ndarrays, if they are lists
-    counts, sizes = np.array(counts), np.array(sizes)
-
-    # Obtain the indices corresponding to the largest N% values of counts
-    # Thereafter, sort the counts and sizes arrays in the order specified by sort_inds
-    num_cuts = counts.size
-    how_many_top_counts = min(math.ceil(N / 100 * num_cuts),
-                              num_cuts)
-    sort_inds = np.argsort(counts)[-how_many_top_counts:]
-    counts = counts[sort_inds]
-    sizes = sizes[sort_inds]
-
-    return - np.sum(counts * sizes) / np.sum(counts)
-
 def compute_cvar(counts, sizes, alpha = 0.1, **kwargs):
     """
     Obtains the Conditional Value at Risk or CVaR for samples measured at the end of the variational circuit.
@@ -1037,10 +1001,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         y_size = 1.5
         
     # Choose the objective function to minimize, based on values of the parameters
-    possible_approx_ratios = {'cvar_ratio', 'Max_N_approx_ratio', 'approx_ratio', 'gibbs_ratio', 'bestcut_ratio'}
+    possible_approx_ratios = {'cvar_ratio', 'approx_ratio', 'gibbs_ratio', 'bestcut_ratio'}
     non_objFunc_ratios = possible_approx_ratios - { objective_func_type }
     function_mapper = {'cvar_ratio' : compute_cvar, 
-                       'Max_N_approx_ratio' : compute_maxN_mean,
                        'approx_ratio' : compute_sample_mean,
                        'gibbs_ratio' : compute_gibbs,
                        'bestcut_ratio' : compute_best_cut_from_measured}

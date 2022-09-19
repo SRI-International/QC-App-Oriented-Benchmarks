@@ -1483,7 +1483,6 @@ known_y_labels = {
 known_score_labels = {
     'approx_ratio' : 'Avg Approximation Ratio',
     'cvar_ratio' : 'CVaR Ratio',
-    'Max_N_approx_ratio' : 'Max N$\%$ counts Ratio',
     'max_approx_ratio' : 'Max Approximation Ratio',
     'gibbs_ratio' : 'Gibbs Objective Function',
     'bestcut_ratio' : 'Best Measurement Ratio',
@@ -1496,7 +1495,6 @@ known_score_labels = {
 score_label_save_str = {
     'approx_ratio' : 'apprRatio',
     'cvar_ratio' : 'CVaR',
-    'Max_N_approx_ratio' : 'maxN',
     'bestcut_ratio' : 'bestCut',
     'gibbs_ratio' : 'gibbs',
     'fidelity' : 'fidelity',
@@ -1526,7 +1524,7 @@ def get_best_restart_ind(group, which_metric = 'approx_ratio'):
 
     Args:
         group (str): circuit width
-        which_metric (str, optional): Defaults to 'approx_ratio'. Other valid options are 'Max_N_approx_ratio', 'gibbs_ratio', 'cvar_ratio', 'bestcut_ratio'
+        which_metric (str, optional): Defaults to 'approx_ratio'. Other valid options are 'gibbs_ratio', 'cvar_ratio', 'bestcut_ratio'
     """
     restart_indices = list(circuit_metrics_detail_2[group].keys())
     fin_AR_restarts = []
@@ -2007,7 +2005,6 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     # DEVNOTE: Add to group metrics here; this should be done during execute
     # Create a dictionary, with keys specifying metric type, and values specifying corresponding optgap values
     group_metrics_optgaps = {'approx_ratio' : {'color' : 'r', 'label': 'Approx. Ratio', 'gapvals' : []},
-                             'Max_N_approx_ratio' : {'color' : 'b', 'label': r'Max $\%$ counts', 'gapvals' : []},
                              'cvar_ratio' : {'color' : 'g', 'label': 'CVaR', 'gapvals' : []},
                              'bestcut_ratio' : {'color' : 'm', 'label': 'Best Measurement', 'gapvals' : []},
                              'gibbs_ratio' : {'color' : 'y', 'label' : 'Gibbs', 'gapvals' : []},
@@ -2029,7 +2026,6 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             
             # Compute optimality gaps for the objective function types
             group_metrics_optgaps['approx_ratio']['gapvals'].append(abs(1.0 - mets["approx_ratio"]) * 100)
-            group_metrics_optgaps['Max_N_approx_ratio']['gapvals'].append(abs(1.0 - mets["Max_N_approx_ratio"]) * 100)
             group_metrics_optgaps['cvar_ratio']['gapvals'].append(abs(1.0 - mets["cvar_ratio"]) * 100)
             group_metrics_optgaps['bestcut_ratio']['gapvals'].append(abs(1.0 - mets["bestcut_ratio"]) * 100)
             group_metrics_optgaps['gibbs_ratio']['gapvals'].append(abs(1.0 - mets["gibbs_ratio"]) * 100)
@@ -2154,7 +2150,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
 
         # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
-        ideal_lgnd_seq = ['approx_ratio', 'Max_N_approx_ratio', 'cvar_ratio', 'gibbs_ratio', 'bestcut_ratio', 'quantile_optgaps']
+        ideal_lgnd_seq = ['approx_ratio', 'cvar_ratio', 'gibbs_ratio', 'bestcut_ratio', 'quantile_optgaps']
         handles_list= [plt_handles[s] for s in ideal_lgnd_seq if s in plt_handles]
         axs.legend(handles=handles_list, loc='center left', bbox_to_anchor=(1, 0.5)) # For now, we are only plotting for degree 3, and not -3
         axs.set_ylim(bottom=0,top=100)
