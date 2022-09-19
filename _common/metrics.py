@@ -1481,14 +1481,13 @@ known_y_labels = {
 }
 # map known Score metrics to labels    
 known_score_labels = {
-    'approx_ratio' : 'Avg Approximation Ratio',
+    'approx_ratio' : 'Avg. Approximation Ratio',
     'cvar_ratio' : 'CVaR Ratio',
-    'max_approx_ratio' : 'Max Approximation Ratio',
     'gibbs_ratio' : 'Gibbs Objective Function',
     'bestcut_ratio' : 'Best Measurement Ratio',
-    'fidelity' : 'Avg Result Fidelity',
-    'max_fidelity' : 'Max Result Fidelity',
-    'hf_fidelity' : 'Avg Hellinger Fidelity'
+    'fidelity' : 'Avg. Result Fidelity',
+    'max_fidelity' : 'Max. Result Fidelity',
+    'hf_fidelity' : 'Avg. Hellinger Fidelity'
 }
 
 # string that will go into the name of the figure when saved
@@ -2005,9 +2004,9 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     # DEVNOTE: Add to group metrics here; this should be done during execute
     # Create a dictionary, with keys specifying metric type, and values specifying corresponding optgap values
     group_metrics_optgaps = {'approx_ratio' : {'color' : 'r', 'label': 'Approx. Ratio', 'gapvals' : []},
-                             'cvar_ratio' : {'color' : 'g', 'label': 'CVaR', 'gapvals' : []},
-                             'bestcut_ratio' : {'color' : 'm', 'label': 'Best Measurement', 'gapvals' : []},
-                             'gibbs_ratio' : {'color' : 'y', 'label' : 'Gibbs', 'gapvals' : []},
+                             'cvar_ratio' : {'color' : 'g', 'label': 'CVaR Ratio', 'gapvals' : []},
+                             'bestcut_ratio' : {'color' : 'm', 'label': 'Best Measurement Ratio', 'gapvals' : []},
+                             'gibbs_ratio' : {'color' : 'y', 'label' : 'Gibbs Objective Function', 'gapvals' : []},
                              'quantile_optgaps' : {'gapvals' : []},
                              'violin' : {'gapvals' : []}} # list of [xlist, ylist]
     
