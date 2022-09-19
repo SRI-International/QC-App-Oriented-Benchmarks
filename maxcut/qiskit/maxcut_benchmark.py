@@ -1037,13 +1037,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         y_size = 1.5
         
     # Choose the objective function to minimize, based on values of the parameters
-    possible_approx_ratios = {'cvar_ratio', 'Max_N_approx_ratio', 'approx_ratio', 'gibbs_ratio', 'bestCut_ratio'}
+    possible_approx_ratios = {'cvar_ratio', 'Max_N_approx_ratio', 'approx_ratio', 'gibbs_ratio', 'bestcut_ratio'}
     non_objFunc_ratios = possible_approx_ratios - { objective_func_type }
     function_mapper = {'cvar_ratio' : compute_cvar, 
                        'Max_N_approx_ratio' : compute_maxN_mean,
                        'approx_ratio' : compute_sample_mean,
                        'gibbs_ratio' : compute_gibbs,
-                       'bestCut_ratio' : compute_best_cut_from_measured}
+                       'bestcut_ratio' : compute_best_cut_from_measured}
 
     # Initialize metrics module
     metrics.init_metrics()
@@ -1197,7 +1197,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     metrics.store_metric(num_qubits, unique_id, None, dict_of_ratios)
                     # Get the best measurement and store it
                     best = - compute_best_cut_from_measured(counts, sizes)
-                    metrics.store_metric(num_qubits, unique_id, 'bestCut_ratio', best / opt)
+                    metrics.store_metric(num_qubits, unique_id, 'bestcut_ratio', best / opt)
                     # Also compute and store the weights of cuts at three quantile values
                     quantile_sizes = compute_quartiles(counts, sizes)
                     # Store quantile_optgaps as a list (allows storing in json files)
