@@ -1460,6 +1460,7 @@ def save_plot_image(plt, imagename, backend_id):
 # map known X metrics to labels    
 known_x_labels = {
     'cumulative_create_time' : 'Cumulative Circuit Creation Time (s)',
+    'cumulative_elapsed_time' : 'Cumulative Elapsed Quantum Execution Time (s)',
     'cumulative_exec_time' : 'Cumulative Quantum Execution Time (s)',
     'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time (s)',
     'cumulative_depth' : 'Cumulative Circuit Depth'
@@ -1467,6 +1468,7 @@ known_x_labels = {
 
 x_label_save_str = {
     'create_time' : 'createTime',
+    'elapsed_time' : 'elapsedTime',
     'exec_time' : 'execTime',
     'opt_exec_time' : 'optTime',
     'depth' : 'depth'
