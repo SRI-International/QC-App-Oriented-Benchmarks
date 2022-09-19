@@ -1037,9 +1037,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         y_size = 1.5
         
     # Choose the objective function to minimize, based on values of the parameters
-    possible_approx_ratios = {'cvar_approx_ratio', 'Max_N_approx_ratio', 'approx_ratio', 'gibbs_ratio', 'bestCut_approx_ratio'}
+    possible_approx_ratios = {'cvar_ratio', 'Max_N_approx_ratio', 'approx_ratio', 'gibbs_ratio', 'bestCut_approx_ratio'}
     non_objFunc_ratios = possible_approx_ratios - { objective_func_type }
-    function_mapper = {'cvar_approx_ratio' : compute_cvar, 
+    function_mapper = {'cvar_ratio' : compute_cvar, 
                        'Max_N_approx_ratio' : compute_maxN_mean,
                        'approx_ratio' : compute_sample_mean,
                        'gibbs_ratio' : compute_gibbs,
