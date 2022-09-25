@@ -206,7 +206,8 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
         _qc.measure_all()
     
     params = {betas: thetas_array[:p], gammas: thetas_array[p:]}   
-    logger.info(f"Binding parameters {params = }")
+    #logger.info(f"Binding parameters {params = }")
+    logger.info(f"Binding parameters {thetas_array}")
     qc = _qc.bind_parameters(params)
     #print(qc)
     
@@ -871,12 +872,13 @@ iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitst
 iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 saved_result = {  }
 instance_filename = None
+
 def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         method=1, rounds=1, degree=3, N=10, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
-        save_res_to_file = False, save_final_counts = False, detailed_save_names = False,
+        save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
         backend_id='qasm_simulator', provider_backend=None, eta=0.5,
         hub="ibm-q", group="open", project="main", exec_options=None, _instances=None):
     """
@@ -944,6 +946,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         If True, also save the counts from the final iteration for each problem in the json files. The default is True.
     detailed_save_names : bool, optional
         If true, the data and plots will be saved with more detailed names. Default is False
+    confort : bool, optional    
+        If true, print comfort dots during execution
     """
 
     # Store all the input parameters into a dictionary.
@@ -1042,7 +1046,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # DEVNOTE: increment by 2 to match the collection of problems in 'instance' folder
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
         
-        print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
+        if method == 1:
+            print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+        else:
+            print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
         
         # If degree is negative, 
         if degree < 0 :
@@ -1122,6 +1129,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # Must wait for circuit to complete
                     #ex.throttle_execution(metrics.finalize_group)
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
+                    
+                    # after first execution and thereafter, no need for transpilation if parameterized
+                    if parameterized:
+                        ex.do_transpile_for_execute = False
                     #************************************************
                     
                     global saved_result
@@ -1172,7 +1183,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     minimizer_loop_index += 1
                     #************************************************
                     
-                    
+                    if comfort:
+                        if minimizer_loop_index == 1: print("")
+                        print(".", end ="")
+
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
                     
@@ -1184,12 +1198,16 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
 
                 opt_ts = time.time()
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
-                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
+                ##res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
+                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter})
                 # To-do: Set bounds for the minimizer
                 
                 unique_id = restart_ind * 1000 + 0
                 metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
                 
+                if comfort:
+                    print("")
+
                 # Save final iteration data to metrics.circuit_metrics_final_iter
                 # This data includes final counts, cuts, etc.
                 store_final_iter_to_metrics_json(num_qubits=num_qubits, 
