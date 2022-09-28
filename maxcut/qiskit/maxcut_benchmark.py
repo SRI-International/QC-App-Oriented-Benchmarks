@@ -1108,8 +1108,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                 start_iters_t = time.time()
 
                 # Always start by enabling transpile ...
-                ## ex.do_transpile_for_execute = True
-                ## ex.do_transpile_metrics = True
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
                     
                 logger.info(f'===============  Begin method 2 loop, enabling transpile')
@@ -1124,7 +1122,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     
                     #************************************************
                     #*** Circuit Creation and Decomposition start ***
-                    # create the circuit for given qubit size and secret string, store time metric
+                    # create the circuit for given qubit size, secret string and params, store time metric
                     ts = time.time()
                     qc, params = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array, parameterized)
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
@@ -1142,7 +1140,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     
                     #************************************************
                     #*** Quantum Part: Execution of Circuits ***
-                    # submit circuit for execution on target (simulator, cloud simulator, or hardware)
+                    # submit circuit for execution on target with the current parameters
                     ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots, params=params)
                     
                     # Must wait for circuit to complete
