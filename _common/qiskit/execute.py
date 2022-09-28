@@ -265,7 +265,15 @@ def submit_circuit(qc, group_id, circuit_id, shots=100, params=None):
     if verbose:
         print(f'... submit circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={circuit["params"]}')
 
-    logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={circuit["params"]}')
+    '''
+    if params != None: 
+        for param in params.items(): print(f"{param}")
+        print([param[1] for param in params.items()])
+    '''
+    
+    # logger doesn't like unicode, so just log the array values for now
+    #logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={str(circuit["params"])}')
+    logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={[param[1] for param in params.items()] if params else None}')
 
     # immediately post the circuit for execution if active jobs < max
     if len(active_circuits) < max_jobs_active:
@@ -499,19 +507,20 @@ def execute_circuit(circuit):
                         # for now, use this cached transpiled circuit (should be separate flag)
                         trans_qc = cached_circuits["last_circuit"]
                         
-                    print(f"... trans_qc name = {trans_qc.name}")
+                    #print(f"... trans_qc name = {trans_qc.name}")
                     #print(trans_qc)
                 
                     trans_qc_name = trans_qc.name
                         
                     # if parameters provided, bind to circuit
                     if circuit["params"] != None:
-                        logger.info(f"Binding parameters to circuit: {str(circuit['params'])}")
+                        #logger.info(f"Binding parameters to circuit: {str(circuit['params'])}")
+                        logger.info(f"Binding parameters to circuit: {[param[1] for param in circuit['params'].items()]}")
                         trans_qc = trans_qc.bind_parameters(circuit["params"])
                         
                         trans_qc.name = trans_qc_name
                     
-                        print(f"... trans_qc name = {trans_qc.name}")
+                        #print(f"... trans_qc name = {trans_qc.name}")
                         #print(trans_qc)
 
                 if verbose_time:
@@ -558,21 +567,22 @@ def execute_circuit(circuit):
                     trans_qc = cached_circuits["last_circuit"]
                     
                 trans_qc_2 = trans_qc
-                print(f"... trans_qc name = {trans_qc.name}")
+                #print(f"... trans_qc name = {trans_qc.name}")
                 #print(trans_qc)
                 
                 trans_qc_name = trans_qc.name
                     
                 # if parameters provided, bind to circuit
                 if circuit["params"] != None:
-                    logger.info(f"Binding parameters to circuit: {str(circuit['params'])}")
+                    #logger.info(f"Binding parameters to circuit: {str(circuit['params'])}")
+                    logger.info(f"Binding parameters to circuit: {[param[1] for param in circuit['params'].items()]}")
                     trans_qc_2 = trans_qc.bind_parameters(circuit["params"])
                     
                     #trans_qc = assemble(trans_qc, backend)
                     
                     trans_qc_2.name = trans_qc_name
                     
-                    print(f"... trans_qc_2 name = {trans_qc_2.name}")
+                    #print(f"... trans_qc_2 name = {trans_qc_2.name}")
                     #print(trans_qc_2)
 
                 logger.info(f'Running trans_qc_2')
