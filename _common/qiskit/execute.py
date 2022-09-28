@@ -32,7 +32,7 @@ from collections import Counter
 import logging
 import numpy as np
 
-from qiskit import execute, Aer, transpile, assemble
+from qiskit import execute, Aer, transpile
 from qiskit import IBMQ
 from qiskit.providers.jobstatus import JobStatus
 
@@ -518,6 +518,7 @@ def execute_circuit(circuit):
                         logger.info(f"Binding parameters to circuit: {[param[1] for param in circuit['params'].items()]}")
                         trans_qc = trans_qc.bind_parameters(circuit["params"])
                         
+                        # store original name in parameterized circuit, so it can be found with get_result()
                         trans_qc.name = trans_qc_name
                     
                         #print(f"... trans_qc name = {trans_qc.name}")
@@ -578,8 +579,7 @@ def execute_circuit(circuit):
                     logger.info(f"Binding parameters to circuit: {[param[1] for param in circuit['params'].items()]}")
                     trans_qc_2 = trans_qc.bind_parameters(circuit["params"])
                     
-                    #trans_qc = assemble(trans_qc, backend)
-                    
+                    # store original name in parameterized circuit, so it can be found with get_result()
                     trans_qc_2.name = trans_qc_name
                     
                     #print(f"... trans_qc_2 name = {trans_qc_2.name}")
