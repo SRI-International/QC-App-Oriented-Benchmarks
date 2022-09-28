@@ -139,7 +139,7 @@ def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized, 
         if num_qubits < 9: QC_ = qc
 
     # return a handle on the circuit
-    return qc
+    return qc, None
 
 
 ############### Circuit Definition - Parameterized version
@@ -216,8 +216,10 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
     
     params = {betas: thetas_array[:p], gammas: thetas_array[p:]}   
     #logger.info(f"Binding parameters {params = }")
-    logger.info(f"Binding parameters {thetas_array}")
-    qc = _qc.bind_parameters(params)
+    logger.info(f"Create binding parameters for {thetas_array}")
+    ##qc = _qc.bind_parameters(params)
+    
+    qc = _qc
     #print(qc)
     
     # pre-compute and save an array of expected measurements
@@ -231,7 +233,7 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
         if num_qubits < 9: QC_ = qc
 
     # return a handle on the circuit
-    return qc
+    return qc, params
 
 
 ############### Expectation Tables
@@ -1091,7 +1093,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
             if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                qc = MaxCut(num_qubits, restart_ind, edges, rounds, thetas_array, parameterized)
+                qc, params = MaxCut(num_qubits, restart_ind, edges, rounds, thetas_array, parameterized)
                 metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
@@ -1106,8 +1108,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                 start_iters_t = time.time()
 
                 # Always start by enabling transpile ...
-                ex.do_transpile_for_execute = True
-                ex.do_transpile_metrics = True
+                ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
                     
                 logger.info(f'===============  Begin method 2 loop, enabling transpile')
                 
@@ -1121,9 +1122,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     
                     #************************************************
                     #*** Circuit Creation and Decomposition start ***
-                    # create the circuit for given qubit size and secret string, store time metric
+                    # create the circuit for given qubit size, secret string and params, store time metric
                     ts = time.time()
-                    qc = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array, parameterized)
+                    qc, params = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array, parameterized)
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     
                     # also store the 'rounds' and 'degree' for each execution
@@ -1139,16 +1140,16 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     
                     #************************************************
                     #*** Quantum Part: Execution of Circuits ***
-                    # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                    ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots)
+                    # submit circuit for execution on target with the current parameters
+                    ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots, params=params)
+                    
                     # Must wait for circuit to complete
                     #ex.throttle_execution(metrics.finalize_group)
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                     
                     # after first execution and thereafter, no need for transpilation if parameterized
                     if parameterized:
-                        ex.do_transpile_for_execute = False
-                        ex.do_transpile_metrics = False
+                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
                         logger.info(f'**** First execution complete, disabling transpile')
                     #************************************************
                     
@@ -1209,10 +1210,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     
                     return dict_of_vals[objective_func_type]
                 
+                # after first execution and thereafter, no need for transpilation if parameterized
+                # DEVNOTE: this appears to NOT be needed, as we can turn these off after 
                 def callback(xk):
                     if parameterized:
-                        ex.do_transpile_for_execute = False
-                        ex.do_transpile_metrics = False
+                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
 
                 opt_ts = time.time()
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively

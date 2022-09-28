@@ -48,6 +48,9 @@ backend = Aer.get_backend("qasm_simulator")
 # Execution options, passed to transpile method
 backend_exec_options = None
 
+# Cached transpiled circuit, used for parameterized execution
+cached_circuits = {}
+
 #####################
 # DEFAULT NOISE MODEL 
 
@@ -134,6 +137,12 @@ def init_execution(handler):
     batched_circuits.clear()
     active_circuits.clear()
     result_handler = handler
+    
+    cached_circuits.clear()
+    
+    # On initialize, always set trnaspilation for metrics and execute to True
+    set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+    
 
 # Set the backend for execution
 def set_execution_target(backend_id='qasm_simulator',
@@ -208,6 +217,12 @@ def set_execution_target(backend_id='qasm_simulator',
     backend_exec_options = exec_options
 
 
+# Set the state of the transpilation flags
+def set_tranpilation_flags(do_transpile_metrics = True, do_transpile_for_execute = True):
+    globals()['do_transpile_metrics'] = do_transpile_metrics
+    globals()['do_transpile_for_execute'] = do_transpile_for_execute
+    
+
 def set_noise_model(noise_model = None):
     """
     See reference on NoiseModel here https://qiskit.org/documentation/stubs/qiskit.providers.aer.noise.NoiseModel.html
@@ -241,16 +256,24 @@ def set_noise_model(noise_model = None):
 
 # Submit circuit for execution
 # Execute immediately if possible or put into the list of batched circuits
-def submit_circuit(qc, group_id, circuit_id, shots=100):
+def submit_circuit(qc, group_id, circuit_id, shots=100, params=None):
 
     # create circuit object with submission time and circuit info
     circuit = { "qc": qc, "group": str(group_id), "circuit": str(circuit_id),
-            "submit_time": time.time(), "shots": shots }
+            "submit_time": time.time(), "shots": shots, "params": params }
             
     if verbose:
-        print(f'... submit circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]}')
+        print(f'... submit circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={circuit["params"]}')
 
-    logger.info(f'Submiting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]}')
+    '''
+    if params != None: 
+        for param in params.items(): print(f"{param}")
+        print([param[1] for param in params.items()])
+    '''
+    
+    # logger doesn't like unicode, so just log the array values for now
+    #logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={str(circuit["params"])}')
+    logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={[param[1] for param in params.items()] if params else None}')
 
     # immediately post the circuit for execution if active jobs < max
     if len(active_circuits) < max_jobs_active:
@@ -465,15 +488,41 @@ def execute_circuit(circuit):
 
                 else:
                     if do_transpile_for_execute:
+                        logger.info('Transpiling for execute, with exec_options')
                         trans_qc = transpile(
                                         circuit["qc"], 
                                         backend, 
                                         optimization_level=optimization_level,
                                         layout_method=layout_method,
                                         routing_method=routing_method
-                                    )
+                                    ) 
+                        
+                        # cache this transpiled circuit
+                        cached_circuits["last_circuit"] = trans_qc
+                    
                     else:
-                        trans_qc = circuit["qc"]
+                        logger.info('Use cached transpiled circuit for execute, with exec_options')
+                        ##trans_qc = circuit["qc"]
+                        
+                        # for now, use this cached transpiled circuit (should be separate flag)
+                        trans_qc = cached_circuits["last_circuit"]
+                        
+                    #print(f"... trans_qc name = {trans_qc.name}")
+                    #print(trans_qc)
+                
+                    trans_qc_name = trans_qc.name
+                        
+                    # if parameters provided, bind to circuit
+                    if circuit["params"] != None:
+                        #logger.info(f"Binding parameters to circuit: {str(circuit['params'])}")
+                        logger.info(f"Binding parameters to circuit: {[param[1] for param in circuit['params'].items()]}")
+                        trans_qc = trans_qc.bind_parameters(circuit["params"])
+                        
+                        # store original name in parameterized circuit, so it can be found with get_result()
+                        trans_qc.name = trans_qc_name
+                    
+                        #print(f"... trans_qc name = {trans_qc.name}")
+                        #print(trans_qc)
 
                 if verbose_time:
                     print(f"  *** qiskit.transpile() time = {time.time() - st}")
@@ -508,13 +557,37 @@ def execute_circuit(circuit):
                 if do_transpile_for_execute:
                     logger.info('Transpiling for execute')
                     trans_qc = transpile(circuit["qc"], backend)
+                    
+                    # cache this transpiled circuit
+                    cached_circuits["last_circuit"] = trans_qc
                 else:
-                    logger.info('No transpile for execute')
-                    trans_qc = circuit["qc"]
+                    logger.info('Use cached transpiled circuit for execute')
+                    #trans_qc = circuit["qc"]
+                    
+                    # for now, use this cached transpiled circuit (should be separate flag)
+                    trans_qc = cached_circuits["last_circuit"]
+                    
+                trans_qc_2 = trans_qc
+                #print(f"... trans_qc name = {trans_qc.name}")
+                #print(trans_qc)
+                
+                trans_qc_name = trans_qc.name
+                    
+                # if parameters provided, bind to circuit
+                if circuit["params"] != None:
+                    #logger.info(f"Binding parameters to circuit: {str(circuit['params'])}")
+                    logger.info(f"Binding parameters to circuit: {[param[1] for param in circuit['params'].items()]}")
+                    trans_qc_2 = trans_qc.bind_parameters(circuit["params"])
+                    
+                    # store original name in parameterized circuit, so it can be found with get_result()
+                    trans_qc_2.name = trans_qc_name
+                    
+                    #print(f"... trans_qc_2 name = {trans_qc_2.name}")
+                    #print(trans_qc_2)
 
-                logger.info(f'Running trans_qc')
-                job = backend.run(trans_qc, shots=shots)
-                logger.info(f'Finished Running trans_qc')
+                logger.info(f'Running trans_qc_2')
+                job = backend.run(trans_qc_2, shots=shots)
+                logger.info(f'Finished Running trans_qc_2')
 
                 if verbose_time:
                     print(f"  *** qiskit.execute() time = {time.time() - st}")
@@ -770,9 +843,9 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
             break
             
         # delay a bit, increasing the delay periodically 
-        sleeptime = 0.25
-        if pollcount > 6: sleeptime = 0.5
-        if pollcount > 60: sleeptime = 1.0
+        sleeptime = 0.10                        # was 0.25
+        if pollcount > 6: sleeptime = 0.20      # 0.5
+        if pollcount > 60: sleeptime = 0.5      # 1.0
         time.sleep(sleeptime)
         
         pollcount += 1
