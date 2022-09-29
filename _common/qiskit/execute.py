@@ -394,10 +394,12 @@ def execute_circuit(circuit):
         if backend_exec_options_copy != None and "noise_model" in backend_exec_options_copy:
             this_noise = backend_exec_options_copy["noise_model"]
             #print(f"... using custom noise model: {this_noise}")
-            
+        
+        logger.info(f"Executing on backend: {backend.name()}")
+        
         # Initiate execution (with noise if specified and this is a simulator backend)
         if this_noise is not None and backend.name().endswith("qasm_simulator"):
-            #print("... performing simulation")
+            logger.info(f"Performing noisy simulation, shots = {shots}")
             
             simulation_circuits = circuit["qc"]
             
@@ -408,41 +410,43 @@ def execute_circuit(circuit):
                 # (only for simulator;  for other backends, it is treaded like keyword arg)
                 dummy = backend_exec_options_copy.pop("noise_model", None)
                 
+                #trans_qc = transpile(circuit["qc"], backend)
+                    
+                # transpile and bind circuit with parameters; use cache if flagged   
+                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
+                simulation_circuits = trans_qc
+                
+                # DEVNOTE: when parameters used on noisy simulator, fidelty is wrong ... why?
+                #print(circuit["params"])
+                #print(simulation_circuits)
+                    
                 # apply transformer pass if provided
                 transformer = backend_exec_options_copy.pop("transformer", None)
                 if transformer:
-                    #print("... applying transformer to sim!")
+                    logger.info("applying transformer to noisy simulator")
+                    
                     st = time.time()
-                    trans_qc = transpile(circuit["qc"], backend)
-                    simulation_circuits = transformer(trans_qc, backend=backend)
-                    
-                    # if transformer results in multiple circuits, divide shot count
-                    # results will be accumulated in job_complete
-                    # NOTE: this will need to set a flag to distinguish from multiple circuit execution 
-                    if len(simulation_circuits) > 1:
-                        shots = int(shots / len(simulation_circuits))
-                    
+                    simulation_circuits, shots = invoke_transformer(transformer,
+                                        trans_qc, backend=backend, shots=shots)                   
                     if verbose_time:
-                        print(f"  *** transformer() time = {time.time() - st}")
-                        
+                        print(f"  *** transformer() time = {time.time() - st}")                      
             else:
                 backend_exec_options_copy = {}
        
             # for noisy simulator, use execute() which works; it is unclear from docs
             # whether noise_model should be passed to transpile() or run() 
+            logger.info(f'Running circuit on noisy simulator, shots={shots}')
             st = time.time()
-            logger.info('Starting execution of job in this_noise block')
             job = execute(simulation_circuits, backend, shots=shots,
                 noise_model=this_noise, basis_gates=this_noise.basis_gates,
                 **backend_exec_options_copy)
-            logger.info('Ending execution of job in this_noise block')
+            logger.info(f'Finished Running on noisy simulator - {round(time.time() - st, 5)} (ms)')
 
             if verbose_time:
                 print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
                 
         # Initiate execution for all other backends and noiseless simulator
         else:
-            logger.info(f"Executing on backend: {backend.name()}")
             st = time.time()
             
             # use execution options if set for backend
@@ -458,78 +462,14 @@ def execute_circuit(circuit):
                     trans_qc = transpile_multiple_times(circuit["qc"], circuit["params"], backend,
                             transpile_attempt_count, 
                             optimization_level=None, layout_method=None, routing_method=None)
-                    '''
-                    trans_qc_list = [
-                        transpile(
-                            circuit["qc"], 
-                            backend, 
-                            optimization_level=optimization_level,
-                            layout_method=layout_method,
-                            routing_method=routing_method
-                        ) for _ in range(transpile_attempt_count)
-                    ]
-                    best_op_count = []
-                    for circ in trans_qc_list:
-                        # check if there are cx in transpiled circs
-                        if 'cx' in circ.count_ops().keys(): 
-                            # get number of operations
-                            best_op_count.append( circ.count_ops()['cx'] ) 
-                        # check if there are sx in transpiled circs
-                        elif 'sx' in circ.count_ops().keys(): 
-                            # get number of operations
-                            best_op_count.append( circ.count_ops()['sx'] ) 
-                    # print(f"{best_op_count = }")
-                    if best_op_count:
-                        # pick circuit with lowest number of operations
-                        best_idx = np.where(best_op_count == np.min(best_op_count))[0][0] 
-                        trans_qc = trans_qc_list[best_idx]
-                    else: # otherwise just pick the first in the list
-                        trans_qc = trans_qc_list[0] 
-                    '''
+                            
+                # normal transpile                            
                 else:
                     # transpile and bind circuit with parameters; use cache if flagged   
                     trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend,
                                         optimization_level=optimization_level,
                                         layout_method=layout_method,
                                         routing_method=routing_method)
-                    '''
-                    if do_transpile_for_execute:
-                        logger.info('Transpiling for execute, with exec_options')
-                        trans_qc = transpile(
-                                        circuit["qc"], 
-                                        backend, 
-                                        optimization_level=optimization_level,
-                                        layout_method=layout_method,
-                                        routing_method=routing_method
-                                    ) 
-                        
-                        # cache this transpiled circuit
-                        cached_circuits["last_circuit"] = trans_qc
-                    
-                    else:
-                        logger.info('Use cached transpiled circuit for execute, with exec_options')
-                        ##trans_qc = circuit["qc"]
-                        
-                        # for now, use this cached transpiled circuit (should be separate flag)
-                        trans_qc = cached_circuits["last_circuit"]
-                        
-                    #print(f"... trans_qc name = {trans_qc.name}")
-                    #print(trans_qc)
-                
-                    trans_qc_name = trans_qc.name
-                        
-                    # if parameters provided, bind to circuit
-                    if circuit["params"] != None:
-                        #logger.info(f"Binding parameters to circuit: {str(circuit['params'])}")
-                        logger.info(f"Binding parameters to circuit: {[param[1] for param in circuit['params'].items()]}")
-                        trans_qc = trans_qc.bind_parameters(circuit["params"])
-                        
-                        # store original name in parameterized circuit, so it can be found with get_result()
-                        trans_qc.name = trans_qc_name
-                    
-                        #print(f"... trans_qc name = {trans_qc.name}")
-                        #print(trans_qc)
-                    '''
 
                 if verbose_time:
                     print(f"  *** qiskit.transpile_and_bind() time = {round(time.time() - st, 5)}")
@@ -537,24 +477,11 @@ def execute_circuit(circuit):
                 # apply transformer pass if provided
                 transformer = backend_exec_options_copy.pop("transformer", None)
                 if transformer:
-                    trans_qc = invoke_transformer(transformer, trans_qc, backend=backend, shots=shots)
-                    '''
-                    st = time.time()
-                    #print("... applying transformer!")
-                    trans_qc2 = transformer(trans_qc, backend=backend)
-                    trans_qc = trans_qc2
-                
-                    # if transformer results in multiple circuits, divide shot count
-                    # results will be accumulated in job_complete
-                    # NOTE: this will need to set a flag to distinguish from multiple circuit execution 
-                    if len(trans_qc) > 1:
-                        shots = int(shots / len(trans_qc))
-                    
-                    if verbose_time:
-                        print(f"  *** transformer() time = {time.time() - st}")
-                    '''
-                
-                logger.info(f'Running trans_qc, with exec_options')   
+                    trans_qc, shots = invoke_transformer(transformer,
+                                        trans_qc, backend=backend, shots=shots)
+
+                # perform circuit execution on backend
+                logger.info(f'Running trans_qc, with exec_options, shots={shots}')   
                 st = time.time()                
                 job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
                 logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
@@ -567,43 +494,8 @@ def execute_circuit(circuit):
                 # transpile and bind circuit with parameters; use cache if flagged   
                 trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
                 
-                '''                       
-                # job = execute(circuit["qc"], backend, shots=shots)
-                if do_transpile_for_execute:
-                    logger.info('Transpiling for execute')
-                    trans_qc = transpile(circuit["qc"], backend)
-                    
-                    # cache this transpiled circuit
-                    cached_circuits["last_circuit"] = trans_qc
-                else:
-                    logger.info('Use cached transpiled circuit for execute')
-                    #trans_qc = circuit["qc"]
-                    
-                    # for now, use this cached transpiled circuit (should be separate flag)
-                    trans_qc = cached_circuits["last_circuit"]
-                    
-                trans_qc_2 = trans_qc
-                #print(f"... trans_qc name = {trans_qc.name}")
-                #print(trans_qc)
-                
-                trans_qc_name = trans_qc.name
-                    
-                # if parameters provided, bind to circuit
-                if circuit["params"] != None:
-                    #logger.info(f"Binding parameters to circuit: {str(circuit['params'])}")
-                    logger.info(f"Binding parameters to circuit: {[param[1] for param in circuit['params'].items()]}")
-                    trans_qc_2 = trans_qc.bind_parameters(circuit["params"])
-                    
-                    # store original name in parameterized circuit, so it can be found with get_result()
-                    trans_qc_2.name = trans_qc_name
-                    
-                    #print(f"... trans_qc_2 name = {trans_qc_2.name}")
-                    #print(trans_qc_2)
-                '''
-                
-                #trans_qc_2 = trans_qc
-                
-                logger.info(f'Running trans_qc')
+                # perform circuit execution on backend
+                logger.info(f'Running trans_qc, shots={shots}')
                 st = time.time() 
                 job = backend.run(trans_qc, shots=shots)
                 logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
@@ -743,25 +635,27 @@ def transpile_multiple_times(circuit, params, backend, transpile_attempt_count,
         
     return trans_qc
 
-# Invoke a circuit transformer
+
+# Invoke a circuit transformer, returning modifed circuit (array) and modifed shots
 def invoke_transformer(transformer, circuit, backend=backend, shots=100):
 
     logger.info('Invoking Transformer')
     st = time.time()
     
+    # apply the transformer and get back either a single circuit or a list of circuits
     tr_circuit = transformer(circuit, backend=backend)
 
     # if transformer results in multiple circuits, divide shot count
     # results will be accumulated in job_complete
     # NOTE: this will need to set a flag to distinguish from multiple circuit execution 
-    if len(tr_circuit) > 1:
+    if isinstance(tr_circuit, list) and len(tr_circuit) > 1:
         shots = int(shots / len(tr_circuit))
     
     logger.info(f'Transformer - {round(time.time() - st, 5)} (ms)')
     if verbose_time:
         print(f"  *** transformer() time = {round(time.time() - st, 5)} (ms)")
-    
-    return tr_circuit
+        
+    return tr_circuit, shots
 
     
 ###########################################################################

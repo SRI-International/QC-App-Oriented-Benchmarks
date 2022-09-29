@@ -128,6 +128,7 @@ def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized, 
 
     # pre-compute and save an array of expected measurements
     if do_compute_expectation:
+        logger.info('Computing expectation')
         compute_expectation(qc, num_qubits, secret_int)
         
     # add the measure here
@@ -217,7 +218,6 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
     params = {betas: thetas_array[:p], gammas: thetas_array[p:]}   
     #logger.info(f"Binding parameters {params = }")
     logger.info(f"Create binding parameters for {thetas_array}")
-    ##qc = _qc.bind_parameters(params)
     
     qc = _qc
     #print(qc)
@@ -225,7 +225,7 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
     # pre-compute and save an array of expected measurements
     if do_compute_expectation:
         logger.info('Computing expectation')
-        compute_expectation(qc, num_qubits, secret_int)
+        compute_expectation(qc, num_qubits, secret_int, params=params)
    
     # save small circuit example for display
     global QC_
@@ -247,9 +247,11 @@ expectations = {}
 
 # Compute array of expectation values in range 0.0 to 1.0
 # Use statevector_simulator to obtain exact expectation
-def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simulator'):
+def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simulator', params=None):
     
     #ts = time.time()
+    if params != None:
+        qc = qc.bind_parameters(params)
     
     #execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
@@ -1100,7 +1102,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                 qc2 = qc.decompose()
 
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc2, num_qubits, restart_ind, shots=num_shots)
+                ex.submit_circuit(qc2, num_qubits, restart_ind, shots=num_shots, params=params)
 
             if method == 2:
                 # a unique circuit index used inside the inner minimizer loop as identifier
