@@ -438,11 +438,12 @@ def execute_circuit(circuit):
             logger.info('Ending execution of job in this_noise block')
 
             if verbose_time:
-                    print(f"  *** qiskit.execute() time = {time.time() - st}")
+                print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
                 
         # Initiate execution for all other backends and noiseless simulator
         else:
-            #print(f"... executing on backend: {backend.name()}")
+            logger.info(f"Executing on backend: {backend.name()}")
+            st = time.time()
             
             # use execution options if set for backend
             if backend_exec_options_copy != None:
@@ -450,15 +451,14 @@ def execute_circuit(circuit):
                 optimization_level = backend_exec_options_copy.pop("optimization_level", 1)
                 layout_method = backend_exec_options_copy.pop("layout_method", None)
                 routing_method = backend_exec_options_copy.pop("routing_method", None)
-                
-                #job = execute(circuit["qc"], backend, shots=shots,
-                
-                # the 'execute' method includes transpile, use transpile + run instead (to enable time metrics)
-                st = time.time()
-                
+
                 # transpile many times and pick shortest circuit
                 transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
                 if transpile_attempt_count:
+                    trans_qc = transpile_multiple_times(circuit["qc"], circuit["params"], backend,
+                            transpile_attempt_count, 
+                            optimization_level=None, layout_method=None, routing_method=None)
+                    '''
                     trans_qc_list = [
                         transpile(
                             circuit["qc"], 
@@ -485,8 +485,14 @@ def execute_circuit(circuit):
                         trans_qc = trans_qc_list[best_idx]
                     else: # otherwise just pick the first in the list
                         trans_qc = trans_qc_list[0] 
-
+                    '''
                 else:
+                    # transpile and bind circuit with parameters; use cache if flagged   
+                    trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend,
+                                        optimization_level=optimization_level,
+                                        layout_method=layout_method,
+                                        routing_method=routing_method)
+                    '''
                     if do_transpile_for_execute:
                         logger.info('Transpiling for execute, with exec_options')
                         trans_qc = transpile(
@@ -523,13 +529,16 @@ def execute_circuit(circuit):
                     
                         #print(f"... trans_qc name = {trans_qc.name}")
                         #print(trans_qc)
+                    '''
 
                 if verbose_time:
-                    print(f"  *** qiskit.transpile() time = {time.time() - st}")
+                    print(f"  *** qiskit.transpile_and_bind() time = {round(time.time() - st, 5)}")
                 
                 # apply transformer pass if provided
                 transformer = backend_exec_options_copy.pop("transformer", None)
                 if transformer:
+                    trans_qc = invoke_transformer(transformer, trans_qc, backend=backend, shots=shots)
+                    '''
                     st = time.time()
                     #print("... applying transformer!")
                     trans_qc2 = transformer(trans_qc, backend=backend)
@@ -543,16 +552,22 @@ def execute_circuit(circuit):
                     
                     if verbose_time:
                         print(f"  *** transformer() time = {time.time() - st}")
+                    '''
                 
+                logger.info(f'Running trans_qc, with exec_options')   
                 st = time.time()                
                 job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
+                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
                 
                 if verbose_time:
-                    print(f"  *** qiskit.run() time = {time.time() - st}")
+                    print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
                     
             # execute with no options set
-            else:
-                st = time.time()
+            else:              
+                # transpile and bind circuit with parameters; use cache if flagged   
+                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
+                
+                '''                       
                 # job = execute(circuit["qc"], backend, shots=shots)
                 if do_transpile_for_execute:
                     logger.info('Transpiling for execute')
@@ -584,13 +599,17 @@ def execute_circuit(circuit):
                     
                     #print(f"... trans_qc_2 name = {trans_qc_2.name}")
                     #print(trans_qc_2)
-
-                logger.info(f'Running trans_qc_2')
-                job = backend.run(trans_qc_2, shots=shots)
-                logger.info(f'Finished Running trans_qc_2')
+                '''
+                
+                #trans_qc_2 = trans_qc
+                
+                logger.info(f'Running trans_qc')
+                st = time.time() 
+                job = backend.run(trans_qc, shots=shots)
+                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
 
                 if verbose_time:
-                    print(f"  *** qiskit.execute() time = {time.time() - st}")
+                    print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
                 
             # there appears to be no reason to do transpile, as it is done automatically
             # DEVNOTE: this prevents us from measuring transpile time
@@ -634,6 +653,118 @@ def execute_circuit(circuit):
     '''
     if verbose:
         print(f"... executing job {job.job_id()}")
+
+
+# Return a transpiled and bound circuit
+# Cache the transpiled, and use it if do_transpile_for_execute not set
+# DEVNOTE: this approach does not permit passing of untranspiled circuit through
+# DEVNOTE: currently this only caches a single circuit
+def transpile_and_bind_circuit(circuit, params, backend,
+                optimization_level=None, layout_method=None, routing_method=None):
+                
+    logger.info(f'transpile_and_bind_circuit()')
+    st = time.time()
+        
+    if do_transpile_for_execute:
+        logger.info('transpiling for execute')
+        trans_qc = transpile(circuit, backend, 
+                optimization_level=optimization_level, layout_method=layout_method, routing_method=routing_method) 
+        
+        # cache this transpiled circuit
+        cached_circuits["last_circuit"] = trans_qc
+    
+    else:
+        logger.info('use cached transpiled circuit for execute')
+        ##trans_qc = circuit["qc"]
+        
+        # for now, use this cached transpiled circuit (should be separate flag to pass raw circuit)
+        trans_qc = cached_circuits["last_circuit"]
+    
+    #print(trans_qc)
+    #print(f"... trans_qc name = {trans_qc.name}")
+    
+    # obtain name of the transpiled or cached circuit
+    trans_qc_name = trans_qc.name
+        
+    # if parameters provided, bind them to circuit
+    if params != None:
+        # Note: some loggers cannot handle unicode in param names, so only show the values
+        #logger.info(f"Binding parameters to circuit: {str(params)}")
+        logger.info(f"Binding parameters to circuit: {[param[1] for param in params.items()]}")
+        trans_qc = trans_qc.bind_parameters(params)
+        #print(trans_qc)
+        
+        # store original name in parameterized circuit, so it can be found with get_result()
+        trans_qc.name = trans_qc_name
+        #print(f"... trans_qc name = {trans_qc.name}")
+
+    logger.info(f'transpile_and_bind_circuit - {trans_qc_name} {round(time.time() - st, 5)} (ms)')
+    
+    return trans_qc
+
+# Transpile a circuit multiple times for optimal results
+def transpile_multiple_times(circuit, params, backend, transpile_attempt_count, 
+                optimization_level=None, layout_method=None, routing_method=None):
+    
+    logger.info(f"transpile_multiple_times({transpile_attempt_count})")
+    st = time.time()
+    
+    # array of circuits that have been transpile
+    trans_qc_list = [
+        transpile(
+            circuit, 
+            backend, 
+            optimization_level=optimization_level,
+            layout_method=layout_method,
+            routing_method=routing_method
+        ) for _ in range(transpile_attempt_count)
+    ]
+    
+    best_op_count = []
+    for circ in trans_qc_list:
+        # check if there are cx in transpiled circs
+        if 'cx' in circ.count_ops().keys(): 
+            # get number of operations
+            best_op_count.append( circ.count_ops()['cx'] ) 
+        # check if there are sx in transpiled circs
+        elif 'sx' in circ.count_ops().keys(): 
+            # get number of operations
+            best_op_count.append( circ.count_ops()['sx'] ) 
+            
+    # print(f"{best_op_count = }")
+    if best_op_count:
+        # pick circuit with lowest number of operations
+        best_idx = np.where(best_op_count == np.min(best_op_count))[0][0] 
+        trans_qc = trans_qc_list[best_idx]
+    else: # otherwise just pick the first in the list
+        trans_qc = trans_qc_list[0] 
+        
+    logger.info(f'transpile_multiple_times - {best_idx} {round(time.time() - st, 5)} (ms)')
+        
+    return trans_qc
+
+# Invoke a circuit transformer
+def invoke_transformer(transformer, circuit, backend=backend, shots=100):
+
+    logger.info('Invoking Transformer')
+    st = time.time()
+    
+    tr_circuit = transformer(circuit, backend=backend)
+
+    # if transformer results in multiple circuits, divide shot count
+    # results will be accumulated in job_complete
+    # NOTE: this will need to set a flag to distinguish from multiple circuit execution 
+    if len(tr_circuit) > 1:
+        shots = int(shots / len(tr_circuit))
+    
+    logger.info(f'Transformer - {round(time.time() - st, 5)} (ms)')
+    if verbose_time:
+        print(f"  *** transformer() time = {round(time.time() - st, 5)} (ms)")
+    
+    return tr_circuit
+
+    
+###########################################################################
 
 # Process a completed job
 def job_complete(job):
