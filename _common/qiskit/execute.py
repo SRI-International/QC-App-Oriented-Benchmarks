@@ -379,13 +379,21 @@ def execute_circuit(circuit):
                                         trans_qc, backend=backend, shots=shots)
             else:
                 backend_exec_options_copy = {}
+                
+                # transpile and bind circuit with parameters; use cache if flagged   
+                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
+                simulation_circuits = trans_qc
        
             # for noisy simulator, use execute() which works; 
             # no need for transpile above unless there are options like transformer
             logger.info(f'Running circuit on noisy simulator, shots={shots}')
             st = time.time()
             
-            job = execute(simulation_circuits, backend, shots=shots,
+            #job = execute(simulation_circuits, backend, shots=shots,
+                #noise_model=this_noise, basis_gates=this_noise.basis_gates,
+                #**backend_exec_options_copy)
+                
+            job = backend.run(simulation_circuits, shots=shots,
                 noise_model=this_noise, basis_gates=this_noise.basis_gates,
                 **backend_exec_options_copy)
                 
