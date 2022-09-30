@@ -285,6 +285,7 @@ def submit_circuit(qc, group_id, circuit_id, shots=100, params=None):
         if verbose:
             print("  ... added circuit to batch")
 
+
 # Launch execution of one job (circuit)
 def execute_circuit(circuit):
     logging.info('Entering execute_circuit')
@@ -304,72 +305,22 @@ def execute_circuit(circuit):
     # qc = qc.decompose()
     # qc = qc.decompose()
     
-    # obtain initial circuit size metrics
-    qc_depth = qc.depth()
-    qc_size = qc.size()
-    qc_count_ops = qc.count_ops()
-    qc_xi = 0
+    # obtain initial circuit metrics
+    qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = get_circuit_metrics(qc)
 
-    # iterate over the ordereddict to determine xi (ratio of 2 qubit gates to one qubit gates)
-    n1q = 0; n2q = 0
-    if qc_count_ops != None:
-        for key, value in qc_count_ops.items():
-            if key == "measure": continue
-            if key == "barrier": continue
-            if key.startswith("c") or key.startswith("mc"):
-                n2q += value
-            else:
-                n1q += value
-        qc_xi = n2q / (n1q + n2q)
-
-        # default the transpiled metrics to the same, in case exec fails
+    # default the normalized transpiled metrics to the same, in case exec fails
     qc_tr_depth = qc_depth
     qc_tr_size = qc_size
     qc_tr_count_ops = qc_count_ops
-    qc_tr_xi = 0; 
-    qc_tr_n2q = 0
+    qc_tr_xi = qc_xi; 
+    qc_tr_n2q = qc_n2q
     #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
     
     try:    
-        # transpile the circuit to obtain size metrics
+        # transpile the circuit to obtain size metrics using normalized basis
         if do_transpile_metrics:
-            logger.info('Entering transpile metrics')
-            #print("*** Before transpile ...")
-            #print(circuit["qc"])
-            st = time.time()
+            qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q = transpile_for_metrics(qc)
             
-            # use either the backend or one of the basis gate sets
-            if basis_selector == 0:
-                logger.info(f"Start transpile with {basis_selector = }")
-                qc = transpile(circuit["qc"], backend)
-                logger.info(f"End transpile with {basis_selector = }")
-            else:
-                basis_gates = basis_gates_array[basis_selector]
-                logger.info(f"Start transpile with basis_selector != 0")
-                qc = transpile(circuit["qc"], basis_gates=basis_gates, seed_transpiler=0)
-                logger.info(f"End transpile with basis_selector != 0")
-            
-            if verbose_time:
-                print(f"*** normalization qiskit.transpile() time = {time.time() - st}")
-            #print(qc)
-                
-            qc_tr_depth = qc.depth()
-            qc_tr_size = qc.size()
-            qc_tr_count_ops = qc.count_ops()
-            #print(f"*** after transpile: {qc_tr_depth} {qc_tr_size} {qc_tr_count_ops}")
-            
-            # iterate over the ordereddict to determine xi (ratio of 2 qubit gates to one qubit gates)
-            n1q = 0; n2q = 0
-            if qc_tr_count_ops != None:
-                for key, value in qc_tr_count_ops.items():
-                    if key == "measure": continue
-                    if key == "barrier": continue
-                    if key.startswith("c"): n2q += value
-                    else: n1q += value
-                qc_tr_xi = n2q / (n1q + n2q) 
-                qc_tr_n2q = n2q   
-            #print(f"... qc_tr_xi = {qc_tr_xi} {n1q} {n2q}")
-        
         # use noise model from execution options if given for simulator
         this_noise = noise
         
@@ -424,26 +375,22 @@ def execute_circuit(circuit):
                 transformer = backend_exec_options_copy.pop("transformer", None)
                 if transformer:
                     logger.info("applying transformer to noisy simulator")
-                    
-                    st = time.time()
                     simulation_circuits, shots = invoke_transformer(transformer,
-                                        trans_qc, backend=backend, shots=shots)                   
-                    if verbose_time:
-                        print(f"  *** transformer() time = {time.time() - st}")                      
+                                        trans_qc, backend=backend, shots=shots)
             else:
                 backend_exec_options_copy = {}
        
-            # for noisy simulator, use execute() which works; it is unclear from docs
-            # whether noise_model should be passed to transpile() or run() 
+            # for noisy simulator, use execute() which works; 
+            # no need for transpile above unless there are options like transformer
             logger.info(f'Running circuit on noisy simulator, shots={shots}')
             st = time.time()
+            
             job = execute(simulation_circuits, backend, shots=shots,
                 noise_model=this_noise, basis_gates=this_noise.basis_gates,
                 **backend_exec_options_copy)
+                
             logger.info(f'Finished Running on noisy simulator - {round(time.time() - st, 5)} (ms)')
-
-            if verbose_time:
-                print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
+            if verbose_time: print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
                 
         # Initiate execution for all other backends and noiseless simulator
         else:
@@ -463,31 +410,27 @@ def execute_circuit(circuit):
                             transpile_attempt_count, 
                             optimization_level=None, layout_method=None, routing_method=None)
                             
-                # normal transpile                            
+                # transpile and bind circuit with parameters; use cache if flagged                       
                 else:
-                    # transpile and bind circuit with parameters; use cache if flagged   
                     trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend,
-                                        optimization_level=optimization_level,
-                                        layout_method=layout_method,
-                                        routing_method=routing_method)
-
-                if verbose_time:
-                    print(f"  *** qiskit.transpile_and_bind() time = {round(time.time() - st, 5)}")
+                            optimization_level=optimization_level,
+                            layout_method=layout_method,
+                            routing_method=routing_method)
                 
                 # apply transformer pass if provided
                 transformer = backend_exec_options_copy.pop("transformer", None)
                 if transformer:
                     trans_qc, shots = invoke_transformer(transformer,
-                                        trans_qc, backend=backend, shots=shots)
+                            trans_qc, backend=backend, shots=shots)
 
                 # perform circuit execution on backend
                 logger.info(f'Running trans_qc, with exec_options, shots={shots}')   
-                st = time.time()                
-                job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
-                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
+                st = time.time()  
                 
-                if verbose_time:
-                    print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
+                job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
+                
+                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
+                if verbose_time: print(f"  *** qiskit.run() (1) time = {round(time.time() - st, 5)}")
                     
             # execute with no options set
             else:              
@@ -497,23 +440,16 @@ def execute_circuit(circuit):
                 # perform circuit execution on backend
                 logger.info(f'Running trans_qc, shots={shots}')
                 st = time.time() 
-                job = backend.run(trans_qc, shots=shots)
-                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
-
-                if verbose_time:
-                    print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
                 
-            # there appears to be no reason to do transpile, as it is done automatically
-            # DEVNOTE: this prevents us from measuring transpile time
-            # If we use this method, we'd need to validate on all backends again, so leave for now
-            #qc = transpile(circuit["qc"], backend)
-            #job = execute(qc, backend, shots=shots)
+                job = backend.run(trans_qc, shots=shots)
+                
+                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
+                if verbose_time: print(f"  *** qiskit.run() (2) time = {round(time.time() - st, 5)}")
             
     except Exception as e:
         print(f'ERROR: Failed to execute circuit {active_circuit["group"]} {active_circuit["circuit"]}')
         print(f"... exception = {e}")
-        if verbose:
-            print(traceback.format_exc())
+        if verbose: print(traceback.format_exc())
         return
     
     # print("Job status is ", job.status() )
@@ -526,6 +462,7 @@ def execute_circuit(circuit):
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'depth', qc_depth)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'size', qc_size)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'xi', qc_xi)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'n2q', qc_n2q)
 
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_depth', qc_tr_depth)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_size', qc_tr_size)
@@ -546,7 +483,78 @@ def execute_circuit(circuit):
     if verbose:
         print(f"... executing job {job.job_id()}")
 
+# Get circuit metrics fom the circuit passed in
+def get_circuit_metrics(qc):
 
+    logger.info('Entering get_circuit_metrics')
+    #print(qc)
+    
+    # obtain initial circuit size metrics
+    qc_depth = qc.depth()
+    qc_size = qc.size()
+    qc_count_ops = qc.count_ops()
+    qc_xi = 0
+    qc_n2q = 0 
+    
+    # iterate over the ordereddict to determine xi (ratio of 2 qubit gates to one qubit gates)
+    n1q = 0; n2q = 0
+    if qc_count_ops != None:
+        for key, value in qc_count_ops.items():
+            if key == "measure": continue
+            if key == "barrier": continue
+            if key.startswith("c") or key.startswith("mc"):
+                n2q += value
+            else:
+                n1q += value
+        qc_xi = n2q / (n1q + n2q)
+        qc_n2q = n2q
+    
+    return qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q
+    
+# Transpile the circuit to obtain normalized size metrics against a common basis gate set
+def transpile_for_metrics(qc):
+
+    logger.info('Entering transpile_for_metrics')
+    #print("*** Before transpile ...")
+    #print(qc)
+    st = time.time()
+    
+    # use either the backend or one of the basis gate sets
+    if basis_selector == 0:
+        logger.info(f"Start transpile with {basis_selector = }")
+        qc = transpile(qc, backend)
+        logger.info(f"End transpile with {basis_selector = }")
+    else:
+        basis_gates = basis_gates_array[basis_selector]
+        logger.info(f"Start transpile with basis_selector != 0")
+        qc = transpile(qc, basis_gates=basis_gates, seed_transpiler=0)
+        logger.info(f"End transpile with basis_selector != 0")
+    
+    #print(qc)
+        
+    qc_tr_depth = qc.depth()
+    qc_tr_size = qc.size()
+    qc_tr_count_ops = qc.count_ops()
+    #print(f"*** after transpile: {qc_tr_depth} {qc_tr_size} {qc_tr_count_ops}")
+    
+    # iterate over the ordereddict to determine xi (ratio of 2 qubit gates to one qubit gates)
+    n1q = 0; n2q = 0
+    if qc_tr_count_ops != None:
+        for key, value in qc_tr_count_ops.items():
+            if key == "measure": continue
+            if key == "barrier": continue
+            if key.startswith("c"): n2q += value
+            else: n1q += value
+        qc_tr_xi = n2q / (n1q + n2q) 
+        qc_tr_n2q = n2q   
+    #print(f"... qc_tr_xi = {qc_tr_xi} {n1q} {n2q}")
+    
+    logger.info(f'transpile_for_metrics - {round(time.time() - st, 5)} (ms)')
+    if verbose_time: print(f"  *** transpile_for_metrics() time = {round(time.time() - st, 5)}")
+    
+    return qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q
+
+           
 # Return a transpiled and bound circuit
 # Cache the transpiled, and use it if do_transpile_for_execute not set
 # DEVNOTE: this approach does not permit passing of untranspiled circuit through
@@ -591,10 +599,12 @@ def transpile_and_bind_circuit(circuit, params, backend,
         #print(f"... trans_qc name = {trans_qc.name}")
 
     logger.info(f'transpile_and_bind_circuit - {trans_qc_name} {round(time.time() - st, 5)} (ms)')
+    if verbose_time: print(f"  *** transpile_and_bind() time = {round(time.time() - st, 5)}")
     
     return trans_qc
 
 # Transpile a circuit multiple times for optimal results
+# DEVNOTE: this does not handle parameters yet
 def transpile_multiple_times(circuit, params, backend, transpile_attempt_count, 
                 optimization_level=None, layout_method=None, routing_method=None):
     
@@ -629,10 +639,12 @@ def transpile_multiple_times(circuit, params, backend, transpile_attempt_count,
         best_idx = np.where(best_op_count == np.min(best_op_count))[0][0] 
         trans_qc = trans_qc_list[best_idx]
     else: # otherwise just pick the first in the list
+        best_idx = 0
         trans_qc = trans_qc_list[0] 
         
     logger.info(f'transpile_multiple_times - {best_idx} {round(time.time() - st, 5)} (ms)')
-        
+    if verbose_time: print(f"  *** transpile_multiple_times() time = {round(time.time() - st, 5)}")
+    
     return trans_qc
 
 
@@ -652,8 +664,7 @@ def invoke_transformer(transformer, circuit, backend=backend, shots=100):
         shots = int(shots / len(tr_circuit))
     
     logger.info(f'Transformer - {round(time.time() - st, 5)} (ms)')
-    if verbose_time:
-        print(f"  *** transformer() time = {round(time.time() - st, 5)} (ms)")
+    if verbose_time:print(f"  *** transformer() time = {round(time.time() - st, 5)} (ms)")
         
     return tr_circuit, shots
 
