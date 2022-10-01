@@ -1131,6 +1131,10 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
         else:
             score_metric = "avg_fidelities"
     
+    # if aq_mode, force is_individual to be True (cannot blend the circles's colors)
+    if aq_mode > 0:
+        is_individual = True
+    
     # determine the label for the colorbar
     if score_metric == "avg_hf_fidelities": 
         colorbar_label="Avg Hellinger Fidelity"
