@@ -29,6 +29,7 @@ import metrics
 import importlib
 import traceback
 from collections import Counter
+import logging
 import numpy as np
 
 from qiskit import execute, Aer, transpile
@@ -38,6 +39,8 @@ from qiskit.providers.jobstatus import JobStatus
 # Noise
 from qiskit.providers.aer.noise import NoiseModel, ReadoutError
 from qiskit.providers.aer.noise import depolarizing_error, reset_error
+
+logger = logging.getLogger(__name__)
 
 # Use Aer qasm_simulator by default
 backend = Aer.get_backend("qasm_simulator")  
@@ -161,7 +164,17 @@ def set_execution_target(backend_id='qasm_simulator',
     # handle QASM simulator specially
     elif backend_id == 'qasm_simulator':
         backend = Aer.get_backend("qasm_simulator") 
-        
+
+    elif 'fake' in backend_id:
+        backend = getattr(
+            importlib.import_module(
+                f'qiskit.providers.fake_provider.backends.{backend_id.split("_")[-1]}.{backend_id}'
+            ),
+            backend_id.title().replace('_', '')
+        )
+        backend = backend()
+        logger.info(f'Set {backend = }')   
+
     # otherwise use the given backend_id to find the backend
     else:
         if provider_module_name and provider_name:
@@ -236,7 +249,9 @@ def submit_circuit(qc, group_id, circuit_id, shots=100):
             
     if verbose:
         print(f'... submit circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]}')
-    
+
+    logger.info(f'Submiting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]}')
+
     # immediately post the circuit for execution if active jobs < max
     if len(active_circuits) < max_jobs_active:
         execute_circuit(circuit)
@@ -249,6 +264,7 @@ def submit_circuit(qc, group_id, circuit_id, shots=100):
 
 # Launch execution of one job (circuit)
 def execute_circuit(circuit):
+    logging.info('Entering execute_circuit')
 
     active_circuit = copy.copy(circuit)
     active_circuit["launch_time"] = time.time()
@@ -294,17 +310,21 @@ def execute_circuit(circuit):
     try:    
         # transpile the circuit to obtain size metrics
         if do_transpile_metrics:
-        
+            logger.info('Entering transpile metrics')
             #print("*** Before transpile ...")
             #print(circuit["qc"])
             st = time.time()
             
             # use either the backend or one of the basis gate sets
             if basis_selector == 0:
+                logger.info(f"Start transpile with {basis_selector = }")
                 qc = transpile(circuit["qc"], backend)
+                logger.info(f"End transpile with {basis_selector = }")
             else:
                 basis_gates = basis_gates_array[basis_selector]
+                logger.info(f"Start transpile with basis_selector != 0")
                 qc = transpile(circuit["qc"], basis_gates=basis_gates, seed_transpiler=0)
+                logger.info(f"End transpile with basis_selector != 0")
             
             if verbose_time:
                 print(f"*** normalization qiskit.transpile() time = {time.time() - st}")
@@ -332,15 +352,15 @@ def execute_circuit(circuit):
         
         # make a clone of the backend options so we can remove elements that we use, then pass to .run()
         global backend_exec_options
-        backend_exec_options = copy.copy(backend_exec_options)
+        backend_exec_options_copy = copy.copy(backend_exec_options)
 
         '''
         # if 'executor' provided, perform all execution there and return
-        if backend_exec_options != None:
-            executor = backend_exec_options.pop("executor", None)     
+        if backend_exec_options_copy != None:
+            executor = backend_exec_options_copy.pop("executor", None)     
             if executor:
                 st = time.time()
-                executor(circuit["qc"], shots=shots, backend=backend, result_handler=result_handler, **backend_exec_options)            
+                executor(circuit["qc"], shots=shots, backend=backend, result_handler=result_handler, **backend_exec_options_copy)            
                 if verbose_time:
                     print(f"  *** executor() time = {time.time() - st}")   
                     
@@ -348,8 +368,8 @@ def execute_circuit(circuit):
         '''
         
         # get noise model from options; used only in simulator for now
-        if backend_exec_options != None and "noise_model" in backend_exec_options:
-            this_noise = backend_exec_options["noise_model"]
+        if backend_exec_options_copy != None and "noise_model" in backend_exec_options_copy:
+            this_noise = backend_exec_options_copy["noise_model"]
             #print(f"... using custom noise model: {this_noise}")
             
         # Initiate execution (with noise if specified and this is a simulator backend)
@@ -359,14 +379,14 @@ def execute_circuit(circuit):
             simulation_circuits = circuit["qc"]
             
             # use execution options if set for simulator
-            if backend_exec_options != None:
+            if backend_exec_options_copy != None:
             
                 # we already have the noise model, just need to remove it from the options
                 # (only for simulator;  for other backends, it is treaded like keyword arg)
-                dummy = backend_exec_options.pop("noise_model", None)
+                dummy = backend_exec_options_copy.pop("noise_model", None)
                 
                 # apply transformer pass if provided
-                transformer = backend_exec_options.pop("transformer", None)
+                transformer = backend_exec_options_copy.pop("transformer", None)
                 if transformer:
                     #print("... applying transformer to sim!")
                     st = time.time()
@@ -383,15 +403,17 @@ def execute_circuit(circuit):
                         print(f"  *** transformer() time = {time.time() - st}")
                         
             else:
-                backend_exec_options = {}
+                backend_exec_options_copy = {}
        
             # for noisy simulator, use execute() which works; it is unclear from docs
             # whether noise_model should be passed to transpile() or run() 
             st = time.time()
+            logger.info('Starting execution of job in this_noise block')
             job = execute(simulation_circuits, backend, shots=shots,
                 noise_model=this_noise, basis_gates=this_noise.basis_gates,
-                **backend_exec_options)
-                
+                **backend_exec_options_copy)
+            logger.info('Ending execution of job in this_noise block')
+
             if verbose_time:
                     print(f"  *** qiskit.execute() time = {time.time() - st}")
                 
@@ -400,11 +422,11 @@ def execute_circuit(circuit):
             #print(f"... executing on backend: {backend.name()}")
             
             # use execution options if set for backend
-            if backend_exec_options != None:
+            if backend_exec_options_copy != None:
                         
-                optimization_level = backend_exec_options.pop("optimization_level", 1)
-                layout_method = backend_exec_options.pop("layout_method", None)
-                routing_method = backend_exec_options.pop("routing_method", None)
+                optimization_level = backend_exec_options_copy.pop("optimization_level", 1)
+                layout_method = backend_exec_options_copy.pop("layout_method", None)
+                routing_method = backend_exec_options_copy.pop("routing_method", None)
                 
                 #job = execute(circuit["qc"], backend, shots=shots,
                 
@@ -412,7 +434,7 @@ def execute_circuit(circuit):
                 st = time.time()
                 
                 # transpile many times and pick shortest circuit
-                transpile_attempt_count = backend_exec_options.pop("transpile_attempt_count", None)
+                transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
                 if transpile_attempt_count:
                     trans_qc_list = [
                         transpile(
@@ -457,7 +479,7 @@ def execute_circuit(circuit):
                     print(f"  *** qiskit.transpile() time = {time.time() - st}")
                 
                 # apply transformer pass if provided
-                transformer = backend_exec_options.pop("transformer", None)
+                transformer = backend_exec_options_copy.pop("transformer", None)
                 if transformer:
                     st = time.time()
                     #print("... applying transformer!")
@@ -474,7 +496,7 @@ def execute_circuit(circuit):
                         print(f"  *** transformer() time = {time.time() - st}")
                 
                 st = time.time()                
-                job = backend.run(trans_qc, shots=shots, **backend_exec_options)
+                job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
                 
                 if verbose_time:
                     print(f"  *** qiskit.run() time = {time.time() - st}")
@@ -484,11 +506,15 @@ def execute_circuit(circuit):
                 st = time.time()
                 # job = execute(circuit["qc"], backend, shots=shots)
                 if do_transpile_for_execute:
+                    logger.info('Transpiling for execute')
                     trans_qc = transpile(circuit["qc"], backend)
                 else:
+                    logger.info('No transpile for execute')
                     trans_qc = circuit["qc"]
 
+                logger.info(f'Running trans_qc')
                 job = backend.run(trans_qc, shots=shots)
+                logger.info(f'Finished Running trans_qc')
 
                 if verbose_time:
                     print(f"  *** qiskit.execute() time = {time.time() - st}")
@@ -542,7 +568,9 @@ def job_complete(job):
     
     if verbose:
         print(f'\n... job complete - group={active_circuit["group"]} id={active_circuit["circuit"]} shots={active_circuit["shots"]}')
-    
+
+    logger.info(f'job complete - group={active_circuit["group"]} id={active_circuit["circuit"]} shots={active_circuit["shots"]}')
+
     # compute elapsed time for circuit; assume exec is same, unless obtained from result
     elapsed_time = time.time() - active_circuit["launch_time"]
     
@@ -689,6 +717,7 @@ def job_status_failed(job):
 # otherwise continue to wait for additional active circuits to complete.
 
 def throttle_execution(completion_handler=metrics.finalize_group):
+    logger.info('Entering throttle_execution')
 
     #if verbose:
         #print(f"... throttling execution, active={len(active_circuits)}, batched={len(batched_circuits)}")

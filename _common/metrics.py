@@ -297,7 +297,7 @@ def report_metrics_for_group (group):
             if len(group_metrics["avg_tr_depths"]) > 0:
                 avg_tr_depth = group_metrics["avg_tr_depths"][group_index]
                 if avg_tr_depth > 0:
-                    print(f"Average Transpiled Depth, \u03BE (xi), 2q gates for the {group} qubit group = {int(avg_tr_depth)}, {avg_tr_xi}, {avg_tr_n2q}")
+                    print(f"Average Normalized Transpiled Depth, \u03BE (xi), 2q gates for the {group} qubit group = {int(avg_tr_depth)}, {avg_tr_xi}, {avg_tr_n2q}")
                     
             avg_create_time = group_metrics["avg_create_times"][group_index]
             print(f"Average Creation Time for the {group} qubit group = {avg_create_time} secs")
@@ -869,7 +869,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
             
-        axs[axi].legend(['Circuit Depth', 'Transpiled Depth'], loc='upper left')
+        axs[axi].legend(['Circuit Depth', 'Normalized Depth'], loc='upper left')
         axi += 1
     
     if do_2qs:
@@ -882,7 +882,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
             
-        axs[axi].legend(['Transpiled 2Q Gates'], loc='upper left')
+        axs[axi].legend(['Normalized 2Q Gates'], loc='upper left')
         axi += 1
         
     # shared x axis label
