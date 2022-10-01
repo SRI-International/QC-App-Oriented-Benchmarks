@@ -128,6 +128,7 @@ def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized, 
 
     # pre-compute and save an array of expected measurements
     if do_compute_expectation:
+        logger.info('Computing expectation')
         compute_expectation(qc, num_qubits, secret_int)
         
     # add the measure here
@@ -217,7 +218,6 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
     params = {betas: thetas_array[:p], gammas: thetas_array[p:]}   
     #logger.info(f"Binding parameters {params = }")
     logger.info(f"Create binding parameters for {thetas_array}")
-    ##qc = _qc.bind_parameters(params)
     
     qc = _qc
     #print(qc)
@@ -225,7 +225,7 @@ def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
     # pre-compute and save an array of expected measurements
     if do_compute_expectation:
         logger.info('Computing expectation')
-        compute_expectation(qc, num_qubits, secret_int)
+        compute_expectation(qc, num_qubits, secret_int, params=params)
    
     # save small circuit example for display
     global QC_
@@ -247,9 +247,11 @@ expectations = {}
 
 # Compute array of expectation values in range 0.0 to 1.0
 # Use statevector_simulator to obtain exact expectation
-def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simulator'):
+def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simulator', params=None):
     
     #ts = time.time()
+    if params != None:
+        qc = qc.bind_parameters(params)
     
     #execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
@@ -737,7 +739,7 @@ def dump_to_json(parent_folder_save, num_qubits, degree, restart_ind, iter_size_
 
 #%% Loading saved data (from json files)
 
-def load_data_and_plot(folder, **kwargs):
+def load_data_and_plot(folder, backend_id=None, **kwargs):
     """
     The highest level function for loading stored data from a previous run
     and plotting optgaps and area metrics
@@ -747,12 +749,12 @@ def load_data_and_plot(folder, **kwargs):
     folder : string
         Directory where json files are saved.
     """
-    _gen_prop = load_all_metrics(folder)
+    _gen_prop = load_all_metrics(folder, backend_id=backend_id)
     gen_prop = {**_gen_prop, **kwargs}
     plot_results_from_data(**gen_prop)
 
 
-def load_all_metrics(folder):
+def load_all_metrics(folder, backend_id=None):
     """
     Load all data that was saved in a folder.
     The saved data will be in json files in this folder
@@ -793,6 +795,10 @@ def load_all_metrics(folder):
             num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
+            
+    # override device name with the backend_id if supplied by caller
+    if backend_id != None:
+        metrics.set_plot_subtitle(f"Device = {backend_id}")
             
     return gen_prop
 
@@ -1100,7 +1106,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                 qc2 = qc.decompose()
 
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc2, num_qubits, restart_ind, shots=num_shots)
+                ex.submit_circuit(qc2, num_qubits, restart_ind, shots=num_shots, params=params)
 
             if method == 2:
                 # a unique circuit index used inside the inner minimizer loop as identifier
@@ -1270,11 +1276,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
 def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_circuits = 1,
                  objective_func_type='approx_ratio', method=2, score_metric='fidelity',
                  x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
-                 num_x_bins=15, y_size=None, x_size=None,
+                 num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
                  detailed_save_names=False, **kwargs):
     """
     Plot results
     """
+
     if detailed_save_names:
         # If detailed names are desired for saving plots, put date of creation, etc.
         cur_time=datetime.datetime.now()
@@ -1287,9 +1294,13 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
         
     obj_str = metrics.known_score_labels[objective_func_type]
     options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
-    suptitle= f"Benchmark Results - MaxCut ({method}) - Qiskit"
+    suptitle = f"Benchmark Results - MaxCut ({method}) - Qiskit"
     
-    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics, num_x_bins=num_x_bins, x_size=x_size, y_size=y_size, options=options, suffix=suffix)
+    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
+                fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
+                x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
+                options=options, suffix=suffix)
     
     metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type)
     
