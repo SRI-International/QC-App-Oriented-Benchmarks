@@ -389,11 +389,12 @@ def execute_circuit(circuit):
             logger.info(f'Running circuit on noisy simulator, shots={shots}')
             st = time.time()
             
-            #job = execute(simulation_circuits, backend, shots=shots,
-                #noise_model=this_noise, basis_gates=this_noise.basis_gates,
-                #**backend_exec_options_copy)
-                
+            ''' some circuits, like Grover's behave incorrectly if we use run()
             job = backend.run(simulation_circuits, shots=shots,
+                noise_model=this_noise, basis_gates=this_noise.basis_gates,
+                **backend_exec_options_copy)
+            '''   
+            job = execute(simulation_circuits, backend, shots=shots,
                 noise_model=this_noise, basis_gates=this_noise.basis_gates,
                 **backend_exec_options_copy)
                 
