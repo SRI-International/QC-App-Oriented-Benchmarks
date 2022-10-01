@@ -739,7 +739,7 @@ def dump_to_json(parent_folder_save, num_qubits, degree, restart_ind, iter_size_
 
 #%% Loading saved data (from json files)
 
-def load_data_and_plot(folder, **kwargs):
+def load_data_and_plot(folder, backend_id=None, **kwargs):
     """
     The highest level function for loading stored data from a previous run
     and plotting optgaps and area metrics
@@ -749,12 +749,12 @@ def load_data_and_plot(folder, **kwargs):
     folder : string
         Directory where json files are saved.
     """
-    _gen_prop = load_all_metrics(folder)
+    _gen_prop = load_all_metrics(folder, backend_id=backend_id)
     gen_prop = {**_gen_prop, **kwargs}
     plot_results_from_data(**gen_prop)
 
 
-def load_all_metrics(folder):
+def load_all_metrics(folder, backend_id=None):
     """
     Load all data that was saved in a folder.
     The saved data will be in json files in this folder
@@ -795,6 +795,10 @@ def load_all_metrics(folder):
             num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
+            
+    # override device name with the backend_id if supplied by caller
+    if backend_id != None:
+        metrics.set_plot_subtitle(f"Device = {backend_id}")
             
     return gen_prop
 
