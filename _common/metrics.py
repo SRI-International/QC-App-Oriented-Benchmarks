@@ -1141,7 +1141,7 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
 #################################################
 
 # Plot metrics over all groups (level 2), merging data from all apps into smaller cells if not is_individual
-def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0, is_individual=True, score_metric=None):                   
+def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0, is_individual=False, score_metric=None):                   
     
     global circuit_metrics
     global group_metrics
@@ -1339,7 +1339,7 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
 ### plot metrics across all apps for a backend_id
 
 def plot_all_app_metrics(backend_id, do_all_plots=False,
-        include_apps=None, exclude_apps=None, suffix="", avail_qubits=0, is_individual=True, score_metric=None):
+        include_apps=None, exclude_apps=None, suffix="", avail_qubits=0, is_individual=False, score_metric=None):
 
     global circuit_metrics
     global group_metrics
