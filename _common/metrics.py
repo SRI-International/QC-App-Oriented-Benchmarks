@@ -1502,7 +1502,11 @@ score_label_save_str = {
 
  
 # Plot all the given "Score Metrics" against the given "X Metrics" and "Y Metrics" 
-def plot_all_area_metrics(suptitle='', score_metric='fidelity', x_metric='exec_time', y_metric='num_qubits', fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None,suffix=''):
+def plot_all_area_metrics(suptitle='',
+            score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
+            fixed_metrics={}, num_x_bins=100,
+            y_size=None, x_size=None, x_min=None, x_max=None,
+            options=None, suffix=''):
 
     if type(score_metric) == str:
         score_metric = [score_metric]
@@ -1515,7 +1519,7 @@ def plot_all_area_metrics(suptitle='', score_metric='fidelity', x_metric='exec_t
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
-                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, options=options,suffix=suffix)
+                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, options=options,suffix=suffix)
 
 def get_best_restart_ind(group, which_metric = 'approx_ratio'):
     """
@@ -1536,7 +1540,10 @@ def get_best_restart_ind(group, which_metric = 'approx_ratio'):
     return restart_indices[best_index]
 
 # Plot the given "Score Metric" against the given "X Metric" and "Y Metric"
-def plot_area_metrics(suptitle='', score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={}, num_x_bins=100, y_size=None, x_size=None, options=None, suffix=''):
+def plot_area_metrics(suptitle='',
+            score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={}, num_x_bins=100,
+            y_size=None, x_size=None, x_min=None, x_max=None,
+            options=None, suffix=''):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -1653,6 +1660,14 @@ def plot_area_metrics(suptitle='', score_metric='fidelity', x_metric='cumulative
         x = x + x_
         y = y + y_
         scores = scores + scores_
+        
+    # the x axis min/max values will be min(x)/max(x) or values supplied by caller
+    if x_min == None:
+        x_min = min(x)
+    if x_max == None:
+        x_max = max(x)
+    else:
+        x_max = x_max - 1  # subtract one to account for the auto-label algorithm in bakcground function
     
     # append the circuit metrics subtitle to the title
     fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
@@ -1666,7 +1681,7 @@ def plot_area_metrics(suptitle='', score_metric='fidelity', x_metric='cumulative
     with plt.style.context(maxcut_style):
     # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
-                    y_max=max(y), x_max=max(x), y_min=min(y), x_min=min(x))
+                    y_max=max(y), x_max=x_max, y_min=min(y), x_min=x_min)
 
         # no longer used, instead we pass the array of sizes
         #if x_size == None:
@@ -2662,7 +2677,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     if x_min < 0.1: x_min = 0
     
     step = (x_max - x_min) / num_xdivs
-    
+        
     plt.xlim(x_min - step/2, x_max + step/2)
        
     #plt.ylim(y_min*0.5, y_max*1.5)

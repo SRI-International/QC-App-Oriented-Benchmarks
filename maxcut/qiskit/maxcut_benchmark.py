@@ -1272,11 +1272,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
 def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_circuits = 1,
                  objective_func_type='approx_ratio', method=2, score_metric='fidelity',
                  x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
-                 num_x_bins=15, y_size=None, x_size=None,
+                 num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
                  detailed_save_names=False, **kwargs):
     """
     Plot results
     """
+
     if detailed_save_names:
         # If detailed names are desired for saving plots, put date of creation, etc.
         cur_time=datetime.datetime.now()
@@ -1289,9 +1290,13 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
         
     obj_str = metrics.known_score_labels[objective_func_type]
     options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
-    suptitle= f"Benchmark Results - MaxCut ({method}) - Qiskit"
+    suptitle = f"Benchmark Results - MaxCut ({method}) - Qiskit"
     
-    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit", score_metric=score_metric, x_metric=x_metric, y_metric=y_metric, fixed_metrics=fixed_metrics, num_x_bins=num_x_bins, x_size=x_size, y_size=y_size, options=options, suffix=suffix)
+    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
+                fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
+                x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
+                options=options, suffix=suffix)
     
     metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type)
     
