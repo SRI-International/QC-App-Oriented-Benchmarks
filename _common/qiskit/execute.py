@@ -584,6 +584,8 @@ def transpile_and_bind_circuit(circuit, params, backend,
     
     else:
         logger.info('use cached transpiled circuit for execute')
+        if verbose_time: print(f"  ... using cached circuit, no transpile")
+
         ##trans_qc = circuit["qc"]
         
         # for now, use this cached transpiled circuit (should be separate flag to pass raw circuit)
@@ -600,6 +602,8 @@ def transpile_and_bind_circuit(circuit, params, backend,
         # Note: some loggers cannot handle unicode in param names, so only show the values
         #logger.info(f"Binding parameters to circuit: {str(params)}")
         logger.info(f"Binding parameters to circuit: {[param[1] for param in params.items()]}")
+        if verbose_time: print(f"  ... binding parameters")
+        
         trans_qc = trans_qc.bind_parameters(params)
         #print(trans_qc)
         
