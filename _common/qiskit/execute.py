@@ -346,44 +346,38 @@ def execute_circuit(circuit):
             this_noise = backend_exec_options_copy["noise_model"]
             #print(f"... using custom noise model: {this_noise}")
         
-        logger.info(f"Executing on backend: {backend.name()}")
+        # extract execution options if set
+        if backend_exec_options_copy == None: backend_exec_options_copy = {}
         
+        optimization_level = backend_exec_options_copy.pop("optimization_level", None)
+        layout_method = backend_exec_options_copy.pop("layout_method", None)
+        routing_method = backend_exec_options_copy.pop("routing_method", None)
+        transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
+        transformer = backend_exec_options_copy.pop("transformer", None)
+        
+        logger.info(f"Executing on backend: {backend.name()}")
+            
+        #************************************************
         # Initiate execution (with noise if specified and this is a simulator backend)
         if this_noise is not None and backend.name().endswith("qasm_simulator"):
             logger.info(f"Performing noisy simulation, shots = {shots}")
             
             simulation_circuits = circuit["qc"]
-            
-            # use execution options if set for simulator
-            if backend_exec_options_copy != None:
-            
-                # we already have the noise model, just need to remove it from the options
-                # (only for simulator;  for other backends, it is treaded like keyword arg)
-                dummy = backend_exec_options_copy.pop("noise_model", None)
-                
-                #trans_qc = transpile(circuit["qc"], backend)
+
+            # we already have the noise model, just need to remove it from the options
+            # (only for simulator;  for other backends, it is treaded like keyword arg)
+            dummy = backend_exec_options_copy.pop("noise_model", None)
                     
-                # transpile and bind circuit with parameters; use cache if flagged   
-                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
-                simulation_circuits = trans_qc
-                
-                # DEVNOTE: when parameters used on noisy simulator, fidelty is wrong ... why?
-                #print(circuit["params"])
-                #print(simulation_circuits)
+            # transpile and bind circuit with parameters; use cache if flagged   
+            trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
+            simulation_circuits = trans_qc
                     
-                # apply transformer pass if provided
-                transformer = backend_exec_options_copy.pop("transformer", None)
-                if transformer:
-                    logger.info("applying transformer to noisy simulator")
-                    simulation_circuits, shots = invoke_transformer(transformer,
-                                        trans_qc, backend=backend, shots=shots)
-            else:
-                backend_exec_options_copy = {}
-                
-                # transpile and bind circuit with parameters; use cache if flagged   
-                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
-                simulation_circuits = trans_qc
-       
+            # apply transformer pass if provided
+            if transformer:
+                logger.info("applying transformer to noisy simulator")
+                simulation_circuits, shots = invoke_transformer(transformer,
+                                    trans_qc, backend=backend, shots=shots)
+            
             # for noisy simulator, use execute() which works; 
             # no need for transpile above unless there are options like transformer
             logger.info(f'Running circuit on noisy simulator, shots={shots}')
@@ -400,60 +394,39 @@ def execute_circuit(circuit):
                 
             logger.info(f'Finished Running on noisy simulator - {round(time.time() - st, 5)} (ms)')
             if verbose_time: print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
-                
+        
+        #************************************************
         # Initiate execution for all other backends and noiseless simulator
-        else:
-            st = time.time()
-            
-            # use execution options if set for backend
-            if backend_exec_options_copy != None:
+        else:            
+ 
+            # if set, transpile many times and pick shortest circuit
+            # DEVNOTE: this does not handle parameters yet, or optimizations
+            if transpile_attempt_count:
+                trans_qc = transpile_multiple_times(circuit["qc"], circuit["params"], backend,
+                        transpile_attempt_count, 
+                        optimization_level=None, layout_method=None, routing_method=None)
                         
-                optimization_level = backend_exec_options_copy.pop("optimization_level", 1)
-                layout_method = backend_exec_options_copy.pop("layout_method", None)
-                routing_method = backend_exec_options_copy.pop("routing_method", None)
-
-                # transpile many times and pick shortest circuit
-                transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
-                if transpile_attempt_count:
-                    trans_qc = transpile_multiple_times(circuit["qc"], circuit["params"], backend,
-                            transpile_attempt_count, 
-                            optimization_level=None, layout_method=None, routing_method=None)
-                            
-                # transpile and bind circuit with parameters; use cache if flagged                       
-                else:
-                    trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend,
-                            optimization_level=optimization_level,
-                            layout_method=layout_method,
-                            routing_method=routing_method)
-                
-                # apply transformer pass if provided
-                transformer = backend_exec_options_copy.pop("transformer", None)
-                if transformer:
-                    trans_qc, shots = invoke_transformer(transformer,
-                            trans_qc, backend=backend, shots=shots)
-
-                # perform circuit execution on backend
-                logger.info(f'Running trans_qc, with exec_options, shots={shots}')   
-                st = time.time()  
-                
-                job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
-                
-                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
-                if verbose_time: print(f"  *** qiskit.run() (1) time = {round(time.time() - st, 5)}")
-                    
-            # execute with no options set
-            else:              
-                # transpile and bind circuit with parameters; use cache if flagged   
-                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
-                
-                # perform circuit execution on backend
-                logger.info(f'Running trans_qc, shots={shots}')
-                st = time.time() 
-                
-                job = backend.run(trans_qc, shots=shots)
-                
-                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
-                if verbose_time: print(f"  *** qiskit.run() (2) time = {round(time.time() - st, 5)}")
+            # transpile and bind circuit with parameters; use cache if flagged                       
+            else:
+                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend,
+                        optimization_level=optimization_level,
+                        layout_method=layout_method,
+                        routing_method=routing_method)
+            
+            # apply transformer pass if provided
+            if transformer:
+                trans_qc, shots = invoke_transformer(transformer,
+                        trans_qc, backend=backend, shots=shots)
+            
+            #*************************************
+            # perform circuit execution on backend
+            logger.info(f'Running trans_qc, shots={shots}')
+            st = time.time() 
+            
+            job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
+            
+            logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
+            if verbose_time: print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
             
     except Exception as e:
         print(f'ERROR: Failed to execute circuit {active_circuit["group"]} {active_circuit["circuit"]}')
