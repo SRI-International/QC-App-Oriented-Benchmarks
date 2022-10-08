@@ -1689,7 +1689,7 @@ def plot_area_metrics(suptitle='',
     # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                     y_max=max(y), x_max=x_max, y_min=min(y), x_min=x_min)
-
+        
         # no longer used, instead we pass the array of sizes
         #if x_size == None:
             #x_size=(max(x)-min(x))/num_x_bins
@@ -1791,7 +1791,7 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
             fulltitle += f"\n{options_str}"
         
         # and add the title to the plot
-        plt.suptitle(fulltitle)
+        plt.title(fulltitle)
     
         for group in circuit_metrics_final_iter:
             best_restart_ind = str(get_best_restart_ind(group))
@@ -1853,7 +1853,7 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
         suptitle = "Empirical Distribution of Cut Sizes - " + appname
         fulltitle = get_full_title(
             suptitle, options) + "\nwidth={}".format(width)
-        plt.suptitle(fulltitle)
+        plt.title(fulltitle)
 
         indx = group_metrics_optgaps['groups'].index(int(width))  # get index corresponding to width
         # Plot distribution of cut sizes for circuit
@@ -1939,7 +1939,7 @@ def plot_angles_polar(suptitle = '', options=None, suffix = ''):
     colors_gamma = [cmap_gamma(i) for i in colors]
     with plt.style.context(maxcut_style):
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
-        plt.suptitle(fulltitle)
+        plt.title(fulltitle)
         for i in range(rounds):
             # plot betas
             # Note: Betas go from 0 to pi, while gammas go from 0 to 2pi
@@ -2093,7 +2093,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         fig, axs = plt.subplots(1, 1)
         axs.set_xticks(group_metrics_optgaps["groups"])
         axs.set_xlabel('Circuit Width (Number of Qubits)')
-        plt.suptitle(fulltitle)
+        plt.title(fulltitle)
 
         limopts = max(group_metrics_optgaps['approx_ratio']['gapvals'])
         axs.set_ylim([0, max(40, limopts) * 1.1])
@@ -2129,7 +2129,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     ##### Detailed optimality gaps plot
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
-        plt.suptitle(fulltitle)
+        plt.title(fulltitle)
         axs.set_ylabel(r'Optimality Gap ($\%$)')
         axs.set_xlabel('Circuit Width (Number of Qubits)')
         axs.set_xticks(group_metrics_optgaps["groups"])
@@ -2669,7 +2669,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     
     fig, ax = plt.subplots()#constrained_layout=True, figsize=(plot_width, plot_height))
 
-    plt.suptitle(suptitle)
+    plt.title(suptitle)
     
     # round the max up to be divisible evenly (in multiples of 0.1) by num_xdivs 
     num_xdivs = 20
