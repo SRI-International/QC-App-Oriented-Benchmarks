@@ -1904,7 +1904,7 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
 
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-cursize_dist-" + suffix, backend_id)
+            save_plot_image(plt, f"{appname}-cutsize_dist-" + suffix, backend_id)
             
         # show the plot for user to see
         if show_plot_images:
