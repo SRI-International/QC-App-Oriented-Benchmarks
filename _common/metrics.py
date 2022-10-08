@@ -1852,7 +1852,7 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
 
         suptitle = "Empirical Distribution of Cut Sizes - " + appname
         fulltitle = get_full_title(
-            suptitle, options) + "width={}".format(width)
+            suptitle, options) + "\nwidth={}".format(width)
         plt.suptitle(fulltitle)
 
         indx = group_metrics_optgaps['groups'].index(int(width))  # get index corresponding to width
