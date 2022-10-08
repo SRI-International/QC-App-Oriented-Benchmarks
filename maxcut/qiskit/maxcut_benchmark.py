@@ -891,7 +891,7 @@ saved_result = {  }
 instance_filename = None
 
 def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
-        method=1, rounds=1, degree=3, N=10, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
+        method=1, rounds=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
@@ -1171,7 +1171,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     tc1 = time.time()
                     cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
                     # Compute the value corresponding to the objective function first
-                    dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha, N = N)
+                    dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha)
                     # Store the optimizer time as current time- tc1 + ts - opt_ts, since the time between tc1 and ts is not time used by the classical optimizer.
                     metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
                     # Note: the first time it is stored it is just the initialization time for optimizer
@@ -1187,7 +1187,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
 
                     # Compute and the other metrics (eg. cvar, gibbs and max N % if the obj function was set to approx ratio)
                     for s in non_objFunc_ratios:
-                        dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha, N = N)
+                        dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha)
                     # Store the ratios
                     dict_of_ratios = { key : -1 * val / opt for (key, val) in dict_of_vals.items()}
                     dict_of_ratios['gibbs_ratio'] = dict_of_ratios['gibbs_ratio'] / eta 

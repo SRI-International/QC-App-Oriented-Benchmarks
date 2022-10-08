@@ -1859,19 +1859,26 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
         # Plot distribution of cut sizes for circuit
         dist = group_metrics_optgaps['cutsize_ratio_dist']
         axs.plot(dist['ratios'][indx], dist['frequencies'][indx], marker='o',
-                 ls='-', c='k', ms=2, mec='k', mew=0.2, lw=1,
+                 ls='-', c='k', ms=2, mec='k', mew=0.4, lw=1,
                  label=f"Circuit Sampling")  # " degree={deg}") # lw=1,
 
         # Also plot the distribution obtained from uniform random sampling
         dist = group_metrics_optgaps['random_cutsize_ratio_dist']
         axs.plot(dist['ratios'][indx], dist['frequencies'][indx],
-                 marker='o', c='k', ms=1, mec='k', mew=0.2, lw=1,
+                 marker='o', c='k', ms=2, mec='k', mew=0.4, lw=1,
                  ls='dotted', label=f"Uniform Random Sampling")  # " degree={deg}") # lw=1,
 
         # Plot vertical lines corresponding to the various metrics
+        plotted_metric_values = []
         for metric in ['approx_ratio', 'cvar_ratio', 'bestcut_ratio', 'gibbs_ratio']:
             curdict = group_metrics_optgaps[metric]
-            axs.axvline(x=curdict['ratiovals'][indx], color=curdict['color'], label=curdict['label'], lw=1, ls='--', alpha=0.8)
+            curmetricval = curdict['ratiovals'][indx]
+            lw=1; ls='solid'
+            if curmetricval in plotted_metric_values:
+                # for lines that will coincide, assign different styles to distinguish them
+                lw=1.5; ls='dashed'
+            plotted_metric_values.append(curmetricval)
+            axs.axvline(x=curmetricval, color=curdict['color'], label=curdict['label'], lw=lw, ls=ls)
             
 
         axs.set_ylabel('Fraction of Total Counts')
@@ -1884,7 +1891,7 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
 
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-cutsize_dist-width={width}" + suffix, backend_id)
+            save_plot_image(plt, f"{appname}-cutsize_dist-" + suffix + "width-{}".format(width), backend_id)
             
         # show the plot for user to see
         if show_plot_images:
