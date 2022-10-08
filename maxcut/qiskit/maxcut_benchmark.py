@@ -543,7 +543,7 @@ def get_random_angles(rounds, restarts):
     Returns:
         restarts (list of lists of floats): list of length restarts. Each list element is a list of angles
     """
-    restarts = min(10, restarts)
+    # restarts = min(10, restarts)
     # Create random angles
     theta_min = [0] * 2 * rounds
     # Upper limit for betas=pi; upper limit for gammas=2pi
@@ -973,7 +973,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     dict_of_inputs = locals()
     # Get angles for restarts. Thetas = list of lists. Lengths are max_circuits and 2*rounds
     thetas, max_circuits = get_restart_angles(thetas_array, rounds, max_circuits)
-    
     # Update the dictionary of inputs
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
     

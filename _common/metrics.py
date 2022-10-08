@@ -1826,85 +1826,65 @@ def plot_cutsize_distribution(suptitle="Circuit Width (Number of Qubits)",
     For each circuit size and degree, plot the measured distribution of cutsizes
     corresponding to the last optimizer iteration, as well as uniform random sampling
     """
-    # get backend id for this set of circuits
-    backend_id = get_backend_id()
     
-    # Extract shorter app name from the title passed in by user   
-    appname = get_appname_from_title(suptitle)
 
     if not list_of_widths:
         # If list_of_widths is emply, set it to contain all widths
         list_of_widths = list(circuit_metrics_final_iter.keys())
     # Convert list_of_widths elements to string
     list_of_widths = [str(width) for width in list_of_widths]
+    
+    group_metrics_optgaps = get_distribution_and_stats()
+    # 'quantile_optgaps'
+    
+    for width in list_of_widths:
+        plot_cutsize_distribution_single_width(width, suptitle, options, group_metrics_optgaps, suffix)
+        
+def plot_cutsize_distribution_single_width(width, suptitle, options, group_metrics_optgaps, suffix):
+    
+    # get backend id
+    backend_id = get_backend_id()
+
+    # Extract shorter app name from the title passed in by user
+    appname = get_appname_from_title(suptitle)
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
-    
-        # Create more appropriate title
-        suptitle = "Empirical Distribution of cut sizes - " + appname
-        
-        # append key circuit metrics info to the title
-        fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
-        if options != None:
-            options_str = ''
-            for key, value in options.items():
-                if len(options_str) > 0: options_str += ', '
-                options_str += f"{key}={value}"
-            fulltitle += f"\n{options_str}"
 
-
-
-        # Get colors for lines
-        cmap = cm.get_cmap('Dark2')
-        colors = [cmap(ij) for ij in np.linspace(0.1,0.9,len(list_of_widths))]
-
-        # and add the title to the plot
+        suptitle = "Empirical Distribution of Cut Sizes - " + appname
+        fulltitle = get_full_title(
+            suptitle, options) + "width={}".format(width)
         plt.suptitle(fulltitle)
 
-        for group in circuit_metrics_final_iter:
-            if group not in list_of_widths:
-                # Skip if width is not to be plotted
-                continue
-            best_restart_ind = str(get_best_restart_ind(group))
-            for restart_ind in [best_restart_ind]:#circuit_metrics_final_iter[group]:
-                unique_counts = circuit_metrics_final_iter[group][restart_ind]['unique_counts']
-                unique_sizes = circuit_metrics_final_iter[group][restart_ind]['unique_sizes']
-                optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
-                
-                sizes_array = np.arange(optimal_value + 1)
-                counts_array = [unique_counts[unique_sizes.index(s)] if s in unique_sizes else 0 for s in sizes_array]
-                counts_array = np.array(counts_array)
+        indx = group_metrics_optgaps['groups'].index(int(width))  # get index corresponding to width
+        # Plot distribution of cut sizes for circuit
+        dist = group_metrics_optgaps['cutsize_ratio_dist']
+        axs.plot(dist['ratios'][indx], dist['frequencies'][indx], marker='o',
+                 ls='-', c='k', ms=2, mec='k', mew=0.2, lw=1,
+                 label=f"Circuit Sampling")  # " degree={deg}") # lw=1,
 
+        # Also plot the distribution obtained from uniform random sampling
+        dist = group_metrics_optgaps['random_cutsize_ratio_dist']
+        axs.plot(dist['ratios'][indx], dist['frequencies'][indx],
+                 marker='o', c='k', ms=1, mec='k', mew=0.2, lw=1,
+                 ls='dotted', label=f"Uniform Random Sampling")  # " degree={deg}") # lw=1,
 
-                axs.plot(sizes_array / optimal_value, counts_array / np.sum(counts_array), marker='o',
-                         ls = '-', c = colors[list_of_widths.index(group)], ms=2, mec = 'k', mew=0.2,
-                         label = f"Width={group}: QAOA")#" degree={deg}") # lw=1,
-                
-                # Also plot the distribution obtained from uniform random sampling
-                unique_counts_unif = circuit_metrics_final_iter[group][restart_ind]['unique_counts_unif']
-                unique_sizes_unif = circuit_metrics_final_iter[group][restart_ind]['unique_sizes_unif']
-                optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
-                
-                sizes_array = np.arange(optimal_value + 1)
-                unif_counts_array = [unique_counts_unif[unique_sizes_unif.index(s)] if s in unique_sizes_unif else 0 for s in sizes_array]
-                unif_counts_array = np.array(unif_counts_array)
-                
-                axs.plot(sizes_array / optimal_value, unif_counts_array / np.sum(unif_counts_array),
-                         marker='o', c = colors[list_of_widths.index(group)], ms=1, mec = 'k',mew=0.2,
-                         ls = 'dotted', label = f"Width={group}: Uniform Sampling")#" degree={deg}") # lw=1,
-                
+        # Plot vertical lines corresponding to the various metrics
+        for metric in ['approx_ratio', 'cvar_ratio', 'bestcut_ratio', 'gibbs_ratio']:
+            curdict = group_metrics_optgaps[metric]
+            axs.axvline(x=curdict['ratiovals'][indx], color=curdict['color'], label=curdict['label'], lw=1, ls='--', alpha=0.8)
+            
 
         axs.set_ylabel('Fraction of Total Counts')
         axs.set_xlabel(r'$\frac{\mathrm{Cut\ Size}}{\mathrm{Max\ Cut\ Size}}$')
         axs.grid()
-        axs.set_xlim(left=0, right=1)
+        axs.set_xlim(left=-0.02, right=1.02)
         axs.legend(loc='upper left')
 
         fig.tight_layout()
 
         # save plot image to file
         if save_plot_images:
-            save_plot_image(plt, f"{appname}-cutsize_dist-" + suffix, backend_id)
+            save_plot_image(plt, f"{appname}-cutsize_dist-width={width}" + suffix, backend_id)
             
         # show the plot for user to see
         if show_plot_images:
@@ -1992,7 +1972,80 @@ def plot_angles_polar(suptitle = '', options=None, suffix = ''):
             plt.show()
         
 
+def get_distribution_and_stats():
+    """Returns a dictionary with values, colors and labels for various metrics.
 
+    Returns:
+        dictionary
+    """
+    group_metrics_optgaps = {'approx_ratio' : {'color' : 'r', 'label': 'Approx. Ratio', 'gapvals' : [], 'ratiovals':[]},
+                            'cvar_ratio' : {'color' : 'g', 'label': 'CVaR Ratio', 'gapvals' : [],'ratiovals':[]},
+                            'bestcut_ratio' : {'color' : 'm', 'label': 'Best Measurement Ratio', 'gapvals' : [],'ratiovals':[]},
+                            'gibbs_ratio' : {'color' : 'y', 'label' : 'Gibbs Objective Function', 'gapvals' : [],'ratiovals':[]},
+                            'quantile_optgaps' : {'gapvals' : [],'ratiovals':[]},
+                            'violin' : {'gapvals' : []},# gapvals is a list of [xlist, ylist], 
+                            'cutsize_ratio_dist' : {'ratios':[],'frequencies':[]},
+                            'random_cutsize_ratio_dist' : {'ratios':[],'frequencies':[]},
+                            'groups' : []} #widths
+
+    # circuit_metrics_detail_2.keys() may not be in an ascending order. Sort the groups (i.e. widths)
+    groups = list(circuit_metrics_detail_2.keys())
+    groups = sorted(groups, key=lambda x: int(x))
+    group_metrics_optgaps["groups"] = [int(g) for g in groups]
+    
+    for group in groups:
+        best_restart_ind = get_best_restart_ind(group)
+        for circuit_id in [best_restart_ind]:#circuit_metrics_detail_2[group]:
+            # save the metric from the last iteration
+            last_ind = max(circuit_metrics_detail_2[group][circuit_id].keys())
+            mets = circuit_metrics_detail_2[group][circuit_id][last_ind]
+            
+            # Store the ratio values for objective functions
+            group_metrics_optgaps['approx_ratio']['ratiovals'].append(mets["approx_ratio"])
+            group_metrics_optgaps['cvar_ratio']['ratiovals'].append(mets["cvar_ratio"])
+            group_metrics_optgaps['bestcut_ratio']['ratiovals'].append(mets["bestcut_ratio"])
+            group_metrics_optgaps['gibbs_ratio']['ratiovals'].append(mets["gibbs_ratio"])
+            
+            # Compute optimality gaps for the objective function types
+            group_metrics_optgaps['approx_ratio']['gapvals'].append(abs(1.0 - mets["approx_ratio"]) * 100)
+            group_metrics_optgaps['cvar_ratio']['gapvals'].append(abs(1.0 - mets["cvar_ratio"]) * 100)
+            group_metrics_optgaps['bestcut_ratio']['gapvals'].append(abs(1.0 - mets["bestcut_ratio"]) * 100)
+            group_metrics_optgaps['gibbs_ratio']['gapvals'].append(abs(1.0 - mets["gibbs_ratio"]) * 100)
+
+            # Also store the optimality gaps at the three quantiles values
+            # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
+            q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
+            q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
+            group_metrics_optgaps['quantile_optgaps']['gapvals'].append(q_vals)
+            
+
+            # Store empirical distribution of cut size values / optimal value 
+            unique_sizes = circuit_metrics_final_iter[group][str(circuit_id)]['unique_sizes']
+            unique_counts = circuit_metrics_final_iter[group][str(circuit_id)]['unique_counts']
+            optimal_value = circuit_metrics_final_iter[group][str(circuit_id)]['optimal_value']
+
+            full_size_list = list(range(optimal_value + 1))
+            full_counts_list = [unique_counts[unique_sizes.index(s)] if s in unique_sizes else 0 for s in full_size_list]
+            group_metrics_optgaps['cutsize_ratio_dist']['ratios'].append(np.array(full_size_list) / optimal_value)
+            group_metrics_optgaps['cutsize_ratio_dist']['frequencies'].append(np.array(full_counts_list) / sum(full_counts_list))
+            # Also store locations for the half-violin plots to be plotted in the detailed opt-gap plots
+            # gap values for the violin plot will be 1 - unique_sizes / optimal size
+            violin_yvals = 100 * (1 - np.array(full_size_list) / optimal_value)
+            # Normalize the violin plot so that the max width will be 1 unit along horizontal axis
+            violin_xvals =  np.array(full_counts_list) / max(full_counts_list)
+            group_metrics_optgaps['violin']['gapvals'].append([violin_xvals, violin_yvals])
+            
+            # Store empirican distribution of cut size values / optimal value for random sampling
+            unique_sizes_unif = circuit_metrics_final_iter[group][str(circuit_id)]['unique_sizes_unif']
+            unique_counts_unif = circuit_metrics_final_iter[group][str(circuit_id)]['unique_counts_unif']
+            full_size_list = list(range(optimal_value + 1))
+            full_counts_list_unif = [unique_counts_unif[unique_sizes_unif.index(s)] if s in unique_sizes_unif else 0 for s in full_size_list]
+            group_metrics_optgaps['random_cutsize_ratio_dist']['ratios'].append(np.array(full_size_list) / optimal_value)
+            group_metrics_optgaps['random_cutsize_ratio_dist']['frequencies'].append(np.array(full_counts_list_unif) / sum(full_counts_list_unif))
+    
+    
+    return group_metrics_optgaps
+    
 # Plot detailed optgaps
 def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", 
                           transform_qubit_group = False, 
@@ -2022,71 +2075,15 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     
     # sort the group metrics (in case they weren't sorted when collected)
     sort_group_metrics()
-    # Note: This can be moved to a separate function
     # DEVNOTE: Add to group metrics here; this should be done during execute
+    
     # Create a dictionary, with keys specifying metric type, and values specifying corresponding optgap values
-    cmap = cm.get_cmap('jet')
-    colors = [cmap(i) for i in np.linspace(0.05,0.95,4, endpoint=True)]
-    group_metrics_optgaps = {'approx_ratio' : {'color' : 'r', 'label': 'Approx. Ratio', 'gapvals' : []},
-                             'cvar_ratio' : {'color' : 'g', 'label': 'CVaR Ratio', 'gapvals' : []},
-                             'bestcut_ratio' : {'color' : 'm', 'label': 'Best Measurement Ratio', 'gapvals' : []},
-                             'gibbs_ratio' : {'color' : 'y', 'label' : 'Gibbs Objective Function', 'gapvals' : []},
-                             'quantile_optgaps' : {'gapvals' : []},
-                             'violin' : {'gapvals' : []}} # list of [xlist, ylist]
+    group_metrics_optgaps = get_distribution_and_stats()
+
+    if which_metrics_to_plot == 'all' or type(which_metrics_to_plot) != list:
+        which_metrics_to_plot = ['approx_ratio', 'cvar_ratio', 'bestcut_ratio', 'gibbs_ratio', 'quantile_optgaps', 'violin']
     
-    if which_metrics_to_plot == 'all':
-        which_metrics_to_plot = list(group_metrics_optgaps.keys())
-    elif type(which_metrics_to_plot) != list:
-        print("Plotting all optgap metrics")
-        which_metrics_to_plot == list(which_metrics_to_plot.keys())
-
-    for group in circuit_metrics_detail_2:
-        best_restart_ind = get_best_restart_ind(group)
-        for circuit_id in [best_restart_ind]:#circuit_metrics_detail_2[group]:
-            # save the metric from the last iteration
-            last_ind = max(circuit_metrics_detail_2[group][circuit_id].keys())
-            mets = circuit_metrics_detail_2[group][circuit_id][last_ind]
-            
-            # Compute optimality gaps for the objective function types
-            group_metrics_optgaps['approx_ratio']['gapvals'].append(abs(1.0 - mets["approx_ratio"]) * 100)
-            group_metrics_optgaps['cvar_ratio']['gapvals'].append(abs(1.0 - mets["cvar_ratio"]) * 100)
-            group_metrics_optgaps['bestcut_ratio']['gapvals'].append(abs(1.0 - mets["bestcut_ratio"]) * 100)
-            group_metrics_optgaps['gibbs_ratio']['gapvals'].append(abs(1.0 - mets["gibbs_ratio"]) * 100)
-
-            # Also store the optimality gaps at the three quantiles values
-            # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
-            q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
-            q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
-            group_metrics_optgaps['quantile_optgaps']['gapvals'].append(q_vals)
-
-            # get_dist_from_measurements()
-            unique_sizes = circuit_metrics_final_iter[group][str(circuit_id)]['unique_sizes']
-            unique_counts = circuit_metrics_final_iter[group][str(circuit_id)]['unique_counts']
-            optimal_value = circuit_metrics_final_iter[group][str(circuit_id)]['optimal_value']
-
-            full_size_list = list(range(optimal_value + 1))
-            full_counts_list = [unique_counts[unique_sizes.index(s)] if s in unique_sizes else 0 for s in full_size_list]
-
-            # gap values for the violin plot will be 1 - unique_sizes / optimal size
-            violin_yvals = 100 * (1 - np.array(full_size_list) / optimal_value)
-            # Normalize the violin plot so that the max width will be 1 unit along horizontal axis
-            violin_xvals =  np.array(full_counts_list) / max(full_counts_list)
-
-            group_metrics_optgaps['violin']['gapvals'].append([violin_xvals, violin_yvals])
-
-            # and just break after the first circuit, since we are not averaging
-            break
     
-    # circuit_metrics_detail_2.keys() may not be in an ascending order. Get argsort
-    groups = list(circuit_metrics_detail_2.keys())
-    groups = [int(i) for i in groups]
-    sort_inds = np.argsort(groups)
-    groups = [groups[i] for i in sort_inds]
-    # Rearrange optimality_gap and quantile_optgaps using the same sequence
-    for optgap_quantity in group_metrics_optgaps:
-        group_metrics_optgaps[optgap_quantity]['gapvals'] = [group_metrics_optgaps[optgap_quantity]['gapvals'][i] for i in sort_inds]
-    group_metrics_optgaps["groups"] = groups
-
     # Create title for the plots
     fulltitle = get_full_title(suptitle=suptitle, options=options)
 
@@ -2165,8 +2162,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             # For all metrics to be plotted, except quantile optgaps and violin plots, plot a line
             # Plot a solid line for the objective function, and dashed otherwise
             ls = '-' if metric_str == objective_func_type else '--'
-
-            plt_handles[metric_str], = axs.plot(groups, group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])
+            plt_handles[metric_str], = axs.plot(group_metrics_optgaps["groups"], group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])
         
 
 

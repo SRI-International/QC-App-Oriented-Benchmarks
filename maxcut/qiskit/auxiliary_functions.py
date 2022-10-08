@@ -90,7 +90,7 @@ def get_title(suptitle, options):
 
 
 def get_options_effect_init():
-    maxcut_inputs = metrics.maxcut_inputs
+    maxcut_inputs = maxcut_benchmark.maxcut_inputs
     num_shots = maxcut_inputs.get('num_shots')
     width = maxcut_inputs.get('max_qubits')
     degree = maxcut_inputs.get('degree')
