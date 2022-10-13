@@ -97,11 +97,20 @@ QV_transpile_factor = 12.7
 #1) need to round to avoid duplicates, and 2) trailing zeros are getting removed 
 depth_base = 2
 
+# fade saturation of objects plotted for low fidelity at this level
+fade_low_fidelity_level = 0.2
+
+# suppress plotting for low fidelity at this level
+suppress_low_fidelity_level = 0.05
+
 # Get the current time formatted
 def get_timestr():
     #timestr = strftime("%Y-%m-%d %H:%M:%S UTC", gmtime())
     timestr = strftime("%b %d, %Y %H:%M:%S UTC", gmtime())
     return timestr
+
+
+######################################################################
 
 ##### Initialize methods
 
@@ -667,16 +676,32 @@ def polarization_fidelity(counts, correct_dist, thermal_dist=None):
 # METRICS UTILITY FUNCTIONS - FOR VISUALIZATION
 
 # get the min and max width over all apps in shared_data
-def get_min_max(shared_data):
+# suppress low fidelity cells if flag set
+def get_min_max(shared_data, suppress_low_fidelity=False):
     w_max = 0
     w_min = 0
     for app in shared_data:
         group_metrics = shared_data[app]["group_metrics"]
         w_data = group_metrics["groups"]
+        f_data = group_metrics["avg_fidelities"]
+        
+        low_fidelity_count = True
         for i in range(len(w_data)):
             y = float(w_data[i])
+            
+            # need this to handle rotated groups
+            if i >= len(f_data):
+                break
+            
+            # don't include in max width, the cells that reject for low fidelity
+            f = f_data[i]
+            if suppress_low_fidelity and f < suppress_low_fidelity_level:
+                if low_fidelity_count: break
+                else: low_fidelity_count = True
+                    
             w_max = max(w_max, y)
-            w_min = min(w_min, y)       
+            w_min = min(w_min, y) 
+            
     return w_min, w_max
 
 
@@ -1142,7 +1167,9 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
 #################################################
 
 # Plot metrics over all groups (level 2), merging data from all apps into smaller cells if not is_individual
-def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0, is_individual=False, score_metric=None):                   
+def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="_ALL-vplot-2", avail_qubits=0, 
+            is_individual=False, score_metric=None,
+            fade_low_fidelity=False, suppress_low_fidelity=False):                   
     
     global circuit_metrics
     global group_metrics
@@ -1170,7 +1197,7 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
 
     try:       
         # determine largest width for all apps
-        w_min, w_max = get_min_max(shared_data)
+        w_min, w_max = get_min_max(shared_data, suppress_low_fidelity=suppress_low_fidelity)
         
         #determine width for AQ
         AQ = get_aq_width(shared_data, w_min, w_max, score_metric)
@@ -1189,13 +1216,15 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
         # create 2D array to hold merged value arrays with gradations, one array for each qubit size
         # plot rectangles representing these result gradations
         if not is_individual:
-            plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, score_metric=score_metric)
+            plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, score_metric=score_metric,
+                    fade_low_fidelity=fade_low_fidelity, suppress_low_fidelity=suppress_low_fidelity)
         
         # Now overlay depth metrics for each app with unfilled rects, to outline each circuit
         # if is_individual, do filled rects as there is no background fill
         
         vplot_anno_init()
         
+        appname = None;
         for app in shared_data:
         
             # Extract shorter app name from the title passed in by user
@@ -1223,12 +1252,17 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
                 if score_metric not in group_metrics: continue
                 f_data = group_metrics[score_metric]
                 plot_volumetric_data_aq(ax, w_data, n2q_tr_data, f_data, depth_base, fill=filled,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max,
+                   fade_low_fidelity=fade_low_fidelity, suppress_low_fidelity=suppress_low_fidelity)
             else:
                 f_data = group_metrics[score_metric]
                 plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=filled,
-                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max)
+                   label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max,
+                   fade_low_fidelity=fade_low_fidelity, suppress_low_fidelity=suppress_low_fidelity)
         
+        if appname == None:
+            print(f"ERROR: cannot find data file for: {backend_id}")
+            
         # do annotation separately, spreading labels for readability
         anno_volumetric_data(ax, depth_base,
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
@@ -1250,7 +1284,8 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None, imagename="
 
 
 # Plot filled but borderless rectangles based on merged gradations of result metrics
-def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=4, score_metric=None):
+def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=4, score_metric=None,
+            fade_low_fidelity=False, suppress_low_fidelity=False):
 
     depth_values_merged = []
     for w in range(max_qubits):
@@ -1290,11 +1325,17 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
                #label=appname, labelpos=(0.4, 0.6), labelrot=50, type=1)  
 
         # aggregate value metrics for each depth cell over all apps
+        low_fidelity_count = True
         for i in range(len(d_data)):
             x = depth_index(d_tr_data[i], depth_base)
             y = float(w_data[i])
             f = f_data[i]
             
+            # reject cells with low fidelity
+            if suppress_low_fidelity and f < suppress_low_fidelity_level:
+                if low_fidelity_count: break
+                else: low_fidelity_count = True
+                    
             # accumulate largest width for all apps
             w_max = max(w_max, y)
             
@@ -1311,12 +1352,16 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
                 e["count"] += 1
                 e["value"] += f
                 depth_values_merged[int(w_data[i])][int(xp + grad)] = e
-                        
+    
+    #for depth_values in depth_values_merged:
+        #print(f"-- {depth_values}")
+            
     # compute and plot the average fidelity at each width / depth gradation with narrow filled rects 
     for wi in range(len(depth_values_merged)):
         w = depth_values_merged[wi]
         #print(f"... w = {w}")
         
+        low_fidelity_count = True
         for di in range(len(w)):
         
             e = w[di]
@@ -1333,7 +1378,17 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
                 y = float(wi)
                 f = e["value"]
                 
-                ax.add_patch(box4_at(x, y, f, type=1, fill=True))
+                # reject cells with low fidelity
+                if suppress_low_fidelity and f < suppress_low_fidelity_level:
+                    if low_fidelity_count: break
+                    else: low_fidelity_count = True
+                
+                # or, fade color of cells with low fidelity
+                alpha=1.0
+                if fade_low_fidelity and f < fade_low_fidelity_level: 
+                    alpha = 0.99 * math.sqrt(math.sqrt((f + 0.001) / fade_low_fidelity_level)) + 0.005
+                
+                ax.add_patch(box4_at(x, y, f, type=1, fill=True, alpha=alpha))
     
     #print("**** merged...")
     #print(depth_values_merged)
@@ -1344,7 +1399,9 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
 ### plot metrics across all apps for a backend_id
 
 def plot_all_app_metrics(backend_id, do_all_plots=False,
-        include_apps=None, exclude_apps=None, suffix="", avail_qubits=0, is_individual=False, score_metric=None):
+        include_apps=None, exclude_apps=None, suffix="", avail_qubits=0,
+        is_individual=False, score_metric=None,
+        fade_low_fidelity=False, suppress_low_fidelity=False):
 
     global circuit_metrics
     global group_metrics
@@ -1403,7 +1460,10 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
         
         # use a spectral colormap
         cmap = cmap_spectral
-        plot_metrics_all_merged(shared_data, backend_id, suptitle=fulltitle, imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits, is_individual=is_individual, score_metric=score_metric)
+        plot_metrics_all_merged(shared_data, backend_id, suptitle=fulltitle, 
+                imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits,
+                is_individual=is_individual, score_metric=score_metric,
+                fade_low_fidelity=fade_low_fidelity, suppress_low_fidelity=suppress_low_fidelity)
         
         # also draw with a blues colormap (not now actually)
         '''
@@ -2335,7 +2395,7 @@ def depth_index(d, depth_base):
 
 
 # draw a box at x,y with various attributes   
-def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0):
+def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0, alpha=1.0):
     
     value = min(value, 1.0)
     value = max(value, 0.0)
@@ -2344,6 +2404,7 @@ def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0):
     ec = (0.5,0.5,0.5)
     
     return Rectangle((x - (x_size/2), y - (y_size/2)), x_size, y_size,
+             alpha=alpha,
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
@@ -2366,7 +2427,7 @@ def circle_at(x, y, value, type=1, fill=True):
              fill=fill,
              lw=0.5)
              
-def box4_at(x, y, value, type=1, fill=True):
+def box4_at(x, y, value, type=1, fill=True, alpha=1.0):
     size = 1.0
     
     value = min(value, 1.0)
@@ -2377,6 +2438,7 @@ def box4_at(x, y, value, type=1, fill=True):
     ec = fc
     
     return Rectangle((x - size/8, y - size/2), size/4, size,
+             alpha=alpha,
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
@@ -2763,7 +2825,8 @@ def vplot_anno_init ():
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
         labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False,
-        x_size=1.0, y_size=1.0):
+        x_size=1.0, y_size=1.0,
+        fade_low_fidelity=False, suppress_low_fidelity=False):
 
     # since data may come back out of order, save point at max y for annotation
     i_anno = 0
@@ -2771,11 +2834,24 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
     y_anno = 0
     
     # plot data rectangles
+    low_fidelity_count = True
     for i in range(len(d_data)):
         x = depth_index(d_data[i], depth_base)
         y = float(w_data[i])
         f = f_data[i]
         
+        # reject cells with low fidelity
+        if suppress_low_fidelity and f < suppress_low_fidelity_level:
+            if low_fidelity_count: break
+            else: low_fidelity_count = True
+        
+        # or, fade intensity of cells with low_fidelity
+        # (currently, we only use this fading for the outline, so compute alpha differently)
+        alpha = 1.0
+        if fade_low_fidelity and f < fade_low_fidelity_level:
+            #alpha = 0.95 * math.sqrt(math.sqrt(f / fade_low_fidelity_level)) + 0.05
+            alpha = 0.5 * math.sqrt(math.sqrt(f / fade_low_fidelity_level)) + 0.5
+            
         if isinstance(x_size, list):
             ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size))
         else:
@@ -2785,7 +2861,11 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
             x_anno = x
             y_anno = y
             i_anno = i
-            
+    
+    # if no data rectangles plotted, no need for a label
+    if x_anno == 0 or y_anno == 0:
+        return
+        
     x_annos.append(x_anno)
     y_annos.append(y_anno)
     
@@ -2823,7 +2903,8 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
 
 
 def plot_volumetric_data_aq(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
-        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False):
+        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False,
+        fade_low_fidelity=False, suppress_low_fidelity=False):
 
     # since data may come back out of order, save point at max y for annotation
     i_anno = 0
