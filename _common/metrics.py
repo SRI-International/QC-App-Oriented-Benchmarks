@@ -35,6 +35,7 @@ from time import gmtime, strftime
 from datetime import datetime
 import traceback
 import matplotlib.cm as cm
+import copy
 
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
@@ -2271,13 +2272,34 @@ def load_app_metrics (api, backend_id):
     
     # temporary: to read older format files ...     
     for app in shared_data:
+        #print(app)
+        
+        # this is very old and could potentially be removed (but would need testing)
         if "group_metrics" not in shared_data[app]:
             print(f"... upgrading version of app data {app}")
             shared_data[app] = { "circuit_metrics":None, "group_metrics":shared_data[app] }
- 
+
+        group_metrics = shared_data[app]["group_metrics"]
+        #print(group_metrics)
+        
+        # need to include avg_hf_fidelities
+        if "avg_hf_fidelities" not in group_metrics:
+            print(f"... upgrading version of app data {app}")
+            #print(f"... upgrading version of app data {app}, adding avg_hf_fidelities")
+            group_metrics["avg_hf_fidelities"] = copy.copy(group_metrics["avg_fidelities"])
+        
+        # need to include avg_tr_n2qs
+        if "avg_tr_n2qs" not in group_metrics:
+            #print(f"... upgrading version of app data {app}, adding avg_tr_n2qs")
+            group_metrics["avg_tr_n2qs"] = copy.copy(group_metrics["avg_tr_depths"])
+            for i in range(len(group_metrics["avg_tr_n2qs"])):
+                group_metrics["avg_tr_n2qs"][i] *= group_metrics["avg_tr_xis"][i]
+                
+        #print(group_metrics)
+        
     return shared_data
             
-
+            
 ##############################################
 # VOLUMETRIC PLOT
 
