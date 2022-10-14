@@ -1495,6 +1495,10 @@ def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, su
         
     app = "Benchmark Results - " + appname + " - " + apiname
     
+    if app not in shared_data:
+        print(f"ERROR: cannot find app: {appname}")
+        return
+    
     group_metrics = shared_data[app]["group_metrics"]
     plot_metrics(app, filters=filters, suffix=suffix)
 
