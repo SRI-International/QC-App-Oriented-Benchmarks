@@ -1216,6 +1216,8 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
         
         vplot_anno_init()
         
+        # Note: the following loop is required, as it creates the array of annotation points
+        # In this merged version of plottig, we suppress the border as it is already drawn
         appname = None;
         for app in shared_data:
         
@@ -1239,7 +1241,6 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
             n2q_tr_data = group_metrics["avg_tr_n2qs"]
     
             filled = is_individual
-            
             if aq_mode > 0:
                 if score_metric not in group_metrics: continue
                 f_data = group_metrics[score_metric]
@@ -1250,7 +1251,8 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
                 f_data = group_metrics[score_metric]
                 plot_volumetric_data(ax, w_data, d_tr_data, f_data, depth_base, fill=filled,
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, w_max=w_max,
-                   max_depth=max_depth, suppress_low_fidelity=suppress_low_fidelity)
+                   max_depth=max_depth, suppress_low_fidelity=suppress_low_fidelity,
+                   do_border=False)
         
         if appname == None:
             print(f"ERROR: cannot find data file for: {backend_id}")
@@ -1282,6 +1284,9 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
     depth_values_merged = []
     for w in range(max_qubits):
         depth_values_merged.append([ None ] * (num_grads * max_depth_log))
+    
+    # keep an array of the borders squares' centers 
+    borders = []
     
     # run through depth metrics for all apps, splitting cells into gradations
     for app in shared_data:
@@ -1337,6 +1342,9 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
             
             xp = x * 4
             
+            #store center of border rectangle
+            borders.append((int(xp), y))
+            
             if x > max_depth_log - 1:
                 print(f"... data out of chart range, skipped; w={y} d={d_tr_data[i]}")
                 break;
@@ -1378,9 +1386,13 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
                 if suppress_low_fidelity and f < suppress_low_fidelity_level:
                     if low_fidelity_count: break
                     else: low_fidelity_count = True
-                
                 ax.add_patch(box4_at(x, y, f, type=1, fill=True))
-    
+        
+    # draw borders at w,d location of each cell, offset to account for the merge process above
+    for (x,y) in borders: 
+        x = x/4 + 0.125
+        ax.add_patch(box_at(x, y, f, type=1, fill=False))
+        
     #print("**** merged...")
     #print(depth_values_merged)
     
@@ -2911,7 +2923,7 @@ def vplot_anno_init ():
 
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
-        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False,
+        labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, do_border=True,
         x_size=1.0, y_size=1.0,
         max_depth=0, suppress_low_fidelity=False):
 
@@ -2935,11 +2947,13 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
         if suppress_low_fidelity and f < suppress_low_fidelity_level:
             if low_fidelity_count: break
             else: low_fidelity_count = True
-            
-        if isinstance(x_size, list):
-            ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size))
-        else:
-            ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
+        
+        # the only time this is False is when doing merged gradation plots
+        if do_border == True:
+            if isinstance(x_size, list):
+                ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size))
+            else:
+                ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
 
         if y >= y_anno:
             x_anno = x
