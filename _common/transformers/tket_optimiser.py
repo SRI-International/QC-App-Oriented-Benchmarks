@@ -19,14 +19,13 @@ from pytket.extensions.qiskit.qiskit_convert import (
 )
 from pytket import OpType, Circuit
 from qiskit.circuit.quantumcircuit import QuantumCircuit
-from qiskit.providers import BaseBackend
 
 def rebase_pass():
     return auto_rebase_pass(
             {OpType.CX, OpType.X, OpType.SX, OpType.Rz},
         )
 
-def high_optimisation(circuit:QuantumCircuit, backend:BaseBackend) -> list[QuantumCircuit]:
+def high_optimisation(circuit:QuantumCircuit, backend) -> list[QuantumCircuit]:
     """Perform thourough but generic optimisation using 
     TKET optimisation tool.
 
@@ -81,7 +80,7 @@ def high_optimisation(circuit:QuantumCircuit, backend:BaseBackend) -> list[Quant
 
     return [circuit]
 
-def quick_optimisation(circuit:QuantumCircuit, backend:BaseBackend) -> list[QuantumCircuit]:
+def quick_optimisation(circuit:QuantumCircuit, backend) -> list[QuantumCircuit]:
     """Perform basic compilation to build valid circuit for backend.
 
     :param circuit: Circuit to be compiled.
