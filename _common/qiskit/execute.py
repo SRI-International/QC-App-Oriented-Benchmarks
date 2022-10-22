@@ -355,6 +355,9 @@ def execute_circuit(circuit):
         transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
         transformer = backend_exec_options_copy.pop("transformer", None)
         
+        global result_processor
+        result_processor = backend_exec_options_copy.pop("postprocessor", None)
+        
         logger.info(f"Executing on backend: {backend.name()}")
             
         #************************************************
@@ -717,6 +720,11 @@ def job_complete(job):
 
     # If a result handler has been established, invoke it here with result object
     if result != None and result_handler:
+    
+        # invoke a result processor if specified in exec_options
+        if result_processor:
+            logger.info(f'result_processor(...)')
+            result_processor(result)
     
         # The following computes the counts by summing them up, allowing for the case where
         # <result> contains results from multiple circuits
