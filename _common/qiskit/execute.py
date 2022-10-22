@@ -679,30 +679,8 @@ def job_complete(job):
         result = job.result()
         # print("... result = ", str(result))
         
-        # get breakdown of execution time, if method exists 
-        # this attribute not available for some providers;
-        if "time_per_step" in dir(job) and callable(job.time_per_step):
-            time_per_step = job.time_per_step()
-            exec_creating_time = (time_per_step["VALIDATING"] - time_per_step["CREATING"]).total_seconds()
-            exec_validating_time = (time_per_step["QUEUED"] - time_per_step["VALIDATING"]).total_seconds()
-            exec_queued_time = (time_per_step["RUNNING"] - time_per_step["QUEUED"]).total_seconds()
-            exec_running_time = (time_per_step["COMPLETED"] - time_per_step["RUNNING"]).total_seconds()
-            
-            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
-            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', exec_validating_time)
-            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', exec_queued_time)
-            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
-            
-        else: 
-            time_per_step = {}
-            exec_creating_time = 0
-            exec_validating_time = 0
-            exec_queued_time = 0
-            exec_running_time = 0
-        
-        #print("... time_per_step = ", str(time_per_step))
-        if verbose:
-            print(f"... exec times, creating = {exec_creating_time}, validating = {exec_validating_time}, queued = {exec_queued_time}, running = {exec_running_time}")        
+        # process step times, if they exist
+        process_step_times(job, active_circuit)
 
         # counts = result.get_counts(qc)
         # print("Total counts are:", counts)
@@ -775,6 +753,56 @@ def job_complete(job):
             if verbose:
                 print(traceback.format_exc())
 
+# Process step times, if they exist
+def process_step_times(job, active_circuit):
+    #print("... processing step times")
+    
+    exec_creating_time = 0
+    exec_validating_time = 0
+    exec_queued_time = 0
+    exec_running_time = 0
+        
+    # get breakdown of execution time, if method exists 
+    # this attribute not available for some providers;
+    if "time_per_step" in dir(job) and callable(job.time_per_step):
+        time_per_step = job.time_per_step()
+        #print(time_per_step)
+        
+        creating_time = time_per_step.get("CREATING")
+        validating_time = time_per_step.get("VALIDATING")
+        queued_time = time_per_step.get("QUEUED")
+        running_time = time_per_step.get("RUNNING")
+        completed_time = time_per_step.get("COMPLETED")
+        
+        # for testing, since hard to reproduce on systems
+        #running_time = None
+        
+        # make these all slightly non-zero so averaging code is triggered (> 0.001 required)
+        exec_creating_time = 0.001
+        exec_validating_time = 0.001
+        exec_queued_time = 0.001
+        exec_running_time = 0.001
+    
+        if validating_time and creating_time:
+            exec_creating_time = (validating_time - creating_time).total_seconds()
+        if queued_time and validating_time:
+            exec_validating_time = (queued_time - validating_time).total_seconds()
+        if running_time and queued_time:
+            exec_queued_time = (running_time - queued_time).total_seconds()
+        if completed_time and running_time:
+            exec_running_time = (completed_time - running_time).total_seconds()
+        
+        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
+        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', exec_validating_time)
+        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', exec_queued_time)
+        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
+    
+    #print("... time_per_step = ", str(time_per_step))
+    if verbose:
+        print(f"... exec times, creating = {exec_creating_time}, validating = {exec_validating_time}, queued = {exec_queued_time}, running = {exec_running_time}") 
+    
+    #print(f"... exec times, creating = {exec_creating_time}, validating = {exec_validating_time}, queued = {exec_queued_time}, running = {exec_running_time}")
+        
 
 # Process a job, whose status cannot be obtained
 def job_status_failed(job):
