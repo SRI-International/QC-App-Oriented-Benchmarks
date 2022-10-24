@@ -724,7 +724,7 @@ def job_complete(job):
         # invoke a result processor if specified in exec_options
         if result_processor:
             logger.info(f'result_processor(...)')
-            result_processor(result)
+            result = result_processor(result)
     
         # The following computes the counts by summing them up, allowing for the case where
         # <result> contains results from multiple circuits
