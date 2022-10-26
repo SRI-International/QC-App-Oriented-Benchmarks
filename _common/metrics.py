@@ -917,7 +917,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
             
-        axs[axi].legend(['Circuit Depth', 'Normalized Depth'], loc='upper left')
+        axs[axi].legend(['Algorithmic Depth', 'Normalized Depth'], loc='upper left')
         axi += 1
     
     if do_2qs:
