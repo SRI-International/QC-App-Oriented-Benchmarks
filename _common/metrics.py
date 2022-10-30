@@ -864,20 +864,21 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_creates:
         if max(group_metrics["avg_create_times"]) < 0.01:
             axs[axi].set_ylim([0, 0.01])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_create_times"])
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_create_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Creation Time (sec)')
         
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
-            
         plt.setp(axs[axi].get_xticklabels(), visible=False)
         axi += 1
     
     if do_executes:
         if max(group_metrics["avg_exec_times"]) < 0.1:
             axs[axi].set_ylim([0, 0.1])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"])
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
         
         if rows > 0 and not xaxis_set:
@@ -892,7 +893,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     if do_fidelities:
         axs[axi].set_ylim([0, 1.0])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"]) 
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"], zorder = 3) 
         axs[axi].set_ylabel('Avg Result Fidelity')
         
         if rows > 0 and not xaxis_set:
@@ -903,7 +905,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     if do_hf_fidelities:
         axs[axi].set_ylim([0, 1.0])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"]) 
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], zorder = 3) 
         axs[axi].set_ylabel('Avg Hellinger Fidelity')
         
         if rows > 0 and not xaxis_set:
@@ -915,8 +918,9 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_depths:
         if max(group_metrics["avg_tr_depths"]) < 20:
             axs[axi].set_ylim([0, 20])  
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_depths"], 0.8)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_depths"], 0.8, zorder = 3)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
         axs[axi].set_ylabel('Circuit Depth')
         
         if rows > 0 and not xaxis_set:
@@ -929,7 +933,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_2qs:
         if max(group_metrics["avg_tr_n2qs"]) < 20:
             axs[axi].set_ylim([0, 20])  
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_n2qs"], 0.5, color='C9') 
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_n2qs"], 0.5, color='C9', zorder = 3) 
         axs[axi].set_ylabel('2Q Gates')
         
         if rows > 0 and not xaxis_set:
