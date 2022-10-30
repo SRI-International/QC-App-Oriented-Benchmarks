@@ -1,12 +1,17 @@
+#################################################################
+# 
+# Post-processor module: mthree error mitigation handlers
+
 import importlib
 import mthree
 from qiskit import Aer
 
 mit = None
-mit_num_qubits = 0
+mit_num_qubits = 2
 
 verbose = False
 
+# Handler called to postprocess results before they are passed to calling program
 def mthree_handler(result):
     if verbose: print(f'Before: {dict(sorted(result.results[0].data.counts.items())) = }')
 
@@ -32,9 +37,11 @@ def mthree_handler(result):
 
     return result
 
+# Handler called to configure mthree for number of qubits in executing circuit
 def mthree_width_handler(circuit):
     global mit_num_qubits
-    num_qubits = circuit.num_qubits #- circuit.num_ancillas
+    
+    num_qubits = circuit.num_qubits
     # print(circuit)
 
     if num_qubits != mit_num_qubits:
@@ -42,13 +49,15 @@ def mthree_width_handler(circuit):
         mit_num_qubits = num_qubits
         mit.cals_from_system(range(num_qubits))
 
-def get_mthree_handlers(backend_id, provider_backend, num_qubits):
-    print("Inside get_mthree_handler")
+# Routine to initialize mthree and return two handlers
+def get_mthree_handlers(backend_id, provider_backend):
     global mit
 
+    # special handling for qasm_simulator
     if backend_id.endswith("qasm_simulator"):
         provider_backend = Aer.get_backend(backend_id) 
 
+    # special handling for fake backends
     elif 'fake' in backend_id:
         backend = getattr(
             importlib.import_module(
@@ -58,13 +67,11 @@ def get_mthree_handlers(backend_id, provider_backend, num_qubits):
         )
         provider_backend = backend()
 
+    # initialize mthree with given backend
     mit = mthree.M3Mitigation(provider_backend)
 
-    global mit_num_qubits 
-    mit_num_qubits = num_qubits
-
-    if verbose: print("... initializing mthree")
+    if verbose: print(f"... initializing mthree for backend_id = {backend_id}")
     
-    mit.cals_from_system(range(num_qubits))
+    mit.cals_from_system(range(mit_num_qubits))
 
     return (mthree_handler, mthree_width_handler)
