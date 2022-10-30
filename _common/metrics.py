@@ -605,6 +605,12 @@ def hellinger_fidelity_with_expected(p, q):
         else:
             total += val
     total += sum(q_normed.values())
+    
+    # in some situations (error mitigation) this can go negative, use abs value
+    if total < 0:
+        print(f"WARNING: using absolute value in fidelity calculation")
+        total = abs(total)
+        
     dist = np.sqrt(total)/np.sqrt(2)
     fidelity = (1-dist**2)**2
 

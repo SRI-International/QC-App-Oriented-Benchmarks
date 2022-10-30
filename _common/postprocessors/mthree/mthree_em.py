@@ -5,8 +5,10 @@ from qiskit import Aer
 mit = None
 mit_num_qubits = 0
 
+verbose = False
+
 def mthree_handler(result):
-    #print(f'Before: {dict(sorted(result.results[0].data.counts.items())) = }')
+    if verbose: print(f'Before: {dict(sorted(result.results[0].data.counts.items())) = }')
 
     raw_counts = result.get_counts()
     shots = sum(raw_counts.values())
@@ -14,10 +16,19 @@ def mthree_handler(result):
     quasi_counts = mit.apply_correction(raw_counts, range(len(list(raw_counts.keys())[0])))
     for k, v in quasi_counts.items():
         quasi_counts[k] = round(v * shots) 
+    
+    if verbose: print(f'Quasi: {quasi_counts = }')
+    
+    qmin = min(quasi_counts.values())
+    qmax = max(quasi_counts.values())
+    qshots = sum(quasi_counts.values())
+    qrange = (qmax - qmin)
+    if verbose: print(f"{qmin = } {qmax = } {qrange = } {qshots = } {shots = }")
 
+    # store modified counts in result object
     result.results[0].data.counts = quasi_counts
 
-    #print(f'After: {result.results[0].data.counts = }')
+    if verbose: print(f'After: {result.results[0].data.counts = }')
 
     return result
 
@@ -27,7 +38,7 @@ def mthree_width_handler(circuit):
     # print(circuit)
 
     if num_qubits != mit_num_qubits:
-        print(f'Updating width to {num_qubits = }')
+        if verbose: print(f'... updating mthree width to {num_qubits = }')
         mit_num_qubits = num_qubits
         mit.cals_from_system(range(num_qubits))
 
@@ -52,6 +63,8 @@ def get_mthree_handlers(backend_id, provider_backend, num_qubits):
     global mit_num_qubits 
     mit_num_qubits = num_qubits
 
+    if verbose: print("... initializing mthree")
+    
     mit.cals_from_system(range(num_qubits))
 
     return (mthree_handler, mthree_width_handler)
