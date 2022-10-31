@@ -823,7 +823,6 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_creates: numplots += 1
     if do_executes: numplots += 1
     if do_fidelities: numplots += 1
-    if do_hf_fidelities: numplots += 1
     if do_depths: numplots += 1
     if do_2qs: numplots += 1
     
@@ -887,7 +886,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_fidelities:
-        axs[axi].set_ylim([0, 1.0])
+        axs[axi].set_ylim([0, 1.1])
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
         axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"], zorder = 3) 
         axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], 0.4, color='skyblue', alpha = 0.8, zorder = 3) 
@@ -897,18 +896,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
             
-        axi += 1
-    
-    if do_hf_fidelities:
-        axs[axi].set_ylim([0, 1.0])
-        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], zorder = 3) 
-        axs[axi].set_ylabel('Avg Hellinger Fidelity')
-        
-        if rows > 0 and not xaxis_set:
-            axs[axi].sharex(axs[rows-1])
-            xaxis_set = True
-            
+        axs[axi].legend(['Normalized', 'Hellinger'], loc='upper right')
         axi += 1
         
     if do_depths:
@@ -1752,7 +1740,7 @@ def plot_area_metrics(suptitle='',
         fulltitle += f"\n{options_str}"
 
     with plt.style.context(maxcut_style):
-    # plot the metrics background with its title
+        # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                     y_max=max(y), x_max=x_max, y_min=min(y), x_min=x_min)
         
@@ -1763,13 +1751,18 @@ def plot_area_metrics(suptitle='',
         if y_size == None:
             y_size = 1.0
     
-    #print(f"... num: {num_x_bins} {len(x)} {x_size} {x}")
+        #print(f"... num: {num_x_bins} {len(x)} {x_size} {x}")
     
-    # plot all the bars, with width specified as an array that matches the array size of the x,y values
+        # add a grid on the x axis (with the maxcut style of alpha=0.5, this color is best for pdf)
+        ax.grid(True, axis = 'x', zorder = 0, color='silver')
+    
+        # plot all the bars, with width specified as an array that matches the array size of the x,y values
         plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
                             labelrot=0, type=1, fill=True, w_max=18, do_label=False,
-                            x_size=xs, y_size=y_size)
+                            x_size=xs, y_size=y_size, zorder=3)                           
+        
         plt.tight_layout()
+        
         if save_plot_images:
             save_plot_image(plt, os.path.join(f"{appname}-area-"
                                               + score_label_save_str[score_metric] + '-'
@@ -2162,6 +2155,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
     ############################################################
     ##### Optimality gaps bar plot
+    
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
         axs.set_xticks(group_metrics_optgaps["groups"])
@@ -2170,9 +2164,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
         limopts = max(group_metrics_optgaps['approx_ratio']['gapvals'])
         axs.set_ylim([0, max(40, limopts) * 1.1])
-        axs.bar(group_metrics_optgaps["groups"], group_metrics_optgaps['approx_ratio']['gapvals'], 0.8)
+        #axs.grid(True, axis = 'y', color='silver', zorder = 0)  # other bars use this iler color
+        axs.grid(True, axis = 'y', zorder = 0)
+        axs.bar(group_metrics_optgaps["groups"], group_metrics_optgaps['approx_ratio']['gapvals'], 0.8, zorder = 3)
         axs.set_ylabel(r'Optimality Gap ($\%$)')
-
 
         # NOTE: Can move the calculation or the errors variable to before the plotting. This code is repeated in the detailed plotting as well.
         # Plot quartiles
@@ -2183,7 +2178,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
         errors = [up_error, down_error]
 
-        axs.errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75)
+        axs.errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75, zorder = 5)
 
         fig.tight_layout()
         axs.legend()
@@ -2195,7 +2190,6 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         # show the plot for user to see
         if show_plot_images:
             plt.show()
-
 
 
     ############################################################
@@ -2235,8 +2229,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             # For all metrics to be plotted, except quantile optgaps and violin plots, plot a line
             # Plot a solid line for the objective function, and dashed otherwise
             ls = '-' if metric_str == objective_func_type else '--'
-            plt_handles[metric_str], = axs.plot(group_metrics_optgaps["groups"], group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])
-        
+            plt_handles[metric_str], = axs.plot(group_metrics_optgaps["groups"], group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])    
 
 
         # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
@@ -2501,7 +2494,7 @@ def depth_index(d, depth_base):
 
 
 # draw a box at x,y with various attributes   
-def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0, alpha=1.0):
+def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0, alpha=1.0, zorder=0):
     
     value = min(value, 1.0)
     value = max(value, 0.0)
@@ -2514,7 +2507,8 @@ def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0, alpha=1.0):
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
-             lw=0.5*y_size)
+             lw=0.5*y_size,
+             zorder=zorder)
 
 # draw a circle at x,y with various attributes 
 def circle_at(x, y, value, type=1, fill=True):
@@ -2863,6 +2857,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     # assume y max is the max of the y data 
     # we only do circuit width for now, so show 3 qubits more than the max
     max_width = y_max + 3
+    min_width = y_min - 3
     
     fig, ax = plt.subplots()#constrained_layout=True, figsize=(plot_width, plot_height))
 
@@ -2881,7 +2876,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     plt.xlim(x_min - step/2, x_max + step/2)
        
     #plt.ylim(y_min*0.5, y_max*1.5)
-    plt.ylim(0, max_width)
+    plt.ylim(min_width, max_width)
 
     # circuit metrics (x axis)
     xround = [step * x for x in range(num_xdivs + 1)]
@@ -2897,7 +2892,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
     
     # circuit metrics (y axis)
-    ybasis = [y for y in range(1, max_width)]
+    ybasis = [y for y in range(min_width + 1, max_width)]
     #yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]    # not used now, since we only do circuit width
     #ylabels = [format_number(y) for y in yround]
         
@@ -2931,7 +2926,7 @@ def vplot_anno_init ():
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
         labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, do_border=True,
-        x_size=1.0, y_size=1.0,
+        x_size=1.0, y_size=1.0, zorder=0,
         max_depth=0, suppress_low_fidelity=False):
 
     # since data may come back out of order, save point at max y for annotation
@@ -2958,7 +2953,7 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
         # the only time this is False is when doing merged gradation plots
         if do_border == True:
             if isinstance(x_size, list):
-                ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size))
+                ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size, zorder=zorder))
             else:
                 ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
 
