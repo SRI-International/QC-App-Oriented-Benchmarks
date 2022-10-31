@@ -1740,7 +1740,7 @@ def plot_area_metrics(suptitle='',
         fulltitle += f"\n{options_str}"
 
     with plt.style.context(maxcut_style):
-    # plot the metrics background with its title
+        # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                     y_max=max(y), x_max=x_max, y_min=min(y), x_min=x_min)
         
@@ -1751,13 +1751,18 @@ def plot_area_metrics(suptitle='',
         if y_size == None:
             y_size = 1.0
     
-    #print(f"... num: {num_x_bins} {len(x)} {x_size} {x}")
+        #print(f"... num: {num_x_bins} {len(x)} {x_size} {x}")
     
-    # plot all the bars, with width specified as an array that matches the array size of the x,y values
+        # add a grid on the x axis (with the maxcut style of alpha=0.5, this color is best for pdf)
+        ax.grid(True, axis = 'x', zorder = 0, color='silver')
+    
+        # plot all the bars, with width specified as an array that matches the array size of the x,y values
         plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
                             labelrot=0, type=1, fill=True, w_max=18, do_label=False,
-                            x_size=xs, y_size=y_size)
+                            x_size=xs, y_size=y_size, zorder=3)                           
+        
         plt.tight_layout()
+        
         if save_plot_images:
             save_plot_image(plt, os.path.join(f"{appname}-area-"
                                               + score_label_save_str[score_metric] + '-'
@@ -2489,7 +2494,7 @@ def depth_index(d, depth_base):
 
 
 # draw a box at x,y with various attributes   
-def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0, alpha=1.0):
+def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0, alpha=1.0, zorder=0):
     
     value = min(value, 1.0)
     value = max(value, 0.0)
@@ -2502,7 +2507,8 @@ def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0, alpha=1.0):
              edgecolor = ec,
              facecolor = fc,
              fill=fill,
-             lw=0.5*y_size)
+             lw=0.5*y_size,
+             zorder=zorder)
 
 # draw a circle at x,y with various attributes 
 def circle_at(x, y, value, type=1, fill=True):
@@ -2919,7 +2925,7 @@ def vplot_anno_init ():
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
         labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, do_border=True,
-        x_size=1.0, y_size=1.0,
+        x_size=1.0, y_size=1.0, zorder=0,
         max_depth=0, suppress_low_fidelity=False):
 
     # since data may come back out of order, save point at max y for annotation
@@ -2946,7 +2952,7 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
         # the only time this is False is when doing merged gradation plots
         if do_border == True:
             if isinstance(x_size, list):
-                ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size))
+                ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size, zorder=zorder))
             else:
                 ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
 
