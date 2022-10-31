@@ -313,7 +313,7 @@ def report_metrics_for_group (group):
             if len(group_metrics["avg_depths"]) > 0:
                 avg_depth = group_metrics["avg_depths"][group_index]
                 if avg_depth > 0:
-                    print(f"Average Depth, \u03BE (xi) for the {group} qubit group = {int(avg_depth)}, {avg_xi}")
+                    print(f"Average Circuit Algorithmic Depth, \u03BE (xi) for the {group} qubit group = {int(avg_depth)}, {avg_xi}")
             
             avg_tr_xi = 0
             if len(group_metrics["avg_tr_xis"]) > 0:
@@ -329,11 +329,9 @@ def report_metrics_for_group (group):
                     print(f"Average Normalized Transpiled Depth, \u03BE (xi), 2q gates for the {group} qubit group = {int(avg_tr_depth)}, {avg_tr_xi}, {avg_tr_n2q}")
                     
             avg_create_time = group_metrics["avg_create_times"][group_index]
-            print(f"Average Creation Time for the {group} qubit group = {avg_create_time} secs")
             avg_elapsed_time = group_metrics["avg_elapsed_times"][group_index]
-            print(f"Average Elapsed Time for the {group} qubit group = {avg_elapsed_time} secs")
             avg_exec_time = group_metrics["avg_exec_times"][group_index]
-            print(f"Average Execution Time for the {group} qubit group = {avg_exec_time} secs")
+            print(f"Average Creation, Elapsed, Execution Time for the {group} qubit group = {avg_create_time}, {avg_elapsed_time}, {avg_exec_time} secs")
             
             #if verbose:
             if len(group_metrics["avg_exec_creating_times"]) > 0:
@@ -355,10 +353,7 @@ def report_metrics_for_group (group):
             
             avg_fidelity = group_metrics["avg_fidelities"][group_index]
             avg_hf_fidelity = group_metrics["avg_hf_fidelities"][group_index]
-            print(f"Average Fidelity for the {group} qubit group = {avg_fidelity}")
-            #if aq_mode > 0:
-            #   print(f"Average Hellinger Fidelity for the {group} qubit group = {avg_hf_fidelity}")
-            print(f"Average Hellinger Fidelity for the {group} qubit group = {avg_hf_fidelity}")
+            print(f"Average Hellinger, Normalized Fidelity for the {group} qubit group = {avg_hf_fidelity}, {avg_fidelity}")
             
             print("")
             return
@@ -605,6 +600,12 @@ def hellinger_fidelity_with_expected(p, q):
         else:
             total += val
     total += sum(q_normed.values())
+    
+    # in some situations (error mitigation) this can go negative, use abs value
+    if total < 0:
+        print(f"WARNING: using absolute value in fidelity calculation")
+        total = abs(total)
+        
     dist = np.sqrt(total)/np.sqrt(2)
     fidelity = (1-dist**2)**2
 
@@ -858,20 +859,21 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_creates:
         if max(group_metrics["avg_create_times"]) < 0.01:
             axs[axi].set_ylim([0, 0.01])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_create_times"])
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_create_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Creation Time (sec)')
         
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
-            
         plt.setp(axs[axi].get_xticklabels(), visible=False)
         axi += 1
     
     if do_executes:
         if max(group_metrics["avg_exec_times"]) < 0.1:
             axs[axi].set_ylim([0, 0.1])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"])
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
         
         if rows > 0 and not xaxis_set:
@@ -886,7 +888,9 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     if do_fidelities:
         axs[axi].set_ylim([0, 1.0])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"]) 
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"], zorder = 3) 
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], 0.4, color='skyblue', alpha = 0.8, zorder = 3) 
         axs[axi].set_ylabel('Avg Result Fidelity')
         
         if rows > 0 and not xaxis_set:
@@ -897,7 +901,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
     if do_hf_fidelities:
         axs[axi].set_ylim([0, 1.0])
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"]) 
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], zorder = 3) 
         axs[axi].set_ylabel('Avg Hellinger Fidelity')
         
         if rows > 0 and not xaxis_set:
@@ -909,8 +914,9 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_depths:
         if max(group_metrics["avg_tr_depths"]) < 20:
             axs[axi].set_ylim([0, 20])  
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_depths"], 0.8)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9') 
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_depths"], 0.8, zorder = 3)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
         axs[axi].set_ylabel('Circuit Depth')
         
         if rows > 0 and not xaxis_set:
@@ -923,7 +929,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_2qs:
         if max(group_metrics["avg_tr_n2qs"]) < 20:
             axs[axi].set_ylim([0, 20])  
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_n2qs"], 0.5, color='C9') 
+        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_n2qs"], 0.5, color='C9', zorder = 3) 
         axs[axi].set_ylabel('2Q Gates')
         
         if rows > 0 and not xaxis_set:
