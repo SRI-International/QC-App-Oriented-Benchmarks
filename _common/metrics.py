@@ -823,7 +823,6 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if do_creates: numplots += 1
     if do_executes: numplots += 1
     if do_fidelities: numplots += 1
-    if do_hf_fidelities: numplots += 1
     if do_depths: numplots += 1
     if do_2qs: numplots += 1
     
@@ -887,7 +886,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_fidelities:
-        axs[axi].set_ylim([0, 1.0])
+        axs[axi].set_ylim([0, 1.1])
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
         axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"], zorder = 3) 
         axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], 0.4, color='skyblue', alpha = 0.8, zorder = 3) 
@@ -897,18 +896,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
             
-        axi += 1
-    
-    if do_hf_fidelities:
-        axs[axi].set_ylim([0, 1.0])
-        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], zorder = 3) 
-        axs[axi].set_ylabel('Avg Hellinger Fidelity')
-        
-        if rows > 0 and not xaxis_set:
-            axs[axi].sharex(axs[rows-1])
-            xaxis_set = True
-            
+        axs[axi].legend(['Normalized', 'Hellinger'], loc='upper right')
         axi += 1
         
     if do_depths:
@@ -2162,6 +2150,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
     ############################################################
     ##### Optimality gaps bar plot
+    
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
         axs.set_xticks(group_metrics_optgaps["groups"])
@@ -2170,9 +2159,10 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
         limopts = max(group_metrics_optgaps['approx_ratio']['gapvals'])
         axs.set_ylim([0, max(40, limopts) * 1.1])
-        axs.bar(group_metrics_optgaps["groups"], group_metrics_optgaps['approx_ratio']['gapvals'], 0.8)
+        #axs.grid(True, axis = 'y', color='silver', zorder = 0)  # other bars use this iler color
+        axs.grid(True, axis = 'y', zorder = 0)
+        axs.bar(group_metrics_optgaps["groups"], group_metrics_optgaps['approx_ratio']['gapvals'], 0.8, zorder = 3)
         axs.set_ylabel(r'Optimality Gap ($\%$)')
-
 
         # NOTE: Can move the calculation or the errors variable to before the plotting. This code is repeated in the detailed plotting as well.
         # Plot quartiles
@@ -2183,7 +2173,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
         errors = [up_error, down_error]
 
-        axs.errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75)
+        axs.errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75, zorder = 5)
 
         fig.tight_layout()
         axs.legend()
@@ -2195,7 +2185,6 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         # show the plot for user to see
         if show_plot_images:
             plt.show()
-
 
 
     ############################################################
@@ -2235,8 +2224,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             # For all metrics to be plotted, except quantile optgaps and violin plots, plot a line
             # Plot a solid line for the objective function, and dashed otherwise
             ls = '-' if metric_str == objective_func_type else '--'
-            plt_handles[metric_str], = axs.plot(group_metrics_optgaps["groups"], group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])
-        
+            plt_handles[metric_str], = axs.plot(group_metrics_optgaps["groups"], group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])    
 
 
         # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
