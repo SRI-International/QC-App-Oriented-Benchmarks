@@ -2164,8 +2164,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
         limopts = max(group_metrics_optgaps['approx_ratio']['gapvals'])
         axs.set_ylim([0, max(40, limopts) * 1.1])
-        #axs.grid(True, axis = 'y', color='silver', zorder = 0)  # other bars use this iler color
-        axs.grid(True, axis = 'y', zorder = 0)
+        axs.grid(True, axis = 'y', color='silver', zorder = 0)  # other bars use this silver color
+        #axs.grid(True, axis = 'y', zorder = 0)
         axs.bar(group_metrics_optgaps["groups"], group_metrics_optgaps['approx_ratio']['gapvals'], 0.8, zorder = 3)
         axs.set_ylabel(r'Optimality Gap ($\%$)')
 
