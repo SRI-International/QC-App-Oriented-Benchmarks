@@ -2857,6 +2857,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     # assume y max is the max of the y data 
     # we only do circuit width for now, so show 3 qubits more than the max
     max_width = y_max + 3
+    min_width = y_min - 3
     
     fig, ax = plt.subplots()#constrained_layout=True, figsize=(plot_width, plot_height))
 
@@ -2875,7 +2876,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     plt.xlim(x_min - step/2, x_max + step/2)
        
     #plt.ylim(y_min*0.5, y_max*1.5)
-    plt.ylim(0, max_width)
+    plt.ylim(min_width, max_width)
 
     # circuit metrics (x axis)
     xround = [step * x for x in range(num_xdivs + 1)]
@@ -2891,7 +2892,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     plt.xticks(xround, xlabels, color='black', rotation=45, ha='right', va='top', rotation_mode="anchor")
     
     # circuit metrics (y axis)
-    ybasis = [y for y in range(1, max_width)]
+    ybasis = [y for y in range(min_width + 1, max_width)]
     #yround = [(y_max - y_min)/12 * y for y in range(0,25,2)]    # not used now, since we only do circuit width
     #ylabels = [format_number(y) for y in yround]
         
