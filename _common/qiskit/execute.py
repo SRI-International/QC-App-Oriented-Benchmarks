@@ -116,6 +116,10 @@ do_transpile_metrics = True
 # Option to perform transpilation prior to execution (disable to execute unmodified circuit)
 do_transpile_for_execute = True
 
+# Intercept function to post-process results
+result_processor = None
+width_processor = None
+
 # Selection of basis gate set for transpilation
 # Note: selector 1 is a hardware agnostic gate set
 basis_selector = 1
@@ -355,9 +359,11 @@ def execute_circuit(circuit):
         transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
         transformer = backend_exec_options_copy.pop("transformer", None)
         
-        global result_processor
-        result_processor = backend_exec_options_copy.pop("postprocessor", None)
-        
+        global result_processor, width_processor
+        postprocessors = backend_exec_options_copy.pop("postprocessor", None)
+        if postprocessors:
+            result_processor, width_processor = postprocessors
+            
         logger.info(f"Executing on backend: {backend.name()}")
             
         #************************************************
@@ -380,6 +386,10 @@ def execute_circuit(circuit):
                 logger.info("applying transformer to noisy simulator")
                 simulation_circuits, shots = invoke_transformer(transformer,
                                     trans_qc, backend=backend, shots=shots)
+
+            # Indicate number of qubits about to be executed
+            if width_processor:
+                width_processor(qc)
             
             # for noisy simulator, use execute() which works; 
             # no need for transpile above unless there are options like transformer
@@ -421,6 +431,10 @@ def execute_circuit(circuit):
                 trans_qc, shots = invoke_transformer(transformer,
                         trans_qc, backend=backend, shots=shots)
             
+            # Indicate number of qubits about to be executed
+            if width_processor:
+                width_processor(qc)
+
             #*************************************
             # perform circuit execution on backend
             logger.info(f'Running trans_qc, shots={shots}')
