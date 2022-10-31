@@ -2494,7 +2494,7 @@ def depth_index(d, depth_base):
 
 
 # draw a box at x,y with various attributes   
-def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0, alpha=1.0, zorder=0):
+def box_at(x, y, value, type=1, fill=True, x_size=1.0, y_size=1.0, alpha=1.0, zorder=1):
     
     value = min(value, 1.0)
     value = max(value, 0.0)
@@ -2926,7 +2926,7 @@ def vplot_anno_init ():
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
         labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, do_border=True,
-        x_size=1.0, y_size=1.0, zorder=0,
+        x_size=1.0, y_size=1.0, zorder=1,
         max_depth=0, suppress_low_fidelity=False):
 
     # since data may come back out of order, save point at max y for annotation
