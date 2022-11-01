@@ -467,20 +467,16 @@ def execute_circuit(circuit):
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_size', qc_tr_size)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_xi', qc_tr_xi)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_n2q', qc_tr_n2q)
-    
-    # return, so caller can do other things while waiting for jobs to complete
 
-    # deprecated code ...
-    '''
-    # wait until job is complete
-    job_wait_for_completion(job)
-
-    ##############
-    # Here we complete the job immediately 
-    job_complete(job)
-    '''
     if verbose:
         print(f"... executing job {job.job_id()}")
+    
+    # special handling when only runnng one job at a time: wait for done here
+    # so the status check called later immediately returns done and avoids polling
+    if max_jobs_active <= 1:
+        result = job.result()
+    
+    # return, so caller can do other things while waiting for jobs to complete    
 
 # Get circuit metrics fom the circuit passed in
 def get_circuit_metrics(qc):
