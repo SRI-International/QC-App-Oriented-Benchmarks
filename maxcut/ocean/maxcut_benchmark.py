@@ -856,7 +856,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
         # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-        ex.submit_circuit(qc2, num_qubits, restart_ind, shots=num_shots, params=params)
+        ex.submit_circuit(qc, num_qubits, restart_ind, shots=num_shots, params=params)
 
         # Save final iteration data to metrics.circuit_metrics_final_iter
         # This data includes final counts, cuts, etc.
