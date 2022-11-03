@@ -209,7 +209,6 @@ def execute_circuit(circuit):
         unique_cuts = list(set(all_cuts))
         cut_occurances = [all_cuts.count(cut) for cut in unique_cuts]
         result = { cut : count for (cut,count) in zip(unique_cuts, cut_occurances)}
-        print(result)
         result_handler(circuit["qc"], result, circuit["group"], circuit["circuit"], circuit["shots"])
             
     except Exception as e:

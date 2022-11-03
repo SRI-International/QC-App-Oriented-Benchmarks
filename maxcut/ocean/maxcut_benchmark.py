@@ -198,7 +198,6 @@ def compute_cutsizes(results, nodes, edges):
     cuts = list(results.keys())
     counts = list(results.values())
     sizes = [common.eval_cut(nodes, edges, cut, reverseStep) for cut in cuts]
-    print(sizes)
     return cuts, counts, sizes
 
 def get_size_dist(counts, sizes):
@@ -823,7 +822,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
      
     def execution_handler2 (qc, result, num_qubits, s_int, num_shots):
         # Stores the results to the global saved_result variable
-        print("execution handler 2 was called")
         global saved_result
         saved_result = result      
         
@@ -894,9 +892,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                         
                 print(f'===============  Begin method 2 loop, enabling embed')
 
-                x=0
+                x = 1
                 while x < 200:
-                    x = 1 if x==0 else x**2
+                    
                     print(f"... using anneal time: {x}")
 
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
@@ -935,7 +933,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     dict_of_vals = dict()
                     # Start counting classical optimizer time here again
                     tc1 = time.time()
-                    print(saved_result)
                     cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
                     # Compute the value corresponding to the objective function first
                     dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha)
@@ -974,6 +971,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     #************************************************
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
+                    
+                    
+                    x *= 2
                         
                         
                     ##### WIP: what to do here?
