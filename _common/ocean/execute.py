@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 # the currently selected provider_backend
 backend = None 
+device_name = None
 
 # Execution options, passed to transpile method
 backend_exec_options = None
@@ -97,7 +98,7 @@ def set_execution_target(backend_id='pegasus',
     set_execution_target(backend_id='honeywell_device_1', provider_module_name='qiskit.providers.honeywell',
                         provider_name='Honeywell')
     """
-    global backend
+    global backend, device_name
 
     authentication_error_msg = "No credentials for {0} backend found.  Using the simulator instead."
     
@@ -138,13 +139,11 @@ def submit_circuit(qc:HamiltonianCircuitProxy, group_id, circuit_id, shots=100, 
     
     # logger doesn't like unicode, so just log the array values for now
     #logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={str(circuit["params"])}')
-    logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={[param[1] for param in params.items()] if params else None}')
     
-    # DEVNOTE: not sure why this is needed
-    #backend["shots"] = shots
-    #backend["group_id"] = group_id
-    #backend["circuit_id"] = circuit_id
-
+    ''' DEVNOTE: doesn't work with our simple annealing time params
+    logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={[param[1] for param in params.items()] if params else None}')
+    '''
+    
     if backend != None:
         execute_circuit(circuit)
     else:
@@ -159,10 +158,10 @@ def execute_circuit(circuit):
     sampleset = None
 
     try:
-        logger.info(f"Executing on backend: {backend['backend_id']}")
+        logger.info(f"Executing on backend: {device_name}")
          
         # perform circuit execution on backend
-        logger.info(f'Running trans_qc, shots={backend["shots"]}')
+        logger.info(f'Running trans_qc, shots={circuit["shots"]}')
         st = time.time() 
 
         # DEVNOTE: may need to reset this somewhere!
@@ -183,33 +182,42 @@ def execute_circuit(circuit):
                 sampleset = sampler.sample_ising(circuit.qc.h, circuit.qc.J, circuit.qc.shots, annealing_time=x)
         '''
         
-        if (embedding==None):
-            sampler = EmbeddingComposite(backend)
+        if device_name == "pegasus":
+            sampler = backend
+            
         else:
-            sampler = FixedEmbeddingComposite(backend, embedding=embedding)
+            if (embedding==None):
+                sampler = EmbeddingComposite(backend)
+            else:
+                sampler = FixedEmbeddingComposite(backend, embedding=embedding)
 
-        sampleset = sampler.sample_ising(circuit.qc.h, circuit.qc.J, circuit.qc.shots, annealing_time=x)
-                
+        #sampleset = sampler.sample_ising(circuit.qc.h, circuit.qc.J, circuit.qc.shots, annealing_time=x)
+        sampleset = sampler.sample_ising(circuit["qc"].h, circuit["qc"].J, num_reads=circuit["shots"], annealing_time=circuit["params"][0])
+        
         logger.info(f'Finished Running - {round(time.time() - st, 5)} (ms)')
         if verbose_time: print(f"  *** ocean.sample() time = {round(time.time() - st, 5)}")
             
     except Exception as e:
-        print(f'ERROR: Failed to execute {backend["group_id"]} {backend["circuit_id"]}')
+        print(f'ERROR: Failed to execute {circuit["group"]} {circuit["circuit"]}')
         print(f"... exception = {e}")
         if verbose: print(traceback.format_exc())
         return
 
     # store circuit dimensional metrics
-    metrics.store_metric(backend["group_id"], backend["circuit_id"], 'depth', qc_depth)
-    metrics.store_metric(backend["group_id"], backend["circuit_id"], 'size', qc_size)
-    metrics.store_metric(backend["group_id"], backend["circuit_id"], 'xi', qc_xi)
-    metrics.store_metric(backend["group_id"], backend["circuit_id"], 'n2q', qc_n2q)
+    '''
+    metrics.store_metric(circuit["group"], circuit["circuit"], 'depth', qc_depth)
+    metrics.store_metric(circuit["group"], circuit["circuit"], 'size', qc_size)
+    metrics.store_metric(circuit["group"], circuit["circuit"], 'xi', qc_xi)
+    metrics.store_metric(circuit["group"], circuit["circuit"], 'n2q', qc_n2q)
 
-    metrics.store_metric(backend["group_id"], backend["circuit_id"], 'tr_depth', qc_tr_depth)
-    metrics.store_metric(backend["group_id"], backend["circuit_id"], 'tr_size', qc_tr_size)
-    metrics.store_metric(backend["group_id"], backend["circuit_id"], 'tr_xi', qc_tr_xi)
-    metrics.store_metric(backend["group_id"], backend["circuit_id"], 'tr_n2q', qc_tr_n2q)
-
+    metrics.store_metric(circuit["group"], circuit["circuit"], 'tr_depth', qc_tr_depth)
+    metrics.store_metric(circuit["group"], circuit["circuit"], 'tr_size', qc_tr_size)
+    metrics.store_metric(circuit["group"], circuit["circuit"], 'tr_xi', qc_tr_xi)
+    metrics.store_metric(circuit["group"], circuit["circuit"], 'tr_n2q', qc_tr_n2q)
+    '''
+    
+    #print(sampleset)
+    
     return sampleset
 
 # Get circuit metrics fom the circuit passed in
@@ -239,7 +247,23 @@ def get_circuit_metrics(qc):
         qc_n2q = n2q
     
     return qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q
+ 
+
+# Wait for all active and batched circuits to complete.
+# Execute the user-supplied completion handler to allow user to 
+# check if a group of circuits has been completed and report on results.
+# Return when there are no more active circuits.
+# This is used as a way to complete all groups of circuits and report results.
+
+def finalize_execution(completion_handler=metrics.finalize_group, report_end=True):
+
+    if verbose:
+        print("... finalize_execution")
     
+    # indicate we are done collecting metrics (called once at end of app)
+    if report_end:
+        metrics.end_metrics()
+       
     
 ###########################################################################
         

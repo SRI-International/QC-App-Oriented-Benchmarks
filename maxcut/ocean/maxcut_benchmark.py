@@ -68,7 +68,7 @@ def create_circ(nqubits, edges):
         else:
             J[e] = 1
 
-    circuitProxy = HamiltonianCircuitProxy()
+    circuitProxy = HamiltonianCircuitProxy.HamiltonianCircuitProxy()
     circuitProxy.h = h
     circuitProxy.J = J
 
@@ -88,7 +88,7 @@ def MaxCut (num_qubits, secret_int, edges, measured = True):
         #compute_expectation(qc, num_qubits, secret_int)
 
     # return a handle on the circuit
-    return circuitProxy
+    return circuitProxy, None
 
 
 _qc = []
@@ -866,7 +866,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
             
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                qc, params = MaxCut(num_qubits, restart_ind, edges, parameterized)
+                qc, params = MaxCut(num_qubits, restart_ind, edges, parameterized)   ### DEVNOTE: remove param?
                 metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
@@ -898,11 +898,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # create the circuit for given qubit size, secret string and params, store time metric
                     ts = time.time()
                     qc, params = MaxCut(num_qubits, unique_id, edges, parameterized)
+                    params = [x]
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                         
                     # also store the 'rounds' and 'degree' for each execution
                     # DEVNOTE: Currently, this is stored for each iteration. Reduce this redundancy
-                    metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
+                    #metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
                     metrics.store_metric(num_qubits, unique_id, 'degree', degree)
                     #************************************************
                     #*** Quantum Part: Execution of Circuits ***
@@ -913,6 +914,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # Must wait for circuit to complete
                     #ex.throttle_execution(metrics.finalize_group)
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
+                    
                     # after first execution and thereafter, no need for embed
                     ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
                     print(f'**** First execution complete, disabling embed')
