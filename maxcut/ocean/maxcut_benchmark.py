@@ -776,7 +776,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     global maxcut_inputs
     maxcut_inputs = dict_of_inputs
     
-    print(f"{dict_of_inputs = }")
+    #print(f"{dict_of_inputs = }")
     
     print("MaxCut Benchmark Program - Ocean")
 
@@ -840,13 +840,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
             hub=hub, group=group, project=project, exec_options=exec_options)
 
     # Execute Benchmark Program N times for anneal times in powers of 2
-    # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    # DEVNOTE: increment by 2 to match the collection of problems in 'instance' folder
-    #for num_qubits in range(min_qubits, max_qubits + 1, 2):
     
-    #for num_qubits in [4, 8, 16, 24, 40, 80, 160, 320]:
-    for num_qubits in [4, 8]:
+    # loop over available problem sizes up to max_qubits
+    for num_qubits in [4, 8, 12, 16, 20, 24, 40, 80, 160, 320]:
+    
+        if num_qubits > max_qubits:
+            break
         
         if method == 1:
             print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
@@ -1025,7 +1025,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                 options=dict(shots=num_shots))
     elif method == 2:
-        metrics.print_all_circuit_metrics()
+        #metrics.print_all_circuit_metrics()
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
@@ -1052,9 +1052,6 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
     obj_str = metrics.known_score_labels[objective_func_type]
     options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
     suptitle = f"Benchmark Results - MaxCut ({method}) - Qiskit"
-    
-    print(x_min)
-    print(x_max)
     
     metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
