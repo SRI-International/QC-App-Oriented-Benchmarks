@@ -476,12 +476,18 @@ def store_final_iter_to_metrics_json(num_qubits,
         opt (int) : Max Cut value
     """
     # In order to compare with uniform random sampling, get some samples
+    ''' DEVNOTE: Not needed
     unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif = uniform_cut_sampling(
         num_qubits, degree, num_shots, _instances)
     unif_dict = {'unique_counts_unif': unique_counts_unif,
                  'unique_sizes_unif': unique_sizes_unif,
                  'cumul_counts_unif': cumul_counts_unif}  # store only the distribution of cut sizes, and not the cuts themselves
-
+    '''
+    unif_dict = {'unique_counts_unif': [],
+                 'unique_sizes_unif': [],
+                 'cumul_counts_unif': []
+                 }
+    
     # Store properties such as (cuts, counts, sizes) of the final iteration, the converged theta values, as well as the known optimal value for the current problem, in metrics.circuit_metrics_final_iter. Also store uniform cut sampling results
     metrics.store_props_final_iter(num_qubits, restart_ind, 'optimal_value', opt)
     metrics.store_props_final_iter(num_qubits, restart_ind, None, iter_size_dist)
@@ -770,6 +776,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     global maxcut_inputs
     maxcut_inputs = dict_of_inputs
     
+    print(f"{dict_of_inputs = }")
+    
     print("MaxCut Benchmark Program - Ocean")
 
     QC_ = None
@@ -836,7 +844,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 to match the collection of problems in 'instance' folder
     #for num_qubits in range(min_qubits, max_qubits + 1, 2):
-    for num_qubits in [4, 8, 16, 24, 40, 80, 160, 320]:
+    
+    #for num_qubits in [4, 8, 16, 24, 40, 80, 160, 320]:
+    for num_qubits in [4, 8]:
         
         if method == 1:
             print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
@@ -972,11 +982,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
                     
-                    
+                    # double the annealing time for the next iteration
                     x *= 2
-                        
-                        
-                    ##### WIP: what to do here?
                     
                     #return dict_of_vals[objective_func_type]
                     
@@ -986,28 +993,41 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                                                 degree=degree, 
                                                 restart_ind=restart_ind,
                                                 num_shots=num_shots, 
-                                                converged_thetas_list=res.x.tolist(),
+                                                #converged_thetas_list=res.x.tolist(),
+                                                converged_thetas_list=[[0],[0]],
                                                 opt=opt,
                                                 iter_size_dist=iter_size_dist, iter_dist=iter_dist, parent_folder_save=parent_folder_save,
                                                 dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
                                                 save_res_to_file=save_res_to_file, _instances=_instances)
-
-            x = x**2
+                                                
+        # for method 2, need to aggregate the detail metrics appropriately for each group
+        # Note that this assumes that all iterations of the circuit have completed by this point
+        if method == 2:                  
+            metrics.process_circuit_metrics_2_level(num_qubits)
+            metrics.finalize_group(str(num_qubits))
             
     # Wait for some active circuits to complete; report metrics when groups complete
-    ex.throttle_execution(metrics.finalize_group)
+    #ex.throttle_execution(metrics.finalize_group)
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-             
+     
+    '''
     global print_sample_circuit
     if print_sample_circuit:
         # print a sample circuit
         print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
-
-    metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-            options=dict(shots=num_shots))
+    '''
+    
+    # Plot metrics for all circuit sizes
+    if method == 1:
+        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+                options=dict(shots=num_shots))
+    elif method == 2:
+        metrics.print_all_circuit_metrics()
+        if plot_results:
+            plot_results_from_data(**dict_of_inputs)
 
 
 def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_circuits = 1,
@@ -1032,6 +1052,9 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
     obj_str = metrics.known_score_labels[objective_func_type]
     options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
     suptitle = f"Benchmark Results - MaxCut ({method}) - Qiskit"
+    
+    print(x_min)
+    print(x_max)
     
     metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,

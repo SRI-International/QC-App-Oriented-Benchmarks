@@ -154,8 +154,16 @@ def submit_circuit(qc:HamiltonianCircuitProxy, group_id, circuit_id, shots=100, 
 
 # Launch execution of one job (circuit)
 def execute_circuit(circuit):
-        
-    # sampleset = None
+    logging.info('Entering execute_circuit')
+
+    active_circuit = copy.copy(circuit)
+    st = active_circuit["launch_time"] = time.time()
+    active_circuit["pollcount"] = 0 
+    
+    shots = circuit["shots"]
+    qc = circuit["qc"]
+    
+    sampleset = None
 
     try:
         logger.info(f"Executing on backend: {device_name}")
@@ -192,11 +200,16 @@ def execute_circuit(circuit):
                 sampler = FixedEmbeddingComposite(backend, embedding=embedding)
 
         #sampleset = sampler.sample_ising(circuit.qc.h, circuit.qc.J, circuit.qc.shots, annealing_time=x)
-        sampleset = sampler.sample_ising(circuit["qc"].h, circuit["qc"].J, num_reads=circuit["shots"], annealing_time=circuit["params"][0])
+        sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, annealing_time=circuit["params"][0])
+        
+        elapsed_time =  exec_time = round(time.time() - st, 5)
         
         logger.info(f'Finished Running - {round(time.time() - st, 5)} (ms)')
         if verbose_time: print(f"  *** ocean.sample() time = {round(time.time() - st, 5)}")
         
+        metrics.store_metric(circuit["group"], circuit["circuit"], 'elapsed_time', elapsed_time)
+        metrics.store_metric(circuit["group"], circuit["circuit"], 'exec_time', exec_time)
+    
         def process_to_bitstring(cut_list):
             # DEVNOTE : Check if the mapping is correct
             # Convert 1 to 0 and -1 to 1
@@ -209,6 +222,7 @@ def execute_circuit(circuit):
         unique_cuts = list(set(all_cuts))
         cut_occurances = [all_cuts.count(cut) for cut in unique_cuts]
         result = { cut : count for (cut,count) in zip(unique_cuts, cut_occurances)}
+        
         result_handler(circuit["qc"], result, circuit["group"], circuit["circuit"], circuit["shots"])
             
     except Exception as e:
