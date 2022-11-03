@@ -679,7 +679,7 @@ def get_width_restart_tuple_from_filename(fileName):
 
 #%% Run method: Benchmarking loop
 
-MAX_QUBITS = 175
+MAX_QUBITS = 320
 iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
 iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 saved_result = {  }
@@ -842,9 +842,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # Execute Benchmark Program N times for anneal times in powers of 2
     # Accumulate metrics asynchronously as circuits complete
     
-    # loop over available problem sizes up to max_qubits
+    # loop over available problem sizes from min_qubits up to max_qubits
     for num_qubits in [4, 8, 12, 16, 20, 24, 40, 80, 160, 320]:
     
+        if num_qubits < min_qubits:
+            continue
+            
         if num_qubits > max_qubits:
             break
         
@@ -950,6 +953,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
                     # Note: the first time it is stored it is just the initialization time for optimizer
                     #************************************************
+                    print(dict_of_vals)
                         
                     #************************************************
                     #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
