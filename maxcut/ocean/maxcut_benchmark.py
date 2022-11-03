@@ -940,6 +940,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
                     print(f'**** First execution complete, disabling embed')
                     global saved_result
+                    #print(saved_result)
+                    
                     #************************************************
                     #*** Classical Processing of Results - essential to optimizer ***
                     global opt_ts
