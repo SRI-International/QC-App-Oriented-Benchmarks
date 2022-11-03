@@ -84,22 +84,33 @@ def set_execution_target(backend_id='pegasus',
                 hub=None, group=None, project=None, exec_options=None):
     """
     Used to run jobs on a real hardware
-    :param backend_id:  annealer to be used
-    :param group: N/A
-    :param project: N/A
-    :param N/A
-    :param N/A
-    :provider_backend: N/A
+    :param backend_id:  device name. List of available devices depends on the provider
+    :param group: used to load IBMQ accounts.
+    :param project: used to load IBMQ accounts.
+    :param provider_module_name: If using a provider other than IBMQ, the string of the module that contains the
+    Provider class.  For example, for honeywell, this would be 'qiskit.providers.honeywell'
+    :param provider_name:  If using a provider other than IBMQ, the name of the provider class.
+    For example, for Honeywell, this would be 'Honeywell'.
+    :provider_backend: a custom backend object created and passed in, use backend_id as identifier
+    example usage.
 
     set_execution_target(backend_id='honeywell_device_1', provider_module_name='qiskit.providers.honeywell',
                         provider_name='Honeywell')
     """
     global backend
     backend["backend_id"] = backend_id
+
     authentication_error_msg = "No credentials for {0} backend found.  Using the simulator instead."
+    
+    # if a custom provider backend is given, use it ...
+    if provider_backend != None:
+        backend = provider_backend
+    
 
     # create an informative device name
-    metrics.set_plot_subtitle(f"Device = {backend_id}")
+    device_name = backend_id
+    metrics.set_plot_subtitle(f"Device = {device_name}")
+    #metrics.set_properties( { "api":"ocean", "backend_id":backend_id } )
     
     # save execute options with backend
     global backend_exec_options
