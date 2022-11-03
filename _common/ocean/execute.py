@@ -204,7 +204,17 @@ def execute_circuit(circuit):
         return
 
     # store circuit dimensional metrics
-    '''
+
+    qc_depth = 20
+    qc_size = 20
+    qc_xi = 0.5
+    qc_n2q = 12
+    
+    qc_tr_depth = 30
+    qc_tr_size = 30
+    qc_tr_xi = .5
+    qc_tr_n2q = 12
+    
     metrics.store_metric(circuit["group"], circuit["circuit"], 'depth', qc_depth)
     metrics.store_metric(circuit["group"], circuit["circuit"], 'size', qc_size)
     metrics.store_metric(circuit["group"], circuit["circuit"], 'xi', qc_xi)
@@ -214,7 +224,7 @@ def execute_circuit(circuit):
     metrics.store_metric(circuit["group"], circuit["circuit"], 'tr_size', qc_tr_size)
     metrics.store_metric(circuit["group"], circuit["circuit"], 'tr_xi', qc_tr_xi)
     metrics.store_metric(circuit["group"], circuit["circuit"], 'tr_n2q', qc_tr_n2q)
-    '''
+
     
     #print(sampleset)
     
