@@ -43,8 +43,8 @@ import HamiltonianCircuitProxy
 
 logger = logging.getLogger(__name__)
 
-# Use Aer pegasus by default
-backend = "pegasus" 
+# the currently selected provider_backend
+backend = None 
 
 # Execution options, passed to transpile method
 backend_exec_options = None
@@ -61,7 +61,7 @@ cached_circuits = {}
 result_handler = None
 
 # Print progress of execution
-verbose = False
+verbose = True
 
 # Print additional time metrics for each stage of execution
 verbose_time = False
@@ -98,14 +98,12 @@ def set_execution_target(backend_id='pegasus',
                         provider_name='Honeywell')
     """
     global backend
-    backend["backend_id"] = backend_id
 
     authentication_error_msg = "No credentials for {0} backend found.  Using the simulator instead."
     
     # if a custom provider backend is given, use it ...
     if provider_backend != None:
-        backend = provider_backend
-    
+        backend = provider_backend   
 
     # create an informative device name
     device_name = backend_id
@@ -115,8 +113,15 @@ def set_execution_target(backend_id='pegasus',
     # save execute options with backend
     global backend_exec_options
     backend_exec_options = exec_options
+    
+    print(f"... using backend_id = {backend_id}")
 
-
+# Set the state of the transpilation flags
+def set_tranpilation_flags(do_transpile_metrics = True, do_transpile_for_execute = True):
+    globals()['do_transpile_metrics'] = do_transpile_metrics
+    globals()['do_transpile_for_execute'] = do_transpile_for_execute
+    
+    
 ######################################################################
 # CIRCUIT EXECUTION METHODS
 
@@ -128,11 +133,22 @@ def submit_circuit(qc:HamiltonianCircuitProxy, group_id, circuit_id, shots=100, 
     circuit = { "qc": qc, "group": str(group_id), "circuit": str(circuit_id),
             "submit_time": time.time(), "shots": shots, "params": params }
 
-    backend["shots"] = shots
-    backend["group_id"] = group_id
-    backend["circuit_id"] = circuit_id
+    if verbose:
+        print(f'... submit circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={circuit["params"]}')
+    
+    # logger doesn't like unicode, so just log the array values for now
+    #logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={str(circuit["params"])}')
+    logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={[param[1] for param in params.items()] if params else None}')
+    
+    # DEVNOTE: not sure why this is needed
+    #backend["shots"] = shots
+    #backend["group_id"] = group_id
+    #backend["circuit_id"] = circuit_id
 
-    execute_circuit(circuit)
+    if backend != None:
+        execute_circuit(circuit)
+    else:
+        print(f"ERROR: No provider_backend specified, cannot execute program")
 
     return
     
@@ -149,7 +165,10 @@ def execute_circuit(circuit):
         logger.info(f'Running trans_qc, shots={backend["shots"]}')
         st = time.time() 
 
+        # DEVNOTE: may need to reset this somewhere!
         embedding = None
+        
+        '''
         x=0
         while x < 200:
                 x = 1 if x==0 else x**2
@@ -162,7 +181,15 @@ def execute_circuit(circuit):
                     sampler = FixedEmbeddingComposite(qpu, embedding=embedding)
 
                 sampleset = sampler.sample_ising(circuit.qc.h, circuit.qc.J, circuit.qc.shots, annealing_time=x)
+        '''
+        
+        if (embedding==None):
+            sampler = EmbeddingComposite(backend)
+        else:
+            sampler = FixedEmbeddingComposite(backend, embedding=embedding)
 
+        sampleset = sampler.sample_ising(circuit.qc.h, circuit.qc.J, circuit.qc.shots, annealing_time=x)
+                
         logger.info(f'Finished Running - {round(time.time() - st, 5)} (ms)')
         if verbose_time: print(f"  *** ocean.sample() time = {round(time.time() - st, 5)}")
             

@@ -676,6 +676,8 @@ iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []
 saved_result = {  }
 instance_filename = None
 
+minimizer_loop_index = 0
+
 def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         method=1, rounds=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
@@ -821,12 +823,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options)
 
-	# Execute Benchmark Program N times for anneal times in powers of 2
+    # Execute Benchmark Program N times for anneal times in powers of 2
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 to match the collection of problems in 'instance' folder
     #for num_qubits in range(min_qubits, max_qubits + 1, 2):
-	for num_qubits in [4, 8, 16, 24, 40, 80, 160, 320]:
+    for num_qubits in [4, 8, 16, 24, 40, 80, 160, 320]:
         
         if method == 1:
             print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
@@ -857,121 +859,127 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
             break
 
         for restart_ind in range(1, max_circuits + 1):
+        
             # restart index should start from 1
             # Loop over restarts for a given graph
-		if method == 1:
-	        # create the circuit for given qubit size and secret string, store time metric
-	        ts = time.time()
-	        qc, params = MaxCut(num_qubits, restart_ind, edges, parameterized)
-	        metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
+            if method == 1:
+            
+                # create the circuit for given qubit size and secret string, store time metric
+                ts = time.time()
+                qc, params = MaxCut(num_qubits, restart_ind, edges, parameterized)
+                metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
-	        # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-	        ex.submit_circuit(qc, num_qubits, restart_ind, shots=num_shots, params=params)
+                # submit circuit for execution on target (simulator, cloud simulator, or hardware)
+                ex.submit_circuit(qc, num_qubits, restart_ind, shots=num_shots, params=params)
 
-		if method == 2:
-            # a unique circuit index used inside the inner minimizer loop as identifier
-            minimizer_loop_index = 0 # Value of 0 corresponds to the 0th iteration of the minimizer
-            start_iters_t = time.time()
-			# Always start by enabling embed ...
-            ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+            if method == 2:
+                global minimizer_loop_index
+                
+                # a unique circuit index used inside the inner minimizer loop as identifier
+                minimizer_loop_index = 0 # Value of 0 corresponds to the 0th iteration of the minimizer
+                
+                start_iters_t = time.time()
+                # Always start by enabling embed ...
+                ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+                        
+                print(f'===============  Begin method 2 loop, enabling embed')
+
+                x=0
+                while x < 200:
+                    x = 1 if x==0 else x**2
+                    print(f"... using anneal time: {x}")
+
+                    # Every circuit needs a unique id; add unique_circuit_index instead of s_int
+                    #global minimizer_loop_index
+                    unique_id = restart_ind * 1000 + minimizer_loop_index
+                    #************************************************
+                    #*** Circuit Creation
+                
+                    # create the circuit for given qubit size, secret string and params, store time metric
+                    ts = time.time()
+                    qc, params = MaxCut(num_qubits, unique_id, edges, parameterized)
+                    metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
+                        
+                    # also store the 'rounds' and 'degree' for each execution
+                    # DEVNOTE: Currently, this is stored for each iteration. Reduce this redundancy
+                    metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
+                    metrics.store_metric(num_qubits, unique_id, 'degree', degree)
+                    #************************************************
+                    #*** Quantum Part: Execution of Circuits ***
+                
+                    # submit circuit for execution on target with the current parameters
+                    ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
+                        
+                    # Must wait for circuit to complete
+                    #ex.throttle_execution(metrics.finalize_group)
+                    ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
+                    # after first execution and thereafter, no need for embed
+                    ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                    print(f'**** First execution complete, disabling embed')
+                    global saved_result
+                    #************************************************
+                    #*** Classical Processing of Results - essential to optimizer ***
+                    global opt_ts
+                    dict_of_vals = dict()
+                    # Start counting classical optimizer time here again
+                    tc1 = time.time()
+                    cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
+                    # Compute the value corresponding to the objective function first
+                    dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha)
+                    # Store the optimizer time as current time- tc1 + ts - opt_ts, since the time between tc1 and ts is not time used by the classical optimizer.
+                    metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
+                    # Note: the first time it is stored it is just the initialization time for optimizer
+                    #************************************************
+                        
+                    #************************************************
+                    #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
+                    # Compute the distribution of cut sizes; store them under metrics
+                    unique_counts, unique_sizes, cumul_counts = get_size_dist(counts, sizes)
+                    global iter_size_dist
+                    iter_size_dist = {'unique_sizes' : unique_sizes, 'unique_counts' : unique_counts, 'cumul_counts' : cumul_counts}
+                    metrics.store_metric(num_qubits, unique_id, None, iter_size_dist)
+
+                    # Compute and the other metrics (eg. cvar, gibbs and max N % if the obj function was set to approx ratio)
+                    for s in non_objFunc_ratios:
+                        dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha)
+                    # Store the ratios
+                    dict_of_ratios = { key : -1 * val / opt for (key, val) in dict_of_vals.items()}
+                    dict_of_ratios['gibbs_ratio'] = dict_of_ratios['gibbs_ratio'] / eta 
+                    metrics.store_metric(num_qubits, unique_id, None, dict_of_ratios)
+                    # Get the best measurement and store it
+                    best = - compute_best_cut_from_measured(counts, sizes)
+                    metrics.store_metric(num_qubits, unique_id, 'bestcut_ratio', best / opt)
+                    # Also compute and store the weights of cuts at three quantile values
+                    quantile_sizes = compute_quartiles(counts, sizes)
+                    # Store quantile_optgaps as a list (allows storing in json files)
+                    metrics.store_metric(num_qubits, unique_id, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) 
+                        
+                    # Also store the cuts, counts and sizes in a global variable, to allow access elsewhere
+                    global iter_dist
+                    iter_dist = {'cuts' : cuts, 'counts' : counts, 'sizes' : sizes}
+                    minimizer_loop_index += 1
+                    #************************************************
+                    # reset timer for optimizer execution after each iteration of quantum program completes
+                    opt_ts = time.time()
+                        
+                        
+                    ##### WIP: what to do here?
                     
-            print(f'===============  Begin method 2 loop, enabling embed')
-
-			x=0
-        	while x < 200:
-                x = 1 if x==0 else x**2
-				print(f"... using anneal time: {x}")
-
-
-
-
-				# Every circuit needs a unique id; add unique_circuit_index instead of s_int
-	            global minimizer_loop_index
-	            unique_id = restart_ind * 1000 + minimizer_loop_index
-				#************************************************
-				#*** Circuit Creation
-			
-				# create the circuit for given qubit size, secret string and params, store time metric
-	            ts = time.time()
-	            qc, params = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array, parameterized)
-	            metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
+                    #return dict_of_vals[objective_func_type]
                     
-	            # also store the 'rounds' and 'degree' for each execution
-	            # DEVNOTE: Currently, this is stored for each iteration. Reduce this redundancy
-	            metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
-	            metrics.store_metric(num_qubits, unique_id, 'degree', degree)
-				#************************************************
-	            #*** Quantum Part: Execution of Circuits ***
-			
-	            # submit circuit for execution on target with the current parameters
-	            ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
-                    
-	            # Must wait for circuit to complete
-	            #ex.throttle_execution(metrics.finalize_group)
-	            ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
-				# after first execution and thereafter, no need for embed
-	            ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-	            print(f'**** First execution complete, disabling embed')
-				global saved_result
-				#************************************************
-	            #*** Classical Processing of Results - essential to optimizer ***
-	            global opt_ts
-	            dict_of_vals = dict()
-	            # Start counting classical optimizer time here again
-	            tc1 = time.time()
-	            cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
-	            # Compute the value corresponding to the objective function first
-	            dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha)
-	            # Store the optimizer time as current time- tc1 + ts - opt_ts, since the time between tc1 and ts is not time used by the classical optimizer.
-	            metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
-	            # Note: the first time it is stored it is just the initialization time for optimizer
-	            #************************************************
-                    
-	            #************************************************
-	            #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
-	            # Compute the distribution of cut sizes; store them under metrics
-	            unique_counts, unique_sizes, cumul_counts = get_size_dist(counts, sizes)
-	            global iter_size_dist
-	            iter_size_dist = {'unique_sizes' : unique_sizes, 'unique_counts' : unique_counts, 'cumul_counts' : cumul_counts}
-	            metrics.store_metric(num_qubits, unique_id, None, iter_size_dist)
+            # Save final iteration data to metrics.circuit_metrics_final_iter
+            # This data includes final counts, cuts, etc.
+            store_final_iter_to_metrics_json(num_qubits=num_qubits, 
+                                                degree=degree, 
+                                                restart_ind=restart_ind,
+                                                num_shots=num_shots, 
+                                                converged_thetas_list=res.x.tolist(),
+                                                opt=opt,
+                                                iter_size_dist=iter_size_dist, iter_dist=iter_dist, parent_folder_save=parent_folder_save,
+                                                dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
+                                                save_res_to_file=save_res_to_file, _instances=_instances)
 
-	            # Compute and the other metrics (eg. cvar, gibbs and max N % if the obj function was set to approx ratio)
-	            for s in non_objFunc_ratios:
-	                dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha)
-	            # Store the ratios
-	            dict_of_ratios = { key : -1 * val / opt for (key, val) in dict_of_vals.items()}
-	            dict_of_ratios['gibbs_ratio'] = dict_of_ratios['gibbs_ratio'] / eta 
-	            metrics.store_metric(num_qubits, unique_id, None, dict_of_ratios)
-	            # Get the best measurement and store it
-	            best = - compute_best_cut_from_measured(counts, sizes)
-	            metrics.store_metric(num_qubits, unique_id, 'bestcut_ratio', best / opt)
-	            # Also compute and store the weights of cuts at three quantile values
-	            quantile_sizes = compute_quartiles(counts, sizes)
-	            # Store quantile_optgaps as a list (allows storing in json files)
-	            metrics.store_metric(num_qubits, unique_id, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) 
-                    
-	            # Also store the cuts, counts and sizes in a global variable, to allow access elsewhere
-	            global iter_dist
-	            iter_dist = {'cuts' : cuts, 'counts' : counts, 'sizes' : sizes}
-	            minimizer_loop_index += 1
-	            #************************************************
-				# reset timer for optimizer execution after each iteration of quantum program completes
-	            opt_ts = time.time()
-                    
-	            return dict_of_vals[objective_func_type]
-        # Save final iteration data to metrics.circuit_metrics_final_iter
-        # This data includes final counts, cuts, etc.
-        store_final_iter_to_metrics_json(num_qubits=num_qubits, 
-                                            degree=degree, 
-                                            restart_ind=restart_ind,
-                                            num_shots=num_shots, 
-                                            converged_thetas_list=res.x.tolist(),
-                                            opt=opt,
-                                            iter_size_dist=iter_size_dist, iter_dist=iter_dist, parent_folder_save=parent_folder_save,
-                                            dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
-                                            save_res_to_file=save_res_to_file, _instances=_instances)
-
-        x = x**2
+            x = x**2
             
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
