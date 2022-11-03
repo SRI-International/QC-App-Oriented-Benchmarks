@@ -1924,8 +1924,8 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
         # Also plot the distribution obtained from uniform random sampling
         dist = group_metrics_optgaps['random_cutsize_ratio_dist']
         axs.plot(dist['ratios'][indx], dist['frequencies'][indx],
-                 marker='o', c='k', ms=2, mec='k', mew=0.4, lw=1,
-                 ls='dotted', label=f"Uniform Random Sampling")  # " degree={deg}") # lw=1,
+             marker='o', ms=1, mec = 'k',mew=0.2, lw=10,alpha=0.5,
+             ls = '-', label = "Uniform Random Sampling", c = "pink")  # " degree={deg}") # lw=1,
 
         # Plot vertical lines corresponding to the various metrics
         plotted_metric_values = []
