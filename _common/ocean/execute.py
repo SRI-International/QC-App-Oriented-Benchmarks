@@ -155,7 +155,7 @@ def submit_circuit(qc:HamiltonianCircuitProxy, group_id, circuit_id, shots=100, 
 # Launch execution of one job (circuit)
 def execute_circuit(circuit):
         
-    sampleset = None
+    # sampleset = None
 
     try:
         logger.info(f"Executing on backend: {device_name}")
@@ -196,6 +196,21 @@ def execute_circuit(circuit):
         
         logger.info(f'Finished Running - {round(time.time() - st, 5)} (ms)')
         if verbose_time: print(f"  *** ocean.sample() time = {round(time.time() - st, 5)}")
+        
+        def process_to_bitstring(cut_list):
+            # DEVNOTE : Check if the mapping is correct
+            # Convert 1 to 0 and -1 to 1
+            cut_list = ['0' if i == 1 else '1' for i in cut_list]
+            # (-(cut_array - 1)/2).astype('int32')
+            return "".join(cut_list)
+            
+        all_cuts = [elem[0].tolist() for elem in sampleset.record]
+        all_cuts = [process_to_bitstring(cut) for cut in all_cuts]
+        unique_cuts = list(set(all_cuts))
+        cut_occurances = [all_cuts.count(cut) for cut in unique_cuts]
+        result = { cut : count for (cut,count) in zip(unique_cuts, cut_occurances)}
+        print(result)
+        result_handler(circuit["qc"], result, circuit["group"], circuit["circuit"], circuit["shots"])
             
     except Exception as e:
         print(f'ERROR: Failed to execute {circuit["group"]} {circuit["circuit"]}')

@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 fname, _, ext = os.path.basename(__file__).partition(".")
 log_to_file = True
 
+# Big-endian format is used in dwave. no need to reverse bitstrings
+reverseStep = 1
+
 try:
     if log_to_file:
         logging.basicConfig(
@@ -192,9 +195,10 @@ def compute_cutsizes(results, nodes, edges):
     sizes : ndarray of ints
         cut sizes (i.e. number of edges crossing the cut)
     """
-    cuts = list(results.get_counts().keys())
-    counts = list(results.get_counts().values())
+    cuts = list(results.keys())
+    counts = list(results.values())
     sizes = [common.eval_cut(nodes, edges, cut, reverseStep) for cut in cuts]
+    print(sizes)
     return cuts, counts, sizes
 
 def get_size_dist(counts, sizes):
@@ -817,8 +821,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
      
+    def execution_handler2 (qc, result, num_qubits, s_int, num_shots):
+        # Stores the results to the global saved_result variable
+        print("execution handler 2 was called")
+        global saved_result
+        saved_result = result      
+        
     # Initialize execution module using the execution result handler above and specified backend_id
-    ex.init_execution(execution_handler)
+    ex.init_execution(execution_handler2)
     
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options)
@@ -925,11 +935,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     dict_of_vals = dict()
                     # Start counting classical optimizer time here again
                     tc1 = time.time()
+                    print(saved_result)
                     cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
                     # Compute the value corresponding to the objective function first
                     dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha)
                     # Store the optimizer time as current time- tc1 + ts - opt_ts, since the time between tc1 and ts is not time used by the classical optimizer.
-                    metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
+                    # metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
                     # Note: the first time it is stored it is just the initialization time for optimizer
                     #************************************************
                         
