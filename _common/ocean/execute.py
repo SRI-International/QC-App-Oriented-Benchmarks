@@ -53,6 +53,9 @@ backend_exec_options = None
 # Cached transpiled circuit, used for parameterized execution
 cached_circuits = {}
 
+# embedding variables cached during execution
+embedding_flag = True
+embedding = None
 
 ##########################
 # JOB MANAGEMENT VARIABLES 
@@ -65,7 +68,7 @@ result_handler = None
 verbose = True
 
 # Print additional time metrics for each stage of execution
-verbose_time = False
+verbose_time = True
 
 
 ######################################################################
@@ -118,9 +121,8 @@ def set_execution_target(backend_id='pegasus',
     print(f"... using backend_id = {backend_id}")
 
 # Set the state of the transpilation flags
-def set_tranpilation_flags(do_transpile_metrics = True, do_transpile_for_execute = True):
-    globals()['do_transpile_metrics'] = do_transpile_metrics
-    globals()['do_transpile_for_execute'] = do_transpile_for_execute
+def set_embedding_flag(embedding_flag = True):   
+    globals()['embedding_flag'] = embedding_flag
     
     
 ######################################################################
@@ -162,6 +164,7 @@ def execute_circuit(circuit):
     
     shots = circuit["shots"]
     qc = circuit["qc"]
+    annealing_time=circuit["params"][0]
     
     sampleset = None
 
@@ -170,42 +173,43 @@ def execute_circuit(circuit):
          
         # perform circuit execution on backend
         logger.info(f'Running trans_qc, shots={circuit["shots"]}')
-        st = time.time() 
-
-        # DEVNOTE: may need to reset this somewhere!
-        embedding = None
         
-        '''
-        x=0
-        while x < 200:
-                x = 1 if x==0 else x**2
-
-                qpu = DWaveSampler(token=token, solver={'topology__type': backend["backend_id"]})
-
-                if (embedding==None):
-                    sampler = EmbeddingComposite(qpu)
-                else:
-                    sampler = FixedEmbeddingComposite(qpu, embedding=embedding)
-
-                sampleset = sampler.sample_ising(circuit.qc.h, circuit.qc.J, circuit.qc.shots, annealing_time=x)
-        '''
+        # start elapsed_time (and default exec_time)
+        st2 = st = time.time() 
         
+        if embedding_flag:
+            globals()["embedding"] = None
+        
+        # execute on the D-Wave Neal simulator
         if device_name == "pegasus":
             sampler = backend
             
+            # for simulation purposes, add a little time for embedding
+            if (embedding_flag):
+                time.sleep(0.5)
+                
+            # start exec_time
+            st2 = time.time() 
+            
+        # execute on D-Wave hardware
         else:
-            if (embedding==None):
+            if (embedding_flag):
                 sampler = EmbeddingComposite(backend)
+                
             else:
+                # start exec_time
+                st2 = time.time()
+                
                 sampler = FixedEmbeddingComposite(backend, embedding=embedding)
 
-        #sampleset = sampler.sample_ising(circuit.qc.h, circuit.qc.J, circuit.qc.shots, annealing_time=x)
-        sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, annealing_time=circuit["params"][0])
+        # perform the annealing operation
+        sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, annealing_time=annealing_time)
         
-        elapsed_time =  exec_time = round(time.time() - st, 5)
+        elapsed_time = round(time.time() - st, 5)
+        exec_time = round(time.time() - st2, 5)
         
-        logger.info(f'Finished Running - {round(time.time() - st, 5)} (ms)')
-        if verbose_time: print(f"  *** ocean.sample() time = {round(time.time() - st, 5)}")
+        logger.info(f'Finished Running - {elapsed_time} (ms)')
+        if verbose_time: print(f"  *** ocean.sample() time = {elapsed_time}")
         
         metrics.store_metric(circuit["group"], circuit["circuit"], 'elapsed_time', elapsed_time)
         metrics.store_metric(circuit["group"], circuit["circuit"], 'exec_time', exec_time)

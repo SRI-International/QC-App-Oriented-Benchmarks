@@ -901,14 +901,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                 
                 start_iters_t = time.time()
                 # Always start by enabling embed ...
-                ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+                ex.set_embedding_flag(embedding_flag=True)
                         
                 print(f'===============  Begin method 2 loop, enabling embed')
 
-                x = 1
-                while x < 200:
+                annealing_time = 1
+                while annealing_time < 200:
                     
-                    print(f"... using anneal time: {x}")
+                    print(f"... using anneal time: {annealing_time}")
 
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                     #global minimizer_loop_index
@@ -919,7 +919,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # create the circuit for given qubit size, secret string and params, store time metric
                     ts = time.time()
                     qc, params = MaxCut(num_qubits, unique_id, edges, parameterized)
-                    params = [x]
+                    params = [annealing_time]
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                         
                     # also store the 'rounds' and 'degree' for each execution
@@ -937,7 +937,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                     
                     # after first execution and thereafter, no need for embed
-                    ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                    ex.set_embedding_flag(embedding_flag=False)
                     print(f'**** First execution complete, disabling embed')
                     global saved_result
                     #print(saved_result)
@@ -989,7 +989,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     opt_ts = time.time()
                     
                     # double the annealing time for the next iteration
-                    x *= 2
+                    annealing_time *= 2
                     
                     #return dict_of_vals[objective_func_type]
                     
