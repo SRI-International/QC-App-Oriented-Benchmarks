@@ -1728,7 +1728,7 @@ def plot_area_metrics(suptitle='',
     if x_max == None:
         x_max = max(x)
     else:
-        x_max = x_max - 1  # subtract one to account for the auto-label algorithm in bakcground function
+        x_max = x_max - 1  # subtract one to account for the auto-label algorithm in background function
     
     # append the circuit metrics subtitle to the title
     fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
@@ -1738,11 +1738,14 @@ def plot_area_metrics(suptitle='',
             if len(options_str) > 0: options_str += ', '
             options_str += f"{key}={value}"
         fulltitle += f"\n{options_str}"
-
+    
+    # convert irregular y-axis data to linear if any non-linear gaps in the data
+    yy, ylabels = linearize_axis(y, gap=2)
+    
     with plt.style.context(maxcut_style):
         # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
-                    y_max=max(y), x_max=x_max, y_min=min(y), x_min=x_min)
+                    y_max=max(yy), x_max=x_max, y_min=min(yy), x_min=x_min, ylabels=ylabels)
         
         # no longer used, instead we pass the array of sizes
         #if x_size == None:
@@ -1757,7 +1760,7 @@ def plot_area_metrics(suptitle='',
         ax.grid(True, axis = 'x', zorder = 0, color='silver')
     
         # plot all the bars, with width specified as an array that matches the array size of the x,y values
-        plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
+        plot_volumetric_data(ax, yy, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
                             labelrot=0, type=1, fill=True, w_max=18, do_label=False,
                             x_size=xs, y_size=y_size, zorder=3)                           
         
@@ -1769,7 +1772,56 @@ def plot_area_metrics(suptitle='',
                                               + x_label_save_str[x_metric] + '-'
                                               + suffix), backend_id)
 
+# convert irregular axis data to linear, with minimum gap size
+# only show labels for the actual data points
+# (the labels assume that the return data will be plotted with 2 points before and after)
+def linearize_axis(values, gap=2):  
+    #print(f"{values = }")
 
+    # use this flag to test if there are gaps > gap
+    gaps_exist = False
+    
+    # add two labels at beginning
+    basis = [None, None];
+    
+    # loop over values and generate new values that are separated by the gap value
+    newvalues = [];
+    for i in range(len(values)):
+        newvalues.append(values[i])
+        
+        # first point is unchanged
+        if i == 0:
+            basis.append(values[i]) 
+        
+        # subsequent points are unchanged if same, but modified by gap if different
+        if i > 0:
+            delta = values[i] - values[i - 1]
+            if delta == 0:
+                #print("delta 0")
+                newvalues[i] = newvalues[i - 1]
+            elif delta > gap:
+                #print("delta 1+")
+                gaps_exist = True
+                newvalues[i] = newvalues[i - 1] + gap
+                basis.append(None)
+                basis.append(values[i])
+    
+    # add two labels at end    
+    basis += [None, None] 
+
+    #print(f"{newvalues = }")
+    #print(f"{basis = }")
+      
+    # format new labels as strings, showing only the actual values (non-zero)
+    ylabels = [format_number(yb) if yb != None else '' for yb in basis]
+    #print(f"{ylabels = }")
+    
+    if gaps_exist:
+        return newvalues, ylabels
+    else:
+        return values, None
+    
+  
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
 # DEVNOTE: this binning approach creates unevenly spaced bins, cannot use the delta between then for size
 def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins):
@@ -2846,7 +2898,8 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
 
 
 # Linear Background Analog of the QV Volumetric Background, to allow arbitrary metrics on each axis
-def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max, y_min=0, x_min=0):
+def plot_metrics_background(suptitle, ylabel, x_label, score_label,
+            y_max, x_max, y_min=0, x_min=0, ylabels=None):
     
     if suptitle == None:
         suptitle = f"{ylabel} vs. {x_label}, Parameter Positioning of {score_label}"
@@ -2859,7 +2912,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     max_width = y_max + 3
     min_width = y_min - 3
     
-    fig, ax = plt.subplots()#constrained_layout=True, figsize=(plot_width, plot_height))
+    fig, ax = plt.subplots() #constrained_layout=True, figsize=(plot_width, plot_height))
 
     plt.title(suptitle)
     
@@ -2898,7 +2951,10 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
         
     ax.set_ylabel(ylabel)
     #ax.set_yticks(yround)
-    ax.set_yticks(ybasis)    
+    ax.set_yticks(ybasis)   
+
+    if ylabels != None:
+        plt.yticks(ybasis, ylabels)
     
     # add colorbar to right of plot
     plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
