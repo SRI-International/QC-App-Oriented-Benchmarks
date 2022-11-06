@@ -1742,7 +1742,7 @@ def plot_area_metrics(suptitle='',
         scores = [_s for _y,_x,_xs,_s in z]
         
         # convert irregular y-axis data to linear if any non-linear gaps in the data
-        yy, ylabels = linearize_axis(y, gap=2)
+        yy, ylabels = linearize_axis(y, gap=2, outer=2, fill=True)
         
     else:
         yy = y
@@ -1810,8 +1810,9 @@ def needs_linearize(values, gap=2):
 # (the labels assume that the return data will be plotted with 2 points before and after)
 # DEVNOTE: the use of this function is limited to the special case of the maxcut plots for now,
 # given the limited range of problem definitions
-def linearize_axis(values, gap=2):  
+def linearize_axis(values, gap=2, outer=2, fill=True):  
     #print(f"{values = }")
+    #print(f"{outer = }")
     
     # if only one element, no need to linearize
     if len(values) < 2:
@@ -1820,9 +1821,9 @@ def linearize_axis(values, gap=2):
     # use this flag to test if there are gaps > gap
     gaps_exist = False
     
-    # add two labels at beginning
-    basis = [None, None];
-    
+    # add labels at beginning
+    basis = [None] * outer;
+
     # loop over values and generate new values that are separated by the gap value
     newvalues = [];
     for i in range(len(values)):
@@ -1842,11 +1843,11 @@ def linearize_axis(values, gap=2):
                 #print("delta 1+")
                 gaps_exist = True
                 newvalues[i] = newvalues[i - 1] + gap
-                basis.append(None)
+                if fill and gap > 1: basis.append(None)         # put space between items if gap > 1
                 basis.append(values[i])
     
-    # add two labels at end    
-    basis += [None, None] 
+    # add labels at end    
+    basis += [None] * outer
 
     #print(f"{newvalues = }")
     #print(f"{basis = }")
@@ -2244,6 +2245,15 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     if which_metrics_to_plot == 'all' or type(which_metrics_to_plot) != list:
         which_metrics_to_plot = ['approx_ratio', 'cvar_ratio', 'bestcut_ratio', 'gibbs_ratio', 'quantile_optgaps', 'violin']
     
+    # check if we have sparse or non-linear axis data and linearize if so
+    xvalues = group_metrics_optgaps["groups"]
+    xlabels = None
+    if needs_linearize(xvalues, gap=2):
+        #print("... needs linearize")
+        
+        # convert irregular x-axis data to linear if any non-linear gaps in the data
+        xx, xlabels = linearize_axis(xvalues, gap=2, outer=0, fill=False)
+        xvalues = xx
     
     # Create title for the plots
     fulltitle = get_full_title(suptitle=suptitle, options=options)
@@ -2253,17 +2263,24 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
-        axs.set_xticks(group_metrics_optgaps["groups"])
-        axs.set_xlabel('Circuit Width (Number of Qubits)')
         plt.title(fulltitle)
-
+        axs.set_xlabel('Circuit Width (Number of Qubits)')
+        axs.set_ylabel(r'Optimality Gap ($\%$)')
+                
+        axs.set_xticks(xvalues)
+        if xlabels != None:
+            plt.xticks(xvalues, xlabels)
+ 
         limopts = max(group_metrics_optgaps['approx_ratio']['gapvals'])
-        axs.set_ylim([0, max(40, limopts) * 1.1])
+        if limopts > 5:
+            axs.set_ylim([0, max(40, limopts) * 1.1])
+        else:
+            axs.set_ylim([0, 5.0])
+            
         axs.grid(True, axis = 'y', color='silver', zorder = 0)  # other bars use this silver color
         #axs.grid(True, axis = 'y', zorder = 0)
-        axs.bar(group_metrics_optgaps["groups"], group_metrics_optgaps['approx_ratio']['gapvals'], 0.8, zorder = 3)
-        axs.set_ylabel(r'Optimality Gap ($\%$)')
-
+        axs.bar(xvalues, group_metrics_optgaps['approx_ratio']['gapvals'], 0.8, zorder = 3)
+        
         # NOTE: Can move the calculation or the errors variable to before the plotting. This code is repeated in the detailed plotting as well.
         # Plot quartiles
         q_vals = group_metrics_optgaps['quantile_optgaps']['gapvals'] # list of lists; shape (number of circuit widths, 3)
@@ -2273,7 +2290,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
         errors = [up_error, down_error]
 
-        axs.errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75, zorder = 5)
+        axs.errorbar(xvalues, center_optgaps, yerr = errors, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75, zorder = 5)
 
         fig.tight_layout()
         axs.legend()
@@ -2289,18 +2306,22 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
     ############################################################
     ##### Detailed optimality gaps plot
+    
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
         plt.title(fulltitle)
         axs.set_ylabel(r'Optimality Gap ($\%$)')
         axs.set_xlabel('Circuit Width (Number of Qubits)')
-        axs.set_xticks(group_metrics_optgaps["groups"])
+        
+        axs.set_xticks(xvalues)
+        if xlabels != None:
+            plt.xticks(xvalues, xlabels)
 
         if 'violin' in which_metrics_to_plot:
             list_of_violins = group_metrics_optgaps['violin']['gapvals']
             # violinx_list = [x for [x,y] in list_of_violins]
             # violiny_list = [y for [x,y] in list_of_violins]
-            violin_list_locs = group_metrics_optgaps['groups']
+            violin_list_locs = xvalues
             for loc, vxy in zip(violin_list_locs, list_of_violins):
                 vy = vxy[1]
                 vx = vxy[0]
@@ -2318,13 +2339,13 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
             errors = [up_error, down_error]
 
-            plt_handles['quantile_optgaps'] = axs.errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors,ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75)
+            plt_handles['quantile_optgaps'] = axs.errorbar(xvalues, center_optgaps, yerr = errors,ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75)
 
         for metric_str in set(which_metrics_to_plot) - set(["quantile_optgaps", "violin"]):
             # For all metrics to be plotted, except quantile optgaps and violin plots, plot a line
             # Plot a solid line for the objective function, and dashed otherwise
             ls = '-' if metric_str == objective_func_type else '--'
-            plt_handles[metric_str], = axs.plot(group_metrics_optgaps["groups"], group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])    
+            plt_handles[metric_str], = axs.plot(xvalues, group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])    
 
 
         # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
@@ -2338,10 +2359,16 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             ylim_top = max(ylim_top, max(group_metrics_optgaps[o_f]['gapvals']))
         ylim_top = max(ylim_top, max(map(max, group_metrics_optgaps['quantile_optgaps']['gapvals'])))
         if ylim_top > 60: 
-            ylim_top = 100
+            ylim_top = 100 + 3
+            bottom = 0 - 3
+        elif ylim_top > 10:
+            ylim_top = 60 + 3
+            bottom = 0 - 3
         else:
-            ylim_top = 60
-        axs.set_ylim(bottom = 0 - 3, top = ylim_top + 3)
+            ylim_top = 8 + 1
+            bottom = 0 - 1
+            
+        axs.set_ylim(bottom=bottom, top = ylim_top)
         # axs.set_ylim(bottom=0,top=100)
 
         # Add grid
