@@ -1731,28 +1731,34 @@ def plot_area_metrics(suptitle='',
             options_str += f"{key}={value}"
         fulltitle += f"\n{options_str}"
     
-    # sort the data by y axis values, as it may be loaded out of order from file storage
-    z = sorted(zip(y,x,xs,scores))
-    y = [_y for _y,_x,_xs,_s in z]
-    x = [_x for _y,_x,_xs,_s in z]
-    xs = [_xs for _y,_x,_xs,_s in z]
-    scores = [_s for _y,_x,_xs,_s in z]
+    # if the y axis data is sparse or non-linear, linearize the axis data and sort all arrays
+    if needs_linearize(y, gap=2):
     
-    # convert irregular y-axis data to linear if any non-linear gaps in the data
-    yy, ylabels = linearize_axis(y, gap=2)
+        # sort the data by y axis values, as it may be loaded out of order from file storage
+        z = sorted(zip(y,x,xs,scores))
+        y = [_y for _y,_x,_xs,_s in z]
+        x = [_x for _y,_x,_xs,_s in z]
+        xs = [_xs for _y,_x,_xs,_s in z]
+        scores = [_s for _y,_x,_xs,_s in z]
+        
+        # convert irregular y-axis data to linear if any non-linear gaps in the data
+        yy, ylabels = linearize_axis(y, gap=2)
+        
+    else:
+        yy = y
+        ylabels = None
        
     # the x axis min/max values will be min(x)/max(x) or values supplied by caller
     if x_min == None:
-        x_min = min(x)
+        #x_min = min(x)
+        x_min = 0       # if not supplied, always use 0 for area plots, as leftmost time is 0
+        
     if x_max == None:
         x_max = max(x)
+        x_max += max(xs)/2  # if not supplied, rightmost time must include the width
     else:
         x_max = x_max - 1  # subtract one to account for the auto-label algorithm in background function
    
-    # for area plots, adjust x limits, as left most time is 0 and the right must include the width
-    x_min = 0
-    x_max += max(xs)/2
-    
     with plt.style.context(maxcut_style):
         # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
@@ -1780,6 +1786,25 @@ def plot_area_metrics(suptitle='',
                                               + x_label_save_str[x_metric] + '-'
                                               + suffix), backend_id)
 
+# Check if axis data needs to be linearized
+# Returns true if data sparse or non-linear; sparse means with any gap > gap size
+def needs_linearize(values, gap=2):
+    #print(f"{values = }")
+
+    # if only one element, no need to linearize
+    if len(values) < 2:
+        return False
+    
+    # simple logic for now: return if any gap > 2
+    for i in range(len(values)):    
+        if i > 0:
+            delta = values[i] - values[i - 1]
+            if delta > gap:
+                return True
+                
+    # no need to linearize if all small gaps
+    return False
+
 # convert irregular axis data to linear, with minimum gap size
 # only show labels for the actual data points
 # (the labels assume that the return data will be plotted with 2 points before and after)
@@ -1787,7 +1812,11 @@ def plot_area_metrics(suptitle='',
 # given the limited range of problem definitions
 def linearize_axis(values, gap=2):  
     #print(f"{values = }")
-
+    
+    # if only one element, no need to linearize
+    if len(values) < 2:
+        return values, None
+    
     # use this flag to test if there are gaps > gap
     gaps_exist = False
     

@@ -548,8 +548,9 @@ def load_data_and_plot(folder, backend_id=None, **kwargs):
         Directory where json files are saved.
     """
     _gen_prop = load_all_metrics(folder, backend_id=backend_id)
-    gen_prop = {**_gen_prop, **kwargs}
-    plot_results_from_data(**gen_prop)
+    if _gen_prop != None:
+        gen_prop = {**_gen_prop, **kwargs}
+        plot_results_from_data(**gen_prop)
 
 
 def load_all_metrics(folder, backend_id=None):
@@ -582,6 +583,11 @@ def load_all_metrics(folder, backend_id=None):
         [tup[2] for tup in width_restart_file_tuples if tup[0] == width] for width in distinct_widths
         ]
     
+    # connot continue without at least one dataset
+    if len(list_of_files) < 1:
+        print("ERROR: No result files found")
+        return None
+        
     for width_files in list_of_files:
         # For each width, first load all the restart files
         for fileName in width_files:
