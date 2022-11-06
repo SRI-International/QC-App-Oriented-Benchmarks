@@ -1721,15 +1721,7 @@ def plot_area_metrics(suptitle='',
         x = x + x_
         y = y + y_
         scores = scores + scores_
-        
-    # the x axis min/max values will be min(x)/max(x) or values supplied by caller
-    if x_min == None:
-        x_min = min(x)
-    if x_max == None:
-        x_max = max(x)
-    else:
-        x_max = x_max - 1  # subtract one to account for the auto-label algorithm in background function
-    
+
     # append the circuit metrics subtitle to the title
     fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
     if options != None:
@@ -1739,17 +1731,32 @@ def plot_area_metrics(suptitle='',
             options_str += f"{key}={value}"
         fulltitle += f"\n{options_str}"
     
+    # sort the data by y axis values, as it may be loaded out of order from file storage
+    z = sorted(zip(y,x,xs,scores))
+    y = [_y for _y,_x,_xs,_s in z]
+    x = [_x for _y,_x,_xs,_s in z]
+    xs = [_xs for _y,_x,_xs,_s in z]
+    scores = [_s for _y,_x,_xs,_s in z]
+    
     # convert irregular y-axis data to linear if any non-linear gaps in the data
     yy, ylabels = linearize_axis(y, gap=2)
+       
+    # the x axis min/max values will be min(x)/max(x) or values supplied by caller
+    if x_min == None:
+        x_min = min(x)
+    if x_max == None:
+        x_max = max(x)
+    else:
+        x_max = x_max - 1  # subtract one to account for the auto-label algorithm in background function
+   
+    # for area plots, adjust x limits, as left most time is 0 and the right must include the width
+    x_min = 0
+    x_max += max(xs)/2
     
     with plt.style.context(maxcut_style):
         # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
                     y_max=max(yy), x_max=x_max, y_min=min(yy), x_min=x_min, ylabels=ylabels)
-        
-        # no longer used, instead we pass the array of sizes
-        #if x_size == None:
-            #x_size=(max(x)-min(x))/num_x_bins
             
         if y_size == None:
             y_size = 1.0
@@ -1759,10 +1766,11 @@ def plot_area_metrics(suptitle='',
         # add a grid on the x axis (with the maxcut style of alpha=0.5, this color is best for pdf)
         ax.grid(True, axis = 'x', zorder = 0, color='silver')
     
-        # plot all the bars, with width specified as an array that matches the array size of the x,y values
-        plot_volumetric_data(ax, yy, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
-                            labelrot=0, type=1, fill=True, w_max=18, do_label=False,
-                            x_size=xs, y_size=y_size, zorder=3)                           
+        # plot all bars, with width specified as an array that matches array size of the x,y values
+        plot_volumetric_data(ax, yy, x, scores, depth_base=-1,
+                    label='Depth', labelpos=(0.2, 0.7), labelrot=0,
+                    type=1, fill=True, w_max=18, do_label=False,
+                    x_size=xs, y_size=y_size, zorder=3)                           
         
         plt.tight_layout()
         
@@ -1775,6 +1783,8 @@ def plot_area_metrics(suptitle='',
 # convert irregular axis data to linear, with minimum gap size
 # only show labels for the actual data points
 # (the labels assume that the return data will be plotted with 2 points before and after)
+# DEVNOTE: the use of this function is limited to the special case of the maxcut plots for now,
+# given the limited range of problem definitions
 def linearize_axis(values, gap=2):  
     #print(f"{values = }")
 
@@ -2159,9 +2169,13 @@ def get_distribution_and_stats():
             full_size_list = list(range(optimal_value + 1))
             full_counts_list_unif = [unique_counts_unif[unique_sizes_unif.index(s)] if s in unique_sizes_unif else 0 for s in full_size_list]
             group_metrics_optgaps['random_cutsize_ratio_dist']['ratios'].append(np.array(full_size_list) / optimal_value)
-            group_metrics_optgaps['random_cutsize_ratio_dist']['frequencies'].append(np.array(full_counts_list_unif) / sum(full_counts_list_unif))
-    
-    
+             
+            # hack to avoid crash if all zeros
+            sum_full_counts_list_unif = sum(full_counts_list_unif)
+            if sum_full_counts_list_unif <= 0: sum_full_counts_list_unif = 1
+            
+            group_metrics_optgaps['random_cutsize_ratio_dist']['frequencies'].append(np.array(full_counts_list_unif) / sum_full_counts_list_unif)
+       
     return group_metrics_optgaps
     
 # Plot detailed optgaps
@@ -2924,8 +2938,8 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
     #print(f"... {x_min} {x_max} {max_base} {x_max}")
     if x_min < 0.1: x_min = 0
     
-    step = (x_max - x_min) / num_xdivs
-        
+    # and compute the step size for the tick divisions
+    step = (x_max - x_min) / num_xdivs   
     plt.xlim(x_min - step/2, x_max + step/2)
        
     #plt.ylim(y_min*0.5, y_max*1.5)

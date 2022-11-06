@@ -50,8 +50,11 @@ except Exception as e:
 np.random.seed(0)
 
 maxcut_inputs = dict() #inputs to the run method
+
 verbose = False
+
 print_sample_circuit = True
+
 # Indicates whether to perform the (expensive) pre compute of expectations
 do_compute_expectation = True
 
@@ -688,7 +691,7 @@ instance_filename = None
 minimizer_loop_index = 0
 
 def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
-        method=1, rounds=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
+        method=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
@@ -708,8 +711,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         Number of times the circut will be measured, for each iteration. The default is 100.
     method : int, optional
         If 1, then do standard metrics, if 2, implement iterative algo metrics. The default is 1.
-    rounds : int, optional
-        number of QAOA rounds. The default is 1.
     degree : int, optional
         degree of graph. The default is 3.
     thetas_array : list, optional
@@ -803,8 +804,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
     do_compute_expectation = False
-    
-    rounds = max(1, rounds)
     
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
@@ -902,13 +901,15 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                 start_iters_t = time.time()
                 # Always start by enabling embed ...
                 ex.set_embedding_flag(embedding_flag=True)
-                        
-                print(f'===============  Begin method 2 loop, enabling embed')
+                
+                if verbose:
+                    print(f'===============  Begin method 2 loop, enabling embed')
 
                 annealing_time = 1
                 while annealing_time < 200:
                     
-                    print(f"... using anneal time: {annealing_time}")
+                    if verbose:
+                        print(f"... using anneal time: {annealing_time}")
 
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                     #global minimizer_loop_index
@@ -922,10 +923,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     params = [annealing_time]
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                         
-                    # also store the 'rounds' and 'degree' for each execution
+                    # also store the 'degree' for each execution
                     # DEVNOTE: Currently, this is stored for each iteration. Reduce this redundancy
-                    #metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
                     metrics.store_metric(num_qubits, unique_id, 'degree', degree)
+                    
                     #************************************************
                     #*** Quantum Part: Execution of Circuits ***
                 
@@ -938,7 +939,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     
                     # after first execution and thereafter, no need for embed
                     ex.set_embedding_flag(embedding_flag=False)
-                    print(f'**** First execution complete, disabling embed')
+                    
+                    if verbose:
+                        print(f'**** First execution complete, disabling embed')
+                        
                     global saved_result
                     #print(saved_result)
                     
@@ -955,7 +959,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
                     # Note: the first time it is stored it is just the initialization time for optimizer
                     #************************************************
-                    print(dict_of_vals)
+                    
+                    if verbose:
+                        print(dict_of_vals)
                         
                     #************************************************
                     #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
@@ -984,14 +990,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     global iter_dist
                     iter_dist = {'cuts' : cuts, 'counts' : counts, 'sizes' : sizes}
                     minimizer_loop_index += 1
+                    
                     #************************************************
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
                     
                     # double the annealing time for the next iteration
                     annealing_time *= 2
-                    
-                    #return dict_of_vals[objective_func_type]
                     
             # Save final iteration data to metrics.circuit_metrics_final_iter
             # This data includes final counts, cuts, etc.
@@ -1011,32 +1016,22 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         if method == 2:                  
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
-            
-    # Wait for some active circuits to complete; report metrics when groups complete
-    #ex.throttle_execution(metrics.finalize_group)
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-     
-    '''
-    global print_sample_circuit
-    if print_sample_circuit:
-        # print a sample circuit
-        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
-    '''
     
-    # Plot metrics for all circuit sizes
+    # Plot metrics for all problem sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Ocean",
                 options=dict(shots=num_shots))
+                
     elif method == 2:
         #metrics.print_all_circuit_metrics()
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
-
-def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_circuits = 1,
+# Method to plot the results from the collected data
+def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 1,
                  objective_func_type='approx_ratio', method=2, score_metric='fidelity',
                  x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
                  num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
@@ -1050,16 +1045,16 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
         cur_time=datetime.datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
         short_obj_func_str = metrics.score_label_save_str[objective_func_type]
-        suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_of-{short_obj_func_str}_{dt}' #of=objective function
+        suffix = f'-s{num_shots}_d{degree}_mi{max_iter}_of-{short_obj_func_str}_{dt}' #of=objective function
     else:
         short_obj_func_str = metrics.score_label_save_str[objective_func_type]
         suffix = f'of-{short_obj_func_str}' #of=objective function
         
     obj_str = metrics.known_score_labels[objective_func_type]
-    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
-    suptitle = f"Benchmark Results - MaxCut ({method}) - Qiskit"
+    options = {'shots' : num_shots, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
+    suptitle = f"Benchmark Results - MaxCut ({method}) - Ocean"
     
-    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Ocean",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
                 fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
                 x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
