@@ -38,6 +38,9 @@ from dwave.system.samplers import DWaveSampler
 from dwave.system import DWaveSampler, EmbeddingComposite, FixedEmbeddingComposite
 from neal import SimulatedAnnealingSampler
 
+# this seems to be required for embedding to work
+import dwave.inspector
+
 import HamiltonianCircuitProxy
 
 
@@ -65,10 +68,10 @@ embedding = None
 result_handler = None
 
 # Print progress of execution
-verbose = True
+verbose = False
 
 # Print additional time metrics for each stage of execution
-verbose_time = True
+verbose_time = False
 
 
 ######################################################################
@@ -194,16 +197,24 @@ def execute_circuit(circuit):
         # execute on D-Wave hardware
         else:
             if (embedding_flag):
+                if verbose: print("... CREATE embedding")
                 sampler = EmbeddingComposite(backend)
-                
+                            
             else:
                 # start exec_time
                 st2 = time.time()
                 
+                if verbose: print("... USE embedding")
                 sampler = FixedEmbeddingComposite(backend, embedding=embedding)
 
         # perform the annealing operation
         sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, annealing_time=annealing_time)
+        if verbose: print(sampleset.info)
+        
+        # if embedding context is returned and we haven't already cached it, cache it here
+        if embedding == None:
+            if "embedding_context" in sampleset.info:
+                globals()["embedding"] = sampleset.info["embedding_context"]["embedding"]
         
         elapsed_time = round(time.time() - st, 5)
         exec_time = round(time.time() - st2, 5)

@@ -698,7 +698,7 @@ minimizer_loop_index = 0
 
 def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         method=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
-        max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
+        max_iter=30, max_annealing_time=200, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
@@ -731,6 +731,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         Compute circuit fidelity. The default is True.
     max_iter : int, optional
         Number of iterations for the minimizer routine. The default is 30.
+    max_annealing_time : int, optional
+        Maximum annealing time. The default is 200.
     score_metric : list or string, optional
         Which metrics are to be plotted in area metrics plots. The default is 'fidelity'.
     x_metric : list or string, optional
@@ -912,7 +914,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     print(f'===============  Begin method 2 loop, enabling embed')
 
                 annealing_time = 1
-                while annealing_time < 200:
+                while annealing_time < max_annealing_time:
                     
                     if verbose:
                         print(f"... using anneal time: {annealing_time}")
