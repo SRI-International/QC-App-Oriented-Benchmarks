@@ -471,13 +471,63 @@ def execute_circuit(circuit):
     if verbose:
         print(f"... executing job {job.job_id()}")
     
-    # special handling when only runnng one job at a time: wait for done here
+    # special handling when only runnng one job at a time: wait for result here
     # so the status check called later immediately returns done and avoids polling
     if max_jobs_active <= 1:
-        result = job.result()
-    
+        wait_on_job_result(job, active_circuit)
+
     # return, so caller can do other things while waiting for jobs to complete    
 
+# block and wait for the job result to be returned
+# handle network timeouts by doing up to 40 retries once every 15 seconds
+def wait_on_job_result(job, active_circuit):
+    retry_count = 0
+    result = None
+    while retry_count < 40:
+        try:
+            retry_count += 1
+            #print(f"... calling job.result()")
+            result = job.result()
+            break
+                         
+        except Exception as e:
+            print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
+            time.sleep(15)
+            continue
+    
+    if result == None:
+        print(f'ERROR: during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+        raise ValueError("Failed to execute job")
+    else:
+        #print(f"... job.result() is done, with result data, continuing")
+        pass
+
+# Check and return job_status
+# handle network timeouts by doing up to 40 retries once every 15 seconds
+def get_job_status(job, active_circuit):
+    retry_count = 0
+    status = None
+    while retry_count < 3:
+        try:
+            retry_count += 1
+            #print(f"... calling job.status()")
+            status = job.status()
+            break
+                         
+        except Exception as e:
+            print(f'... error occurred during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
+            time.sleep(15)
+            continue
+    
+    if status == None:
+        print(f'ERROR: during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+        raise ValueError("Failed to get job status")
+    else:
+        #print(f"... job.result() is done, with result data, continuing")
+        pass
+        
+    return status
+ 
 # Get circuit metrics fom the circuit passed in
 def get_circuit_metrics(qc):
 
@@ -936,7 +986,8 @@ def check_jobs(completion_handler=None):
     for job, circuit in active_circuits.items():
 
         try:
-            status = job.status()
+            #status = job.status()
+            status = get_job_status(job, circuit)   # use this version, robust to network failure 
             #print("Job status is ", status)
             
         except Exception as e:
