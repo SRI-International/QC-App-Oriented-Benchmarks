@@ -1721,15 +1721,7 @@ def plot_area_metrics(suptitle='',
         x = x + x_
         y = y + y_
         scores = scores + scores_
-        
-    # the x axis min/max values will be min(x)/max(x) or values supplied by caller
-    if x_min == None:
-        x_min = min(x)
-    if x_max == None:
-        x_max = max(x)
-    else:
-        x_max = x_max - 1  # subtract one to account for the auto-label algorithm in bakcground function
-    
+
     # append the circuit metrics subtitle to the title
     fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
     if options != None:
@@ -1738,15 +1730,39 @@ def plot_area_metrics(suptitle='',
             if len(options_str) > 0: options_str += ', '
             options_str += f"{key}={value}"
         fulltitle += f"\n{options_str}"
-
+    
+    # if the y axis data is sparse or non-linear, linearize the axis data and sort all arrays
+    if needs_linearize(y, gap=2):
+    
+        # sort the data by y axis values, as it may be loaded out of order from file storage
+        z = sorted(zip(y,x,xs,scores))
+        y = [_y for _y,_x,_xs,_s in z]
+        x = [_x for _y,_x,_xs,_s in z]
+        xs = [_xs for _y,_x,_xs,_s in z]
+        scores = [_s for _y,_x,_xs,_s in z]
+        
+        # convert irregular y-axis data to linear if any non-linear gaps in the data
+        yy, ylabels = linearize_axis(y, gap=2, outer=2, fill=True)
+        
+    else:
+        yy = y
+        ylabels = None
+       
+    # the x axis min/max values will be min(x)/max(x) or values supplied by caller
+    if x_min == None:
+        #x_min = min(x)
+        x_min = 0       # if not supplied, always use 0 for area plots, as leftmost time is 0
+        
+    if x_max == None:
+        x_max = max(x)
+        x_max += max(xs)/2  # if not supplied, rightmost time must include the width
+    else:
+        x_max = x_max - 1  # subtract one to account for the auto-label algorithm in background function
+   
     with plt.style.context(maxcut_style):
         # plot the metrics background with its title
         ax = plot_metrics_background(fulltitle, y_label, x_label, score_label,
-                    y_max=max(y), x_max=x_max, y_min=min(y), x_min=x_min)
-        
-        # no longer used, instead we pass the array of sizes
-        #if x_size == None:
-            #x_size=(max(x)-min(x))/num_x_bins
+                    y_max=max(yy), x_max=x_max, y_min=min(yy), x_min=x_min, ylabels=ylabels)
             
         if y_size == None:
             y_size = 1.0
@@ -1756,10 +1772,11 @@ def plot_area_metrics(suptitle='',
         # add a grid on the x axis (with the maxcut style of alpha=0.5, this color is best for pdf)
         ax.grid(True, axis = 'x', zorder = 0, color='silver')
     
-        # plot all the bars, with width specified as an array that matches the array size of the x,y values
-        plot_volumetric_data(ax, y, x, scores, depth_base=-1, label='Depth', labelpos=(0.2, 0.7), 
-                            labelrot=0, type=1, fill=True, w_max=18, do_label=False,
-                            x_size=xs, y_size=y_size, zorder=3)                           
+        # plot all bars, with width specified as an array that matches array size of the x,y values
+        plot_volumetric_data(ax, yy, x, scores, depth_base=-1,
+                    label='Depth', labelpos=(0.2, 0.7), labelrot=0,
+                    type=1, fill=True, w_max=18, do_label=False,
+                    x_size=xs, y_size=y_size, zorder=3)                           
         
         plt.tight_layout()
         
@@ -1769,7 +1786,82 @@ def plot_area_metrics(suptitle='',
                                               + x_label_save_str[x_metric] + '-'
                                               + suffix), backend_id)
 
+# Check if axis data needs to be linearized
+# Returns true if data sparse or non-linear; sparse means with any gap > gap size
+def needs_linearize(values, gap=2):
+    #print(f"{values = }")
 
+    # if only one element, no need to linearize
+    if len(values) < 2:
+        return False
+    
+    # simple logic for now: return if any gap > 2
+    for i in range(len(values)):    
+        if i > 0:
+            delta = values[i] - values[i - 1]
+            if delta > gap:
+                return True
+                
+    # no need to linearize if all small gaps
+    return False
+
+# convert irregular axis data to linear, with minimum gap size
+# only show labels for the actual data points
+# (the labels assume that the return data will be plotted with 2 points before and after)
+# DEVNOTE: the use of this function is limited to the special case of the maxcut plots for now,
+# given the limited range of problem definitions
+def linearize_axis(values, gap=2, outer=2, fill=True):  
+    #print(f"{values = }")
+    #print(f"{outer = }")
+    
+    # if only one element, no need to linearize
+    if len(values) < 2:
+        return values, None
+    
+    # use this flag to test if there are gaps > gap
+    gaps_exist = False
+    
+    # add labels at beginning
+    basis = [None] * outer;
+
+    # loop over values and generate new values that are separated by the gap value
+    newvalues = [];
+    for i in range(len(values)):
+        newvalues.append(values[i])
+        
+        # first point is unchanged
+        if i == 0:
+            basis.append(values[i]) 
+        
+        # subsequent points are unchanged if same, but modified by gap if different
+        if i > 0:
+            delta = values[i] - values[i - 1]
+            if delta == 0:
+                #print("delta 0")
+                newvalues[i] = newvalues[i - 1]
+            elif delta > gap:
+                #print("delta 1+")
+                gaps_exist = True
+                newvalues[i] = newvalues[i - 1] + gap
+                if fill and gap > 1: basis.append(None)         # put space between items if gap > 1
+                basis.append(values[i])
+    
+    # add labels at end    
+    basis += [None] * outer
+
+    #print(f"{newvalues = }")
+    #print(f"{basis = }")
+      
+    # format new labels as strings, showing only the actual values (non-zero)
+    ylabels = [format_number(yb) if yb != None else '' for yb in basis]
+    #print(f"{ylabels = }")
+    
+    if gaps_exist:
+        return newvalues, ylabels
+    else:
+        return values, None
+    
+  
 # Helper function to bin for averaging metrics, for instances occurring at equal num_qubits
 # DEVNOTE: this binning approach creates unevenly spaced bins, cannot use the delta between then for size
 def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins):
@@ -1924,8 +2016,8 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
         # Also plot the distribution obtained from uniform random sampling
         dist = group_metrics_optgaps['random_cutsize_ratio_dist']
         axs.plot(dist['ratios'][indx], dist['frequencies'][indx],
-                 marker='o', c='k', ms=2, mec='k', mew=0.4, lw=1,
-                 ls='dotted', label=f"Uniform Random Sampling")  # " degree={deg}") # lw=1,
+             marker='o', ms=1, mec = 'k',mew=0.2, lw=10,alpha=0.5,
+             ls = '-', label = "Uniform Random Sampling", c = "pink")  # " degree={deg}") # lw=1,
 
         # Plot vertical lines corresponding to the various metrics
         plotted_metric_values = []
@@ -2107,9 +2199,13 @@ def get_distribution_and_stats():
             full_size_list = list(range(optimal_value + 1))
             full_counts_list_unif = [unique_counts_unif[unique_sizes_unif.index(s)] if s in unique_sizes_unif else 0 for s in full_size_list]
             group_metrics_optgaps['random_cutsize_ratio_dist']['ratios'].append(np.array(full_size_list) / optimal_value)
-            group_metrics_optgaps['random_cutsize_ratio_dist']['frequencies'].append(np.array(full_counts_list_unif) / sum(full_counts_list_unif))
-    
-    
+             
+            # hack to avoid crash if all zeros
+            sum_full_counts_list_unif = sum(full_counts_list_unif)
+            if sum_full_counts_list_unif <= 0: sum_full_counts_list_unif = 1
+            
+            group_metrics_optgaps['random_cutsize_ratio_dist']['frequencies'].append(np.array(full_counts_list_unif) / sum_full_counts_list_unif)
+       
     return group_metrics_optgaps
     
 # Plot detailed optgaps
@@ -2149,6 +2245,15 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     if which_metrics_to_plot == 'all' or type(which_metrics_to_plot) != list:
         which_metrics_to_plot = ['approx_ratio', 'cvar_ratio', 'bestcut_ratio', 'gibbs_ratio', 'quantile_optgaps', 'violin']
     
+    # check if we have sparse or non-linear axis data and linearize if so
+    xvalues = group_metrics_optgaps["groups"]
+    xlabels = None
+    if needs_linearize(xvalues, gap=2):
+        #print("... needs linearize")
+        
+        # convert irregular x-axis data to linear if any non-linear gaps in the data
+        xx, xlabels = linearize_axis(xvalues, gap=2, outer=0, fill=False)
+        xvalues = xx
     
     # Create title for the plots
     fulltitle = get_full_title(suptitle=suptitle, options=options)
@@ -2158,17 +2263,24 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
-        axs.set_xticks(group_metrics_optgaps["groups"])
-        axs.set_xlabel('Circuit Width (Number of Qubits)')
         plt.title(fulltitle)
-
+        axs.set_xlabel('Circuit Width (Number of Qubits)')
+        axs.set_ylabel(r'Optimality Gap ($\%$)')
+                
+        axs.set_xticks(xvalues)
+        if xlabels != None:
+            plt.xticks(xvalues, xlabels)
+ 
         limopts = max(group_metrics_optgaps['approx_ratio']['gapvals'])
-        axs.set_ylim([0, max(40, limopts) * 1.1])
+        if limopts > 5:
+            axs.set_ylim([0, max(40, limopts) * 1.1])
+        else:
+            axs.set_ylim([0, 5.0])
+            
         axs.grid(True, axis = 'y', color='silver', zorder = 0)  # other bars use this silver color
         #axs.grid(True, axis = 'y', zorder = 0)
-        axs.bar(group_metrics_optgaps["groups"], group_metrics_optgaps['approx_ratio']['gapvals'], 0.8, zorder = 3)
-        axs.set_ylabel(r'Optimality Gap ($\%$)')
-
+        axs.bar(xvalues, group_metrics_optgaps['approx_ratio']['gapvals'], 0.8, zorder = 3)
+        
         # NOTE: Can move the calculation or the errors variable to before the plotting. This code is repeated in the detailed plotting as well.
         # Plot quartiles
         q_vals = group_metrics_optgaps['quantile_optgaps']['gapvals'] # list of lists; shape (number of circuit widths, 3)
@@ -2178,7 +2290,7 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
         errors = [up_error, down_error]
 
-        axs.errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75, zorder = 5)
+        axs.errorbar(xvalues, center_optgaps, yerr = errors, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75, zorder = 5)
 
         fig.tight_layout()
         axs.legend()
@@ -2194,18 +2306,22 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
 
     ############################################################
     ##### Detailed optimality gaps plot
+    
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
         plt.title(fulltitle)
         axs.set_ylabel(r'Optimality Gap ($\%$)')
         axs.set_xlabel('Circuit Width (Number of Qubits)')
-        axs.set_xticks(group_metrics_optgaps["groups"])
+        
+        axs.set_xticks(xvalues)
+        if xlabels != None:
+            plt.xticks(xvalues, xlabels)
 
         if 'violin' in which_metrics_to_plot:
             list_of_violins = group_metrics_optgaps['violin']['gapvals']
             # violinx_list = [x for [x,y] in list_of_violins]
             # violiny_list = [y for [x,y] in list_of_violins]
-            violin_list_locs = group_metrics_optgaps['groups']
+            violin_list_locs = xvalues
             for loc, vxy in zip(violin_list_locs, list_of_violins):
                 vy = vxy[1]
                 vx = vxy[0]
@@ -2223,13 +2339,13 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             up_error = [q_vals[i][1] - q_vals[i][2] for i in range(len(q_vals))]
             errors = [up_error, down_error]
 
-            plt_handles['quantile_optgaps'] = axs.errorbar(group_metrics_optgaps["groups"], center_optgaps, yerr = errors,ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75)
+            plt_handles['quantile_optgaps'] = axs.errorbar(xvalues, center_optgaps, yerr = errors,ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Quartiles', alpha = 0.75)
 
         for metric_str in set(which_metrics_to_plot) - set(["quantile_optgaps", "violin"]):
             # For all metrics to be plotted, except quantile optgaps and violin plots, plot a line
             # Plot a solid line for the objective function, and dashed otherwise
             ls = '-' if metric_str == objective_func_type else '--'
-            plt_handles[metric_str], = axs.plot(group_metrics_optgaps["groups"], group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])    
+            plt_handles[metric_str], = axs.plot(xvalues, group_metrics_optgaps[metric_str]['gapvals'],marker='o', lw=1,ls = ls,color = group_metrics_optgaps[metric_str]['color'],label = group_metrics_optgaps[metric_str]['label'])    
 
 
         # Put up the legend, but with labels arranged in the order specified by ideal_lgnd_seq
@@ -2243,10 +2359,16 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
             ylim_top = max(ylim_top, max(group_metrics_optgaps[o_f]['gapvals']))
         ylim_top = max(ylim_top, max(map(max, group_metrics_optgaps['quantile_optgaps']['gapvals'])))
         if ylim_top > 60: 
-            ylim_top = 100
+            ylim_top = 100 + 3
+            bottom = 0 - 3
+        elif ylim_top > 10:
+            ylim_top = 60 + 3
+            bottom = 0 - 3
         else:
-            ylim_top = 60
-        axs.set_ylim(bottom = 0 - 3, top = ylim_top + 3)
+            ylim_top = 8 + 1
+            bottom = 0 - 1
+            
+        axs.set_ylim(bottom=bottom, top = ylim_top)
         # axs.set_ylim(bottom=0,top=100)
 
         # Add grid
@@ -2846,7 +2968,8 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
 
 
 # Linear Background Analog of the QV Volumetric Background, to allow arbitrary metrics on each axis
-def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max, y_min=0, x_min=0):
+def plot_metrics_background(suptitle, ylabel, x_label, score_label,
+            y_max, x_max, y_min=0, x_min=0, ylabels=None):
     
     if suptitle == None:
         suptitle = f"{ylabel} vs. {x_label}, Parameter Positioning of {score_label}"
@@ -2859,7 +2982,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     max_width = y_max + 3
     min_width = y_min - 3
     
-    fig, ax = plt.subplots()#constrained_layout=True, figsize=(plot_width, plot_height))
+    fig, ax = plt.subplots() #constrained_layout=True, figsize=(plot_width, plot_height))
 
     plt.title(suptitle)
     
@@ -2871,8 +2994,8 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
     #print(f"... {x_min} {x_max} {max_base} {x_max}")
     if x_min < 0.1: x_min = 0
     
-    step = (x_max - x_min) / num_xdivs
-        
+    # and compute the step size for the tick divisions
+    step = (x_max - x_min) / num_xdivs   
     plt.xlim(x_min - step/2, x_max + step/2)
        
     #plt.ylim(y_min*0.5, y_max*1.5)
@@ -2898,7 +3021,10 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label, y_max, x_max
         
     ax.set_ylabel(ylabel)
     #ax.set_yticks(yround)
-    ax.set_yticks(ybasis)    
+    ax.set_yticks(ybasis)   
+
+    if ylabels != None:
+        plt.yticks(ybasis, ylabels)
     
     # add colorbar to right of plot
     plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
