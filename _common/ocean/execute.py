@@ -250,8 +250,8 @@ def execute_circuit(circuit):
         exec_time = round(exec_time, 5)
         opt_exec_time = round(opt_exec_time, 5)
         
-        logger.info(f'Finished Running - elapsed, exec, opt time = {elapsed_time} {exec_time} {opt_exec_time} (ms)')
-        if verbose_time: print(f"  ... ocean.execute() elapsed, exec, opt time = {elapsed_time}, {exec_time}, {opt_exec_time} ms")
+        logger.info(f'Finished Running ocean.execute() - elapsed, exec, opt time = {elapsed_time} {exec_time} {opt_exec_time} (sec)')
+        if verbose_time: print(f"  ... ocean.execute() elapsed, exec, opt time = {elapsed_time}, {exec_time}, {opt_exec_time} (sec)")
         
         metrics.store_metric(circuit["group"], circuit["circuit"], 'elapsed_time', elapsed_time)
         metrics.store_metric(circuit["group"], circuit["circuit"], 'exec_time', exec_time)
