@@ -181,43 +181,61 @@ def execute_circuit(circuit):
          
         # perform circuit execution on backend
         logger.info(f'Running trans_qc, shots={circuit["shots"]}')
-        
-        # start elapsed_time (and default exec_time)
-        st2 = st = time.time() 
-        
+
+        # this flag is true on the first iteration of a group
         if embedding_flag:
             globals()["embedding"] = None
+            total_elapsed_time = 0
+            total_exec_time = 0
+            total_opt_time = 0     
         
-        # execute on the D-Wave Neal simulator
+        #***************************************
+        # execute on D-Wave Neal simulator (not really simulator, for us it 'mimics' D-Wave behavior)
         if device_name == "pegasus":
             sampler = backend
             
             # for simulation purposes, add a little time for embedding
+            ts = time.time() 
+            
             if (embedding_flag):
                 time.sleep(0.5)
                 
-            # start exec_time
-            st2 = time.time() 
+            opt_exec_time = time.time() - ts
             
-            # perform the sim annealing operation
+            # mimic the annealing operation
+            ts = time.time() 
+            
             sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, num_sweeps=num_sweeps, annealing_time=annealing_time)
             
+            elapsed_time = time.time() - ts
+            exec_time = elapsed_time / 2        # faking these out for now
+            opt_exec_time += elapsed_time / 8
+            
+        #***************************************
         # execute on D-Wave hardware
         else:
+            ts = time.time() 
+            
             if (embedding_flag):
                 if verbose: print("... CREATE embedding")
                 sampler = EmbeddingComposite(backend)
                             
-            else:
-                # start exec_time
-                st2 = time.time()
-                
+            else:                
                 if verbose: print("... USE embedding")
                 sampler = FixedEmbeddingComposite(backend, embedding=embedding)
 
+            opt_exec_time = time.time() - ts
+            
             # perform the annealing operation
+            ts = time.time() 
+            
             sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, annealing_time=annealing_time)
         
+            elapsed_time = time.time() - ts
+            exec_time = (sampleset.info["timing"]["qpu_access_time"] / 1000000)
+            opt_exec_time += (sampleset.info["timing"]["total_post_processing_time"] / 1000000)
+            opt_exec_time += (sampleset.info["timing"]["qpu_access_overhead_time"] / 1000000)
+            
             if verbose_time: print(json.dumps(sampleset.info["timing"], indent=2))
             
             # if embedding context is returned and we haven't already cached it, cache it here
@@ -228,14 +246,16 @@ def execute_circuit(circuit):
         #if verbose: print(sampleset.info)
         if verbose: print(sampleset.record)
 
-        elapsed_time = round(time.time() - st, 5)
-        exec_time = round(time.time() - st2, 5)
+        elapsed_time = round(elapsed_time, 5)
+        exec_time = round(exec_time, 5)
+        opt_exec_time = round(opt_exec_time, 5)
         
-        logger.info(f'Finished Running - {elapsed_time} (ms)')
-        if verbose_time: print(f"  ... ocean.execute() time = {elapsed_time}")
+        logger.info(f'Finished Running - elapsed, exec, opt time = {elapsed_time} {exec_time} {opt_exec_time} (ms)')
+        if verbose_time: print(f"  ... ocean.execute() elapsed, exec, opt time = {elapsed_time}, {exec_time}, {opt_exec_time} ms")
         
         metrics.store_metric(circuit["group"], circuit["circuit"], 'elapsed_time', elapsed_time)
         metrics.store_metric(circuit["group"], circuit["circuit"], 'exec_time', exec_time)
+        metrics.store_metric(circuit["group"], circuit["circuit"], 'opt_exec_time', opt_exec_time)
     
         def process_to_bitstring(cut_list):
             # DEVNOTE : Check if the mapping is correct

@@ -1663,7 +1663,10 @@ def plot_area_metrics(suptitle='',
             
             for it in circuit_metrics_detail_2[group][circuit_id]:
                 mets = circuit_metrics_detail_2[group][circuit_id][it]
-
+                
+                if x_metric not in mets: break
+                if score_metric not in mets: break
+                
                 # get each metric and accumulate if indicated
                 x_raw = x_now = mets[x_metric]
                 if cumulative_flag:
