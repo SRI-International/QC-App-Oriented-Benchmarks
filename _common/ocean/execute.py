@@ -33,6 +33,7 @@ import logging
 import numpy as np
 import csv
 from itertools import count
+import json
 
 from dwave.system.samplers import DWaveSampler
 from dwave.system import DWaveSampler, EmbeddingComposite, FixedEmbeddingComposite
@@ -59,6 +60,10 @@ cached_circuits = {}
 # embedding variables cached during execution
 embedding_flag = True
 embedding = None
+
+# The "num_sweeps" variable used by Neal simulator to generate reasonable distributions for testing.
+# A value of 1 will provide the most random behavior.
+num_sweeps = 10
 
 ##########################
 # JOB MANAGEMENT VARIABLES 
@@ -194,6 +199,9 @@ def execute_circuit(circuit):
             # start exec_time
             st2 = time.time() 
             
+            # perform the sim annealing operation
+            sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, num_sweeps=num_sweeps, annealing_time=annealing_time)
+            
         # execute on D-Wave hardware
         else:
             if (embedding_flag):
@@ -207,20 +215,24 @@ def execute_circuit(circuit):
                 if verbose: print("... USE embedding")
                 sampler = FixedEmbeddingComposite(backend, embedding=embedding)
 
-        # perform the annealing operation
-        sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, annealing_time=annealing_time)
-        if verbose: print(sampleset.info)
+            # perform the annealing operation
+            sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, annealing_time=annealing_time)
         
-        # if embedding context is returned and we haven't already cached it, cache it here
-        if embedding == None:
-            if "embedding_context" in sampleset.info:
-                globals()["embedding"] = sampleset.info["embedding_context"]["embedding"]
-        
+            if verbose_time: print(json.dumps(sampleset.info["timing"], indent=2))
+            
+            # if embedding context is returned and we haven't already cached it, cache it here
+            if embedding == None:
+                if "embedding_context" in sampleset.info:
+                    globals()["embedding"] = sampleset.info["embedding_context"]["embedding"]
+                    
+        #if verbose: print(sampleset.info)
+        if verbose: print(sampleset.record)
+
         elapsed_time = round(time.time() - st, 5)
         exec_time = round(time.time() - st2, 5)
         
         logger.info(f'Finished Running - {elapsed_time} (ms)')
-        if verbose_time: print(f"  *** ocean.sample() time = {elapsed_time}")
+        if verbose_time: print(f"  ... ocean.execute() time = {elapsed_time}")
         
         metrics.store_metric(circuit["group"], circuit["circuit"], 'elapsed_time', elapsed_time)
         metrics.store_metric(circuit["group"], circuit["circuit"], 'exec_time', exec_time)
@@ -231,13 +243,24 @@ def execute_circuit(circuit):
             cut_list = ['0' if i == 1 else '1' for i in cut_list]
             # (-(cut_array - 1)/2).astype('int32')
             return "".join(cut_list)
-            
-        all_cuts = [elem[0].tolist() for elem in sampleset.record]
-        all_cuts = [process_to_bitstring(cut) for cut in all_cuts]
-        unique_cuts = list(set(all_cuts))
-        cut_occurances = [all_cuts.count(cut) for cut in unique_cuts]
-        result = { cut : count for (cut,count) in zip(unique_cuts, cut_occurances)}
         
+        # for Neal simulator (mimicker), compute counts from each record returned, one per shot
+        if device_name == "pegasus":
+            all_cuts = [elem[0].tolist() for elem in sampleset.record]
+            all_cuts = [process_to_bitstring(cut) for cut in all_cuts]
+            unique_cuts = list(set(all_cuts))
+            cut_occurances = [all_cuts.count(cut) for cut in unique_cuts]
+            result = { cut : count for (cut,count) in zip(unique_cuts, cut_occurances)}
+            #print(result)
+        
+        # for hardware execution, generate counts by repeating records based on the number of times seen
+        else:        
+            all_cuts = [elem[0].tolist() for elem in sampleset.record]
+            all_counts = [int(elem[2]) for elem in sampleset.record]
+            all_cuts = [process_to_bitstring(cut) for cut in all_cuts]
+            result = { cut : count for (cut,count) in zip(all_cuts, all_counts)}
+            #print(result)
+
         result_handler(circuit["qc"], result, circuit["group"], circuit["circuit"], circuit["shots"])
             
     except Exception as e:
