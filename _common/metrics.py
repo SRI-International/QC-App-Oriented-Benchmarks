@@ -2490,7 +2490,7 @@ import math
 from matplotlib.patches import Rectangle
 from matplotlib.patches import Circle
 import matplotlib.cm as cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap, Normalize
 
 ############### Color Map functions
  
@@ -2500,9 +2500,27 @@ cmap_greys = plt.get_cmap('Greys')
 cmap_blues = plt.get_cmap('Blues')
 cmap_custom_spectral = None
 
+# the default colormap is the spectral map
+cmap = cmap_spectral
+
+# current cmap normalization function (default None)
+cmap_norm = None
+
 default_fade_low_fidelity_level = 0.16
 default_fade_rate = 0.7
 
+# Specify a normalization function here (default None)
+def set_custom_cmap_norm(vmin, vmax):
+
+    global cmap_norm
+    
+    if vmin == vmax or (vmin == 0.0 and vmax == 1.0):
+        print("... setting cmap norm to None")
+        cmap_norm = None
+    else:
+        print(f"... setting cmap norm to [{vmin}, {vmax}]")
+        cmap_norm = Normalize(vmin=vmin, vmax=vmax)
+    
 # Remake the custom spectral colormap with user settings
 def set_custom_cmap_style(
             fade_low_fidelity_level=default_fade_low_fidelity_level,
@@ -2590,14 +2608,15 @@ def create_custom_spectral_cmap(
 
 cmap_custom_spectral = create_custom_spectral_cmap()
 
-# the default is the spectral map
-cmap = cmap_spectral
-
 
 ############### Helper functions
 
 def get_color(value):
-
+    
+    # if there is a normalize function installed, scale the data
+    if cmap_norm:
+        value = float(cmap_norm(value))
+        
     if cmap == cmap_spectral:
         value = 0.05 + value*0.9
     elif cmap == cmap_blues:
@@ -3029,8 +3048,8 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
     if ylabels != None:
         plt.yticks(ybasis, ylabels)
     
-    # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+    # add colorbar to right of plot (scale if normalize function installed)
+    plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
         
     return ax
 
