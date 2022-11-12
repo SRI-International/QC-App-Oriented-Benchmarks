@@ -214,6 +214,8 @@ def execute_circuit(circuit):
         #***************************************
         # execute on D-Wave hardware
         else:
+        
+            # prepare the sampler with embedding or use a cached embedding
             ts = time.time() 
             
             if (embedding_flag):
@@ -230,19 +232,21 @@ def execute_circuit(circuit):
             ts = time.time() 
             
             sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, annealing_time=annealing_time)
-        
+            sampleset.resolve()
+            
             elapsed_time = time.time() - ts
             exec_time = (sampleset.info["timing"]["qpu_access_time"] / 1000000)
+            
             opt_exec_time += (sampleset.info["timing"]["total_post_processing_time"] / 1000000)
             opt_exec_time += (sampleset.info["timing"]["qpu_access_overhead_time"] / 1000000)
-            
-            if verbose_time: print(json.dumps(sampleset.info["timing"], indent=2))
-            
+
             # if embedding context is returned and we haven't already cached it, cache it here
             if embedding == None:
                 if "embedding_context" in sampleset.info:
                     globals()["embedding"] = sampleset.info["embedding_context"]["embedding"]
-                    
+            
+            if verbose_time: print(json.dumps(sampleset.info["timing"], indent=2))
+            
         #if verbose: print(sampleset.info)
         if verbose: print(sampleset.record)
 
