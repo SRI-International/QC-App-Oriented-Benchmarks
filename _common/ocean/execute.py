@@ -34,6 +34,7 @@ import numpy as np
 import csv
 from itertools import count
 import json
+import math
 
 from dwave.system.samplers import DWaveSampler
 from dwave.system import DWaveSampler, EmbeddingComposite, FixedEmbeddingComposite
@@ -205,11 +206,13 @@ def execute_circuit(circuit):
             # mimic the annealing operation
             ts = time.time() 
             
+            num_sweeps = math.log(annealing_time, 2)
+            
             sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, num_sweeps=num_sweeps, annealing_time=annealing_time)
             sampleset.resolve()
             
             elapsed_time = time.time() - ts  
-            elapsed_time *= (annealing_time/4)  # funky way to fake elapsed time
+            elapsed_time *= (annealing_time / 8)  # funky way to fake elapsed time
             exec_time = elapsed_time / 2        # faking exec time too
             opt_exec_time += elapsed_time / 8
             
