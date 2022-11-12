@@ -698,7 +698,7 @@ minimizer_loop_index = 0
 
 def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         method=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
-        max_iter=30, max_annealing_time=200, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
+        max_iter=30, min_annealing_time=1, max_annealing_time=200, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
@@ -731,6 +731,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         Compute circuit fidelity. The default is True.
     max_iter : int, optional
         Number of iterations for the minimizer routine. The default is 30.
+    min_annealing_time : int, optional
+        Minimum annealing time. The default is 1.
     max_annealing_time : int, optional
         Maximum annealing time. The default is 200.
     score_metric : list or string, optional
@@ -907,14 +909,15 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                 minimizer_loop_index = 0 # Value of 0 corresponds to the 0th iteration of the minimizer
                 
                 start_iters_t = time.time()
+                
                 # Always start by enabling embed ...
                 ex.set_embedding_flag(embedding_flag=True)
                 
                 if verbose:
                     print(f'===============  Begin method 2 loop, enabling embed')
 
-                annealing_time = 1
-                while annealing_time < max_annealing_time:
+                annealing_time = min_annealing_time
+                while annealing_time <= max_annealing_time:
                     
                     if verbose:
                         print(f"... using anneal time: {annealing_time}")
@@ -945,12 +948,15 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     #ex.throttle_execution(metrics.finalize_group)
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                     
-                    # after first execution and thereafter, no need for embed
-                    ex.set_embedding_flag(embedding_flag=False)
-                    
+                    '''
+                    # after first execution and thereafter, no need for embed (actually NOT)
+                    #since we are benchmarking, we want to compare performance across anneal times
+                    # so we do not want to use embedding, or it wouldn't be a valid comparison
+                    #ex.set_embedding_flag(embedding_flag=False)
+                    ex.set_embedding_flag(embedding_flag=True)
                     if verbose:
                         print(f'**** First execution complete, disabling embed')
-                        
+                    '''   
                     global saved_result
                     #print(saved_result)
                     
