@@ -398,7 +398,7 @@ def uniform_cut_sampling(num_qubits, degree, num_shots, _instances=None):
 
     
 #%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
-
+### DEVNOTE: this only applies for Qiskit, not Ocean
 def save_runtime_data(result_dict): # This function will need changes, since circuit metrics dictionaries are now different
     cm = result_dict.get('circuit_metrics')
     detail = result_dict.get('circuit_metrics_detail', None)
@@ -1011,7 +1011,28 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     
                     # double the annealing time for the next iteration
                     annealing_time *= 2
-                    
+            
+            # for this benchmark, need to convert the times to deltas
+            # since there is wobble in some of the times, don't go below delta = 0
+            elapsed_time = exec_time = opt_exec_time = 0
+            for circuit_id in metrics.circuit_metrics[str(num_qubits)]:
+                circuit = metrics.circuit_metrics[str(num_qubits)][circuit_id]
+
+                d_elapsed_time = max(0, circuit['elapsed_time'] - elapsed_time)
+                d_exec_time = max(0, circuit['exec_time'] - exec_time)
+                d_opt_exec_time = max(0, circuit['opt_exec_time'] - opt_exec_time)
+                
+                elapsed_time = circuit['elapsed_time']
+                exec_time = circuit['exec_time']
+                opt_exec_time = circuit['opt_exec_time']
+                
+                #print(f"... times = {elapsed_time} {exec_time} {opt_exec_time}")
+                #print(f"... delta times = {d_elapsed_time} {d_exec_time} {d_opt_exec_time}")
+
+                circuit['elapsed_time'] = d_elapsed_time
+                circuit['exec_time'] = d_exec_time
+                circuit['opt_exec_time'] = d_opt_exec_time
+                
             # Save final iteration data to metrics.circuit_metrics_final_iter
             # This data includes final counts, cuts, etc.
             store_final_iter_to_metrics_json(num_qubits=num_qubits, 

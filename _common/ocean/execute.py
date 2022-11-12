@@ -197,8 +197,8 @@ def execute_circuit(circuit):
             # for simulation purposes, add a little time for embedding
             ts = time.time() 
             
-            if (embedding_flag):
-                time.sleep(0.5)
+            #if (embedding_flag):
+                #time.sleep(0.3)
                 
             opt_exec_time = time.time() - ts
             
@@ -206,9 +206,11 @@ def execute_circuit(circuit):
             ts = time.time() 
             
             sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, num_sweeps=num_sweeps, annealing_time=annealing_time)
+            sampleset.resolve()
             
-            elapsed_time = time.time() - ts
-            exec_time = elapsed_time / 2        # faking these out for now
+            elapsed_time = time.time() - ts  
+            elapsed_time *= (annealing_time/4)  # funky way to fake elapsed time
+            exec_time = elapsed_time / 2        # faking exec time too
             opt_exec_time += elapsed_time / 8
             
         #***************************************
