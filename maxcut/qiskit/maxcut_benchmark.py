@@ -899,7 +899,7 @@ instance_filename = None
 def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         method=1, rounds=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
-        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
+        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, use_fixed_angles=False,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
         backend_id='qasm_simulator', provider_backend=None, eta=0.5,
@@ -923,6 +923,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         degree of graph. The default is 3.
     thetas_array : list, optional
         list or ndarray of beta and gamma values. The default is None.
+    use_fixed_angles : bool, optional
+        use betas and gammas obtained from a 'fixed angles' table, specific to degree and rounds
     N : int, optional
         For the max % counts metric, choose the highest N% counts. The default is 10.
     alpha : float, optional
@@ -977,12 +979,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # This dictionary will later be stored in a json file
     # It will also be used for sending parameters to the plotting function
     dict_of_inputs = locals()
+    
     # Get angles for restarts. Thetas = list of lists. Lengths are max_circuits and 2*rounds
     thetas, max_circuits = get_restart_angles(thetas_array, rounds, max_circuits)
+    
     # Update the dictionary of inputs
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
     
-    # Delete some entris from the dictionary
+    # Delete some entries from the dictionary
     for key in ["hub", "group", "project", "provider_backend"]:
         dict_of_inputs.pop(key)
     
@@ -1015,13 +1019,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     max_qubits = max(4, max_qubits)
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
+    degree = max(3, degree)
+    rounds = max(1, rounds)
     
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
     do_compute_expectation = do_fidelities
-    
-    rounds = max(1, rounds)
-    
+        
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
         y_size = 1.5
@@ -1033,9 +1037,24 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                        'approx_ratio' : compute_sample_mean,
                        'gibbs_ratio' : compute_gibbs,
                        'bestcut_ratio' : compute_best_cut_from_measured}
-
+                       
+    # if using fixed angles, get thetas array from table
+    if use_fixed_angles:
+    
+        # Load the fixed angle tables from data file
+        fixed_angles = common.read_fixed_angles(
+            os.path.join(os.path.dirname(__file__), '..', '_common', 'angles_regular_graphs.json'))
+            
+        thetas_array = common.get_fixed_angles_for(fixed_angles, degree, rounds)
+        if thetas_array == None:
+            print(f"ERROR: no fixed angles for rounds = {rounds}")
+            return
+            
+    # ****************************
+    
     # Initialize metrics module
     metrics.init_metrics()
+    
     # Define custom result handler
     def execution_handler (qc, result, num_qubits, s_int, num_shots):  
      
@@ -1096,11 +1115,17 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
             print(f"  ... problem not found.")
             break
         
-
         for restart_ind in range(1, max_circuits + 1):
             # restart index should start from 1
             # Loop over restarts for a given graph
-            thetas_array = thetas[restart_ind - 1]
+            
+            # if not using fixed angles, get initial or random thetas from array saved earlier
+            # otherwise use random angles (if restarts > 1) or [1] * 2 * rounds
+            if not use_fixed_angles:
+                thetas_array = thetas[restart_ind - 1]
+                
+            print(f"{thetas_array = }")
+            
             if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()

@@ -780,7 +780,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # It will also be used for sending parameters to the plotting function
     dict_of_inputs = locals()
 
-    # Delete some entris from the dictionary
+    # Delete some entries from the dictionary
     for key in ["hub", "group", "project", "provider_backend"]:
         dict_of_inputs.pop(key)
     
@@ -810,6 +810,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     max_qubits = max(4, max_qubits)
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
+    degree = max(3, degree)
     
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
@@ -829,6 +830,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
 
     # Initialize metrics module
     metrics.init_metrics()
+    
     # Define custom result handler
     def execution_handler (qc, result, num_qubits, s_int, num_shots):  
      

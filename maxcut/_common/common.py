@@ -1,4 +1,5 @@
 import os
+import json
 
 INSTANCE_DIR = 'instances'
 
@@ -42,3 +43,28 @@ def eval_cut(nodes, edges, solution, reverseStep = 1):
             cut_size += 1
 
     return cut_size
+
+# Load from given filename and return a list of lists
+# containing fixed angles (betas, gammas) for multiple degrees and rounds
+def read_fixed_angles(file_path):
+    
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        with open(file_path, 'r') as json_file:
+        
+            # 'thetas_array', 'approx_ratio_list', 'num_qubits_list
+            fixed_angles = json.load(json_file)
+
+        return fixed_angles
+    
+    else:
+        return None
+
+# return the thetas array containing betas and gammas for specific degree and rounds     
+def get_fixed_angles_for(fixed_angles, degree, rounds):
+
+    if str(degree) in fixed_angles and str(rounds) in fixed_angles[str(degree)]:
+        param_pairs = fixed_angles[str(degree)][str(rounds)]
+        return [param_pairs['beta'] + param_pairs['gamma']]
+    else:
+        return None 
+        
