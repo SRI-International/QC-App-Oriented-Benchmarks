@@ -1043,7 +1043,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     
         # Load the fixed angle tables from data file
         fixed_angles = common.read_fixed_angles(
-            os.path.join(os.path.dirname(__file__), '..', '_common', 'angles_regular_graphs.json'))
+            os.path.join(os.path.dirname(__file__), '..', '_common', 'angles_regular_graphs.json'),
+            _instances)
             
         thetas_array = common.get_fixed_angles_for(fixed_angles, degree, rounds)
         if thetas_array == None:
