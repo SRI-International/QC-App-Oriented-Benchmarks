@@ -72,6 +72,10 @@ def prepare_instances():
             insts[k]['instance'] = common.read_maxcut_instance(p)
         if 'sol' in f:
             insts[k]['sol'] = common.read_maxcut_solution(p)
+            
+    common_dir = os.path.join("..", "_common")
+    insts['fixed_angles'] = common.read_fixed_angles(
+            os.path.join(common_dir, 'angles_regular_graphs.json'))
     
     return insts
 

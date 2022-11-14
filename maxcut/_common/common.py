@@ -3,10 +3,16 @@ import json
 
 INSTANCE_DIR = 'instances'
 
+# Utility functions for processing Max-Cut data files
+# If _instances is None, read from data file.  If a dict, extract from a named field
+# (second form used for Qiskit Runtime and similar systems)
+
 def read_maxcut_instance(file_path, _instances=None):
+
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
         return _instances.get(inst, {}).get("instance", (None, None))
+        
     if os.path.exists(file_path) and os.path.isfile(file_path):
         with open(file_path, 'r') as file:
             nodes = int(file.readline())
@@ -21,9 +27,11 @@ def read_maxcut_instance(file_path, _instances=None):
         return None, None
 
 def read_maxcut_solution(file_path, _instances=None):
+
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
         return _instances.get(inst, {}).get("sol", (None, None))
+        
     if os.path.exists(file_path) and os.path.isfile(file_path):
         with open(file_path, 'r') as file:
             objective = int(file.readline())
@@ -46,8 +54,13 @@ def eval_cut(nodes, edges, solution, reverseStep = 1):
 
 # Load from given filename and return a list of lists
 # containing fixed angles (betas, gammas) for multiple degrees and rounds
-def read_fixed_angles(file_path):
-    
+def read_fixed_angles(file_path, _instances=None):
+
+    if isinstance(_instances, dict):
+        #inst = os.path.splitext(os.path.basename(file_path))[0]
+        #return _instances.get(inst, {}).get("fixed_angles", (None, None))
+        return _instances.get("fixed_angles", (None, None))
+
     if os.path.exists(file_path) and os.path.isfile(file_path):
         with open(file_path, 'r') as json_file:
         
