@@ -1303,10 +1303,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
             plot_results_from_data(**dict_of_inputs)
 
 def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_circuits = 1,
-                 objective_func_type='approx_ratio', method=2, score_metric='fidelity',
-                 x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
-                 num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
-                 detailed_save_names=False, **kwargs):
+            objective_func_type='approx_ratio', method=2, use_fixed_angles=False,
+            score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
+            num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
+            detailed_save_names=False, **kwargs):
     """
     Plot results
     """
@@ -1322,7 +1322,7 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
         suffix = f'of-{short_obj_func_str}' #of=objective function
         
     obj_str = metrics.known_score_labels[objective_func_type]
-    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
+    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, 'restarts' : max_circuits, 'fixed_angles' : use_fixed_angles, '\nObjective Function' : obj_str}
     suptitle = f"Benchmark Results - MaxCut ({method}) - Qiskit"
     
     metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
