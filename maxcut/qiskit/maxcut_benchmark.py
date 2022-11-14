@@ -1123,9 +1123,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
             # otherwise use random angles (if restarts > 1) or [1] * 2 * rounds
             if not use_fixed_angles:
                 thetas_array = thetas[restart_ind - 1]
-                
-            print(f"{thetas_array = }")
-            
+                            
             if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
