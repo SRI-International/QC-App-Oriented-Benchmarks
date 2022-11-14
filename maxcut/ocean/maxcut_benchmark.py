@@ -1,5 +1,5 @@
 """
-MaxCut Benchmark Program - Qiskit
+MaxCut Benchmark Program - Ocean
 """
 
 import datetime
@@ -13,21 +13,20 @@ import time
 from collections import namedtuple
 
 import numpy as np
-from scipy.optimize import minimize
 
-from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
-                    QuantumCircuit, QuantumRegister, execute, transpile)
-from qiskit.circuit import ParameterVector
-
-sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
+sys.path[1:1] = [ "_common", "_common/ocean", "maxcut/_common" ]
+sys.path[1:1] = [ "../../_common", "../../_common/ocean", "../../maxcut/_common/" ]
 import common
 import execute as ex
 import metrics as metrics
+import HamiltonianCircuitProxy
 
 logger = logging.getLogger(__name__)
 fname, _, ext = os.path.basename(__file__).partition(".")
 log_to_file = True
+
+# Big-endian format is used in dwave. no need to reverse bitstrings
+reverseStep = 1
 
 try:
     if log_to_file:
@@ -51,8 +50,11 @@ except Exception as e:
 np.random.seed(0)
 
 maxcut_inputs = dict() #inputs to the run method
+
 verbose = False
+
 print_sample_circuit = True
+
 # Indicates whether to perform the (expensive) pre compute of expectations
 do_compute_expectation = True
 
@@ -60,182 +62,45 @@ do_compute_expectation = True
 QC_ = None
 Uf_ = None
 
-# based on examples from https://qiskit.org/textbook/ch-applications/qaoa.html
-QAOA_Parameter  = namedtuple('QAOA_Parameter', ['beta', 'gamma'])
-
-# Qiskit uses the little-Endian convention. Hence, measured bit-strings need to be reversed while evaluating cut sizes
-reverseStep = -1
 
 #%% MaxCut circuit creation and fidelity analaysis functions
-def create_qaoa_circ(nqubits, edges, parameters):
+def create_circ(nqubits, edges):
 
-    qc = QuantumCircuit(nqubits)
+    h = {}
+    J = {}
+    for e in edges:
+        if e in J:
+            J[e] += 1
+        else:
+            J[e] = 1
 
-    # initial_state
-    for i in range(0, nqubits):
-        qc.h(i)
+    circuitProxy = HamiltonianCircuitProxy.HamiltonianCircuitProxy()
+    circuitProxy.h = h
+    circuitProxy.J = J
 
-    for par in parameters:
-        #print(f"... gamma, beta = {par.gamma} {par.beta}")
-        
-        # problem unitary
-        for i,j in edges:
-            qc.rzz(- par.gamma, i, j)
-
-        qc.barrier()
-        
-        # mixer unitary
-        for i in range(0, nqubits):
-            qc.rx(2 * par.beta, i)
-
-    return qc
+    return circuitProxy
    
 
-def MaxCut (num_qubits, secret_int, edges, rounds, thetas_array, parameterized, measured = True):
-
-    if parameterized:
-        return MaxCut_param(num_qubits, secret_int, edges, rounds, thetas_array)
-
-    # if no thetas_array passed in, create defaults 
-    if thetas_array is None:
-        thetas_array = 2*rounds*[1.0]
-    
-    #print(f"... incoming thetas_array={thetas_array} rounds={rounds}")
-       
-    # get number of qaoa rounds (p) from length of incoming array
-    p = len(thetas_array)//2 
-    
-    # if rounds passed in is less than p, truncate array
-    if rounds < p:
-        p = rounds
-        thetas_array = thetas_array[:2*rounds]
-    
-    # if more rounds requested than in thetas_array, give warning (can fill array later)
-    elif rounds > p:
-        rounds = p
-        print(f"WARNING: rounds is greater than length of thetas_array/2; using rounds={rounds}")
+def MaxCut (num_qubits, secret_int, edges, measured = True):
     
     logger.info(f'*** Constructing NON-parameterized circuit for {num_qubits = } {secret_int}')
-    
-    # create parameters in the form expected by the ansatz generator
-    # this is an array of betas followed by array of gammas, each of length = rounds
-    betas = thetas_array[:p]
-    gammas = thetas_array[p:]
-    parameters = [QAOA_Parameter(*t) for t in zip(betas,gammas)]
            
-    # and create the circuit, without measurements
-    qc = create_qaoa_circ(num_qubits, edges, parameters)   
+    # and create the hamiltonian
+    circuitProxy = create_circ(num_qubits, edges)   
 
     # pre-compute and save an array of expected measurements
     if do_compute_expectation:
         logger.info('Computing expectation')
-        compute_expectation(qc, num_qubits, secret_int)
-        
-    # add the measure here
-    if measured: qc.measure_all()
-        
-    # save small circuit example for display
-    global QC_
-    if QC_ == None or num_qubits <= 6:
-        if num_qubits < 9: QC_ = qc
+        #compute_expectation(qc, num_qubits, secret_int)
 
     # return a handle on the circuit
-    return qc, None
+    return circuitProxy, None
 
 
-############### Circuit Definition - Parameterized version
-  
-# Create ansatz specific to this problem, defined by G = nodes, edges, and the given parameters
-# Do not include the measure operation, so we can pre-compute statevector
-def create_qaoa_circ_param(nqubits, edges, betas, gammas):
-
-    qc = QuantumCircuit(nqubits)
-
-    # initial_state
-    for i in range(0, nqubits):
-        qc.h(i)
-
-    for beta, gamma in zip(betas, gammas):
-        #print(f"... gamma, beta = {gammas}, {betas}")
-        
-        # problem unitary
-        for i,j in edges:
-            qc.rzz(- gamma, i, j)
-
-        qc.barrier()
-        
-        # mixer unitary
-        for i in range(0, nqubits):
-            qc.rx(2 * beta, i)
-
-    return qc
-  
-_qc = None
+_qc = []
 beta_params = []
 gamma_params = []
         
-# Create the benchmark program circuit
-# Accepts optional rounds and array of thetas (betas and gammas)
-def MaxCut_param (num_qubits, secret_int, edges, rounds, thetas_array):
-    # if no thetas_array passed in, create defaults 
-    if thetas_array is None:
-        thetas_array = 2*rounds*[1.0]
-    
-    #print(f"... incoming thetas_array={thetas_array} rounds={rounds}")
-       
-    # get number of qaoa rounds (p) from length of incoming array
-    p = len(thetas_array)//2 
-    
-    # if rounds passed in is less than p, truncate array
-    if rounds < p:
-        p = rounds
-        thetas_array = thetas_array[:2*rounds]
-    
-    # if more rounds requested than in thetas_array, give warning (can fill array later)
-    elif rounds > p:
-        rounds = p
-        print(f"WARNING: rounds is greater than length of thetas_array/2; using rounds={rounds}")
-    
-    #print(f"... actual thetas_array={thetas_array}")
-    
-    # create parameters in the form expected by the ansatz generator
-    # this is an array of betas followed by array of gammas, each of length = rounds
-    global _qc
-    global betas
-    global gammas
-    
-    # create the circuit the first time, add measurements
-    if ex.do_transpile_for_execute:
-        logger.info(f'*** Constructing parameterized circuit for {num_qubits = } {secret_int}')
-        betas = ParameterVector("𝞫", p)
-        gammas = ParameterVector("𝞬", p)
-    
-        _qc = create_qaoa_circ_param(num_qubits, edges, betas, gammas)
-        
-        # add the measure here, only after circuit is created
-        _qc.measure_all()
-    
-    params = {betas: thetas_array[:p], gammas: thetas_array[p:]}   
-    #logger.info(f"Binding parameters {params = }")
-    logger.info(f"Create binding parameters for {thetas_array}")
-    
-    qc = _qc
-    #print(qc)
-    
-    # pre-compute and save an array of expected measurements
-    if do_compute_expectation:
-        logger.info('Computing expectation')
-        compute_expectation(qc, num_qubits, secret_int, params=params)
-   
-    # save small circuit example for display
-    global QC_
-    if QC_ == None or num_qubits <= 6:
-        if num_qubits < 9: QC_ = qc
-
-    # return a handle on the circuit
-    return qc, params
-
-
 ############### Expectation Tables
 
 # DEVNOTE: We are building these tables on-demand for now, but for larger circuits
@@ -333,8 +198,8 @@ def compute_cutsizes(results, nodes, edges):
     sizes : ndarray of ints
         cut sizes (i.e. number of edges crossing the cut)
     """
-    cuts = list(results.get_counts().keys())
-    counts = list(results.get_counts().values())
+    cuts = list(results.keys())
+    counts = list(results.values())
     sizes = [common.eval_cut(nodes, edges, cut, reverseStep) for cut in cuts]
     return cuts, counts, sizes
 
@@ -531,82 +396,9 @@ def uniform_cut_sampling(num_qubits, degree, num_shots, _instances=None):
 
     return unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif
 
-
-
-def get_random_angles(rounds, restarts):
-    """Create max_circuit number of random initial conditions
-
-    Args:
-        rounds (int): number of rounds in QAOA
-        restarts (int): number of random initial conditions 
-
-    Returns:
-        restarts (list of lists of floats): list of length restarts. Each list element is a list of angles
-    """
-    # restarts = min(10, restarts)
-    # Create random angles
-    theta_min = [0] * 2 * rounds
-    # Upper limit for betas=pi; upper limit for gammas=2pi
-    theta_max = [np.pi] * rounds + [2 * np.pi] * rounds
-    thetas = np.random.uniform(
-        low=theta_min, high=theta_max, size=(restarts, 2 * rounds)
-    )
-    thetas = thetas.tolist()
-    return thetas
-        
-
-
-def get_restart_angles(thetas_array, rounds, restarts):
-    """
-    Create random initial conditions for the restart loop.
-    thetas_array takes precedence over restarts.
-    If the user inputs valid thetas_array, restarts will be inferred accordingly.
-    If thetas_array is None and restarts is 1, return all 1's as initial angles.
-    If thetas_array is None and restarts >1, generate restarts number of random initial conditions
-    If only one set of random angles are desired, then the user needs to create them and send as thetas_array 
-
-    Args:
-        thetas_array (list of lists of floats): list of initial angles.
-        restarts (int): number of random initial conditions
-        rounds (int): of QAOA
-
-    Returns:
-        thetas (list of lists. Shape = (max_circuits, 2 * rounds))
-        restarts : int
-    """
-    assert type(restarts) == int and restarts > 0, "max_circuits must be an integer greater than 0"
-    default_angles = [[1] * 2 * rounds]
-    default_restarts = 1
-    if thetas_array is None:
-        if restarts == 1:
-            # if the angles are none, but restarts equals 1, use default of all 1's
-            return default_angles, default_restarts
-        else:
-            # restarts can only be greater than 1.
-            return get_random_angles(rounds, restarts), restarts
-        
-    if type(thetas_array) != list:
-        # thetas_array is not None, but is also not a list.
-        print("thetas_array is not a list. Using random angles.")
-        return get_random_angles(rounds, restarts), restarts
-    
-    # At this point, thetas_array is a list. check if thetas_array is a list of lists
-    if not all([type(item) == list for item in thetas_array]):
-        # if every list element is not a list, return random angles
-        print("thetas_array is not a list of lists. Using random angles.")
-        return get_random_angles(rounds, restarts), restarts
-        
-    if not all([len(item) == 2 * rounds for item in thetas_array]):
-        # If not all list elements are lists of the correct length...
-        print("Each element of thetas_array must be a list of length 2 * rounds. Using random angles.")
-        return get_random_angles(rounds, restarts), restarts
-    
-    # At this point, thetas_array is a list of lists of length 2*rounds. All conditions are satisfied. Return inputted angles.
-    return thetas_array, len(thetas_array)
-    
     
 #%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
-
+### DEVNOTE: this only applies for Qiskit, not Ocean
 def save_runtime_data(result_dict): # This function will need changes, since circuit metrics dictionaries are now different
     cm = result_dict.get('circuit_metrics')
     detail = result_dict.get('circuit_metrics_detail', None)
@@ -687,12 +479,18 @@ def store_final_iter_to_metrics_json(num_qubits,
         opt (int) : Max Cut value
     """
     # In order to compare with uniform random sampling, get some samples
+    ''' DEVNOTE: Not needed
     unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif = uniform_cut_sampling(
         num_qubits, degree, num_shots, _instances)
     unif_dict = {'unique_counts_unif': unique_counts_unif,
                  'unique_sizes_unif': unique_sizes_unif,
                  'cumul_counts_unif': cumul_counts_unif}  # store only the distribution of cut sizes, and not the cuts themselves
-
+    '''
+    unif_dict = {'unique_counts_unif': [],
+                 'unique_sizes_unif': [],
+                 'cumul_counts_unif': []
+                 }
+    
     # Store properties such as (cuts, counts, sizes) of the final iteration, the converged theta values, as well as the known optimal value for the current problem, in metrics.circuit_metrics_final_iter. Also store uniform cut sampling results
     metrics.store_props_final_iter(num_qubits, restart_ind, 'optimal_value', opt)
     metrics.store_props_final_iter(num_qubits, restart_ind, None, iter_size_dist)
@@ -890,16 +688,18 @@ def get_width_restart_tuple_from_filename(fileName):
 
 #%% Run method: Benchmarking loop
 
-MAX_QUBITS = 24
+MAX_QUBITS = 320
 iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
 iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 saved_result = {  }
 instance_filename = None
 
+minimizer_loop_index = 0
+
 def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
-        method=1, rounds=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
-        max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
-        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, use_fixed_angles=False,
+        method=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
+        max_iter=30, min_annealing_time=1, max_annealing_time=200, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
+        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
         backend_id='qasm_simulator', provider_backend=None, eta=0.5,
@@ -917,14 +717,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         Number of times the circut will be measured, for each iteration. The default is 100.
     method : int, optional
         If 1, then do standard metrics, if 2, implement iterative algo metrics. The default is 1.
-    rounds : int, optional
-        number of QAOA rounds. The default is 1.
     degree : int, optional
         degree of graph. The default is 3.
     thetas_array : list, optional
         list or ndarray of beta and gamma values. The default is None.
-    use_fixed_angles : bool, optional
-        use betas and gammas obtained from a 'fixed angles' table, specific to degree and rounds
     N : int, optional
         For the max % counts metric, choose the highest N% counts. The default is 10.
     alpha : float, optional
@@ -935,6 +731,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         Compute circuit fidelity. The default is True.
     max_iter : int, optional
         Number of iterations for the minimizer routine. The default is 30.
+    min_annealing_time : int, optional
+        Minimum annealing time. The default is 1.
+    max_annealing_time : int, optional
+        Maximum annealing time. The default is 200.
     score_metric : list or string, optional
         Which metrics are to be plotted in area metrics plots. The default is 'fidelity'.
     x_metric : list or string, optional
@@ -979,13 +779,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # This dictionary will later be stored in a json file
     # It will also be used for sending parameters to the plotting function
     dict_of_inputs = locals()
-    
-    # Get angles for restarts. Thetas = list of lists. Lengths are max_circuits and 2*rounds
-    thetas, max_circuits = get_restart_angles(thetas_array, rounds, max_circuits)
-    
-    # Update the dictionary of inputs
-    dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
-    
+
     # Delete some entries from the dictionary
     for key in ["hub", "group", "project", "provider_backend"]:
         dict_of_inputs.pop(key)
@@ -993,12 +787,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     global maxcut_inputs
     maxcut_inputs = dict_of_inputs
     
-    global QC_
-    global circuits_done
-    global minimizer_loop_index
-    global opt_ts
+    #print(f"{dict_of_inputs = }")
     
-    print("MaxCut Benchmark Program - Qiskit")
+    print("MaxCut Benchmark Program - Ocean")
 
     QC_ = None
     
@@ -1020,12 +811,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
     degree = max(3, degree)
-    rounds = max(1, rounds)
     
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
-    do_compute_expectation = do_fidelities
-        
+    do_compute_expectation = False
+    
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
         y_size = 1.5
@@ -1037,21 +827,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                        'approx_ratio' : compute_sample_mean,
                        'gibbs_ratio' : compute_gibbs,
                        'bestcut_ratio' : compute_best_cut_from_measured}
-                       
-    # if using fixed angles, get thetas array from table
-    if use_fixed_angles:
-    
-        # Load the fixed angle tables from data file
-        fixed_angles = common.read_fixed_angles(
-            os.path.join(os.path.dirname(__file__), '..', '_common', 'angles_regular_graphs.json'))
-            
-        thetas_array = common.get_fixed_angles_for(fixed_angles, degree, rounds)
-        if thetas_array == None:
-            print(f"ERROR: no fixed angles for rounds = {rounds}")
-            return
-            
-    # ****************************
-    
+
     # Initialize metrics module
     metrics.init_metrics()
     
@@ -1062,36 +838,35 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         num_qubits = int(num_qubits)
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
-
+     
     def execution_handler2 (qc, result, num_qubits, s_int, num_shots):
         # Stores the results to the global saved_result variable
         global saved_result
-        saved_result = result
-     
+        saved_result = result      
+        
     # Initialize execution module using the execution result handler above and specified backend_id
-    # for method=2 we need to set max_jobs_active to 1, so each circuit completes before continuing
-    if method == 2:
-        ex.max_jobs_active = 1
-        ex.init_execution(execution_handler2)
-    else:
-        ex.init_execution(execution_handler)
+    ex.init_execution(execution_handler2)
     
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options)
 
-    # for noiseless simulation, set noise model to be None
-    # ex.set_noise_model(None)
-
-    # Execute Benchmark Program N times for multiple circuit sizes
+    # Execute Benchmark Program N times for anneal times in powers of 2
     # Accumulate metrics asynchronously as circuits complete
-    # DEVNOTE: increment by 2 to match the collection of problems in 'instance' folder
-    for num_qubits in range(min_qubits, max_qubits + 1, 2):
+    
+    # loop over available problem sizes from min_qubits up to max_qubits
+    for num_qubits in [4, 8, 12, 16, 20, 24, 40, 80, 160, 320]:
+    
+        if num_qubits < min_qubits:
+            continue
+            
+        if num_qubits > max_qubits:
+            break
         
         if method == 1:
             print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
         else:
             print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
-        
+
         # If degree is negative, 
         if degree < 0 :
             degree = max(3, (num_qubits + degree))
@@ -1114,83 +889,78 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         if nodes == None:
             print(f"  ... problem not found.")
             break
-        
+
         for restart_ind in range(1, max_circuits + 1):
+        
             # restart index should start from 1
             # Loop over restarts for a given graph
-            
-            # if not using fixed angles, get initial or random thetas from array saved earlier
-            # otherwise use random angles (if restarts > 1) or [1] * 2 * rounds
-            if not use_fixed_angles:
-                thetas_array = thetas[restart_ind - 1]
-                            
             if method == 1:
+            
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                qc, params = MaxCut(num_qubits, restart_ind, edges, rounds, thetas_array, parameterized)
+                qc, params = MaxCut(num_qubits, restart_ind, edges, parameterized)   ### DEVNOTE: remove param?
                 metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
-                # collapse the sub-circuit levels used in this benchmark (for qiskit)
-                qc2 = qc.decompose()
-
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc2, num_qubits, restart_ind, shots=num_shots, params=params)
+                ex.submit_circuit(qc, num_qubits, restart_ind, shots=num_shots, params=params)
 
             if method == 2:
+                global minimizer_loop_index
+                
                 # a unique circuit index used inside the inner minimizer loop as identifier
                 minimizer_loop_index = 0 # Value of 0 corresponds to the 0th iteration of the minimizer
-                start_iters_t = time.time()
-
-                # Always start by enabling transpile ...
-                ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
-                    
-                logger.info(f'===============  Begin method 2 loop, enabling transpile')
                 
-                def expectation(thetas_array):
+                start_iters_t = time.time()
+                
+                # Always start by enabling embed ...
+                ex.set_embedding_flag(embedding_flag=True)
+                
+                if verbose:
+                    print(f'===============  Begin method 2 loop, enabling embed')
+
+                annealing_time = min_annealing_time
+                while annealing_time <= max_annealing_time:
                     
+                    if verbose:
+                        print(f"... using anneal time: {annealing_time}")
+
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
-                    global minimizer_loop_index
+                    #global minimizer_loop_index
                     unique_id = restart_ind * 1000 + minimizer_loop_index
-                    # store thetas_array
-                    metrics.store_metric(num_qubits, unique_id, 'thetas_array', thetas_array.tolist())
-                    
                     #************************************************
-                    #*** Circuit Creation and Decomposition start ***
+                    #*** Circuit Creation
+                
                     # create the circuit for given qubit size, secret string and params, store time metric
                     ts = time.time()
-                    qc, params = MaxCut(num_qubits, unique_id, edges, rounds, thetas_array, parameterized)
+                    qc, params = MaxCut(num_qubits, unique_id, edges, parameterized)
+                    params = [annealing_time]
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
-                    
-                    # also store the 'rounds' and 'degree' for each execution
+                        
+                    # also store the 'degree' for each execution
                     # DEVNOTE: Currently, this is stored for each iteration. Reduce this redundancy
-                    metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
                     metrics.store_metric(num_qubits, unique_id, 'degree', degree)
-                    
-                    # collapse the sub-circuit levels used in this benchmark (for qiskit)
-                    qc2 = qc.decompose()
-                    
-                    # Circuit Creation and Decomposition end
-                    #************************************************
                     
                     #************************************************
                     #*** Quantum Part: Execution of Circuits ***
+                
                     # submit circuit for execution on target with the current parameters
-                    ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots, params=params)
-                    
+                    ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
+                        
                     # Must wait for circuit to complete
                     #ex.throttle_execution(metrics.finalize_group)
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                     
-                    # after first execution and thereafter, no need for transpilation if parameterized
-                    if parameterized:
-                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                        logger.info(f'**** First execution complete, disabling transpile')
-                    #************************************************
-                    
+                    '''
+                    # after first execution and thereafter, no need for embed (actually NOT)
+                    #since we are benchmarking, we want to compare performance across anneal times
+                    # so we do not want to use embedding, or it wouldn't be a valid comparison
+                    #ex.set_embedding_flag(embedding_flag=False)
+                    ex.set_embedding_flag(embedding_flag=True)
+                    if verbose:
+                        print(f'**** First execution complete, disabling embed')
+                    '''   
                     global saved_result
-                    # Fidelity Calculation and Storage
-                    _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, unique_id, num_shots) 
-                    metrics.store_metric(num_qubits, unique_id, 'fidelity', fidelity)
+                    #print(saved_result)
                     
                     #************************************************
                     #*** Classical Processing of Results - essential to optimizer ***
@@ -1202,10 +972,13 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # Compute the value corresponding to the objective function first
                     dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha)
                     # Store the optimizer time as current time- tc1 + ts - opt_ts, since the time between tc1 and ts is not time used by the classical optimizer.
-                    metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
+                    # metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
                     # Note: the first time it is stored it is just the initialization time for optimizer
                     #************************************************
                     
+                    if verbose:
+                        print(dict_of_vals)
+                        
                     #************************************************
                     #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
                     # Compute the distribution of cut sizes; store them under metrics
@@ -1228,80 +1001,74 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     quantile_sizes = compute_quartiles(counts, sizes)
                     # Store quantile_optgaps as a list (allows storing in json files)
                     metrics.store_metric(num_qubits, unique_id, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) 
-                    
+                        
                     # Also store the cuts, counts and sizes in a global variable, to allow access elsewhere
                     global iter_dist
                     iter_dist = {'cuts' : cuts, 'counts' : counts, 'sizes' : sizes}
                     minimizer_loop_index += 1
-                    #************************************************
                     
-                    if comfort:
-                        if minimizer_loop_index == 1: print("")
-                        print(".", end ="")
-
+                    #************************************************
                     # reset timer for optimizer execution after each iteration of quantum program completes
                     opt_ts = time.time()
                     
-                    return dict_of_vals[objective_func_type]
-                
-                # after first execution and thereafter, no need for transpilation if parameterized
-                # DEVNOTE: this appears to NOT be needed, as we can turn these off after 
-                def callback(xk):
-                    if parameterized:
-                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                    # double the annealing time for the next iteration
+                    annealing_time *= 2
+            
+            # for this benchmark, need to convert the times to deltas
+            # since there is wobble in some of the times, don't go below delta = 0
+            elapsed_time = exec_time = opt_exec_time = 0
+            for circuit_id in metrics.circuit_metrics[str(num_qubits)]:
+                circuit = metrics.circuit_metrics[str(num_qubits)][circuit_id]
 
-                opt_ts = time.time()
-                # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
-                ##res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
-                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter})
-                # To-do: Set bounds for the minimizer
+                d_elapsed_time = max(0, circuit['elapsed_time'] - elapsed_time)
+                d_exec_time = max(0, circuit['exec_time'] - exec_time)
+                d_opt_exec_time = max(0, circuit['opt_exec_time'] - opt_exec_time)
                 
-                unique_id = restart_ind * 1000 + 0
-                metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
+                elapsed_time = circuit['elapsed_time']
+                exec_time = circuit['exec_time']
+                opt_exec_time = circuit['opt_exec_time']
                 
-                if comfort:
-                    print("")
+                #print(f"... times = {elapsed_time} {exec_time} {opt_exec_time}")
+                #print(f"... delta times = {d_elapsed_time} {d_exec_time} {d_opt_exec_time}")
 
-                # Save final iteration data to metrics.circuit_metrics_final_iter
-                # This data includes final counts, cuts, etc.
-                store_final_iter_to_metrics_json(num_qubits=num_qubits, 
-                                                 degree=degree, 
-                                                 restart_ind=restart_ind,
-                                                 num_shots=num_shots, 
-                                                 converged_thetas_list=res.x.tolist(),
-                                                 opt=opt,
-                                                 iter_size_dist=iter_size_dist, iter_dist=iter_dist, parent_folder_save=parent_folder_save,
-                                                 dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
-                                                 save_res_to_file=save_res_to_file, _instances=_instances)
-
+                circuit['elapsed_time'] = d_elapsed_time
+                circuit['exec_time'] = d_exec_time
+                circuit['opt_exec_time'] = d_opt_exec_time
+                
+            # Save final iteration data to metrics.circuit_metrics_final_iter
+            # This data includes final counts, cuts, etc.
+            store_final_iter_to_metrics_json(num_qubits=num_qubits, 
+                                                degree=degree, 
+                                                restart_ind=restart_ind,
+                                                num_shots=num_shots, 
+                                                #converged_thetas_list=res.x.tolist(),
+                                                converged_thetas_list=[[0],[0]],
+                                                opt=opt,
+                                                iter_size_dist=iter_size_dist, iter_dist=iter_dist, parent_folder_save=parent_folder_save,
+                                                dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
+                                                save_res_to_file=save_res_to_file, _instances=_instances)
+                                                
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
         if method == 2:                  
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
-            
-    # Wait for some active circuits to complete; report metrics when groups complete
-    ex.throttle_execution(metrics.finalize_group)
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-             
-    global print_sample_circuit
-    if print_sample_circuit:
-        # print a sample circuit
-        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
-
-    # Plot metrics for all circuit sizes
+    
+    # Plot metrics for all problem sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Ocean",
                 options=dict(shots=num_shots))
+                
     elif method == 2:
         #metrics.print_all_circuit_metrics()
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
-def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_circuits = 1,
+# Method to plot the results from the collected data
+def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 1,
                  objective_func_type='approx_ratio', method=2, score_metric='fidelity',
                  x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
                  num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
@@ -1315,16 +1082,16 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
         cur_time=datetime.datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
         short_obj_func_str = metrics.score_label_save_str[objective_func_type]
-        suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_of-{short_obj_func_str}_{dt}' #of=objective function
+        suffix = f'-s{num_shots}_d{degree}_mi{max_iter}_of-{short_obj_func_str}_{dt}' #of=objective function
     else:
         short_obj_func_str = metrics.score_label_save_str[objective_func_type]
         suffix = f'of-{short_obj_func_str}' #of=objective function
         
     obj_str = metrics.known_score_labels[objective_func_type]
-    options = {'shots' : num_shots, 'rounds' : rounds, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
-    suptitle = f"Benchmark Results - MaxCut ({method}) - Qiskit"
+    options = {'shots' : num_shots, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
+    suptitle = f"Benchmark Results - MaxCut ({method}) - Ocean"
     
-    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+    metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Ocean",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
                 fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
                 x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
