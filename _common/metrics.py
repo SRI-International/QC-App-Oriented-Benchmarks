@@ -1566,7 +1566,7 @@ score_label_save_str = {
 def plot_all_area_metrics(suptitle='',
             score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
             fixed_metrics={}, num_x_bins=100,
-            y_size=None, x_size=None, x_min=None, x_max=None,
+            y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
             options=None, suffix=''):
 
     if type(score_metric) == str:
@@ -1580,7 +1580,7 @@ def plot_all_area_metrics(suptitle='',
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
-                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, options=options,suffix=suffix)
+                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=options, suffix=suffix)
 
 def get_best_restart_ind(group, which_metric = 'approx_ratio'):
     """
@@ -1603,7 +1603,7 @@ def get_best_restart_ind(group, which_metric = 'approx_ratio'):
 # Plot the given "Score Metric" against the given "X Metric" and "Y Metric"
 def plot_area_metrics(suptitle='',
             score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={}, num_x_bins=100,
-            y_size=None, x_size=None, x_min=None, x_max=None,
+            y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
             options=None, suffix=''):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
@@ -1779,7 +1779,7 @@ def plot_area_metrics(suptitle='',
         plot_volumetric_data(ax, yy, x, scores, depth_base=-1,
                     label='Depth', labelpos=(0.2, 0.7), labelrot=0,
                     type=1, fill=True, w_max=18, do_label=False,
-                    x_size=xs, y_size=y_size, zorder=3)                           
+                    x_size=xs, y_size=y_size, zorder=3, offset_flag=offset_flag)                      
         
         plt.tight_layout()
         
@@ -3074,7 +3074,7 @@ def vplot_anno_init ():
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
         labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, do_border=True,
-        x_size=1.0, y_size=1.0, zorder=1,
+        x_size=1.0, y_size=1.0, zorder=1, offset_flag=False,
         max_depth=0, suppress_low_fidelity=False):
 
     # since data may come back out of order, save point at max y for annotation
@@ -3084,10 +3084,27 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
     
     # plot data rectangles
     low_fidelity_count = True
-    for i in range(len(d_data)):
+    
+    last_y = -1
+    k = 0
+
+    # determine y-axis dimension for one pixel to use for offset of bars that start at 0
+    (_, dy) = get_pixel_dims(ax)
+    
+    # do this loop in reverse to handle the case where earlier cells are overlapped by later cells
+    for i in reversed(range(len(d_data))):
         x = depth_index(d_data[i], depth_base)
         y = float(w_data[i])
         f = f_data[i]
+        
+        # each time we star a new row, reset the offset counter
+        # DEVNOTE: this is highly specialized for the QA area plots, where there are 8 bars
+        # that represent time starting from 0 secs.  We offset by one pixel each and center the group
+        if y != last_y:
+            last_y = y;
+            k = 3              # hardcoded for 8 cells, offset by 3
+        
+        #print(f"{i = } {x = } {y = }")
         
         if max_depth > 0 and d_data[i] > max_depth:
             #print(f"... excessive depth (2), skipped; w={y} d={d_data[i]}")
@@ -3100,15 +3117,30 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
         
         # the only time this is False is when doing merged gradation plots
         if do_border == True:
+        
+            # this case is for an array of x_sizes, i.e. each box has different width
             if isinstance(x_size, list):
-                ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size, zorder=zorder))
+                
+                # draw each of the cells, with no offset
+                if not offset_flag:
+                    ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size, zorder=zorder))
+                    
+                # use an offset for y value, AND account for x and width to draw starting at 0
+                else:
+                    ax.add_patch(box_at((x/2 + x_size[i]/4), y + k*dy, f, type=type, fill=fill, x_size=x+ x_size[i]/2, y_size=y_size, zorder=zorder))
+                
+            # this case is for only a single cell
             else:
                 ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
 
+        # save the annotation point with the largest y value
         if y >= y_anno:
             x_anno = x
             y_anno = y
             i_anno = i
+        
+        # move the next bar down (if using offset)
+        k -= 1
     
     # if no data rectangles plotted, no need for a label
     if x_anno == 0 or y_anno == 0:
@@ -3261,7 +3293,21 @@ def anno_volumetric_data(ax, depth_base=2, label='Depth',
             color=(0.2,0.2,0.2),
             clip_on=True)
  
- 
+# Return the x and y equivalent to a single pixel for the given plot axis
+def get_pixel_dims(ax):
+
+    # transform 0 -> 1 to pixel dimensions
+    pixdims = ax.transData.transform([(0,1),(1,0)])-ax.transData.transform((0,0))
+    xpix = pixdims[1][0]
+    ypix = pixdims[0][1]
+    
+    #determine x- and y-axis dimension for one pixel 
+    dx = (1 / xpix)
+    dy = (1 / ypix)
+    
+    return (dx, dy)
+    
+    
 ####################################
 # TEST METHODS 
         

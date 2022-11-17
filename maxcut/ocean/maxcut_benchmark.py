@@ -1095,6 +1095,7 @@ def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
                 fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
                 x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
+                offset_flag=True,       # for the QA area plots, offset the cells
                 options=options, suffix=suffix)
     
     metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type)
