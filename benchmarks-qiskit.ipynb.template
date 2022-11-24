@@ -96,6 +96,13 @@
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Deutsch-Jozsa"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {
