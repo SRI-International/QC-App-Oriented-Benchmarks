@@ -1128,7 +1128,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
             if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                qc, params = MaxCut(num_qubits, restart_ind, edges, rounds, thetas_array, parameterized)
+                
+                # if using fixed angles in method 1, need to access first element
+                # DEVNOTE: eliminate differences between method 1 and 2 and handling of thetas_array
+                thetas_array_0 = thetas_array
+                if use_fixed_angles:
+                    thetas_array_0 = thetas_array[0]
+                                       
+                qc, params = MaxCut(num_qubits, restart_ind, edges, rounds, thetas_array_0, parameterized)
                 metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
@@ -1254,6 +1261,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                 opt_ts = time.time()
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
                 ##res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
+
                 res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter})
                 # To-do: Set bounds for the minimizer
                 
@@ -1296,7 +1304,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # Plot metrics for all circuit sizes
     if method == 1:
         metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
-                options=dict(shots=num_shots))
+                options=dict(shots=num_shots,rounds=rounds))
     elif method == 2:
         #metrics.print_all_circuit_metrics()
         if plot_results:

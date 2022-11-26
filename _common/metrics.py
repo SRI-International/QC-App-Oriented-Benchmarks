@@ -1471,7 +1471,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
 
 ### Plot Metrics for a specific application
 
-def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, suffix=""):
+def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, options=None, suffix=""):
     global circuit_metrics
     global group_metrics
     
@@ -1489,7 +1489,7 @@ def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, su
         return
     
     group_metrics = shared_data[app]["group_metrics"]
-    plot_metrics(app, filters=filters, suffix=suffix)
+    plot_metrics(app, filters=filters, suffix=suffix, options=options)
 
 # save plot as image
 def save_plot_image(plt, imagename, backend_id):
@@ -2749,6 +2749,9 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
         QV = -QV
         qv_estimate = True
         est_str = " (est.)"
+        
+    if avail_qubits > 0 and max_qubits > avail_qubits:
+        max_qubits = avail_qubits
         
     max_width = 13
     if max_qubits > 11: max_width = 18
