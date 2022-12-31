@@ -958,7 +958,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     ex.set_embedding_flag(embedding_flag=True)
                     if verbose:
                         print(f'**** First execution complete, disabling embed')
-                    '''   
+                    '''  
                     global saved_result
                     #print(saved_result)
                     
@@ -1014,21 +1014,22 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # double the annealing time for the next iteration
                     annealing_time *= 2
             
-            # for this benchmark, need to convert the times to deltas
+            # for this benchmark, need to convert the times to deltas (for compatibility with metrics)
             # since there is wobble in some of the times, don't go below delta = 0
             elapsed_time = exec_time = opt_exec_time = 0
             for circuit_id in metrics.circuit_metrics[str(num_qubits)]:
                 circuit = metrics.circuit_metrics[str(num_qubits)][circuit_id]
-
+                #print(f"... times = {circuit['elapsed_time']} {circuit['exec_time']} {circuit['opt_exec_time']}")
+                
                 d_elapsed_time = max(0, circuit['elapsed_time'] - elapsed_time)
                 d_exec_time = max(0, circuit['exec_time'] - exec_time)
                 d_opt_exec_time = max(0, circuit['opt_exec_time'] - opt_exec_time)
                 
-                elapsed_time = circuit['elapsed_time']
-                exec_time = circuit['exec_time']
-                opt_exec_time = circuit['opt_exec_time']
+                elapsed_time = max(elapsed_time, circuit['elapsed_time'])
+                exec_time = max(exec_time, circuit['exec_time'])
+                opt_exec_time = max(opt_exec_time, circuit['opt_exec_time'])
                 
-                #print(f"... times = {elapsed_time} {exec_time} {opt_exec_time}")
+                #print(f"... max times = {elapsed_time} {exec_time} {opt_exec_time}")
                 #print(f"... delta times = {d_elapsed_time} {d_exec_time} {d_opt_exec_time}")
 
                 circuit['elapsed_time'] = d_elapsed_time
