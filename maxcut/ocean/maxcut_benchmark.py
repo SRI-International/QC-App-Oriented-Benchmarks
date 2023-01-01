@@ -599,8 +599,7 @@ def load_all_metrics(folder, backend_id=None):
             num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
-        #metrics.print_all_circuit_metrics()
-        #metrics.dump_json("  ==> all circuit_metrics_detail_2", metrics.circuit_metrics_detail_2)
+    
     # override device name with the backend_id if supplied by caller
     if backend_id != None:
         metrics.set_plot_subtitle(f"Device = {backend_id}")
