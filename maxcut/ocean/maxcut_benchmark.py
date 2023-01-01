@@ -599,7 +599,7 @@ def load_all_metrics(folder, backend_id=None):
             num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
-            
+    
     # override device name with the backend_id if supplied by caller
     if backend_id != None:
         metrics.set_plot_subtitle(f"Device = {backend_id}")
@@ -656,6 +656,9 @@ def load_from_width_restart_file(folder, fileName):
             metrics.store_props_final_iter(num_qubits, restart_ind, None, unif_dict)
             if gen_prop['save_final_counts']:
                 metrics.store_props_final_iter(num_qubits, restart_ind, None, final_counts)
+                
+        # after loading data, need to convert times to deltas (compatibility with metrics plots)   
+        convert_times_to_deltas(num_qubits)
 
     return gen_prop
     
@@ -958,7 +961,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     ex.set_embedding_flag(embedding_flag=True)
                     if verbose:
                         print(f'**** First execution complete, disabling embed')
-                    '''   
+                    '''  
                     global saved_result
                     #print(saved_result)
                     
@@ -1014,27 +1017,10 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                     # double the annealing time for the next iteration
                     annealing_time *= 2
             
-            # for this benchmark, need to convert the times to deltas
-            # since there is wobble in some of the times, don't go below delta = 0
-            elapsed_time = exec_time = opt_exec_time = 0
-            for circuit_id in metrics.circuit_metrics[str(num_qubits)]:
-                circuit = metrics.circuit_metrics[str(num_qubits)][circuit_id]
-
-                d_elapsed_time = max(0, circuit['elapsed_time'] - elapsed_time)
-                d_exec_time = max(0, circuit['exec_time'] - exec_time)
-                d_opt_exec_time = max(0, circuit['opt_exec_time'] - opt_exec_time)
-                
-                elapsed_time = circuit['elapsed_time']
-                exec_time = circuit['exec_time']
-                opt_exec_time = circuit['opt_exec_time']
-                
-                #print(f"... times = {elapsed_time} {exec_time} {opt_exec_time}")
-                #print(f"... delta times = {d_elapsed_time} {d_exec_time} {d_opt_exec_time}")
-
-                circuit['elapsed_time'] = d_elapsed_time
-                circuit['exec_time'] = d_exec_time
-                circuit['opt_exec_time'] = d_opt_exec_time
-                
+            # DEVNOTE: Do this here, if we want to save deltas to file (which we used to do)         
+            # for this benchmark, need to convert times to deltas (for compatibility with metrics)   
+            #convert_times_to_deltas(num_qubits)
+            
             # Save final iteration data to metrics.circuit_metrics_final_iter
             # This data includes final counts, cuts, etc.
             store_final_iter_to_metrics_json(num_qubits=num_qubits, 
@@ -1047,6 +1033,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                                                 iter_size_dist=iter_size_dist, iter_dist=iter_dist, parent_folder_save=parent_folder_save,
                                                 dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
                                                 save_res_to_file=save_res_to_file, _instances=_instances)
+                                                
+            # after saving data, convert times to deltas (for compatibility with metrics plots)   
+            convert_times_to_deltas(num_qubits)
                                                 
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
@@ -1067,6 +1056,31 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
+# Convert elapsed/exec/opt_exec times to deltas from absolute
+# for this benchmark, need to convert the times to deltas (for compatibility with metrics)
+# since there is wobble in some of the times, don't go below delta = 0
+def convert_times_to_deltas(num_qubits):
+
+    elapsed_time = exec_time = opt_exec_time = 0
+    for circuit_id in metrics.circuit_metrics[str(num_qubits)]:
+        circuit = metrics.circuit_metrics[str(num_qubits)][circuit_id]
+        #print(f"... times = {circuit['elapsed_time']} {circuit['exec_time']} {circuit['opt_exec_time']}")
+        
+        d_elapsed_time = max(0, circuit['elapsed_time'] - elapsed_time)
+        d_exec_time = max(0, circuit['exec_time'] - exec_time)
+        d_opt_exec_time = max(0, circuit['opt_exec_time'] - opt_exec_time)
+        
+        elapsed_time = max(elapsed_time, circuit['elapsed_time'])
+        exec_time = max(exec_time, circuit['exec_time'])
+        opt_exec_time = max(opt_exec_time, circuit['opt_exec_time'])
+        
+        #print(f"... max times = {elapsed_time} {exec_time} {opt_exec_time}")
+        #print(f"... delta times = {d_elapsed_time} {d_exec_time} {d_opt_exec_time}")
+        
+        circuit['elapsed_time'] = d_elapsed_time
+        circuit['exec_time'] = d_exec_time
+        circuit['opt_exec_time'] = d_opt_exec_time
+        
 # Method to plot the results from the collected data
 def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 1,
                  objective_func_type='approx_ratio', method=2, score_metric='fidelity',
