@@ -1064,7 +1064,7 @@ def convert_times_to_deltas(num_qubits):
     elapsed_time = exec_time = opt_exec_time = 0
     for circuit_id in metrics.circuit_metrics[str(num_qubits)]:
         circuit = metrics.circuit_metrics[str(num_qubits)][circuit_id]
-        #print(f"... times = {circuit['elapsed_time']} {circuit['exec_time']} {circuit['opt_exec_time']}")
+        #print(f"... id = {circuit_id}, times = {circuit['elapsed_time']} {circuit['exec_time']} {circuit['opt_exec_time']}")
         
         d_elapsed_time = max(0, circuit['elapsed_time'] - elapsed_time)
         d_exec_time = max(0, circuit['exec_time'] - exec_time)
@@ -1074,8 +1074,8 @@ def convert_times_to_deltas(num_qubits):
         exec_time = max(exec_time, circuit['exec_time'])
         opt_exec_time = max(opt_exec_time, circuit['opt_exec_time'])
         
-        #print(f"... max times = {elapsed_time} {exec_time} {opt_exec_time}")
-        #print(f"... delta times = {d_elapsed_time} {d_exec_time} {d_opt_exec_time}")
+        #print(f"  ... max times = {elapsed_time} {exec_time} {opt_exec_time}")
+        #print(f"  ... delta times = {d_elapsed_time} {d_exec_time} {d_opt_exec_time}")
         
         circuit['elapsed_time'] = d_elapsed_time
         circuit['exec_time'] = d_exec_time
