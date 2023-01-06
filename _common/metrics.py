@@ -1523,7 +1523,7 @@ known_x_labels = {
     'cumulative_create_time' : 'Cumulative Circuit Creation Time (s)',
     'cumulative_elapsed_time' : 'Cumulative Elapsed Quantum Execution Time (s)',
     'cumulative_exec_time' : 'Cumulative Quantum Execution Time (s)',
-    'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time (s)',
+    'cumulative_opt_exec_time' : 'Cumulative Classical Optimization Time (s)',
     'cumulative_depth' : 'Cumulative Circuit Depth'
 }
 
@@ -1538,7 +1538,9 @@ x_label_save_str = {
 
 # map known Y metrics to labels
 known_y_labels = {
-    'num_qubits' : 'Circuit Width'
+    #'num_qubits' : 'Circuit Width'     # this is only used for max-cut area plots 
+    #'num_qubits' : 'Problem Size (Number of Variables)'      # use Problem Size instead
+    'num_qubits' : 'Problem Size (# of Variables)'      # use Problem Size instead
 }
 # map known Score metrics to labels    
 known_score_labels = {
@@ -1911,7 +1913,7 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     return new_xs, new_x, new_y, new_s
     
 
-def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
+def plot_ECDF(suptitle="",
               options=None, suffix=None):
     """
     Plot the ECDF (Empirical Cumulative Distribution Function)
@@ -1955,7 +1957,8 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
                 unique_sizes = circuit_metrics_final_iter[group][restart_ind]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
                 axs.plot(np.array(unique_sizes) / optimal_value, np.array(cumul_counts) / cumul_counts[-1], marker='o',
-                         ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
+                         #ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
+                         ls = '-', label = f"Problem Size={group}")#" degree={deg}") # lw=1,
 
         axs.set_ylabel('Fraction of Total Counts')
         axs.set_xlabel(r'$\frac{\mathrm{Cut\ Size}}{\mathrm{Max\ Cut\ Size}}$')
@@ -2006,7 +2009,8 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
 
         suptitle = "Empirical Distribution of Cut Sizes - " + appname
         fulltitle = get_full_title(
-            suptitle, options) + "\nwidth={}".format(width)
+            #suptitle, options) + "\nwidth={}".format(width)
+            suptitle, options) + "\nProblem Size = {}".format(width)
         plt.title(fulltitle)
 
         indx = group_metrics_optgaps['groups'].index(int(width))  # get index corresponding to width
@@ -2172,14 +2176,13 @@ def get_distribution_and_stats():
             group_metrics_optgaps['cvar_ratio']['gapvals'].append(abs(1.0 - mets["cvar_ratio"]) * 100)
             group_metrics_optgaps['bestcut_ratio']['gapvals'].append(abs(1.0 - mets["bestcut_ratio"]) * 100)
             group_metrics_optgaps['gibbs_ratio']['gapvals'].append(abs(1.0 - mets["gibbs_ratio"]) * 100)
-
+            
             # Also store the optimality gaps at the three quantiles values
             # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
             q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
             q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
             group_metrics_optgaps['quantile_optgaps']['gapvals'].append(q_vals)
             
-
             # Store empirical distribution of cut size values / optimal value 
             unique_sizes = circuit_metrics_final_iter[group][str(circuit_id)]['unique_sizes']
             unique_counts = circuit_metrics_final_iter[group][str(circuit_id)]['unique_counts']
@@ -2212,7 +2215,7 @@ def get_distribution_and_stats():
     return group_metrics_optgaps
     
 # Plot detailed optgaps
-def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", 
+def plot_metrics_optgaps (suptitle="", 
                           transform_qubit_group = False, 
                           new_qubit_group = None, filters=None, 
                           suffix="", objective_func_type = 'cvar_ratio',
@@ -2267,8 +2270,9 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
         plt.title(fulltitle)
-        axs.set_xlabel('Circuit Width (Number of Qubits)')
         axs.set_ylabel(r'Optimality Gap ($\%$)')
+        #axs.set_xlabel('Circuit Width (Number of Qubits)')
+        axs.set_xlabel(known_y_labels['num_qubits'])    # indirection
                 
         axs.set_xticks(xvalues)
         if xlabels != None:
@@ -2314,7 +2318,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         fig, axs = plt.subplots(1, 1)
         plt.title(fulltitle)
         axs.set_ylabel(r'Optimality Gap ($\%$)')
-        axs.set_xlabel('Circuit Width (Number of Qubits)')
+        #axs.set_xlabel('Circuit Width (Number of Qubits)')
+        axs.set_xlabel(known_y_labels['num_qubits'])    # indirection
         
         axs.set_xticks(xvalues)
         if xlabels != None:
@@ -3011,12 +3016,17 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
 
     plt.title(suptitle)
     
-    # round the max up to be divisible evenly (in multiples of 0.1) by num_xdivs 
+    # DEVNOTE: this code could be made more general, rounding the axis max to 20 divs nicely
+    # round the max up to be divisible evenly (in multiples of 0.05 or 0.005) by num_xdivs 
     num_xdivs = 20
     max_base = num_xdivs * 0.05
-    x_max = max_base * int((x_max + max_base) / max_base)
+    if x_max != None and x_max > 1.0:
+        x_max = max_base * int((x_max + max_base) / max_base)
+    if x_max != None and x_max > 0.1:
+        max_base = num_xdivs * 0.005
+        x_max = max_base * int((x_max + max_base) / max_base)
     
-    #print(f"... {x_min} {x_max} {max_base} {x_max}")
+    #print(f"... {x_min} {x_max} {max_base}")
     if x_min < 0.1: x_min = 0
     
     # and compute the step size for the tick divisions
