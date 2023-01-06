@@ -1913,7 +1913,7 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     return new_xs, new_x, new_y, new_s
     
 
-def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
+def plot_ECDF(suptitle="",
               options=None, suffix=None):
     """
     Plot the ECDF (Empirical Cumulative Distribution Function)
@@ -1957,7 +1957,8 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
                 unique_sizes = circuit_metrics_final_iter[group][restart_ind]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
                 axs.plot(np.array(unique_sizes) / optimal_value, np.array(cumul_counts) / cumul_counts[-1], marker='o',
-                         ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
+                         #ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
+                         ls = '-', label = f"Problem Size={group}")#" degree={deg}") # lw=1,
 
         axs.set_ylabel('Fraction of Total Counts')
         axs.set_xlabel(r'$\frac{\mathrm{Cut\ Size}}{\mathrm{Max\ Cut\ Size}}$')
@@ -2008,7 +2009,8 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
 
         suptitle = "Empirical Distribution of Cut Sizes - " + appname
         fulltitle = get_full_title(
-            suptitle, options) + "\nwidth={}".format(width)
+            #suptitle, options) + "\nwidth={}".format(width)
+            suptitle, options) + "\nProblem Size = {}".format(width)
         plt.title(fulltitle)
 
         indx = group_metrics_optgaps['groups'].index(int(width))  # get index corresponding to width
@@ -2213,7 +2215,7 @@ def get_distribution_and_stats():
     return group_metrics_optgaps
     
 # Plot detailed optgaps
-def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", 
+def plot_metrics_optgaps (suptitle="", 
                           transform_qubit_group = False, 
                           new_qubit_group = None, filters=None, 
                           suffix="", objective_func_type = 'cvar_ratio',
@@ -2268,8 +2270,9 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
         plt.title(fulltitle)
-        axs.set_xlabel('Circuit Width (Number of Qubits)')
         axs.set_ylabel(r'Optimality Gap ($\%$)')
+        #axs.set_xlabel('Circuit Width (Number of Qubits)')
+        axs.set_xlabel(known_y_labels['num_qubits'])    # indirection
                 
         axs.set_xticks(xvalues)
         if xlabels != None:
@@ -2315,7 +2318,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         fig, axs = plt.subplots(1, 1)
         plt.title(fulltitle)
         axs.set_ylabel(r'Optimality Gap ($\%$)')
-        axs.set_xlabel('Circuit Width (Number of Qubits)')
+        #axs.set_xlabel('Circuit Width (Number of Qubits)')
+        axs.set_xlabel(known_y_labels['num_qubits'])    # indirection
         
         axs.set_xticks(xvalues)
         if xlabels != None:
