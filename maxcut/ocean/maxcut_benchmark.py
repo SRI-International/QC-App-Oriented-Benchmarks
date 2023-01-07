@@ -1126,7 +1126,8 @@ def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 
     list_of_widths = [all_widths[-1]]
     metrics.plot_cutsize_distribution(suptitle=suptitle,options=options, suffix=suffix, list_of_widths = list_of_widths)
     
-    metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
+    # not needed for Ocean version
+    #metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
 # if main, execute method
 if __name__ == '__main__': run()
