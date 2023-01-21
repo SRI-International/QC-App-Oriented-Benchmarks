@@ -1343,7 +1343,8 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
     
     metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type)
     
-    metrics.plot_ECDF(suptitle=suptitle, options=options, suffix=suffix)
+    # this plot is deemed less useful
+    #metrics.plot_ECDF(suptitle=suptitle, options=options, suffix=suffix)
 
     all_widths = list(metrics.circuit_metrics_final_iter.keys())
     all_widths = [int(ii) for ii in all_widths]
