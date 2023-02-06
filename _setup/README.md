@@ -8,6 +8,7 @@ All versions of the prototype benchmark programs require that you have available
 * [Qiskit](qiskit/README.md)
 * [Cirq](cirq/README.md)
 * [Braket](braket/README.md)
+* [Ocean](ocean/README.md)
 * [Q# (Comming soon)](README.md)
 
 # General Environment Setup
