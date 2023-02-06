@@ -2,12 +2,13 @@
 
 You can run the benchmarks in Qiskit, Cirq, Braket, or Q#. For each of the programming environments supported by this project, there is a subdirectory containing detailed information about requirements and operational conventions. To view this information, along with instructions on how to to configure a unique environment for the API of your choice, follow the links in [Links to API Specific Setup](#links-to-api-specific-setup) below.
 
-All versions of the prototype benchmark programs require that you have available the Python interpreter (**version 3.6 or later**), and have installed the necessary Python packages in a virtual environment. If you have a proper Python environment available, you may go directly to your preferred API directory by following one of the links under [Links to API Specific Setup](#links-to-api-specific-setup). For instructions on how to download Python and set up a base virtual environment, see [General Environment Setup](#general-environment-setup) below.
+All versions of the benchmark programs require that you have available the Python interpreter (**version 3.6 or later**), and have installed the necessary Python packages in a virtual environment. If you have a proper Python environment available, you may go directly to your preferred API directory by following one of the links under [Links to API Specific Setup](#links-to-api-specific-setup). For instructions on how to download Python and set up a base virtual environment, see [General Environment Setup](#general-environment-setup) below.
 
 ## Links to API Specific Setup
 * [Qiskit](qiskit/README.md)
 * [Cirq](cirq/README.md)
 * [Braket](braket/README.md)
+* [Ocean](ocean/README.md)
 * [Q# (Comming soon)](README.md)
 
 # General Environment Setup
