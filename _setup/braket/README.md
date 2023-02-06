@@ -2,7 +2,7 @@
 
 # Amazon Braket Version
 
-This directory describes the requirements and operational conventions for using Braket as the programming environment for running the prototype benchmark programs contained in the QC-Proto-Benchmarks repository.
+This directory describes the requirements and operational conventions for using Braket as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
 In particular, this document explains how to set up the tools needed to run the Braket implementation of these benchmarks.
 
 ## Configure a Braket Environment
@@ -53,7 +53,7 @@ Once these variables are set, you may proceed to execution the benchmark program
 
 ## Run the benchmark programs in a Jupyter Notebook
 
-The easiest way to configure and run the Application Benchmark programs is to use a Jupyter Notebook that is provided at the top level of the Proto-Benchmarks repository.
+The easiest way to configure and run the Application Benchmark programs is to use a Jupyter Notebook that is provided at the top level of the App-Oriented-Benchmarks repository.
 Support for Jupyter notebooks is automatically available with your Anaconda installation.
 
 First, prepare the Amazon Braket notebook by copying the delivered 'template' file with the following command:
@@ -93,7 +93,7 @@ The code for the each of the application benchmarks is largely self-contained, e
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Braket Bernstein-Vazirani directory and run the benchmark program:
 
-    cd [your github home directory]\QC-Proto-Benchmarks\bernstein-vazirani\braket
+    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein-vazirani\braket
   
     python bv_benchmark.py
     
