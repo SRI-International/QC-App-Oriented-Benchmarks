@@ -1,9 +1,15 @@
-# MaxCut Algorithm - Prototype Benchmark Program
+# MaxCut Algorithm - Benchmark Program
 
-The MaxCut algorithm [[1]](#references) is ... 
-The MaxCut algorithm demonstrates a quantum speedup over its classical counterpart for solving linear equations. 
+This benchmnark uses the MaxCut algorithm [[1]](#references) as an example of a quantum application that solves a combinatorial optimization problem.
+With the MaxCut algorithm, the goal is to find the maximum cut size of an undirected graph.
+It is representative of a class of optimization problems that are easy to specify but difficult to solve efficiently, NP-HARD problems.
+These often arise from mapping practical applications to computing hardware and can appear as subroutines in composite algorithms.
+The Max-Cut problem offers a simple early-stage target for evaluating the effectiveness of quantum computing solutions that are hybrid in nature, i.e. combining both classical and quantum computation.
 
-NOTE: The remainder of this README needs to be modified with content for MaxCut.
+This benchmark measures the performance characteristics of quantum computing systems when executing a combinatorial optimization application that uses either the QA and QAOA algorithms and can evaluate the gate model and annealing styles of quantum computing side-by-side.
+It is designed to provide insight into unique aspects of quantum computing while maintaining a presentation recognizable to practitioners in the optimization field and uniformly captures, analyzes, and presents metrics associated with the execution of both models of quantum computing to support comparisons across architectures.
+
+The remainder of this README is Work-in-Progress.
 
 ## Problem outline
 
