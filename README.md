@@ -22,8 +22,9 @@ The directory names and the currently supported environments are:
     qiskit      -- IBM Qiskit
     cirq        -- Google Cirq
     braket      -- Amazon Braket
+    ocean       -- D-Wave Ocean
 ```  
-The goal has been to make the implementation of each algorithm identical across the different target environments, with processing and reporting of results as similar as possible. Each application directory includes a README file with information specific to that application or algorithm. Below we list the benchmarks we have implemented with a suggested order of approach; the benchmarks in levels 1 and 2 are more simple and a good place to start for beginners, while levels 3 and 4 are more complicated and might build off of intuition and reasoning developed in earlier algorithms. 
+The goal has been to make the implementation of each algorithm identical across the different target environments, with processing and reporting of results as similar as possible. Each application directory includes a README file with information specific to that application or algorithm. Below we list the benchmarks we have implemented with a suggested order of approach; the benchmarks in levels 1 and 2 are more simple and a good place to start for beginners, while levels 3 and 4 are more complicated and might build off of intuition and reasoning developed in earlier algorithms. Level 5 includes newly released benchmarks based on iterative execution done within hybrid algorithms.
 
 ```
 Complexity of Benchmark Algorithms (Increasing Difficulty)
@@ -32,6 +33,7 @@ Complexity of Benchmark Algorithms (Increasing Difficulty)
     2: Quantum Fourier Transform, Grover's Search
     3: Phase Estimation, Amplitude Estimation
     4: Monte Carlo, Hamiltonian Simulation, Variational Quantum Eigensolver, Shor's Order Finding
+    5: MaxCut
 ```
 
 In addition to the application directories at the highest level, there several other directories or files with specific purpose:
@@ -85,6 +87,8 @@ There is one template file provided for each of the API environments supported.
 
 In the top level of this repo, start your **jupyter-notebook** process. When the browser listing appears, select the desired notebook `.ipynb` file to launch the notebook.
 There you will have access to a cell for each of the benchmarks in the repository, and may "Run" any one of them independently and see the results presented there.
+
+Some benchmarks, such as MaxCut, include a notebook for running advanced tests, specifically the iterative execution of interleaved class/quantum code for a hybrid algorithm. See the instructions in the README for those benchmarks for procedures and options that are available. 
 
 ## Enabling Compiler Optimizations
 
