@@ -11,7 +11,7 @@ It is designed to provide insight into unique aspects of quantum computing while
 
 The QED-C committee which developed these benchmarks released (Feb 2023) a second pre-print of a paper describing the addition of combinatorial optimzation problems as advanced application-oriented benchmarks. This paper provides much detail about the theory and concrete implementation of the benchmark contained in this repository. 
 
-&nbsp;&nbsp;&nbsp;&nbsp;[Optimization Applications as Quantum Performance Benchmarks](https://arxiv.org/abs/2110.03137).
+&nbsp;&nbsp;&nbsp;&nbsp;[Optimization Applications as Quantum Performance Benchmarks](https://arxiv.org/abs/2302.02278)
 
 The remainder of this README offers a brief summary of the benchmark and how to run it.  For more detail, please see the aforementioned paper.
 
