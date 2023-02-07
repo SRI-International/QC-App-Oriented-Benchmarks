@@ -1,6 +1,6 @@
 # MaxCut Algorithm - Benchmark Program
 
-This benchmnark uses the MaxCut algorithm [[1]](#references) as an example of a quantum application that solves a combinatorial optimization problem.
+This benchmark uses the MaxCut algorithm [[1]](#references) as an example of a quantum application that solves a combinatorial optimization problem.
 With the MaxCut algorithm, the goal is to find the maximum cut size of an undirected graph.
 It is representative of a class of optimization problems that are easy to specify but difficult to solve efficiently, NP-HARD problems.
 These often arise from mapping practical applications to computing hardware and can appear as subroutines in composite algorithms.
@@ -9,10 +9,15 @@ The Max-Cut problem offers a simple early-stage target for evaluating the effect
 This benchmark measures the performance characteristics of quantum computing systems when executing a combinatorial optimization application that uses either the QA and QAOA algorithms and can evaluate the gate model and annealing styles of quantum computing side-by-side.
 It is designed to provide insight into unique aspects of quantum computing while maintaining a presentation recognizable to practitioners in the optimization field and uniformly captures, analyzes, and presents metrics associated with the execution of both models of quantum computing to support comparisons across architectures.
 
-The remainder of this README is Work-in-Progress.
+The QED-C committee which developed these benchmarks released (Feb 2023) a second pre-print of a paper describing the addition of combinatorial optimzation problems as advanced application-oriented benchmarks. This paper provides much detail about the theory and concrete implementation of the benchmark contained in this repository. 
+
+&nbsp;&nbsp;&nbsp;&nbsp;[Optimization Applications as Quantum Performance Benchmarks](https://arxiv.org/abs/2110.03137).
+
+The remainder of this README offers a brief summary of the benchmark and how to run it.  For more detail, please see the aforementioned paper.
 
 ## Problem outline
 
+Described in detail in the referenced paper.
 
 ## Benchmarking
 
@@ -49,27 +54,31 @@ In the run() method for the benchmark, there are a number of optiional arguments
 
 ## Classical algorithm
 
+Described in detail in the referenced paper.
 
 ## Quantum algorithm
 
+Described in detail in the referenced paper.
 
 ### General Quantum Circuit
 
+Described in detail in the referenced paper.
 
 ### Algorithmic Visualization
 
-
+Described in detail in the referenced paper.
 
 ### Algorithm Steps
 
-  
+ Described in detail in the referenced paper. 
 
 ## Gate Implementation
 
-
+Described in detail in the referenced paper.
 
 ## Circuit Methods
 
+Described in detail in the referenced paper.
 
 ## References
 
