@@ -16,6 +16,36 @@ The remainder of this README is Work-in-Progress.
 
 ## Benchmarking
 
+The MaxCut algorithm is benchmarked in slightly different ways for QOAO (gate model) and QA (quantum annealing).
+
+For QAOA, currently implemented only via Qiskit, there are two benchmark methods provided. The first, specified as method = 1, simply executes the MaxCut ansatz circuit at different widths to gauge the fidelity of execution that is achieved by a particular target system.  The second, method = 2, executes the complete MaxCut algorithm, in which the ansatz circuit is executed multiple times under the control of a classical optimizer, (default = COBYLA), which attempts to find circuit parameters that yields the greatest approximation ratio for its solutions.
+
+For QA, only the second method is supported, as there is no use of an ansatz circuit. With method = 2, the benchmark execute the QA algorithm multiple times, cycling though a series of annealing times, ranging from 1 us to 256 us, and measuring the total execution time and quality of the result obtained. This execution multiple times is designed to mimic the iterative ansatz execution of QAOA, but in a way that is unique to QA. 
+
+In both cases, the results are displayed in a performance profile that illustrates the tradeoff between total time of execution and the quality of result that can be achieved.
+The details underpinning the QAOA and QA algorithms, their implementation for benchmark purposes, and the displays that are produced are explained in detail in the paper that is referenced in the first section of this README above.
+
+In the run() method for the benchmark, there are a number of optiional arguments that can be specified. All of the arguments can be examined in the source code, but the key arguments that would typically be modifed from defaults are the following:
+```
+    method : int, optional
+        If 1, then do standard metrics, if 2, implement iterative algo metrics. The default is 1.
+    rounds : int, optional
+        number of QAOA rounds. The default is 1.
+    degree : int, optional
+        degree of graph. The default is 3. Can be -3 also.
+    thetas_array : list, optional
+        list or ndarray of beta and gamma values. The default is None, which uses [1,1,...].
+    use_fixed_angles : bool, optional
+        use betas and gammas obtained from a 'fixed angles' table, specific to degree and rounds
+    parameterized : bool, optional
+        Whether to use parametrized circuits or not. The default is False.
+    max_iter : int, optional
+        Number of iterations for the minimizer routine. The default is 30.
+    score_metric : list or string, optional
+        Which metrics are to be plotted in area metrics plots. The default is 'fidelity'. For method 2 s/b 'approx_ratio'.
+    x_metric : list or string, optional
+        Horizontal axis for area plots. The default is 'cumulative_exec_time' Can be 'cumulative_elapsed_time' also.
+```
 
 ## Classical algorithm
 
