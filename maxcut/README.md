@@ -30,7 +30,7 @@ For QA, only the second method is supported, as there is no use of an ansatz cir
 In both cases, the results are displayed in a performance profile that illustrates the tradeoff between total time of execution and the quality of result that can be achieved.
 The details underpinning the QAOA and QA algorithms, their implementation for benchmark purposes, and the displays that are produced are explained in detail in the paper that is referenced in the first section of this README above.
 
-In the run() method for the benchmark, there are a number of optiional arguments that can be specified. All of the arguments can be examined in the source code, but the key arguments that would typically be modifed from defaults are the following:
+In the run() method for the benchmark, there are a number of optional arguments that can be specified. All of the arguments can be examined in the source code, but the key arguments that would typically be modifed from defaults are the following:
 ```
     method : int, optional
         If 1, then do standard metrics, if 2, implement iterative algo metrics. The default is 1.
