@@ -1,1 +1,0 @@
-Testing notes for QA approaches. Not intended to be production quality code.
