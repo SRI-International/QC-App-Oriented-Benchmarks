@@ -1471,7 +1471,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
 
 ### Plot Metrics for a specific application
 
-def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, suffix=""):
+def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, options=None, suffix=""):
     global circuit_metrics
     global group_metrics
     
@@ -1489,7 +1489,7 @@ def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, su
         return
     
     group_metrics = shared_data[app]["group_metrics"]
-    plot_metrics(app, filters=filters, suffix=suffix)
+    plot_metrics(app, filters=filters, suffix=suffix, options=options)
 
 # save plot as image
 def save_plot_image(plt, imagename, backend_id):
@@ -1523,7 +1523,7 @@ known_x_labels = {
     'cumulative_create_time' : 'Cumulative Circuit Creation Time (s)',
     'cumulative_elapsed_time' : 'Cumulative Elapsed Quantum Execution Time (s)',
     'cumulative_exec_time' : 'Cumulative Quantum Execution Time (s)',
-    'cumulative_opt_exec_time' : 'Cumulative Classical Optimizer Time (s)',
+    'cumulative_opt_exec_time' : 'Cumulative Classical Optimization Time (s)',
     'cumulative_depth' : 'Cumulative Circuit Depth'
 }
 
@@ -1538,7 +1538,9 @@ x_label_save_str = {
 
 # map known Y metrics to labels
 known_y_labels = {
-    'num_qubits' : 'Circuit Width'
+    #'num_qubits' : 'Circuit Width'     # this is only used for max-cut area plots 
+    #'num_qubits' : 'Problem Size (Number of Variables)'      # use Problem Size instead
+    'num_qubits' : 'Problem Size (# of Variables)'      # use Problem Size instead
 }
 # map known Score metrics to labels    
 known_score_labels = {
@@ -1566,7 +1568,7 @@ score_label_save_str = {
 def plot_all_area_metrics(suptitle='',
             score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
             fixed_metrics={}, num_x_bins=100,
-            y_size=None, x_size=None, x_min=None, x_max=None,
+            y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
             options=None, suffix=''):
 
     if type(score_metric) == str:
@@ -1580,7 +1582,7 @@ def plot_all_area_metrics(suptitle='',
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
-                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, options=options,suffix=suffix)
+                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=options, suffix=suffix)
 
 def get_best_restart_ind(group, which_metric = 'approx_ratio'):
     """
@@ -1603,7 +1605,7 @@ def get_best_restart_ind(group, which_metric = 'approx_ratio'):
 # Plot the given "Score Metric" against the given "X Metric" and "Y Metric"
 def plot_area_metrics(suptitle='',
             score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={}, num_x_bins=100,
-            y_size=None, x_size=None, x_min=None, x_max=None,
+            y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
             options=None, suffix=''):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
@@ -1663,7 +1665,10 @@ def plot_area_metrics(suptitle='',
             
             for it in circuit_metrics_detail_2[group][circuit_id]:
                 mets = circuit_metrics_detail_2[group][circuit_id][it]
-
+                
+                if x_metric not in mets: break
+                if score_metric not in mets: break
+                
                 # get each metric and accumulate if indicated
                 x_raw = x_now = mets[x_metric]
                 if cumulative_flag:
@@ -1776,7 +1781,7 @@ def plot_area_metrics(suptitle='',
         plot_volumetric_data(ax, yy, x, scores, depth_base=-1,
                     label='Depth', labelpos=(0.2, 0.7), labelrot=0,
                     type=1, fill=True, w_max=18, do_label=False,
-                    x_size=xs, y_size=y_size, zorder=3)                           
+                    x_size=xs, y_size=y_size, zorder=3, offset_flag=offset_flag)                      
         
         plt.tight_layout()
         
@@ -1908,7 +1913,7 @@ def x_bin_averaging(x_size_groups, x_groups, y_groups, score_groups, num_x_bins)
     return new_xs, new_x, new_y, new_s
     
 
-def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
+def plot_ECDF(suptitle="",
               options=None, suffix=None):
     """
     Plot the ECDF (Empirical Cumulative Distribution Function)
@@ -1952,7 +1957,8 @@ def plot_ECDF(suptitle="Circuit Width (Number of Qubits)",
                 unique_sizes = circuit_metrics_final_iter[group][restart_ind]['unique_sizes']
                 optimal_value = circuit_metrics_final_iter[group][restart_ind]['optimal_value']
                 axs.plot(np.array(unique_sizes) / optimal_value, np.array(cumul_counts) / cumul_counts[-1], marker='o',
-                         ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
+                         #ls = '-', label = f"Width={group}")#" degree={deg}") # lw=1,
+                         ls = '-', label = f"Problem Size={group}")#" degree={deg}") # lw=1,
 
         axs.set_ylabel('Fraction of Total Counts')
         axs.set_xlabel(r'$\frac{\mathrm{Cut\ Size}}{\mathrm{Max\ Cut\ Size}}$')
@@ -2003,7 +2009,8 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
 
         suptitle = "Empirical Distribution of Cut Sizes - " + appname
         fulltitle = get_full_title(
-            suptitle, options) + "\nwidth={}".format(width)
+            #suptitle, options) + "\nwidth={}".format(width)
+            suptitle, options) + "\nProblem Size = {}".format(width)
         plt.title(fulltitle)
 
         indx = group_metrics_optgaps['groups'].index(int(width))  # get index corresponding to width
@@ -2169,14 +2176,13 @@ def get_distribution_and_stats():
             group_metrics_optgaps['cvar_ratio']['gapvals'].append(abs(1.0 - mets["cvar_ratio"]) * 100)
             group_metrics_optgaps['bestcut_ratio']['gapvals'].append(abs(1.0 - mets["bestcut_ratio"]) * 100)
             group_metrics_optgaps['gibbs_ratio']['gapvals'].append(abs(1.0 - mets["gibbs_ratio"]) * 100)
-
+            
             # Also store the optimality gaps at the three quantiles values
             # Here, optgaps are defined as weight(cut)/weight(maxcut) * 100
             q_vals = mets["quantile_optgaps"] # in fraction form. List of floats
             q_vals = [q_vals[i] * 100 for i in range(len(q_vals))] # In percentages
             group_metrics_optgaps['quantile_optgaps']['gapvals'].append(q_vals)
             
-
             # Store empirical distribution of cut size values / optimal value 
             unique_sizes = circuit_metrics_final_iter[group][str(circuit_id)]['unique_sizes']
             unique_counts = circuit_metrics_final_iter[group][str(circuit_id)]['unique_counts']
@@ -2209,7 +2215,7 @@ def get_distribution_and_stats():
     return group_metrics_optgaps
     
 # Plot detailed optgaps
-def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)", 
+def plot_metrics_optgaps (suptitle="", 
                           transform_qubit_group = False, 
                           new_qubit_group = None, filters=None, 
                           suffix="", objective_func_type = 'cvar_ratio',
@@ -2264,8 +2270,9 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
     with plt.style.context(maxcut_style):
         fig, axs = plt.subplots(1, 1)
         plt.title(fulltitle)
-        axs.set_xlabel('Circuit Width (Number of Qubits)')
         axs.set_ylabel(r'Optimality Gap ($\%$)')
+        #axs.set_xlabel('Circuit Width (Number of Qubits)')
+        axs.set_xlabel(known_y_labels['num_qubits'])    # indirection
                 
         axs.set_xticks(xvalues)
         if xlabels != None:
@@ -2311,7 +2318,8 @@ def plot_metrics_optgaps (suptitle="Circuit Width (Number of Qubits)",
         fig, axs = plt.subplots(1, 1)
         plt.title(fulltitle)
         axs.set_ylabel(r'Optimality Gap ($\%$)')
-        axs.set_xlabel('Circuit Width (Number of Qubits)')
+        #axs.set_xlabel('Circuit Width (Number of Qubits)')
+        axs.set_xlabel(known_y_labels['num_qubits'])    # indirection
         
         axs.set_xticks(xvalues)
         if xlabels != None:
@@ -2487,7 +2495,7 @@ import math
 from matplotlib.patches import Rectangle
 from matplotlib.patches import Circle
 import matplotlib.cm as cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap, Normalize
 
 ############### Color Map functions
  
@@ -2497,9 +2505,27 @@ cmap_greys = plt.get_cmap('Greys')
 cmap_blues = plt.get_cmap('Blues')
 cmap_custom_spectral = None
 
+# the default colormap is the spectral map
+cmap = cmap_spectral
+
+# current cmap normalization function (default None)
+cmap_norm = None
+
 default_fade_low_fidelity_level = 0.16
 default_fade_rate = 0.7
 
+# Specify a normalization function here (default None)
+def set_custom_cmap_norm(vmin, vmax):
+
+    global cmap_norm
+    
+    if vmin == vmax or (vmin == 0.0 and vmax == 1.0):
+        print("... setting cmap norm to None")
+        cmap_norm = None
+    else:
+        print(f"... setting cmap norm to [{vmin}, {vmax}]")
+        cmap_norm = Normalize(vmin=vmin, vmax=vmax)
+    
 # Remake the custom spectral colormap with user settings
 def set_custom_cmap_style(
             fade_low_fidelity_level=default_fade_low_fidelity_level,
@@ -2587,14 +2613,15 @@ def create_custom_spectral_cmap(
 
 cmap_custom_spectral = create_custom_spectral_cmap()
 
-# the default is the spectral map
-cmap = cmap_spectral
-
 
 ############### Helper functions
 
 def get_color(value):
-
+    
+    # if there is a normalize function installed, scale the data
+    if cmap_norm:
+        value = float(cmap_norm(value))
+        
     if cmap == cmap_spectral:
         value = 0.05 + value*0.9
     elif cmap == cmap_blues:
@@ -2727,6 +2754,9 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
         QV = -QV
         qv_estimate = True
         est_str = " (est.)"
+        
+    if avail_qubits > 0 and max_qubits > avail_qubits:
+        max_qubits = avail_qubits
         
     max_width = 13
     if max_qubits > 11: max_width = 18
@@ -2986,12 +3016,17 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
 
     plt.title(suptitle)
     
-    # round the max up to be divisible evenly (in multiples of 0.1) by num_xdivs 
+    # DEVNOTE: this code could be made more general, rounding the axis max to 20 divs nicely
+    # round the max up to be divisible evenly (in multiples of 0.05 or 0.005) by num_xdivs 
     num_xdivs = 20
     max_base = num_xdivs * 0.05
-    x_max = max_base * int((x_max + max_base) / max_base)
+    if x_max != None and x_max > 1.0:
+        x_max = max_base * int((x_max + max_base) / max_base)
+    if x_max != None and x_max > 0.1:
+        max_base = num_xdivs * 0.005
+        x_max = max_base * int((x_max + max_base) / max_base)
     
-    #print(f"... {x_min} {x_max} {max_base} {x_max}")
+    #print(f"... {x_min} {x_max} {max_base}")
     if x_min < 0.1: x_min = 0
     
     # and compute the step size for the tick divisions
@@ -3026,8 +3061,8 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
     if ylabels != None:
         plt.yticks(ybasis, ylabels)
     
-    # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+    # add colorbar to right of plot (scale if normalize function installed)
+    plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
         
     return ax
 
@@ -3052,7 +3087,7 @@ def vplot_anno_init ():
 # Plot one group of data for volumetric presentation    
 def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth',
         labelpos=(0.2, 0.7), labelrot=0, type=1, fill=True, w_max=18, do_label=False, do_border=True,
-        x_size=1.0, y_size=1.0, zorder=1,
+        x_size=1.0, y_size=1.0, zorder=1, offset_flag=False,
         max_depth=0, suppress_low_fidelity=False):
 
     # since data may come back out of order, save point at max y for annotation
@@ -3062,10 +3097,27 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
     
     # plot data rectangles
     low_fidelity_count = True
-    for i in range(len(d_data)):
+    
+    last_y = -1
+    k = 0
+
+    # determine y-axis dimension for one pixel to use for offset of bars that start at 0
+    (_, dy) = get_pixel_dims(ax)
+    
+    # do this loop in reverse to handle the case where earlier cells are overlapped by later cells
+    for i in reversed(range(len(d_data))):
         x = depth_index(d_data[i], depth_base)
         y = float(w_data[i])
         f = f_data[i]
+        
+        # each time we star a new row, reset the offset counter
+        # DEVNOTE: this is highly specialized for the QA area plots, where there are 8 bars
+        # that represent time starting from 0 secs.  We offset by one pixel each and center the group
+        if y != last_y:
+            last_y = y;
+            k = 3              # hardcoded for 8 cells, offset by 3
+        
+        #print(f"{i = } {x = } {y = }")
         
         if max_depth > 0 and d_data[i] > max_depth:
             #print(f"... excessive depth (2), skipped; w={y} d={d_data[i]}")
@@ -3078,15 +3130,30 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
         
         # the only time this is False is when doing merged gradation plots
         if do_border == True:
+        
+            # this case is for an array of x_sizes, i.e. each box has different width
             if isinstance(x_size, list):
-                ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size, zorder=zorder))
+                
+                # draw each of the cells, with no offset
+                if not offset_flag:
+                    ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size[i], y_size=y_size, zorder=zorder))
+                    
+                # use an offset for y value, AND account for x and width to draw starting at 0
+                else:
+                    ax.add_patch(box_at((x/2 + x_size[i]/4), y + k*dy, f, type=type, fill=fill, x_size=x+ x_size[i]/2, y_size=y_size, zorder=zorder))
+                
+            # this case is for only a single cell
             else:
                 ax.add_patch(box_at(x, y, f, type=type, fill=fill, x_size=x_size, y_size=y_size))
 
+        # save the annotation point with the largest y value
         if y >= y_anno:
             x_anno = x
             y_anno = y
             i_anno = i
+        
+        # move the next bar down (if using offset)
+        k -= 1
     
     # if no data rectangles plotted, no need for a label
     if x_anno == 0 or y_anno == 0:
@@ -3239,7 +3306,21 @@ def anno_volumetric_data(ax, depth_base=2, label='Depth',
             color=(0.2,0.2,0.2),
             clip_on=True)
  
- 
+# Return the x and y equivalent to a single pixel for the given plot axis
+def get_pixel_dims(ax):
+
+    # transform 0 -> 1 to pixel dimensions
+    pixdims = ax.transData.transform([(0,1),(1,0)])-ax.transData.transform((0,0))
+    xpix = pixdims[1][0]
+    ypix = pixdims[0][1]
+    
+    #determine x- and y-axis dimension for one pixel 
+    dx = (1 / xpix)
+    dy = (1 / ypix)
+    
+    return (dx, dy)
+    
+    
 ####################################
 # TEST METHODS 
         
