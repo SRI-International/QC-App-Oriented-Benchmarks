@@ -7,7 +7,7 @@ import numpy as np
 import json 
 
 maxcut_benchmark.verbose = False
-maxcut_style = os.path.join('..', '..', '_common', 'maxcut.mplstyle')
+maxcut_style = os.path.join(os.path.dirname(__file__), '..', '..', '_common', 'maxcut.mplstyle')
 #%% Functions for analyzing the effects of initial conditions
 
 

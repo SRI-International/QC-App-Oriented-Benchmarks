@@ -14,8 +14,12 @@ from collections import namedtuple
 
 import numpy as np
 
-sys.path[1:1] = [ "_common", "_common/ocean", "maxcut/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/ocean", "../../maxcut/_common/" ]
+relative_paths_to_add = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ] # paths relative to maxcut_benchmark.py that need to be added to system path list.
+current_file_location = os.path.dirname(__file__)
+absolute_paths_to_add = [os.path.join(current_file_location, rel_path) for rel_path in relative_paths_to_add]
+
+sys.path[1:1] = absolute_paths_to_add
+
 import common
 import execute as ex
 import metrics as metrics
