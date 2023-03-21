@@ -471,6 +471,9 @@ def execute_circuit(circuit):
     if verbose:
         print(f"... executing job {job.job_id()}")
     
+    #print(f"... executing job {job.job_id()}")
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'job_id', job.job_id())
+    
     # special handling when only runnng one job at a time: wait for result here
     # so the status check called later immediately returns done and avoids polling
     if max_jobs_active <= 1:

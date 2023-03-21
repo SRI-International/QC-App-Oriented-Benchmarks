@@ -141,7 +141,7 @@ def bitstring_to_theta(counts, num_counting_qubits):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
+def run(min_qubits=3, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
 
@@ -175,7 +175,7 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
         
         # reset random seed
         np.random.seed(0)
