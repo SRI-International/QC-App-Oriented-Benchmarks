@@ -1,7 +1,8 @@
 """
 Quantum Fourier Transform Benchmark Program - Qiskit
 """
-
+import argparse
+import json
 import math
 import sys
 import time
@@ -336,5 +337,31 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, num_shots = 100,
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - Quantum Fourier Transform ({method}) - Qiskit")
 
-# if main, execute method 1
-if __name__ == '__main__': run()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Run benchmarking")
+
+    parser.add_argument("-min_qubits", default=2, help="Minimum number of qubits.", type=int)
+    parser.add_argument("-max_qubits", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("-max_circuits", default=3, help="Maximum number of circuits", type=int)
+    parser.add_argument("-num_shots", default=100, help="Number of shots.", type=int)
+    parser.add_argument("-method", default=1, help="Method selection for algorithm", type=int)
+    parser.add_argument("-backend_id", default="qasm_simulator", help="Backend simulator or hardware string", type=str)
+    parser.add_argument("-provider_backend", default=None, help="Provider backend string", type=str)
+    parser.add_argument("-hub", default="ibm-q", help="Hub for machine", type=str)
+    parser.add_argument("-group", default="open", help="Group string", type=str)
+    parser.add_argument("-project", default="main", help="Project string", type=str)
+    parser.add_argument("-exec_options", default=None, help="Execution options", type=dict)
+
+    args = parser.parse_args()
+
+    min_qubits = args.min_qubits
+    max_qubits = args.max_qubits
+    max_circuits = args.max_circuits
+    num_shots = args.max_qubits
+    method = args.method
+    backend_id = args.backend_id
+    provider_backend = args.provider_backend
+    hub = args.hub
+    group = args.group
+    project = args.project
+    exec_options = args.exec_options
