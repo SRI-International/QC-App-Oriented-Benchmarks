@@ -1,6 +1,5 @@
 from pytket.extensions.qiskit import qiskit_to_tk, tk_to_qiskit
 from pytket.passes import (  # type: ignore
-    BasePass,
     auto_rebase_pass,
     RemoveRedundancies,
     SequencePass,
@@ -18,11 +17,13 @@ from pytket.extensions.qiskit.qiskit_convert import (
     process_characterisation,
     get_avg_characterisation,
 )
-from pytket import OpType, Circuit
+from pytket import OpType
 from qiskit.circuit.quantumcircuit import QuantumCircuit
+
 
 def rebase_pass():
     return auto_rebase_pass({OpType.CX, OpType.X, OpType.SX, OpType.Rz})
+
 
 def tket_transformer_generator(quick=False, cx_fidelity=1.0):
     """Generator for transformer using TKET passes
@@ -33,7 +34,9 @@ def tket_transformer_generator(quick=False, cx_fidelity=1.0):
     :type cx_fidelity: float, optional
     """
 
-    def transformation_method(circuit:QuantumCircuit, backend) -> list[QuantumCircuit]:
+    def transformation_method(
+        circuit: QuantumCircuit, backend
+    ) -> list[QuantumCircuit]:
         """Transformer using TKET optimisation passes.
 
         :param circuit: Circuit to be optimised
@@ -49,7 +52,8 @@ def tket_transformer_generator(quick=False, cx_fidelity=1.0):
 
         # Initialise pass list and perform thorough optimisation.
         pass_list = [DecomposeBoxes()]
-        if not quick: pass_list.append(FullPeepholeOptimise())
+        if not quick:
+            pass_list.append(FullPeepholeOptimise())
 
         # Add noise aware placement and routing to pass list.
         coupling_map = backend.configuration().coupling_map
@@ -79,7 +83,10 @@ def tket_transformer_generator(quick=False, cx_fidelity=1.0):
             pass_list.extend(
                 [
                     RemoveRedundancies(),
-                    SimplifyInitial(allow_classical=False, create_all_qubits=True),
+                    SimplifyInitial(
+                        allow_classical=False,
+                        create_all_qubits=True,
+                    ),
                 ]
             )
 
@@ -87,6 +94,6 @@ def tket_transformer_generator(quick=False, cx_fidelity=1.0):
         SequencePass(pass_list).apply(tk_circuit)
         circuit = tk_to_qiskit(tk_circuit)
 
-        return [circuit]
+        return circuit
 
     return transformation_method
