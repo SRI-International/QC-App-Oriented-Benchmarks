@@ -10,6 +10,10 @@ from pytket.passes import (  # type: ignore
     CliffordSimp,
     SimplifyInitial,
     KAKDecomposition,
+    PauliSimp,
+    RemoveBarriers,
+    RemoveImplicitQubitPermutation,
+    RebaseTket,
 )
 from pytket.architecture import Architecture
 from pytket.placement import NoiseAwarePlacement
@@ -19,19 +23,23 @@ from pytket.extensions.qiskit.qiskit_convert import (
 )
 from pytket import OpType
 from qiskit.circuit.quantumcircuit import QuantumCircuit
+from pytket.circuit.display import render_circuit_jupyter
 
 
 def rebase_pass():
     return auto_rebase_pass({OpType.CX, OpType.X, OpType.SX, OpType.Rz})
 
 
-def tket_transformer_generator(quick=False, cx_fidelity=1.0):
+def tket_transformer_generator(quick=False, cx_fidelity=1.0, pauli_simp=False):
     """Generator for transformer using TKET passes
 
     :param quick: Perform quick optimisation, defaults to False
     :type quick: bool, optional
     :param cx_fidelity: Estimated CX gate fidelity, defaults to 1.0
     :type cx_fidelity: float, optional
+    :param pauli_simp: True if the circuit contains a large number of
+        Pauli gadgets (exponentials of pauli strings).
+    :type pauli_simp: bool, optional
     """
 
     def transformation_method(
@@ -46,52 +54,62 @@ def tket_transformer_generator(quick=False, cx_fidelity=1.0):
         :rtype: list[QuantumCircuit]
         """
 
+        tk_circuit = qiskit_to_tk(circuit)
+        # RemoveImplicitQubitPermutation().apply(tk_circuit)
+        RemoveBarriers().apply(tk_circuit)
+        DecomposeBoxes().apply(tk_circuit)
+
         # Obtain device data for noise aware placement.
         characterisation = process_characterisation(backend)
         averaged_errors = get_avg_characterisation(characterisation)
 
+        # If the circuit contains a large number of pauli gadgets,
+        # run PauliSimp
+        if pauli_simp:
+            if len(tk_circuit.commands_of_type(OpType.Reset)) > 0:
+                raise Exception(
+                    "PauliSimp does not support reset operations."
+                )
+            auto_rebase_pass(
+                {OpType.CX, OpType.Rz, OpType.Rx}
+            ).apply(tk_circuit)
+            PauliSimp().apply(tk_circuit)
+
         # Initialise pass list and perform thorough optimisation.
-        pass_list = [DecomposeBoxes()]
         if not quick:
-            pass_list.append(FullPeepholeOptimise())
+            FullPeepholeOptimise().apply(tk_circuit)
 
         # Add noise aware placement and routing to pass list.
         coupling_map = backend.configuration().coupling_map
         if coupling_map:
             arch = Architecture(coupling_map)
-            pass_list.append(
-                CXMappingPass(
+            CXMappingPass(
+                arch,
+                NoiseAwarePlacement(
                     arch,
-                    NoiseAwarePlacement(
-                        arch,
-                        averaged_errors["node_errors"],
-                        averaged_errors["edge_errors"],
-                        averaged_errors["readout_errors"],
-                    ),
-                    directed_cx=False,
-                )
-            )
+                    averaged_errors["node_errors"],
+                    averaged_errors["edge_errors"],
+                    averaged_errors["readout_errors"],
+                ),
+                directed_cx=False,
+                delay_measures=False,
+            ).apply(tk_circuit)
 
         if not quick:
-            pass_list.append(KAKDecomposition(cx_fidelity=0.9))
-            pass_list.extend([CliffordSimp(False), SynthesiseTket()])
+            KAKDecomposition(cx_fidelity=cx_fidelity).apply(tk_circuit)
+            CliffordSimp().apply(tk_circuit)
+            SynthesiseTket().apply(tk_circuit)
 
         # Rebase to backend gate set and perform basic optimisation
-        pass_list.append(rebase_pass())
+        rebase_pass().apply(tk_circuit)
 
         if not quick:
-            pass_list.extend(
-                [
-                    RemoveRedundancies(),
-                    SimplifyInitial(
-                        allow_classical=False,
-                        create_all_qubits=True,
-                    ),
-                ]
-            )
+            RemoveRedundancies().apply(tk_circuit)
+            SimplifyInitial(
+                allow_classical=False,
+                create_all_qubits=True,
+            ).apply(tk_circuit)
 
-        tk_circuit = qiskit_to_tk(circuit)
-        SequencePass(pass_list).apply(tk_circuit)
         circuit = tk_to_qiskit(tk_circuit)
 
         return circuit
