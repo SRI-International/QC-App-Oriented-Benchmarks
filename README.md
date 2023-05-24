@@ -96,6 +96,46 @@ There you will have access to a cell for each of the benchmarks in the repositor
 
 Some benchmarks, such as MaxCut, include a notebook for running advanced tests, specifically the iterative execution of interleaved class/quantum code for a hybrid algorithm. See the instructions in the README for those benchmarks for procedures and options that are available. 
 
+## Executing the Application Benchmark Program via the Qiskit Runner
+
+It is possible to run the 
+
+For instance, here is an example of running the default QFT algorithm from the
+`quantum-fourier-transform` directory
+
+```
+python _common/qiskit/benchmark_runner.py -algorithm quantum-fourier-transform
+```
+
+Alternatively, one can supply custom arguments to this call if they differ from
+the defaults. For instance
+
+```
+ python _common/qiskit/benchmark_runner.py 
+    --algorithm 'quantum-fourier-transform'
+    --min_qubits 2 
+    --max_qubits 8 
+    --max_circuits 3 
+    --num_shots 100 
+    --method 2 
+    --backend_id 'qasm_simulator' 
+    --provider_backend None 
+    --hub "ibm-q" 
+    --group "open" 
+    --project "main" 
+    --exec_options '{"noise_model": "custom_qiskit_noise_model.my_noise_model()"}'
+```
+
+Note that any arguments of type `dict` must be provided as a string where both
+the key and value pair are also string values.
+
+In general, the arguments one can supply for a given algorithm are defined by
+the associated `run` method are described when running
+
+```
+python _common/qiskit/benchmark_runner ALGORITHM_NAME -h
+```
+
 ## Enabling Compiler Optimizations
 
 There is support provided within the Jupyter Notebook for the Qiskit versions of the benchmarks to enable certain compiler optimizations. In the first cell of the notebook there is a variable called `exec_options` where several of the built-in Qiskit compiler optimizations may be specified.

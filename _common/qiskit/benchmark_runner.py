@@ -1,3 +1,4 @@
+import ast
 import argparse
 import os
 import sys
@@ -38,48 +39,52 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run benchmarking")
 
     # Universal arguments: These arguments are used by all algorithms in the benchmarking suite.
-    parser.add_argument("-algorithm", default="quantum-fourier-transform", help="Benchmarking algorithm to run.", type=str)
-    parser.add_argument("-min_qubits", default=2, help="Minimum number of qubits.", type=int)
-    parser.add_argument("-max_qubits", default=8, help="Maximum number of qubits", type=int)
-    parser.add_argument("-num_shots", default=100, help="Number of shots.", type=int)
-    parser.add_argument("-backend_id", default="qasm_simulator", help="Backend simulator or hardware string", type=str)
-    parser.add_argument("-provider_backend", default=None, help="Provider backend name.", type=str)
-    parser.add_argument("-hub", default="ibm-q", help="Computing group hub.", type=str)
-    parser.add_argument("-group", default="open", help="Group status", type=str)
-    parser.add_argument("-project", default="main", help="Project", type=str)
-    parser.add_argument("-exec_options", default={}, help="Additional execution options", type=dict)
+    parser.add_argument("--algorithm", default="quantum-fourier-transform", help="Benchmarking algorithm to run.", type=str)
+    parser.add_argument("--min_qubits", default=2, help="Minimum number of qubits.", type=int)
+    parser.add_argument("--max_qubits", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("--max_circuits", default=3, help="Maximum number of circuits", type=int)
+    parser.add_argument("--num_shots", default=100, help="Number of shots.", type=int)
+    parser.add_argument("--backend_id", default="qasm_simulator", help="Backend simulator or hardware string", type=str)
+    parser.add_argument("--provider_backend", default=None, help="Provider backend name.", type=str)
+    parser.add_argument("--hub", default="ibm-q", help="Computing group hub.", type=str)
+    parser.add_argument("--group", default="open", help="Group status", type=str)
+    parser.add_argument("--project", default="main", help="Project", type=str)
+    parser.add_argument("--exec_options", default={}, help="Additional execution options", type=ast.literal_eval)
 
     # Additional arguments required by other algorithms.
-    parser.add_argument("-epsilon", default=0.05, help="Used for Monte-Carlo", type=float)
-    parser.add_argument("-degree", default=2, help="Used for Monte-Carlo", type=int)
-    parser.add_argument("-use_mcx_shim", default=False, help="Used for Grovers", type=bool)
-    parser.add_argument("-use_XX_YY_ZZ", default=False, help="Used for Hamiltonian-Simulation", type=bool)
-    parser.add_argument("-num_state_qubits", default=1, help="Used for amplitude-estimation and Monte-Carlo", type=int)
-    parser.add_argument("-method", default=1, help="Used for Bernstein-Vazirani, MaxCut, Monte-Carlo, QFT, Shor, and VQE", type=int)
+    parser.add_argument("--epsilon", default=0.05, help="Used for Monte-Carlo", type=float)
+    parser.add_argument("--degree", default=2, help="Used for Monte-Carlo", type=int)
+    parser.add_argument("--use_mcx_shim", default=False, help="Used for Grovers", type=bool)
+    parser.add_argument("--use_XX_YY_ZZ", default=False, help="Used for Hamiltonian-Simulation", type=bool)
+    parser.add_argument("--num_state_qubits", default=1, help="Used for amplitude-estimation and Monte-Carlo", type=int)
+    parser.add_argument("--method", default=1, help="Used for Bernstein-Vazirani, MaxCut, Monte-Carlo, QFT, Shor, and VQE", type=int)
 
     # Additional arguments required (only for MaxCut).
-    parser.add_argument("-rounds", default=1, help="Used for MaxCut", type=int)
-    parser.add_argument("-alpha", default=0.1, help="Used for MaxCut", type=float)
-    parser.add_argument("-thetas_array", default=None, help="Used for MaxCut", type=list)
-    parser.add_argument("-parameterized", default=False, help="Used for MaxCut", type=bool)
-    parser.add_argument("-do_fidelities", default=True, help="Used for MaxCut", type=bool)
-    parser.add_argument("-max_iter", default=30, help="Used for MaxCut", type=int)
-    parser.add_argument("-score_metric", default="fidelity", help="Used for MaxCut", type=str)
-    parser.add_argument("-x_metric", default="cumulative_exec_time", help="Used for MaxCut", type=str)
-    parser.add_argument("-y_metric", default="num_qubits", help="Used for MaxCut", type=str)
-    parser.add_argument("-fixed_metrics", default={}, help="Used for MaxCut", type=dict)
-    parser.add_argument("-num_x_bins", default=15, help="Used for MaxCut", type=int)
-    parser.add_argument("-x_size", default=None, help="Used for MaxCut", type=int)
-    parser.add_argument("-y_size", default=None, help="Used for MaxCut", type=int)
-    parser.add_argument("-use_fixed_angles", default=False, help="Used for MaxCut", type=bool)
-    parser.add_argument("-objective_func_type", default='approx_ratio', help="Used for MaxCut", type=str)
-    parser.add_argument("-plot_results", default=True, help="Used for MaxCut", type=bool)
-    parser.add_argument("-save_res_to_file", default=False, help="Used for MaxCut", type=bool)
-    parser.add_argument("-save_final_counts", default=False, help="Used for MaxCut", type=bool)
-    parser.add_argument("-detailed_save_names", default=False, help="Used for MaxCut", type=bool)
-    parser.add_argument("-comfort", default=False, help="Used for MaxCut", type=bool)
-    parser.add_argument("-eta", default=0.5, help="Used for MaxCut", type=float)
-    parser.add_argument("-_instance", default=None, help="Used for MaxCut", type=str)
+    parser.add_argument("--rounds", default=1, help="Used for MaxCut", type=int)
+    parser.add_argument("--alpha", default=0.1, help="Used for MaxCut", type=float)
+    parser.add_argument("--thetas_array", default=None, help="Used for MaxCut", type=list)
+    parser.add_argument("--parameterized", default=False, help="Used for MaxCut", type=bool)
+    parser.add_argument("--do_fidelities", default=True, help="Used for MaxCut", type=bool)
+    parser.add_argument("--max_iter", default=30, help="Used for MaxCut", type=int)
+    parser.add_argument("--score_metric", default="fidelity", help="Used for MaxCut", type=str)
+    parser.add_argument("--x_metric", default="cumulative_exec_time", help="Used for MaxCut", type=str)
+    parser.add_argument("--y_metric", default="num_qubits", help="Used for MaxCut", type=str)
+    parser.add_argument("--fixed_metrics", default={}, help="Used for MaxCut", type=ast.literal_eval)
+    parser.add_argument("--num_x_bins", default=15, help="Used for MaxCut", type=int)
+    parser.add_argument("--x_size", default=None, help="Used for MaxCut", type=int)
+    parser.add_argument("--y_size", default=None, help="Used for MaxCut", type=int)
+    parser.add_argument("--use_fixed_angles", default=False, help="Used for MaxCut", type=bool)
+    parser.add_argument("--objective_func_type", default='approx_ratio', help="Used for MaxCut", type=str)
+    parser.add_argument("--plot_results", default=True, help="Used for MaxCut", type=bool)
+    parser.add_argument("--save_res_to_file", default=False, help="Used for MaxCut", type=bool)
+    parser.add_argument("--save_final_counts", default=False, help="Used for MaxCut", type=bool)
+    parser.add_argument("--detailed_save_names", default=False, help="Used for MaxCut", type=bool)
+    parser.add_argument("--comfort", default=False, help="Used for MaxCut", type=bool)
+    parser.add_argument("--eta", default=0.5, help="Used for MaxCut", type=float)
+    parser.add_argument("--_instance", default=None, help="Used for MaxCut", type=str)
+
+    # Grouping for "common options"
+    # i.e. show_plot_images etc. (others in metrics.py)
 
     args = parser.parse_args()
 
@@ -166,6 +171,7 @@ if __name__ == "__main__":
 
     elif algorithm == "monte-carlo":
         universal_args["epsilon"] = additional_args["epsilon"]
+        universal_args["method"] = additional_args["method"]
         universal_args["degree"] = additional_args["degree"]
         mc_benchmark.run(**universal_args)
 
@@ -173,6 +179,7 @@ if __name__ == "__main__":
         pe_benchmark.run(**universal_args)
 
     elif algorithm == "quantum-fourier-transform":
+        universal_args["method"] = additional_args["method"]
         qft_benchmark.run(**universal_args)
 
     elif algorithm == "shors":
