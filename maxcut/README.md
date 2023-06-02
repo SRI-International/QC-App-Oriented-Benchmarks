@@ -70,7 +70,9 @@ The Max-Cut problem can be framed in terms of obtaining the ground state of the 
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}H_p=\frac{-1}{2}\sum_{<i,j>{\in}E}(1-Z_iZ_j)"/>
 </p>
 
-In order to characterize the quality of solutions, a quantity called the approximation ratio is usually computed. The approximation ratio r is defined as the ratio of the energy expectation value $\langle\beta,\gamma|H_P|\beta,\gamma\rangle$ and the ground state energy value $E_{min}$.
+
+
+In order to characterize the quality of solutions, a quantity called the approximation ratio is usually computed. The approximation ratio r is defined as the ratio of the energy expectation value <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\langle\beta,\gamma|H_P|\beta,\gamma\rangle"> and the ground state energy value <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}E_{min}">.
 
 <p align="center">
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}r_{\beta,\gamma}=\frac{F_{\beta,\gamma}}{E_{min}}=\frac{\langle\beta,\gamma|H_P|\beta,\gamma\rangle}{E_{min}}"/>
@@ -79,10 +81,10 @@ In order to characterize the quality of solutions, a quantity called the approxi
 In Quantum Annealing, an optimization problem is encoded into the machine, after which the solution is determined through quantum adiabatic evolution to arrive at a near-optimal final state. The algorithmic approach of quantum annealing is to leverage the dynamic evolution of a quantum system to transform an initial ground state (which is easy to prepare) into the ground state of a target Hamiltonian, which is unknown and difficult to compute by other means.
 
 <p align="center">
-<img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}H(s)=(1-s)H_{Init} + (s)H_{Target}"/>
+<img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}H(s)=(1-s)H_{Init}+(s)H_{Target}"/>
 </p>
 
-States starts at $H_{Init}$(s=0). Currently available quantum annealing hardware focuses on a special case that is limited to the Transverse Field Ising model:
+States starts at <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}H_{Init}">(s=0). Currently available quantum annealing hardware focuses on a special case that is limited to the Transverse Field Ising model:
 
 <p align="center">
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}H(s)=A(s)(\sum_{i}H_{i})+B(s)(\sum_{i}h_{i}Z_{i}+\sum_{i,j}J_{i,j}Z_{i}Z_{j})"/>
