@@ -17,7 +17,7 @@ The remainder of this README offers a brief summary of the benchmark and how to 
 
 ## Problem outline
 
-The MaxCut algorithm, in which the goal is to find the maximum cut size of an undirected graph, is representative of a class of opti- mization problems that are easy to specify but difficult to solve efficiently, NP-HARD problems. As such, bencharmking the MaxCut algorithm gives insight into establishing quantum benchmarks for optimization tasks.
+The MaxCut algorithm, in which the goal is to find the maximum cut size of an undirected graph, is representative of a class of opti- mization problems that are easy to specify but difficult to solve efficiently, NP-HARD problems. As such, benchmarking the MaxCut algorithm gives insight into establishing quantum benchmarks for optimization tasks.
 
 ## Benchmarking
 
