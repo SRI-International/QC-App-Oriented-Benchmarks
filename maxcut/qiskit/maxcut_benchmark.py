@@ -2,7 +2,7 @@
 MaxCut Benchmark Program - Qiskit
 """
 
-import datetime
+from datetime import datetime
 import json
 import logging
 import math
@@ -252,7 +252,7 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simu
     #ts = time.time()
     if params != None:
         qc = qc.bind_parameters(params)
-    
+
     #execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
     sv_result = execute(qc, sv_backend).result()
@@ -299,7 +299,7 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    
+
     # retrieve pre-computed expectation values for the circuit that just completed
     expected_dist = get_expectation(num_qubits, secret_int, num_shots)
     
@@ -903,7 +903,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
         backend_id='qasm_simulator', provider_backend=None, eta=0.5,
-        hub="ibm-q", group="open", project="main", exec_options=None, _instances=None):
+        hub="ibm-q", group="open", project="main", exec_options=None, _instances=None, use_Sessions = False):
     """
     Parameters
     ----------
@@ -973,6 +973,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         If true, the data and plots will be saved with more detailed names. Default is False
     confort : bool, optional    
         If true, print comfort dots during execution
+    use_Sessions : bool, optional
+        If true, run circuits using Qiskit Runtime sessions
     """
 
     # Store all the input parameters into a dictionary.
@@ -1008,7 +1010,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     # measured for the final circuit will be stored.
     # Use the following parent folder, for a more detailed 
     if detailed_save_names:
-        start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        start_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         parent_folder_save = os.path.join('__results', f'{backend_id}', objective_func_type, f'run_start_{start_time_str}')
     else:
         parent_folder_save = os.path.join('__results', f'{backend_id}', objective_func_type)
@@ -1057,7 +1059,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     metrics.init_metrics()
     
     # Define custom result handler
-    def execution_handler (qc, result, num_qubits, s_int, num_shots):  
+    def execution_handler (qc, result, num_qubits, s_int, num_shots): 
      
         # determine fidelity of result set
         num_qubits = int(num_qubits)
@@ -1078,7 +1080,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         ex.init_execution(execution_handler)
     
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options, use_Sessions=use_Sessions)
 
     # for noiseless simulation, set noise model to be None
     # ex.set_noise_model(None)
@@ -1322,7 +1324,7 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
 
     if detailed_save_names:
         # If detailed names are desired for saving plots, put date of creation, etc.
-        cur_time=datetime.datetime.now()
+        cur_time=datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
         short_obj_func_str = metrics.score_label_save_str[objective_func_type]
         suffix = f'-s{num_shots}_r{rounds}_d{degree}_mi{max_iter}_of-{short_obj_func_str}_{dt}' #of=objective function
