@@ -104,7 +104,7 @@ For instance, here is an example of running the default QFT algorithm from the
 `quantum-fourier-transform` directory:
 
 ```
-python _common/qiskit/benchmark_runner.py -algorithm quantum-fourier-transform
+python _common/qiskit/benchmark_runner.py --algorithm quantum-fourier-transform
 ```
 
 Alternatively, one can supply custom arguments to this call if they differ from
@@ -112,18 +112,17 @@ the defaults. For instance:
 
 ```
  python _common/qiskit/benchmark_runner.py 
-    --algorithm 'quantum-fourier-transform'
+    --algorithm "quantum-fourier-transform"
     --min_qubits 2 
     --max_qubits 8 
     --max_circuits 3 
     --num_shots 100 
     --method 2 
     --backend_id 'qasm_simulator' 
-    --provider_backend None 
     --hub "ibm-q" 
     --group "open" 
     --project "main" 
-    --exec_options '{"noise_model": "custom_qiskit_noise_model.my_noise_model()"}'
+    --exec_options "{ }"
 ```
 
 Note that any arguments of type `dict` must be provided as a string where both
