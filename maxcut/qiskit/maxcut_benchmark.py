@@ -296,7 +296,7 @@ expected_dist = {}
 # Compare the measurement results obtained with the expected measurements to determine fidelity
 def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     global expected_dist
-    
+    print(result)
     # obtain counts from the result object
     counts = result.get_counts(qc)
 
@@ -903,7 +903,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
         backend_id='qasm_simulator', provider_backend=None, eta=0.5,
-        hub="ibm-q", group="open", project="main", exec_options=None, _instances=None, use_Sessions = False):
+        hub="ibm-q", group="open", project="main", exec_options=None, _instances=None):
     """
     Parameters
     ----------
@@ -973,8 +973,6 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         If true, the data and plots will be saved with more detailed names. Default is False
     confort : bool, optional    
         If true, print comfort dots during execution
-    use_Sessions : bool, optional
-        If true, run circuits using Qiskit Runtime sessions
     """
 
     # Store all the input parameters into a dictionary.
@@ -1080,7 +1078,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         ex.init_execution(execution_handler)
     
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options, use_Sessions=use_Sessions)
+            hub=hub, group=group, project=project, exec_options=exec_options)
 
     # for noiseless simulation, set noise model to be None
     # ex.set_noise_model(None)

@@ -1513,6 +1513,8 @@ def save_plot_image(plt, imagename, backend_id):
     pdffilepath = os.path.join(os.getcwd(),"__images", pngfilename + ".pdf")
     
     plt.savefig(pdffilepath)
+
+#determine when to close session without using width
     
     
 #################################################

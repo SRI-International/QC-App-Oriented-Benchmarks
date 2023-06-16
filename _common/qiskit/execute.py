@@ -40,7 +40,6 @@ from qiskit.providers.jobstatus import JobStatus
 # Noise
 from qiskit.providers.aer.noise import NoiseModel, ReadoutError
 from qiskit.providers.aer.noise import depolarizing_error, reset_error
-from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +52,11 @@ backend_exec_options = None
 # Cached transpiled circuit, used for parameterized execution
 cached_circuits = {}
 
+#class BenchmarkResult is made for sessions runs. This is because
+#qiskit primitive job result instances don't have a get_counts method 
+#like backend results do. As such, a get counts method is calculated
+#from the quasi distributions and shots taken.
 class BenchmarkResult(object):
-
     def __init__(self, qiskit_result):
         super().__init__()
         self.qiskit_result = qiskit_result
@@ -166,7 +168,7 @@ def init_execution(handler):
 # Set the backend for execution
 def set_execution_target(backend_id='qasm_simulator',
                 provider_module_name=None, provider_name=None, provider_backend=None,
-                hub=None, group=None, project=None, exec_options=None, use_Sessions=False):
+                hub=None, group=None, project=None, exec_options=None):
     """
     Used to run jobs on a real hardware
     :param backend_id:  device name. List of available devices depends on the provider
@@ -221,11 +223,10 @@ def set_execution_target(backend_id='qasm_simulator',
                 IBMQ.load_account()
 
                 #use sessions in here
-                if use_Sessions:
+                if use_sessions:
+                    from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session
                     global service
                     service = QiskitRuntimeService()
-                    global use_sessions
-                    use_sessions = use_Sessions
                     global session
                     global sampler
                     backend = service.backend(backend_id)
@@ -282,6 +283,14 @@ def set_noise_model(noise_model = None):
     
     global noise
     noise = noise_model
+
+
+use_sessions = False
+def use_Sessions(val = False):
+    global use_sessions
+    use_sessions = val
+
+
 
 ######################################################################
 # CIRCUIT EXECUTION METHODS
@@ -466,7 +475,7 @@ def execute_circuit(circuit):
             logger.info(f'Running trans_qc, shots={shots}')
             st = time.time() 
 
-            if use_sessions == True:
+            if use_sessions:
                 job = sampler.run(trans_qc, shots=shots, **backend_exec_options_copy)
             else:
                 job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
@@ -915,11 +924,13 @@ def process_step_times(job, active_circuit):
 
         exec_creating_time = (running_time_delta - created_time_delta).seconds
         exec_running_time = (finished_time_delta - running_time_delta).seconds
-        exec_quantum_classical_time = job.metrics()['bss']
+        #exec_quantum_classical_time = job.metrics()['bss']
 
         metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
+        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', 0.001)
+        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', 0.001)
         metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
+        #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
 
     #print("... time_per_step = ", str(time_per_step))
     if verbose:
