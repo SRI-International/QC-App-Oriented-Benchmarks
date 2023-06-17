@@ -1514,9 +1514,7 @@ def save_plot_image(plt, imagename, backend_id):
     
     plt.savefig(pdffilepath)
 
-#determine when to close session without using width
-    
-    
+ 
 #################################################
 # ANALYSIS AND VISUALIZATION - AREA METRICS PLOTS
 

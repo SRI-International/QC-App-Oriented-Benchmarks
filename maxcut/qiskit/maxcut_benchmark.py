@@ -296,7 +296,6 @@ expected_dist = {}
 # Compare the measurement results obtained with the expected measurements to determine fidelity
 def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     global expected_dist
-    print(result)
     # obtain counts from the result object
     counts = result.get_counts(qc)
 

@@ -291,7 +291,6 @@ def use_Sessions(val = False):
     use_sessions = val
 
 
-
 ######################################################################
 # CIRCUIT EXECUTION METHODS
 
