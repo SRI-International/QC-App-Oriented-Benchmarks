@@ -231,6 +231,7 @@ def set_execution_target(backend_id='qasm_simulator',
                     global sampler
                     backend = service.backend(backend_id)
                     session= Session(service=service, backend=backend_id)
+                    print('hi')
                     sampler = Sampler(session=session)
 
                 else: #use provider
@@ -403,7 +404,6 @@ def execute_circuit(circuit):
         #************************************************
         # Initiate execution (with noise if specified and this is a simulator backend)
         if this_noise is not None and backend.name().endswith("qasm_simulator") and not use_sessions:
-            print('noise')
             logger.info(f"Performing noisy simulation, shots = {shots}")
             
             simulation_circuits = circuit["qc"]
@@ -905,11 +905,6 @@ def process_step_times(job, active_circuit):
             exec_queued_time = (running_time - queued_time).total_seconds()
         if completed_time and running_time:
             exec_running_time = (completed_time - running_time).total_seconds()
-        
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', exec_validating_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', exec_queued_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
 
     if use_sessions:
         job_timestamps= job.metrics()['timestamps']
@@ -924,12 +919,20 @@ def process_step_times(job, active_circuit):
         exec_creating_time = (running_time_delta - created_time_delta).seconds
         exec_running_time = (finished_time_delta - running_time_delta).seconds
         #exec_quantum_classical_time = job.metrics()['bss']
-
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', 0.001)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', 0.001)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
+        exec_validating_time = 0.001
+        exec_queued_time = 0.001
         #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
+
+    # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
+    exec_creating_time = max(0.001, exec_creating_time)
+    exec_validating_time = max(0.001, exec_validating_time)
+    exec_queued_time = max(0.001, exec_queued_time)
+    exec_running_time = max(0.001, exec_running_time)
+
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', 0.001)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', 0.001)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
 
     #print("... time_per_step = ", str(time_per_step))
     if verbose:
