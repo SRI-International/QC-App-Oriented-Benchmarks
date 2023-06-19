@@ -111,6 +111,9 @@ noise = default_noise_model()
 batched_circuits = []
 active_circuits = {}
 
+# determines whether to run with sessions
+use_sessions = False
+
 # maximum number of active jobs
 max_jobs_active = 5
 
@@ -231,7 +234,6 @@ def set_execution_target(backend_id='qasm_simulator',
                     global sampler
                     backend = service.backend(backend_id)
                     session= Session(service=service, backend=backend_id)
-                    print('hi')
                     sampler = Sampler(session=session)
 
                 else: #use provider
@@ -286,8 +288,8 @@ def set_noise_model(noise_model = None):
     noise = noise_model
 
 
-use_sessions = False
-def use_Sessions(val = False):
+# set flag to control use of sessions
+def set_use_sessions(val = False):
     global use_sessions
     use_sessions = val
 
@@ -356,10 +358,12 @@ def execute_circuit(circuit):
     qc_tr_xi = qc_xi; 
     qc_tr_n2q = qc_n2q
     #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
+
     try:    
         # transpile the circuit to obtain size metrics using normalized basis
         if do_transpile_metrics:
             qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q = transpile_for_metrics(qc)
+
         # use noise model from execution options if given for simulator
         this_noise = noise
         
@@ -384,6 +388,7 @@ def execute_circuit(circuit):
         if backend_exec_options_copy != None and "noise_model" in backend_exec_options_copy:
             this_noise = backend_exec_options_copy["noise_model"]
             #print(f"... using custom noise model: {this_noise}")
+
         # extract execution options if set
         if backend_exec_options_copy == None: backend_exec_options_copy = {}
         optimization_level = backend_exec_options_copy.pop("optimization_level", None)
@@ -391,6 +396,7 @@ def execute_circuit(circuit):
         routing_method = backend_exec_options_copy.pop("routing_method", None)
         transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
         transformer = backend_exec_options_copy.pop("transformer", None)
+
         global result_processor, width_processor
         postprocessors = backend_exec_options_copy.pop("postprocessor", None)
         if postprocessors:
@@ -403,7 +409,8 @@ def execute_circuit(circuit):
 
         #************************************************
         # Initiate execution (with noise if specified and this is a simulator backend)
-        if this_noise is not None and backend.name().endswith("qasm_simulator") and not use_sessions:
+        if this_noise is not None and not use_sessions and backend.name().endswith("qasm_simulator"):
+
             logger.info(f"Performing noisy simulation, shots = {shots}")
             
             simulation_circuits = circuit["qc"]
