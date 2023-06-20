@@ -2,13 +2,16 @@ import json
 
 import numpy as np
 
+from qiskit.opflow.primitive_ops import PauliSumOp
 from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.formats.molecule_info import MoleculeInfo
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 
 
-def ring(n=10, r=1.0):
-
+def ring(n: int = 10, r: float = 1.0) -> tuple[list[str], np.ndarray, str]:
+    """
+    Generate the xyz coordinates of a ring of hydrogen atoms.
+    """
     xyz = np.zeros((n, 3))
     atoms = ['H'] * n
 
@@ -27,10 +30,14 @@ def ring(n=10, r=1.0):
     return atoms, xyz, description
 
 
-def h10_pyramid(n=10, r=1.0):
-
-    xyz = np.zeros((n, 3))
-    atoms = ['H'] * n
+def h10_pyramid(
+        n: int = 10, r: float = 1.0) -> tuple[list[str], np.ndarray, str]:
+    """
+    Generate the xyz coordinates of a pyramid of 10 (and only 10) hydrogen atoms.
+    """
+    # hardcoded for n = 10 right now
+    xyz = np.zeros((10, 3))
+    atoms = ['H'] * 10
 
     hpyr = np.sqrt(2.0 / 3) * r
     htri = np.cos(np.pi / 6.0) * r
@@ -69,13 +76,19 @@ def h10_pyramid(n=10, r=1.0):
 
     description = "H10 pyramid, " + str(r) + " Angstroms\n"
 
-    return as_xyz(atoms, xyz, description)
+    return atoms, xyz, description
 
 
-def h10_sheet(n=10, r=1.0):
-
-    xyz = np.zeros((n, 3))
-    atoms = ['H'] * n
+def h10_sheet(n: int = 10,
+              r: float = 1.0) -> tuple[list[str],
+                                       np.ndarray,
+                                       str]:
+    """
+    Generate the xyz coordinates of a sheet of 10 (and only 10) hydrogen atoms.
+    """
+    # hardcoded for n = 10 right now
+    xyz = np.zeros((10, 3))
+    atoms = ['H'] * 10
 
     htri = np.cos(np.pi / 6.0) * r
 
@@ -103,10 +116,13 @@ def h10_sheet(n=10, r=1.0):
 
     description = "H10 2D sheet, " + str(r) + " Angstroms\n"
 
-    return as_xyz(atoms, xyz, description)
+    return atoms, xyz, description
 
 
-def chain(n=10, r=1.0, ):
+def chain(n: int = 10, r: float = 1.0,) -> tuple[list[str], np.ndarray, str]:
+    """
+    Generate the xyz coordinates of a chain of hydrogen atoms.
+    """
 
     xyz = np.zeros((n, 3))
     atoms = ['H'] * n
@@ -134,7 +150,10 @@ def as_xyz(atoms, xyz, description='\n'):
     return pretty_xyz
 
 
-def generate_qubit_hamiltonian(atoms, xyz):
+def generate_qubit_hamiltonian(
+    atoms: list[str],
+    xyz: np.ndarray,
+) -> PauliSumOp:
     # Generate chain atoms and positions
 
     # define the molecular structure
@@ -161,8 +180,8 @@ def generate_qubit_hamiltonian(atoms, xyz):
 
 if __name__ == '__main__':
 
-    for shape in [chain, ring]:
-        for n in [4]:  # should probably let user set n + r at some point
+    for shape in [chain, ring, h10_sheet, h10_pyramid]:
+        for n in [10]:
             for r in [1.0]:
 
                 # get lattice info from a particular shape
@@ -170,8 +189,6 @@ if __name__ == '__main__':
                 print(xyz)
                 # log in console
                 print(as_xyz(atoms, xyz, description))
-
-                # store position info in a .json
 
                 # generate hamiltonian in spin basis
                 qubit_hamiltonian = generate_qubit_hamiltonian(atoms, xyz)
