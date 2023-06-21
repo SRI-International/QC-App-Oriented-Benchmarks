@@ -154,8 +154,11 @@ def generate_qubit_hamiltonian(
     atoms: list[str],
     xyz: np.ndarray,
 ) -> PauliSumOp:
-    # Generate chain atoms and positions
+    """
+    Create a hamiltonian from a list of atoms and their xyz positions. 
+    """
 
+        
     # define the molecular structure
     hydrogen_molecule = MoleculeInfo(atoms, xyz, charge=0, multiplicity=1)
 
