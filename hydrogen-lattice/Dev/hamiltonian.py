@@ -150,15 +150,15 @@ def as_xyz(atoms, xyz, description='\n'):
     return pretty_xyz
 
 
-def generate_qubit_hamiltonian(
-    atoms: list[str],
-    xyz: np.ndarray,
-) -> PauliSumOp:
+def molecule_to_hamiltonian(atoms: list[str],
+                            xyz: np.ndarray,
+                            ) -> ElectronicEnergy:
     """
-    Create a hamiltonian from a list of atoms and their xyz positions. 
+    Creates an ElectronicEnergy object corresponding to a list of atoms and xyz positions.
+
+    This object can be used to access hamiltonian information.
     """
 
-        
     # define the molecular structure
     hydrogen_molecule = MoleculeInfo(atoms, xyz, charge=0, multiplicity=1)
 
@@ -170,7 +170,16 @@ def generate_qubit_hamiltonian(
     quantum_molecule = molecule_driver.run()
 
     # acquire fermionic hamiltonian
-    fermionic_hamiltonian = quantum_molecule.hamiltonian.second_q_op()
+    return quantum_molecule.hamiltonian
+
+
+def generate_spin_qubit_hamiltonian(
+    hamiltonian: ElectronicEnergy
+) -> PauliSumOp:
+    """
+    Returns an ElectronicEnergy hamiltonian in the spin basis. (Not in the spatial basis.)
+    """
+    hamiltonian.second_q_op()
 
     # create mapper from fermionic to spin basis
     mapper = JordanWignerMapper()
@@ -181,23 +190,105 @@ def generate_qubit_hamiltonian(
     return qubit_hamiltonian
 
 
-if __name__ == '__main__':
+def generate_paired_electron_hamiltonian(
+        hamiltonian: ElectronicEnergy
+) -> PauliSumOp:
+    """
+    Returns an ElectronicEnergy hamiltonian in the efficient paired electronc basis.
+    """
 
+    one_body_integrals = hamiltonian.electronic_integrals.alpha['+-']
+    two_body_integrals = hamiltonian.electronic_integrals.alpha['++--'].transpose(
+        (0, 3, 2, 1))
+    core_energy = quantum_molecule.hamiltonian.nuclear_repulsion_energy
+
+    num_orbitals = len(one_body_integrals)
+
+    def I():
+        return "I" * num_orbitals
+
+    def Z(p):
+        Zp = ["I"] * num_orbitals
+        Zp[p] = "Z"
+        return "".join(Zp)[::-1]
+
+    def ZZ(p, q):
+        ZpZq = ["I"] * num_orbitals
+        ZpZq[p] = "Z"
+        ZpZq[q] = "Z"
+        return "".join(ZpZq)[::-1]
+
+    def XX(p, q):
+        XpXq = ["I"] * num_orbitals
+        XpXq[p] = "X"
+        XpXq[q] = "X"
+        return "".join(XpXq)[::-1]
+
+    def YY(p, q):
+        YpYq = ["I"] * num_orbitals
+        YpYq[p] = "Y"
+        YpYq[q] = "Y"
+        return "".join(YpYq)[::-1]
+
+    terms = [((I(), core_energy))]  # nuclear repulsion is a constant
+
+    # loop to create paired electron Hamiltonian
+    # last term is from p = p case in (I - Zp) * (I - Zp)* (pp|qq)
+    gpq = one_body_integrals - 0.5 * \
+        np.einsum("prrq->pq", two_body_integrals) + np.einsum("ppqq->pq", two_body_integrals)
+    for p in range(num_orbitals):
+        terms.append((I(), gpq[p, p]))
+        terms.append((Z(p), -gpq[p, p]))
+        for q in range(num_orbitals):
+            if p != q:
+                terms.append((I(), 0.5 *
+                              two_body_integrals[p, p, q, q] +
+                              0.25 *
+                              two_body_integrals[p, q, q, p]))
+                terms.append((Z(p), -
+                              0.5 *
+                              two_body_integrals[p, p, q, q] -
+                              0.25 *
+                              two_body_integrals[p, q, q, p]))
+                terms.append((Z(q), -
+                              0.5 *
+                              two_body_integrals[p, p, q, q] +
+                              0.25 *
+                              two_body_integrals[p, q, q, p]))
+                terms.append((ZZ(p, q), 0.5 *
+                              two_body_integrals[p, p, q, q] -
+                              0.25 *
+                              two_body_integrals[p, q, q, p]))
+                terms.append((XX(p, q), 0.25 * two_body_integrals[p, q, p, q]))
+                terms.append((YY(p, q), 0.25 * two_body_integrals[p, q, p, q]))
+
+    qubit_hamiltonian = PauliSumOp.from_list(terms)  # pass in list of terms
+
+    return qubit_hamiltonian.reduce()  # Qiskit can collect and simplify terms
+
+
+if __name__ == '__main__':
+    """
+    generate various hydrogen lattice shapes/sizes
+    """
     for shape in [chain, ring, h10_sheet, h10_pyramid]:
         for n in [10]:
             for r in [1.0]:
 
                 # get lattice info from a particular shape
                 atoms, xyz, description = shape(n, r)
-                print(xyz)
-                # log in console
-                print(as_xyz(atoms, xyz, description))
+                # create hamiltonian from lattice info
+                hamiltonian = molecule_to_hamiltonian(atoms, xyz)
 
-                # generate hamiltonian in spin basis
-                qubit_hamiltonian = generate_qubit_hamiltonian(atoms, xyz)
+                # generate hamiltonian in spin basis- inefficient
+                # spin_qubit_hamiltonian = generate_spin_qubit_hamiltonian(hamiltonian)
+
+                # generate hamiltonian in paired spin basis
+                spin_pair_hamiltonian = generate_spin_qubit_hamiltonian(
+                    hamiltonian)
 
                 # begin putting spin basis hamiltonian into json
-                op = qubit_hamiltonian.primitive.to_list()
+                op = spin_pair_hamiltonian.primitive.to_list()
 
                 n_terms = len(op)
                 coeffs = []
@@ -218,6 +309,11 @@ if __name__ == '__main__':
                     "hamiltonian": pauli_dict
                 }
 
-                with open('h' + str(n) + '_' + str(r) + '_' + str(shape.__name__) + '.json', 'w') as f:
+                if shape in [h10_sheet, h10_pyramid]:
+                    file_name = f"h{shape.__name__}_{r}.json",
+                else:
+                    file_name = f"h{n}_{shape.__name__}_{r}.json",
+
+                with open(file_name, 'w') as f:
                     json.dump(d, f)
                 # end putting spin basis hamiltonian into json
