@@ -52,7 +52,7 @@ if __name__ == "__main__":
     parser.add_argument("--group", default="open", help="Group status", type=str)
     parser.add_argument("--project", default="main", help="Project", type=str)
     parser.add_argument("--provider_module_name", default= None , help="provider_module_name", type= str)
-    parser.add_argument("--provider_class_name", default= None , help="Noise Model", type= str)
+    parser.add_argument("--provider_class_name", default= None , help="provider_class_name", type= str)
     parser.add_argument("--noise_model", default= None , help="Noise Model", type= str)
     parser.add_argument("--exec_options", default={}, help="Additional execution options", type=ast.literal_eval)
 
