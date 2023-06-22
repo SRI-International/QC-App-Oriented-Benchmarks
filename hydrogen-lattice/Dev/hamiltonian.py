@@ -3,14 +3,15 @@ import json
 import numpy as np
 
 from qiskit.opflow.primitive_ops import PauliSumOp
+
 from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.formats.molecule_info import MoleculeInfo
+from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 
 
 def ring(n: int = 10, r: float = 1.0) -> tuple[list[str], np.ndarray, str]:
-    """
-    Generate the xyz coordinates of a ring of hydrogen atoms.
+    """Generate the xyz coordinates of a ring of hydrogen atoms.
     """
     xyz = np.zeros((n, 3))
     atoms = ['H'] * n
@@ -179,7 +180,7 @@ def generate_spin_qubit_hamiltonian(
     """
     Returns an ElectronicEnergy hamiltonian in the spin basis. (Not in the spatial basis.)
     """
-    hamiltonian.second_q_op()
+    fermionic_hamiltonian = hamiltonian.second_q_op()
 
     # create mapper from fermionic to spin basis
     mapper = JordanWignerMapper()
@@ -271,12 +272,22 @@ if __name__ == '__main__':
     """
     generate various hydrogen lattice shapes/sizes
     """
-    for shape in [chain, ring, h10_sheet, h10_pyramid]:
+#    for shape in [chain, ring, h10_sheet, h10_pyramid]:
+    for shape in [chain]:
         for n in [10]:
             for r in [1.0]:
+                
+                if shape in [h10_sheet, h10_pyramid]:
+                    file_name = f"h{shape.__name__}_{r}.json"
+                    print(f"Working on {shape.__name__}")
+                else:
+                    file_name = f"h{n}_{shape.__name__}_{r}.json"
+                    print(f"Working on {shape.__name__} for n={n} and r={r}")
 
                 # get lattice info from a particular shape
                 atoms, xyz, description = shape(n, r)
+                #print to console the lattice info
+                print(as_xyz(atoms,xyz,description))
                 # create hamiltonian from lattice info
                 hamiltonian = molecule_to_hamiltonian(atoms, xyz)
 
@@ -308,12 +319,6 @@ if __name__ == '__main__':
                     },
                     "hamiltonian": pauli_dict
                 }
-
-                if shape in [h10_sheet, h10_pyramid]:
-                    file_name = f"h{shape.__name__}_{r}.json",
-                else:
-                    file_name = f"h{n}_{shape.__name__}_{r}.json",
-
                 with open(file_name, 'w') as f:
                     json.dump(d, f)
                 # end putting spin basis hamiltonian into json
