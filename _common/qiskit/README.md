@@ -29,7 +29,7 @@ You also have an Option to use custom Noise Model or No Noise Model along with e
     --noise_model "custom_qiskit_noise_model.my_noise_model()"
 ```
 
-In addition to Simulator Arguments their is an option to choose Hardware backend which needs to be provided if we want to differ the default values. In order to implement using below arguments need to choose backend_id & provider_backend according to your choice
+In addition to Simulator Arguments their is an option to choose Hardware backend which needs to be provided if we want to differ the default values. In order to run on  provider backend choice of provider details shoulde be updated like provider module name & provider class name according to your choice of provider
 
 ```
  python _common/qiskit/benchmark_runner.py 
@@ -39,8 +39,9 @@ In addition to Simulator Arguments their is an option to choose Hardware backend
     --max_circuits 3 
     --num_shots 100 
     --method 2 
-    --backend_id " Respective Hardware backend id "
-    --provider_backend " Provider backend " 
+    --backend_id " backend id "
+    --provider_module_name " Provider module name " 
+    --provider_class_name  " Provider Class Name"
     --hub "open" 
     --group "open" 
     --project "main" 
