@@ -270,13 +270,15 @@ def generate_paired_electron_hamiltonian(
 
 if __name__ == '__main__':
     """
-    generate various hydrogen lattice shapes/sizes
+    generate various hydrogen lattice pUCCD hamiltonians
     """
 #    for shape in [chain, ring, h10_sheet, h10_pyramid]:
     for shape in [chain]:
         for n in [10]:
             for r in [1.0]:
                 
+                # define json file name and print. for h10 sheet/pyramid n = 10
+                # so no need to set/print it
                 if shape in [h10_sheet, h10_pyramid]:
                     file_name = f"h{shape.__name__}_{r}.json"
                     print(f"Working on {shape.__name__}")
@@ -291,14 +293,14 @@ if __name__ == '__main__':
                 # create hamiltonian from lattice info
                 hamiltonian = molecule_to_hamiltonian(atoms, xyz)
 
-                # generate hamiltonian in spin basis- inefficient
+                # generate hamiltonian in spin basis- 
                 # spin_qubit_hamiltonian = generate_spin_qubit_hamiltonian(hamiltonian)
 
                 # generate hamiltonian in paired spin basis
                 spin_pair_hamiltonian = generate_spin_qubit_hamiltonian(
                     hamiltonian)
 
-                # begin putting spin basis hamiltonian into json
+                #begin JSON file creation
                 op = spin_pair_hamiltonian.primitive.to_list()
 
                 n_terms = len(op)
@@ -321,4 +323,4 @@ if __name__ == '__main__':
                 }
                 with open(file_name, 'w') as f:
                     json.dump(d, f)
-                # end putting spin basis hamiltonian into json
+                # end JSON file creation
