@@ -41,7 +41,7 @@ In addition to Simulator Arguments their is an option to choose Hardware backend
     --method 2 
     --backend_id " backend id "
     --provider_module_name " Provider module name " 
-    --provider_class_name  " Provider Class Name"
+    --provider_class_name  " Provider class name "
     --hub "open" 
     --group "open" 
     --project "main" 
@@ -55,6 +55,6 @@ In general, the arguments one can supply for a given algorithm are defined by
 the associated `run` method are described when executing the runner with only the algorithm argument:
 
 ```
-python _common/qiskit/benchmark_runner ALGORITHM_NAME -h
+python _common/qiskit/benchmark_runner.py ALGORITHM_NAME -h
 ```
 

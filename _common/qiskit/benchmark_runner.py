@@ -35,7 +35,7 @@ import pe_benchmark
 import qft_benchmark
 import shors_benchmark
 import vqe_benchmark
-from custom import custom_qiskit_noise_model
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run benchmarking")
@@ -51,9 +51,9 @@ if __name__ == "__main__":
     parser.add_argument("--hub", default="ibm-q", help="Computing group hub.", type=str)
     parser.add_argument("--group", default="open", help="Group status", type=str)
     parser.add_argument("--project", default="main", help="Project", type=str)
-    parser.add_argument("--provider_module_name", default= None , help="provider_module_name", type= str)
-    parser.add_argument("--provider_class_name", default= None , help="provider_class_name", type= str)
-    parser.add_argument("--noise_model", default= None , help="Noise Model", type= str)
+    parser.add_argument("--provider_module_name", default=None, help="provider_module_name", type= str)
+    parser.add_argument("--provider_class_name", default=None, help="provider_class_name", type= str)
+    parser.add_argument("--noise_model", default=None, help="Noise Model", type= str)
     parser.add_argument("--exec_options", default={}, help="Additional execution options", type=ast.literal_eval)
 
     # Additional arguments required by other algorithms.
@@ -93,21 +93,20 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-# For Inserting the Noise model default into exec option as it is function call 
+    # For Inserting the Noise model default into exec option as it is function call 
     if args.noise_model != None :
         
         if args.noise_model == 'None':
            args.exec_options["noise_model"] = None 
         else:
             module,method = args.noise_model.split(".")
-            module = globals()[module]
+            module = importlib.import_module(f"custom.{module}")
             method = method.split("(")[0]
             custom_noise = getattr(module, method)
-            print(custom_noise)
             noise = custom_noise()
             args.exec_options["noise_model"] = noise
     
-    # Provdider detail update using provider module name and class name
+    # Provider detail update using provider module name and class name
     if args.provider_module_name != None and args.provider_class_name != None:
         provider_class = getattr(importlib.import_module(args.provider_module_name), args.provider_name)
         provider = provider_class.get_backend(args.backend_id)
