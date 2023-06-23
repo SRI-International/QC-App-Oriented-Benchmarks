@@ -11,10 +11,9 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 
 
 def ring(n: int = 10, r: float = 1.0) -> tuple[list[str], np.ndarray, str]:
-    """Generate the xyz coordinates of a ring of hydrogen atoms.
-    """
+    """Generate the xyz coordinates of a ring of hydrogen atoms."""
     xyz = np.zeros((n, 3))
-    atoms = ['H'] * n
+    atoms = ["H"] * n
 
     angle = 2 * np.pi / n
     rad_denom = 2 * np.sin(np.pi / n)
@@ -31,14 +30,13 @@ def ring(n: int = 10, r: float = 1.0) -> tuple[list[str], np.ndarray, str]:
     return atoms, xyz, description
 
 
-def h10_pyramid(
-        n: int = 10, r: float = 1.0) -> tuple[list[str], np.ndarray, str]:
+def h10_pyramid(n: int = 10, r: float = 1.0) -> tuple[list[str], np.ndarray, str]:
     """
     Generate the xyz coordinates of a pyramid of 10 (and only 10) hydrogen atoms.
     """
     # hardcoded for n = 10 right now
     xyz = np.zeros((10, 3))
-    atoms = ['H'] * 10
+    atoms = ["H"] * 10
 
     hpyr = np.sqrt(2.0 / 3) * r
     htri = np.cos(np.pi / 6.0) * r
@@ -80,16 +78,13 @@ def h10_pyramid(
     return atoms, xyz, description
 
 
-def h10_sheet(n: int = 10,
-              r: float = 1.0) -> tuple[list[str],
-                                       np.ndarray,
-                                       str]:
+def h10_sheet(n: int = 10, r: float = 1.0) -> tuple[list[str], np.ndarray, str]:
     """
     Generate the xyz coordinates of a sheet of 10 (and only 10) hydrogen atoms.
     """
     # hardcoded for n = 10 right now
     xyz = np.zeros((10, 3))
-    atoms = ['H'] * 10
+    atoms = ["H"] * 10
 
     htri = np.cos(np.pi / 6.0) * r
 
@@ -120,13 +115,16 @@ def h10_sheet(n: int = 10,
     return atoms, xyz, description
 
 
-def chain(n: int = 10, r: float = 1.0,) -> tuple[list[str], np.ndarray, str]:
+def chain(
+    n: int = 10,
+    r: float = 1.0,
+) -> tuple[list[str], np.ndarray, str]:
     """
     Generate the xyz coordinates of a chain of hydrogen atoms.
     """
 
     xyz = np.zeros((n, 3))
-    atoms = ['H'] * n
+    atoms = ["H"] * n
 
     z = np.arange(-(n - 1) / 2, (n) / 2) * r
     assert len(z) == n
@@ -139,21 +137,23 @@ def chain(n: int = 10, r: float = 1.0,) -> tuple[list[str], np.ndarray, str]:
     return atoms, xyz, description
 
 
-def as_xyz(atoms, xyz, description='\n'):
+def as_xyz(atoms, xyz, description="\n"):
     # format as .XYZ
     n = len(atoms)
-    pretty_xyz = str(n) + '\n'
+    pretty_xyz = str(n) + "\n"
     pretty_xyz += description
     for i in range(n):
         pretty_xyz += "{0:s} {1:10.4f} {2:10.4f} {3:10.4f}\n".format(
-                      atoms[i], xyz[i, 0], xyz[i, 1], xyz[i, 2])
+            atoms[i], xyz[i, 0], xyz[i, 1], xyz[i, 2]
+        )
 
     return pretty_xyz
 
 
-def molecule_to_hamiltonian(atoms: list[str],
-                            xyz: np.ndarray,
-                            ) -> ElectronicEnergy:
+def molecule_to_hamiltonian(
+    atoms: list[str],
+    xyz: np.ndarray,
+) -> ElectronicEnergy:
     """
     Creates an ElectronicEnergy object corresponding to a list of atoms and xyz positions.
 
@@ -164,8 +164,7 @@ def molecule_to_hamiltonian(atoms: list[str],
     hydrogen_molecule = MoleculeInfo(atoms, xyz, charge=0, multiplicity=1)
 
     # Prepare and run the initial Hartree-Fock calculation on molecule
-    molecule_driver = PySCFDriver.from_molecule(
-        hydrogen_molecule, basis="sto3g")
+    molecule_driver = PySCFDriver.from_molecule(hydrogen_molecule, basis="sto3g")
     # print("Spin:", molecule_driver.spin)
     # print("Atom:", molecule_driver.atom)
     quantum_molecule = molecule_driver.run()
@@ -174,9 +173,7 @@ def molecule_to_hamiltonian(atoms: list[str],
     return quantum_molecule.hamiltonian
 
 
-def generate_spin_qubit_hamiltonian(
-    hamiltonian: ElectronicEnergy
-) -> PauliSumOp:
+def generate_spin_qubit_hamiltonian(hamiltonian: ElectronicEnergy) -> PauliSumOp:
     """
     Returns an ElectronicEnergy hamiltonian in the spin basis. (Not in the spatial basis.)
     """
@@ -191,16 +188,15 @@ def generate_spin_qubit_hamiltonian(
     return qubit_hamiltonian
 
 
-def generate_paired_electron_hamiltonian(
-        hamiltonian: ElectronicEnergy
-) -> PauliSumOp:
+def generate_paired_electron_hamiltonian(hamiltonian: ElectronicEnergy) -> PauliSumOp:
     """
     Returns an ElectronicEnergy hamiltonian in the efficient paired electronc basis.
     """
 
-    one_body_integrals = hamiltonian.electronic_integrals.alpha['+-']
-    two_body_integrals = hamiltonian.electronic_integrals.alpha['++--'].transpose(
-        (0, 3, 2, 1))
+    one_body_integrals = hamiltonian.electronic_integrals.alpha["+-"]
+    two_body_integrals = hamiltonian.electronic_integrals.alpha["++--"].transpose(
+        (0, 3, 2, 1)
+    )
     core_energy = quantum_molecule.hamiltonian.nuclear_repulsion_energy
 
     num_orbitals = len(one_body_integrals)
@@ -235,31 +231,44 @@ def generate_paired_electron_hamiltonian(
 
     # loop to create paired electron Hamiltonian
     # last term is from p = p case in (I - Zp) * (I - Zp)* (pp|qq)
-    gpq = one_body_integrals - 0.5 * \
-        np.einsum("prrq->pq", two_body_integrals) + np.einsum("ppqq->pq", two_body_integrals)
+    gpq = (
+        one_body_integrals
+        - 0.5 * np.einsum("prrq->pq", two_body_integrals)
+        + np.einsum("ppqq->pq", two_body_integrals)
+    )
     for p in range(num_orbitals):
         terms.append((I(), gpq[p, p]))
         terms.append((Z(p), -gpq[p, p]))
         for q in range(num_orbitals):
             if p != q:
-                terms.append((I(), 0.5 *
-                              two_body_integrals[p, p, q, q] +
-                              0.25 *
-                              two_body_integrals[p, q, q, p]))
-                terms.append((Z(p), -
-                              0.5 *
-                              two_body_integrals[p, p, q, q] -
-                              0.25 *
-                              two_body_integrals[p, q, q, p]))
-                terms.append((Z(q), -
-                              0.5 *
-                              two_body_integrals[p, p, q, q] +
-                              0.25 *
-                              two_body_integrals[p, q, q, p]))
-                terms.append((ZZ(p, q), 0.5 *
-                              two_body_integrals[p, p, q, q] -
-                              0.25 *
-                              two_body_integrals[p, q, q, p]))
+                terms.append(
+                    (
+                        I(),
+                        0.5 * two_body_integrals[p, p, q, q]
+                        + 0.25 * two_body_integrals[p, q, q, p],
+                    )
+                )
+                terms.append(
+                    (
+                        Z(p),
+                        -0.5 * two_body_integrals[p, p, q, q]
+                        - 0.25 * two_body_integrals[p, q, q, p],
+                    )
+                )
+                terms.append(
+                    (
+                        Z(q),
+                        -0.5 * two_body_integrals[p, p, q, q]
+                        + 0.25 * two_body_integrals[p, q, q, p],
+                    )
+                )
+                terms.append(
+                    (
+                        ZZ(p, q),
+                        0.5 * two_body_integrals[p, p, q, q]
+                        - 0.25 * two_body_integrals[p, q, q, p],
+                    )
+                )
                 terms.append((XX(p, q), 0.25 * two_body_integrals[p, q, p, q]))
                 terms.append((YY(p, q), 0.25 * two_body_integrals[p, q, p, q]))
 
@@ -268,15 +277,14 @@ def generate_paired_electron_hamiltonian(
     return qubit_hamiltonian.reduce()  # Qiskit can collect and simplify terms
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     generate various hydrogen lattice pUCCD hamiltonians
     """
-#    for shape in [chain, ring, h10_sheet, h10_pyramid]:
+    #    for shape in [chain, ring, h10_sheet, h10_pyramid]:
     for shape in [chain]:
         for n in [10]:
             for r in [1.0]:
-                
                 # define json file name and print. for h10 sheet/pyramid n = 10
                 # so no need to set/print it
                 if shape in [h10_sheet, h10_pyramid]:
@@ -288,19 +296,18 @@ if __name__ == '__main__':
 
                 # get lattice info from a particular shape
                 atoms, xyz, description = shape(n, r)
-                #print to console the lattice info
-                print(as_xyz(atoms,xyz,description))
+                # print to console the lattice info
+                print(as_xyz(atoms, xyz, description))
                 # create hamiltonian from lattice info
                 hamiltonian = molecule_to_hamiltonian(atoms, xyz)
 
-                # generate hamiltonian in spin basis- 
+                # generate hamiltonian in spin basis-
                 # spin_qubit_hamiltonian = generate_spin_qubit_hamiltonian(hamiltonian)
 
                 # generate hamiltonian in paired spin basis
-                spin_pair_hamiltonian = generate_spin_qubit_hamiltonian(
-                    hamiltonian)
+                spin_pair_hamiltonian = generate_spin_qubit_hamiltonian(hamiltonian)
 
-                #begin JSON file creation
+                # begin JSON file creation
                 op = spin_pair_hamiltonian.primitive.to_list()
 
                 n_terms = len(op)
@@ -319,8 +326,8 @@ if __name__ == '__main__':
                         "y": xyz[:, 1].tolist(),
                         "z": xyz[:, 2].tolist(),
                     },
-                    "hamiltonian": pauli_dict
+                    "hamiltonian": pauli_dict,
                 }
-                with open(file_name, 'w') as f:
+                with open(file_name, "w") as f:
                     json.dump(d, f)
                 # end JSON file creation
