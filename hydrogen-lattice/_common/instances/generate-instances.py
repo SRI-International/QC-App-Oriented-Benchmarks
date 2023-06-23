@@ -78,6 +78,7 @@ def generate_jordan_wigner_hamiltonian(hamiltonian: ElectronicEnergy) -> PauliSu
     # create qubit hamiltonian from fermionic one
     qubit_hamiltonian = mapper.map(fermionic_hamiltonian)
 
+    # hamiltonian does not include scalar nuclear energy constant, so we add it back here for consistency in benchmarks
     qubit_hamiltonian += PauliSumOp(
         SparsePauliOp("I" * qubit_hamiltonian.num_qubits, coeffs=hamiltonian.nuclear_repulsion_energy)
     )
