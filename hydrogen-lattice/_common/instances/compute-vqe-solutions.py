@@ -5,6 +5,10 @@ import json
 from qiskit.quantum_info import SparsePauliOp
 import numpy as np
 
+def read_vqe_instance(file_path):
+    with open(file_path, "r") as file:
+        instance = json.load(file)
+    return instance
 
 
 instance_files = []
