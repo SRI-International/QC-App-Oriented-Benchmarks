@@ -17,9 +17,7 @@ class Backend(Enum):
 
 
 class ErrorMessages(Enum):
-    UNDEFINED_PARAMS = (
-        "Parameters undefined. You need to bind/assign parameters before executing."
-    )
+    UNDEFINED_PARAMS = "Parameters undefined. You need to bind/assign parameters before executing."
     UNRECOGNIZED_SHOTS = "shots: {shots} not understood"
 
 
@@ -47,9 +45,7 @@ class Simulator:
         self.statevector_backend = Aer.get_backend(Backend.STATEVECTOR_SIMULATOR.value)
         self.qasm_backend = Aer.get_backend(Backend.QASM_SIMULATOR.value)
 
-    def run(
-        self, circuit: QuantumCircuit, shots: Optional[int] = None
-    ) -> Dict[str, float]:
+    def run(self, circuit: QuantumCircuit, shots: Optional[int] = None) -> Dict[str, float]:
         """Run a quantum circuit on the noise-free simulator and return the probabilities."""
 
         # Refactored error check
@@ -71,11 +67,7 @@ class Simulator:
             )
             probs = Statevector(statevector).probabilities_dict(qargs=measured_qubits)
         elif isinstance(shots, int):
-            counts = (
-                execute(circuit, backend=self.qasm_backend, shots=shots)
-                .result()
-                .get_counts()
-            )
+            counts = execute(circuit, backend=self.qasm_backend, shots=shots).result().get_counts()
             probs = self.normalize_counts(counts, num_qubits=circuit.num_qubits)
         else:
             raise TypeError(ErrorMessages.UNRECOGNIZED_SHOTS.value.format(shots=shots))
@@ -97,9 +89,7 @@ class Simulator:
         except ValueError:
             bitstrings = counts
 
-        probabilities = dict(
-            {key: value / normalizer for key, value in bitstrings.items()}
-        )
+        probabilities = dict({key: value / normalizer for key, value in bitstrings.items()})
         assert abs(sum(probabilities.values()) - 1) < 1e-9
         return probabilities
 
@@ -119,19 +109,13 @@ class Simulator:
             Optional parameters to pass in if the circuit is parameterized
         """
         if parameters is not None and base_circuit.num_parameters != len(parameters):
-            raise ValueError(
-                f"Circuit has {base_circuit.num_parameters} but parameter length is {len(parameters)}."
-            )
+            raise ValueError(f"Circuit has {base_circuit.num_parameters} but parameter length is {len(parameters)}.")
 
         measurable_expression = StateFn(operator, is_measurement=True)
         observables = PauliExpectation().convert(measurable_expression)
-        circuits, formatted_observables = self._prepare_circuits(
-            base_circuit, observables
-        )
+        circuits, formatted_observables = self._prepare_circuits(base_circuit, observables)
         probabilities = self._compute_probabilities(circuits, parameters, shots)
-        expectation_values = self._calculate_expectation_values(
-            probabilities, formatted_observables
-        )
+        expectation_values = self._calculate_expectation_values(probabilities, formatted_observables)
         return sum(expectation_values)
 
     @staticmethod
@@ -172,9 +156,7 @@ class Simulator:
         """
         expectation_values = list()
         for idx, op in enumerate(observables):
-            expectation_value = sampled_expectation_value(
-                probabilities[idx], op[0].primitive
-            )
+            expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
             expectation_values.append(expectation_value)
 
         return expectation_values
