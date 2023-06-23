@@ -1,15 +1,10 @@
-#!/usr/bin/env python3
+!/usr/bin/env python3
 
 import os
 import json
 from qiskit.quantum_info import SparsePauliOp
 import numpy as np
 
-
-def read_vqe_instance(file_path):
-    with open(file_path, "r") as file:
-        instance = json.load(file)
-    return instance
 
 
 instance_files = []
@@ -37,4 +32,4 @@ for path in instance_files:
     solution_path = path.replace(".json", ".sol")
     with open(solution_path, "w") as file:
         file.write(f"doci_energy: {np.linalg.eigvalsh(paired_matrix)[0]}\n")
-        file.write(f"fci_energy:  {np.linalg.eigvalsh(jordan_wigner_matrix)[0]}\n")
+        file.write(f"fci_energy: {np.linalg.eigvalsh(jordan_wigner_matrix)[0]}\n")
