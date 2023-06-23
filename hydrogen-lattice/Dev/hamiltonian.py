@@ -143,9 +143,7 @@ def as_xyz(atoms, xyz, description="\n"):
     pretty_xyz = str(n) + "\n"
     pretty_xyz += description
     for i in range(n):
-        pretty_xyz += "{0:s} {1:10.4f} {2:10.4f} {3:10.4f}\n".format(
-            atoms[i], xyz[i, 0], xyz[i, 1], xyz[i, 2]
-        )
+       pretty_xyz += "{0:s} {1:10.4f} {2:10.4f} {3:10.4f}\n".format(atoms[i], xyz[i, 0], xyz[i, 1], xyz[i, 2])
 
     return pretty_xyz
 
@@ -194,9 +192,7 @@ def generate_paired_electron_hamiltonian(hamiltonian: ElectronicEnergy) -> Pauli
     """
 
     one_body_integrals = hamiltonian.electronic_integrals.alpha["+-"]
-    two_body_integrals = hamiltonian.electronic_integrals.alpha["++--"].transpose(
-        (0, 3, 2, 1)
-    )
+    two_body_integrals = hamiltonian.electronic_integrals.alpha["++--"].transpose((0, 3, 2, 1))
     core_energy = quantum_molecule.hamiltonian.nuclear_repulsion_energy
 
     num_orbitals = len(one_body_integrals)
@@ -232,43 +228,17 @@ def generate_paired_electron_hamiltonian(hamiltonian: ElectronicEnergy) -> Pauli
     # loop to create paired electron Hamiltonian
     # last term is from p = p case in (I - Zp) * (I - Zp)* (pp|qq)
     gpq = (
-        one_body_integrals
-        - 0.5 * np.einsum("prrq->pq", two_body_integrals)
-        + np.einsum("ppqq->pq", two_body_integrals)
+       one_body_integrals - 0.5 * np.einsum("prrq->pq", two_body_integrals) + np.einsum("ppqq->pq", two_body_integrals)
     )
     for p in range(num_orbitals):
         terms.append((I(), gpq[p, p]))
         terms.append((Z(p), -gpq[p, p]))
         for q in range(num_orbitals):
             if p != q:
-                terms.append(
-                    (
-                        I(),
-                        0.5 * two_body_integrals[p, p, q, q]
-                        + 0.25 * two_body_integrals[p, q, q, p],
-                    )
-                )
-                terms.append(
-                    (
-                        Z(p),
-                        -0.5 * two_body_integrals[p, p, q, q]
-                        - 0.25 * two_body_integrals[p, q, q, p],
-                    )
-                )
-                terms.append(
-                    (
-                        Z(q),
-                        -0.5 * two_body_integrals[p, p, q, q]
-                        + 0.25 * two_body_integrals[p, q, q, p],
-                    )
-                )
-                terms.append(
-                    (
-                        ZZ(p, q),
-                        0.5 * two_body_integrals[p, p, q, q]
-                        - 0.25 * two_body_integrals[p, q, q, p],
-                    )
-                )
+                terms.append((I(), 0.5 * two_body_integrals[p, p, q, q] + 0.25 * two_body_integrals[p, q, q, p]))
+                terms.append((Z(p), -0.5 * two_body_integrals[p, p, q, q] - 0.25 * two_body_integrals[p, q, q, p]))
+                terms.append((Z(q), -0.5 * two_body_integrals[p, p, q, q] + 0.25 * two_body_integrals[p, q, q, p]))
+                terms.append((ZZ(p, q), 0.5 * two_body_integrals[p, p, q, q] - 0.25 * two_body_integrals[p, q, q, p]))
                 terms.append((XX(p, q), 0.25 * two_body_integrals[p, q, p, q]))
                 terms.append((YY(p, q), 0.25 * two_body_integrals[p, q, p, q]))
 
