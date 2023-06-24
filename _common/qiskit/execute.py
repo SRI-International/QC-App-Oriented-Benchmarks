@@ -358,12 +358,12 @@ def execute_circuit(circuit):
     qc_tr_xi = qc_xi; 
     qc_tr_n2q = qc_n2q
     #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
-
+    
     try:    
         # transpile the circuit to obtain size metrics using normalized basis
         if do_transpile_metrics:
             qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q = transpile_for_metrics(qc)
-
+            
         # use noise model from execution options if given for simulator
         this_noise = noise
         
@@ -388,15 +388,16 @@ def execute_circuit(circuit):
         if backend_exec_options_copy != None and "noise_model" in backend_exec_options_copy:
             this_noise = backend_exec_options_copy["noise_model"]
             #print(f"... using custom noise model: {this_noise}")
-
+        
         # extract execution options if set
         if backend_exec_options_copy == None: backend_exec_options_copy = {}
+        
         optimization_level = backend_exec_options_copy.pop("optimization_level", None)
         layout_method = backend_exec_options_copy.pop("layout_method", None)
         routing_method = backend_exec_options_copy.pop("routing_method", None)
         transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
         transformer = backend_exec_options_copy.pop("transformer", None)
-
+        
         global result_processor, width_processor
         postprocessors = backend_exec_options_copy.pop("postprocessor", None)
         if postprocessors:
@@ -446,13 +447,14 @@ def execute_circuit(circuit):
             job = execute(simulation_circuits, backend, shots=shots,
                 noise_model=this_noise, basis_gates=this_noise.basis_gates,
                 **backend_exec_options_copy)
-            
+                
             logger.info(f'Finished Running on noisy simulator - {round(time.time() - st, 5)} (ms)')
             if verbose_time: print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
         
         #************************************************
         # Initiate execution for all other backends and noiseless simulator
         else:            
+ 
             # if set, transpile many times and pick shortest circuit
             # DEVNOTE: this does not handle parameters yet, or optimizations
             if transpile_attempt_count:
