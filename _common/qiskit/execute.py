@@ -32,6 +32,7 @@ from collections import Counter
 import logging
 import numpy as np
 
+from datetime import datetime, timedelta
 from qiskit import execute, Aer, transpile
 from qiskit import IBMQ
 from qiskit.providers.jobstatus import JobStatus
@@ -50,6 +51,22 @@ backend_exec_options = None
 
 # Cached transpiled circuit, used for parameterized execution
 cached_circuits = {}
+
+#class BenchmarkResult is made for sessions runs. This is because
+#qiskit primitive job result instances don't have a get_counts method 
+#like backend results do. As such, a get counts method is calculated
+#from the quasi distributions and shots taken.
+class BenchmarkResult(object):
+    def __init__(self, qiskit_result):
+        super().__init__()
+        self.qiskit_result = qiskit_result
+        self.metadata = qiskit_result.metadata
+
+    def get_counts(self, qc=0):
+        counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
+        for key in counts.keys():
+            counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])        
+        return counts
 
 #####################
 # DEFAULT NOISE MODEL 
@@ -94,8 +111,11 @@ noise = default_noise_model()
 batched_circuits = []
 active_circuits = {}
 
+# determines whether to run with sessions
+use_sessions = False
+
 # maximum number of active jobs
-max_jobs_active = 5;
+max_jobs_active = 5
 
 # Configure a handler for processing circuits on completion
 # user-supplied result handler
@@ -105,10 +125,10 @@ result_handler = None
 job_mode = False
 
 # Print progress of execution
-verbose = False;
+verbose = False
 
 # Print additional time metrics for each stage of execution
-verbose_time = False;
+verbose_time = False
 
 # Option to perform explicit transpile to collect depth metrics
 do_transpile_metrics = True
@@ -168,8 +188,8 @@ def set_execution_target(backend_id='qasm_simulator',
                         provider_name='Honeywell')
     """
     global backend
-    authentication_error_msg = "No credentials for {0} backend found.  Using the simulator instead."
-    
+    authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
+
     # if a custom provider backend is given, use it ...
     if provider_backend != None:
         backend = provider_backend
@@ -204,10 +224,22 @@ def set_execution_target(backend_id='qasm_simulator',
             if IBMQ.stored_account():
                 # load a stored account
                 IBMQ.load_account()
-                
-                # then create backend from selected provider
-                provider = IBMQ.get_provider(hub=hub, group=group, project=project)
-                backend = provider.get_backend(backend_id)
+
+                #use sessions in here
+                if use_sessions:
+                    from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session
+                    global service
+                    service = QiskitRuntimeService()
+                    global session
+                    global sampler
+                    backend = service.backend(backend_id)
+                    session= Session(service=service, backend=backend_id)
+                    sampler = Sampler(session=session)
+
+                else: #use provider
+                    # then create backend from selected provider
+                    provider = IBMQ.get_provider(hub=hub, group=group, project=project)
+                    backend = provider.get_backend(backend_id)
             else:
                 print(authentication_error_msg.format("IBMQ"))
 
@@ -254,6 +286,13 @@ def set_noise_model(noise_model = None):
     
     global noise
     noise = noise_model
+
+
+# set flag to control use of sessions
+def set_use_sessions(val = False):
+    global use_sessions
+    use_sessions = val
+
 
 ######################################################################
 # CIRCUIT EXECUTION METHODS
@@ -319,12 +358,12 @@ def execute_circuit(circuit):
     qc_tr_xi = qc_xi; 
     qc_tr_n2q = qc_n2q
     #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
-    
+
     try:    
         # transpile the circuit to obtain size metrics using normalized basis
         if do_transpile_metrics:
             qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q = transpile_for_metrics(qc)
-            
+
         # use noise model from execution options if given for simulator
         this_noise = noise
         
@@ -349,26 +388,29 @@ def execute_circuit(circuit):
         if backend_exec_options_copy != None and "noise_model" in backend_exec_options_copy:
             this_noise = backend_exec_options_copy["noise_model"]
             #print(f"... using custom noise model: {this_noise}")
-        
+
         # extract execution options if set
         if backend_exec_options_copy == None: backend_exec_options_copy = {}
-        
         optimization_level = backend_exec_options_copy.pop("optimization_level", None)
         layout_method = backend_exec_options_copy.pop("layout_method", None)
         routing_method = backend_exec_options_copy.pop("routing_method", None)
         transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
         transformer = backend_exec_options_copy.pop("transformer", None)
-        
+
         global result_processor, width_processor
         postprocessors = backend_exec_options_copy.pop("postprocessor", None)
         if postprocessors:
             result_processor, width_processor = postprocessors
-            
-        logger.info(f"Executing on backend: {backend.name()}")
-            
+
+        if use_sessions:
+            logger.info(f"Executing on backend: {backend.name}")
+        else:
+            logger.info(f"Executing on backend: {backend.name()}")
+
         #************************************************
         # Initiate execution (with noise if specified and this is a simulator backend)
-        if this_noise is not None and backend.name().endswith("qasm_simulator"):
+        if this_noise is not None and not use_sessions and backend.name().endswith("qasm_simulator"):
+
             logger.info(f"Performing noisy simulation, shots = {shots}")
             
             simulation_circuits = circuit["qc"]
@@ -404,14 +446,13 @@ def execute_circuit(circuit):
             job = execute(simulation_circuits, backend, shots=shots,
                 noise_model=this_noise, basis_gates=this_noise.basis_gates,
                 **backend_exec_options_copy)
-                
+            
             logger.info(f'Finished Running on noisy simulator - {round(time.time() - st, 5)} (ms)')
             if verbose_time: print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
         
         #************************************************
         # Initiate execution for all other backends and noiseless simulator
         else:            
- 
             # if set, transpile many times and pick shortest circuit
             # DEVNOTE: this does not handle parameters yet, or optimizations
             if transpile_attempt_count:
@@ -439,9 +480,12 @@ def execute_circuit(circuit):
             # perform circuit execution on backend
             logger.info(f'Running trans_qc, shots={shots}')
             st = time.time() 
-            
-            job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
-            
+
+            if use_sessions:
+                job = sampler.run(trans_qc, shots=shots, **backend_exec_options_copy)
+            else:
+                job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
+
             logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
             if verbose_time: print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
             
@@ -749,17 +793,25 @@ def job_complete(job):
         # print("Total counts are:", counts)
         
         # obtain timing info from the results object
-        result_obj = result.to_dict()
-        results_obj = result.to_dict()['results'][0]
+
+        if use_sessions:
+            result = BenchmarkResult(result)
+            counts=result.get_counts()
+            actual_shots = result.metadata[0]['shots']
+            result_obj = result.metadata[0]
+            results_obj = result.metadata[0]
+        else:
+            result_obj = result.to_dict()
+            results_obj = result.to_dict()['results'][0]
+            # get the actual shots and convert to int if it is a string
+            actual_shots = 0
+            for experiment in result_obj["results"]:
+                actual_shots += experiment["shots"]
+
         #print(f"result_obj = {result_obj}")
         #print(f"results_obj = {results_obj}")
         #print(f'shots = {results_obj["shots"]}')
-        
-        # get the actual shots and convert to int if it is a string
-        actual_shots = 0
-        for experiment in result_obj["results"]:
-            actual_shots += experiment["shots"]
-            
+
         if type(actual_shots) is str:
             actual_shots = int(actual_shots)
         
@@ -790,7 +842,7 @@ def job_complete(job):
         # <result> contains results from multiple circuits
         # DEVNOTE: This will need to change; currently the only case where we have multiple result counts
         # is when using randomly_compile; later, there will be other cases
-        if type(result.get_counts()) == list:
+        if not use_sessions and type(result.get_counts()) == list:
             total_counts = dict()
             for count in result.get_counts():
                 total_counts = dict(Counter(total_counts) + Counter(count))
@@ -832,7 +884,7 @@ def process_step_times(job, active_circuit):
         
     # get breakdown of execution time, if method exists 
     # this attribute not available for some providers;
-    if "time_per_step" in dir(job) and callable(job.time_per_step):
+    if not use_sessions and "time_per_step" in dir(job) and callable(job.time_per_step):
         time_per_step = job.time_per_step()
         #print(time_per_step)
         
@@ -850,7 +902,8 @@ def process_step_times(job, active_circuit):
         exec_validating_time = 0.001
         exec_queued_time = 0.001
         exec_running_time = 0.001
-    
+        exec_quantum_classical_time =0.001
+
         if validating_time and creating_time:
             exec_creating_time = (validating_time - creating_time).total_seconds()
         if queued_time and validating_time:
@@ -859,12 +912,35 @@ def process_step_times(job, active_circuit):
             exec_queued_time = (running_time - queued_time).total_seconds()
         if completed_time and running_time:
             exec_running_time = (completed_time - running_time).total_seconds()
-        
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', exec_validating_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', exec_queued_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
-    
+
+    if use_sessions:
+        job_timestamps= job.metrics()['timestamps']
+
+        created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
+        created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
+        finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
+        finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
+        running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
+        running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
+
+        exec_creating_time = (running_time_delta - created_time_delta).seconds
+        exec_running_time = (finished_time_delta - running_time_delta).seconds
+        #exec_quantum_classical_time = job.metrics()['bss']
+        exec_validating_time = 0.001
+        exec_queued_time = 0.001
+        #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
+
+    # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
+    exec_creating_time = max(0.001, exec_creating_time)
+    exec_validating_time = max(0.001, exec_validating_time)
+    exec_queued_time = max(0.001, exec_queued_time)
+    exec_running_time = max(0.001, exec_running_time)
+
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', 0.001)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', 0.001)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
+
     #print("... time_per_step = ", str(time_per_step))
     if verbose:
         print(f"... exec times, creating = {exec_creating_time}, validating = {exec_validating_time}, queued = {exec_queued_time}, running = {exec_running_time}") 
