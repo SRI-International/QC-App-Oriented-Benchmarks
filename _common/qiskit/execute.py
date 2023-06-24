@@ -95,7 +95,7 @@ batched_circuits = []
 active_circuits = {}
 
 # maximum number of active jobs
-max_jobs_active = 5;
+max_jobs_active = 5
 
 # Configure a handler for processing circuits on completion
 # user-supplied result handler
@@ -105,10 +105,10 @@ result_handler = None
 job_mode = False
 
 # Print progress of execution
-verbose = False;
+verbose = False
 
 # Print additional time metrics for each stage of execution
-verbose_time = False;
+verbose_time = False
 
 # Option to perform explicit transpile to collect depth metrics
 do_transpile_metrics = True
@@ -168,8 +168,8 @@ def set_execution_target(backend_id='qasm_simulator',
                         provider_name='Honeywell')
     """
     global backend
-    authentication_error_msg = "No credentials for {0} backend found.  Using the simulator instead."
-    
+    authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
+
     # if a custom provider backend is given, use it ...
     if provider_backend != None:
         backend = provider_backend
