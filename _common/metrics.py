@@ -47,7 +47,8 @@ circuit_metrics_final_iter = {  } # used to store final results for the last cir
 group_metrics = { "groups": [],
     "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [], "avg_hf_fidelities": [],
     "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [], "avg_tr_n2qs": [],
-    "avg_exec_creating_times": [], "avg_exec_validating_times": [], "avg_exec_running_times": []
+    "avg_exec_creating_times": [], "avg_exec_validating_times": [], "avg_exec_running_times": [],
+    "job_ids": []
 }
 
 # Additional properties
@@ -157,6 +158,8 @@ def init_metrics ():
     group_metrics["avg_exec_validating_times"] = []
     group_metrics["avg_exec_running_times"] = []
     
+    group_metrics["job_ids"] = []
+    
     # store the start of execution for the current app
     start_time = time.time()
     print(f'... execution starting at {get_timestr()}')
@@ -224,6 +227,7 @@ def aggregate_metrics_for_group (group):
         group_exec_creating_time = 0
         group_exec_validating_time = 0
         group_exec_running_time = 0
+        group_job_ids = []
 
         # loop over circuits in group to generate totals
         for circuit in circuit_metrics[group]:
@@ -231,6 +235,8 @@ def aggregate_metrics_for_group (group):
             for metric in circuit_metrics[group][circuit]:
                 value = circuit_metrics[group][circuit][metric]
                 #print(f'{group} {circuit} {metric} -> {value}')
+                if metric == "job_id": group_job_ids.append(value)
+                
                 if metric == "create_time": group_create_time += value
                 if metric == "elapsed_time": group_elapsed_time += value
                 if metric == "exec_time": group_exec_time += value
@@ -266,6 +272,8 @@ def aggregate_metrics_for_group (group):
         
         # store averages in arrays structured for reporting and plotting by group
         group_metrics["groups"].append(group)
+        
+        group_metrics["job_ids"].append(group_job_ids)
         
         group_metrics["avg_create_times"].append(avg_create_time)
         group_metrics["avg_elapsed_times"].append(avg_elapsed_time)
