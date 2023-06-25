@@ -96,6 +96,11 @@ There you will have access to a cell for each of the benchmarks in the repositor
 
 Some benchmarks, such as MaxCut, include a notebook for running advanced tests, specifically the iterative execution of interleaved class/quantum code for a hybrid algorithm. See the instructions in the README for those benchmarks for procedures and options that are available. 
 
+## Executing the Application Benchmark Programs via the Qiskit Runner (Qiskit Environment only)
+
+It is possible to run the benchmarks from the top level directory in a generalized way on the command line 
+  [`Qiskit_Runner`](./_common/qiskit/README.md)
+
 ## Enabling Compiler Optimizations
 
 There is support provided within the Jupyter Notebook for the Qiskit versions of the benchmarks to enable certain compiler optimizations. In the first cell of the notebook there is a variable called `exec_options` where several of the built-in Qiskit compiler optimizations may be specified.

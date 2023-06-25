@@ -657,14 +657,18 @@ def polarization_fidelity(counts, correct_dist, thermal_dist=None):
 
     Polarization from: `https://arxiv.org/abs/2008.11294v1`
     """
-    # calculate fidelity via hellinger fidelity between correct distribution and our measured expectation values
+    
+    # get length of random key in correct_dist to find how many qubits measured
+    num_measured_qubits = len(list(correct_dist.keys())[0])
+    
+    # ensure that all keys in counts are zero padded to this length
+    counts = {k.zfill(num_measured_qubits): v for k, v in counts.items()}
+    
+    # calculate hellinger fidelity between measured expectation values and correct distribution
     hf_fidelity = hellinger_fidelity_with_expected(counts, correct_dist)
 
+    # if not provided, generate thermal dist based on number of qubits
     if thermal_dist == None:
-        # get length of random key in counts to find how many qubits measured
-        num_measured_qubits = len(list(counts.keys())[0])
-        
-        # generate thermal dist based on number of qubits
         thermal_dist = uniform_dist(num_measured_qubits)
 
     # set our fidelity rescaling value as the hellinger fidelity for a depolarized state
