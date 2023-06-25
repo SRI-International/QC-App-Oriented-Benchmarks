@@ -206,6 +206,7 @@ def set_execution_target(backend_id='qasm_simulator',
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
 
     # if a custom provider backend is given, use it ...
+    # in this case, the backend_id is an arbitrary identifier that shows up in plots
     if provider_backend != None:
         backend = provider_backend
     
@@ -213,6 +214,7 @@ def set_execution_target(backend_id='qasm_simulator',
     elif backend_id == 'qasm_simulator':
         backend = Aer.get_backend("qasm_simulator") 
 
+    # handle 'fake' backends here
     elif 'fake' in backend_id:
         backend = getattr(
             importlib.import_module(
@@ -223,24 +225,27 @@ def set_execution_target(backend_id='qasm_simulator',
         backend = backend()
         logger.info(f'Set {backend = }')   
 
-    # otherwise use the given backend_id to find the backend
+    # otherwise use the given provider and backend_id to find the backend
     else:
-        if provider_module_name and provider_name:
-            # if provider_module and provider_name is provided, assume a custom provider
+    
+        # if provider_module name and provider_name are provided, obtain a custom provider
+        if provider_module_name and provider_name:  
             provider = getattr(importlib.import_module(provider_module_name), provider_name)
             try:
-                # not all custom providers have the .stored_account() method
+                # try, since not all custom providers have the .stored_account() method
                 provider.load_account()
                 backend = provider.get_backend(backend_id)
             except:
                 print(authentication_error_msg.format(provider_name))
+                
+        # otherwise, assume the backend_id is given and assume it is IBMQ device
         else:
-            # otherwise, assume IBMQ
             if IBMQ.stored_account():
+            
                 # load a stored account
                 IBMQ.load_account()
 
-                #use sessions in here
+                # if use sessions, setup runtime service, Session, and Sampler
                 if use_sessions:
                     from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session
                     global service
@@ -250,15 +255,16 @@ def set_execution_target(backend_id='qasm_simulator',
                     backend = service.backend(backend_id)
                     session= Session(service=service, backend=backend_id)
                     sampler = Sampler(session=session)
-
-                else: #use provider
-                    # then create backend from selected provider
+                    
+                # otherwise, use provider and old style backend
+                # for IBM, create backend from IBMQ provider and given backend_id
+                else: 
                     provider = IBMQ.get_provider(hub=hub, group=group, project=project)
                     backend = provider.get_backend(backend_id)
             else:
                 print(authentication_error_msg.format("IBMQ"))
 
-    # create an informative device name
+    # create an informative device name for plots
     device_name = backend_id
     metrics.set_plot_subtitle(f"Device = {device_name}")
     #metrics.set_properties( { "api":"qiskit", "backend_id":backend_id } )
