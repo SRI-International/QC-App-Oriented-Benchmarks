@@ -41,6 +41,32 @@ from qiskit.providers.jobstatus import JobStatus
 from qiskit.providers.aer.noise import NoiseModel, ReadoutError
 from qiskit.providers.aer.noise import depolarizing_error, reset_error
 
+
+##########################
+# JOB MANAGEMENT VARIABLES 
+
+# these are defined globally currently, but will become class variables later
+
+#### these variables are currently accessed as globals from user code
+
+# determines whether to run with sessions
+use_sessions = False
+
+# maximum number of active jobs
+max_jobs_active = 5
+
+# job mode: False = wait, True = submit multiple jobs
+job_mode = False
+
+# Print progress of execution
+verbose = False
+
+# Print additional time metrics for each stage of execution
+verbose_time = False
+
+#### the following variables are accessed only through functions ...
+
+# logger for this module
 logger = logging.getLogger(__name__)
 
 # Use Aer qasm_simulator by default
@@ -49,14 +75,49 @@ backend = Aer.get_backend("qasm_simulator")
 # Execution options, passed to transpile method
 backend_exec_options = None
 
+# Create array of batched circuits and a dict of active circuits
+batched_circuits = []
+active_circuits = {}
+
 # Cached transpiled circuit, used for parameterized execution
 cached_circuits = {}
 
-#class BenchmarkResult is made for sessions runs. This is because
-#qiskit primitive job result instances don't have a get_counts method 
-#like backend results do. As such, a get counts method is calculated
-#from the quasi distributions and shots taken.
+# Configure a handler for processing circuits on completion
+# user-supplied result handler
+result_handler = None
+
+# Option to perform explicit transpile to collect depth metrics
+do_transpile_metrics = True
+
+# Option to perform transpilation prior to execution (disable to execute unmodified circuit)
+do_transpile_for_execute = True
+
+# Intercept function to post-process results
+result_processor = None
+width_processor = None
+
+# Selection of basis gate set for transpilation
+# Note: selector 1 is a hardware agnostic gate set
+basis_selector = 1
+basis_gates_array = [
+    [],
+    ['rx', 'ry', 'rz', 'cx'],       # a common basis set, default
+    ['cx', 'rz', 'sx', 'x'],        # IBM default basis set
+    ['rx', 'ry', 'rxx'],            # IonQ default basis set
+    ['h', 'p', 'cx'],               # another common basis set
+    ['u', 'cx']                     # general unitaries basis gates
+]
+
+
+#######################
+# SUPPORTING CLASSES
+
+# class BenchmarkResult is made for sessions runs. This is because
+# qiskit primitive job result instances don't have a get_counts method 
+# like backend results do. As such, a get counts method is calculated
+# from the quasi distributions and shots taken.
 class BenchmarkResult(object):
+
     def __init__(self, qiskit_result):
         super().__init__()
         self.qiskit_result = qiskit_result
@@ -68,10 +129,11 @@ class BenchmarkResult(object):
             counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])        
         return counts
 
+
 #####################
 # DEFAULT NOISE MODEL 
 
-# default noise model, can be overridden using set_noise_model
+# default noise model, can be overridden using set_noise_model()
 def default_noise_model():
 
     noise = NoiseModel()
@@ -104,53 +166,6 @@ def default_noise_model():
 
 noise = default_noise_model()
 
-##########################
-# JOB MANAGEMENT VARIABLES 
-
-# Create array of batched circuits and a dict of active circuits
-batched_circuits = []
-active_circuits = {}
-
-# determines whether to run with sessions
-use_sessions = False
-
-# maximum number of active jobs
-max_jobs_active = 5
-
-# Configure a handler for processing circuits on completion
-# user-supplied result handler
-result_handler = None
-
-# job mode: False = wait, True = submit multiple jobs
-job_mode = False
-
-# Print progress of execution
-verbose = False
-
-# Print additional time metrics for each stage of execution
-verbose_time = False
-
-# Option to perform explicit transpile to collect depth metrics
-do_transpile_metrics = True
-
-# Option to perform transpilation prior to execution (disable to execute unmodified circuit)
-do_transpile_for_execute = True
-
-# Intercept function to post-process results
-result_processor = None
-width_processor = None
-
-# Selection of basis gate set for transpilation
-# Note: selector 1 is a hardware agnostic gate set
-basis_selector = 1
-basis_gates_array = [
-    [],
-    ['rx', 'ry', 'rz', 'cx'],       # a common basis set, default
-    ['cx', 'rz', 'sx', 'x'],        # IBM default basis set
-    ['rx', 'ry', 'rxx'],            # IonQ default basis set
-    ['h', 'p', 'cx'],               # another common basis set
-    ['u', 'cx']                     # general unitaries basis gates
-]
 
 ######################################################################
 # INITIALIZATION METHODS
@@ -794,18 +809,23 @@ def job_complete(job):
         # counts = result.get_counts(qc)
         # print("Total counts are:", counts)
         
-        # obtain timing info from the results object
-
+        # if we are using sessions, structure of result object is different;
+        # use a BenchmarkResult object to hold session result and provide a get_counts()
+        # that returns counts to the benchmarks in the same form as without sessions
         if use_sessions:
             result = BenchmarkResult(result)
-            counts=result.get_counts()
+            #counts = result.get_counts()
+            
             actual_shots = result.metadata[0]['shots']
             result_obj = result.metadata[0]
             results_obj = result.metadata[0]
         else:
             result_obj = result.to_dict()
             results_obj = result.to_dict()['results'][0]
+            
             # get the actual shots and convert to int if it is a string
+            # DEVNOTE: this summation currently applies only to randomized compiling 
+            # and may cause problems with other use cases (needs review)
             actual_shots = 0
             for experiment in result_obj["results"]:
                 actual_shots += experiment["shots"]
@@ -814,12 +834,19 @@ def job_complete(job):
         #print(f"results_obj = {results_obj}")
         #print(f'shots = {results_obj["shots"]}')
 
+        # convert actual_shots to int if it is a string
         if type(actual_shots) is str:
             actual_shots = int(actual_shots)
         
+        # check for mismatch of requested shots and actual shots
         if actual_shots != active_circuit["shots"]:
             print(f'WARNING: requested shots not equal to actual shots: {active_circuit["shots"]} != {actual_shots} ')
-        
+            
+            # allow processing to continue, but use the requested shot count
+            actual_shots = active_circuit["shots"]
+            
+        # obtain timing info from the results object
+        # the data has been seen to come from both places below
         if "time_taken" in result_obj:
             exec_time = result_obj["time_taken"]
         
