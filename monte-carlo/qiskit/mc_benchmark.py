@@ -418,6 +418,7 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
         
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (input_size), max_circuits)
+        #print(num_circuits)
 
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
 
@@ -427,10 +428,14 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
         else:
             mu_range = [i/2**(input_size) for i in np.random.choice(2**(input_size), num_circuits, False)]
 
+        #print(mu_range)
+        
         # loop over limited # of mu values for this
         for mu in mu_range:
             target_dist = p_distribution(num_state_qubits, mu)
             f_to_estimate = functools.partial(f_of_X, num_state_qubits=num_state_qubits)
+            
+            #print(mu)
             
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
@@ -445,8 +450,8 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
             ex.submit_circuit(qc2, num_qubits, mu, num_shots)
 
             # if method is 2, we only have one type of circuit, so break out of loop
-            if method == 2:
-                break
+            #if method == 2:
+            #    break
         
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
