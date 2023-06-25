@@ -49,9 +49,6 @@ from qiskit.providers.aer.noise import depolarizing_error, reset_error
 
 #### these variables are currently accessed as globals from user code
 
-# determines whether to run with sessions
-use_sessions = False
-
 # maximum number of active jobs
 max_jobs_active = 5
 
@@ -65,6 +62,9 @@ verbose = False
 verbose_time = False
 
 #### the following variables are accessed only through functions ...
+
+# specify whether to execute using sessions (and currently using Sampler only)
+use_sessions = False
 
 # logger for this module
 logger = logging.getLogger(__name__)
@@ -535,6 +535,9 @@ def execute_circuit(circuit):
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_xi', qc_tr_xi)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_n2q', qc_tr_n2q)
 
+    # also store the job_id for future reference
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'job_id', job.job_id())
+    
     if verbose:
         print(f"... executing job {job.job_id()}")
     
