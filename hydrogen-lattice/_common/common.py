@@ -7,7 +7,6 @@
 import os
 import json
 import numpy as np
-from typing import TypedDict
 
 INSTANCE_DIR = "instances"
 
@@ -16,9 +15,6 @@ INSTANCE_DIR = "instances"
 # (second form used for Qiskit Runtime and similar systems)
 
 # DEVNOTE: change these as needed for VQE and hydrogen lattice
-
-# hamiltonian_dict =
-# problem_dict = TypedDict('Problem Information',
 
 
 def read_vqe_instance(file_path: str) -> dict:
@@ -52,7 +48,6 @@ def read_paired_instance(
         paired_hamiltonian_ops = list(paired_hamiltonian.keys())
         paired_hamiltonian_coeffs = list(paired_hamiltonian.values())
 
-        # get jordan wigner ops and coefficient lists
         return (
             paired_hamiltonian_ops,
             paired_hamiltonian_coeffs,
@@ -158,7 +153,7 @@ def read_puccd_solution(
         return (
             solution_method_names,
             solution_values,
-        )  # for now this is the doci and fci energies, length 2 list
+        )  # for now this is the doci and fci energies
 
     else:
         return None, None
