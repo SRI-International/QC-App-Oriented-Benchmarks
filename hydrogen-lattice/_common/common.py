@@ -17,21 +17,31 @@ INSTANCE_DIR = "instances"
 
 # DEVNOTE: change these as needed for VQE and hydrogen lattice
 
-#hamiltonian_dict = 
-#problem_dict = TypedDict('Problem Information', 
+# hamiltonian_dict =
+# problem_dict = TypedDict('Problem Information',
+
 
 def read_vqe_instance(file_path: str) -> dict:
-    """Genereates a dictionary containing JSON problem instance information."""
+    """Generate a dictionary containing JSON problem instance information."""
 
     with open(file_path, "r") as file:
         instance = json.load(file)
     return instance
 
 
-def read_paired_instance(file_path, _instances=None):
+def read_paired_instance(
+    file_path: str, _instances: dict | None = None
+) -> tuple[list[str], list[float]] | tuple[None, None]:
+    """Return the paired hamiltonian operators and their coefficients."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
-        return _instances.get(inst, {}).get("instance", (None, None,))
+        return _instances.get(inst, {}).get(
+            "instance",
+            (
+                None,
+                None,
+            ),
+        )
 
     if os.path.exists(file_path) and os.path.isfile(file_path):
         # read .json file
@@ -50,10 +60,20 @@ def read_paired_instance(file_path, _instances=None):
     else:
         return None, None
 
-def read_jw_instance(file_path, _instances=None):
+
+def read_jw_instance(
+    file_path: str, _instances: dict | None = None
+) -> tuple[list[str], list[float]] | tuple[None, None]:
+    """Return the Jordon Wigner hamiltonian operators and their coefficients."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
-        return _instances.get(inst, {}).get("instance", (None, None,))
+        return _instances.get(inst, {}).get(
+            "instance",
+            (
+                None,
+                None,
+            ),
+        )
 
     if os.path.exists(file_path) and os.path.isfile(file_path):
         # read .json file
@@ -69,12 +89,25 @@ def read_jw_instance(file_path, _instances=None):
             jordan_wigner_coeffs,
         )
     else:
-        return None, None,
+        return (
+            None,
+            None,
+        )
 
-def read_geometry_instance(file_path, _instances=None):
+
+def read_geometry_instance(
+    file_path: str, _instances: dict | None = None
+) -> tuple[np.ndarray, list[str]] | tuple[None, None]:
+    """Return geometry information from a file path. The xyz information is returned as a (n, 3) array."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
-        return _instances.get(inst, {}).get("instance", (None, None,))
+        return _instances.get(inst, {}).get(
+            "instance",
+            (
+                None,
+                None,
+            ),
+        )
 
     if os.path.exists(file_path) and os.path.isfile(file_path):
         # read .json file
@@ -82,29 +115,35 @@ def read_geometry_instance(file_path, _instances=None):
 
         # create a (n,3) array containing atomic lattice xyz positions
         atoms = instance["geometry"]["atoms"]
+
+        # form a (n,3) array. use the length of x pos. to get n
         xyz = np.zeros((len(instance["geometry"]["x"]), 3))
         xyz[:, 0] = instance["geometry"]["x"]
         xyz[:, 1] = instance["geometry"]["y"]
         xyz[:, 2] = instance["geometry"]["z"]
 
-        return (
-            xyz,
-            atoms
-        )
+        return (xyz, atoms)
     else:
-        return None, None,
+        return (
+            None,
+            None,
+        )
 
-def read_puccd_solution(file_path, _instances=None):
+
+def read_puccd_solution(
+    file_path: str, _instances: dict | None = None
+) -> tuple[list[str], list[float]] | tuple[None, None]:
+    """Return solution information from a file path. Information includes the method used to generate
+    the solution and also the numerical value of the solution itself."""
+
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
         return _instances.get(inst, {}).get("sol", (None))
 
     if os.path.exists(file_path) and os.path.isfile(file_path):
         with open(file_path, "r") as file:
-            # create an arbitrary length list to store solution data
-            # num_lines = len(file.readlines())
-            num_lines = 2  # for now just hardcode it to 2
-            solutions = np.zeros(num_lines)
+            solution_method_names = []
+            solution_values = []
 
             # go through file now and insert them into the list
             for index, line in enumerate(file):
@@ -113,27 +152,37 @@ def read_puccd_solution(file_path, _instances=None):
                 )  # remove leading/trailing whitespace and newline characters
                 if line:
                     name, number = line.split(":")
-                    solutions[index] = float(number.strip())
+                    solution_method_names.append(str(name.strip()))
+                    solution_values.append(number)
 
         return (
-            solutions.tolist()
+            solution_method_names,
+            solution_values,
         )  # for now this is the doci and fci energies, length 2 list
 
     else:
-        return None
+        return None, None
 
 
 # debugging line
 if __name__ == "__main__":
-    file_path = "instances/h2_chain_0.75.json"
-    print(
-        read_puccd_instance(
-            file_path,
+    file_path = "instances/h2_chain_0.75"
+
+    print(f"File is named {file_path}")
+
+    methods_to_print = [read_paired_instance, read_jw_instance]
+
+    for method in methods_to_print:
+        print(f"printing {method.__name__}:")
+
+        print(
+            method(
+                file_path + ".json",
+            )
         )
-    )
-    file_path = "instances/h2_chain_0.75.sol"
+
     print(
         read_puccd_solution(
-            file_path,
+            file_path + ".sol",
         )
     )
