@@ -7,6 +7,7 @@
 import os
 import json
 import numpy as np
+from typing import TypedDict
 
 INSTANCE_DIR = "instances"
 
@@ -16,17 +17,21 @@ INSTANCE_DIR = "instances"
 
 # DEVNOTE: change these as needed for VQE and hydrogen lattice
 
+#hamiltonian_dict = 
+#problem_dict = TypedDict('Problem Information', 
 
-def read_vqe_instance(file_path):
+def read_vqe_instance(file_path: str) -> dict:
+    """Genereates a dictionary containing JSON problem instance information."""
+
     with open(file_path, "r") as file:
         instance = json.load(file)
     return instance
 
 
-def read_puccd_instance(file_path, _instances=None):
+def read_paired_instance(file_path, _instances=None):
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
-        return _instances.get(inst, {}).get("instance", (None, None, None))
+        return _instances.get(inst, {}).get("instance", (None, None,))
 
     if os.path.exists(file_path) and os.path.isfile(file_path):
         # read .json file
@@ -38,9 +43,42 @@ def read_puccd_instance(file_path, _instances=None):
         paired_hamiltonian_coeffs = list(paired_hamiltonian.values())
 
         # get jordan wigner ops and coefficient lists
+        return (
+            paired_hamiltonian_ops,
+            paired_hamiltonian_coeffs,
+        )
+    else:
+        return None, None
+
+def read_jw_instance(file_path, _instances=None):
+    if isinstance(_instances, dict):
+        inst = os.path.splitext(os.path.basename(file_path))[0]
+        return _instances.get(inst, {}).get("instance", (None, None,))
+
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        # read .json file
+        instance = read_vqe_instance(file_path)
+
+        # get jordan wigner ops and coefficient lists
         jordan_wigner_hamiltonian = instance["jordan_wigner_hamiltonian"]
         jordan_wigner_ops = list(jordan_wigner_hamiltonian.keys())
         jordan_wigner_coeffs = list(jordan_wigner_hamiltonian.values())
+
+        return (
+            jordan_wigner_ops,
+            jordan_wigner_coeffs,
+        )
+    else:
+        return None, None,
+
+def read_geometry_instance(file_path, _instances=None):
+    if isinstance(_instances, dict):
+        inst = os.path.splitext(os.path.basename(file_path))[0]
+        return _instances.get(inst, {}).get("instance", (None, None,))
+
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        # read .json file
+        instance = read_vqe_instance(file_path)
 
         # create a (n,3) array containing atomic lattice xyz positions
         atoms = instance["geometry"]["atoms"]
@@ -51,15 +89,10 @@ def read_puccd_instance(file_path, _instances=None):
 
         return (
             xyz,
-            atoms,
-            jordan_wigner_ops,
-            jordan_wigner_coeffs,
-            paired_hamiltonian_ops,
-            paired_hamiltonian_coeffs,
+            atoms
         )
     else:
-        return None, None, None, None, None, None
-
+        return None, None,
 
 def read_puccd_solution(file_path, _instances=None):
     if isinstance(_instances, dict):
