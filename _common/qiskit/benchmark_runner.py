@@ -108,9 +108,10 @@ if __name__ == "__main__":
     
     # Provider detail update using provider module name and class name
     if args.provider_module_name is not None and args.provider_class_name is not None:
-        provider_class = getattr(importlib.import_module(args.provider_module_name), args.provider_name)
-        provider = provider_class.get_backend(args.backend_id)
-        args.provider_backend = provider
+        provider_class = getattr(importlib.import_module(args.provider_module_name), args.provider_class_name)
+        provider = provider_class()
+        provider_backend = provider.get_backend(args.backend_id)
+        args.provider_backend = provider_backend
      
     algorithm = args.algorithm
 
