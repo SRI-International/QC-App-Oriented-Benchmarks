@@ -58,9 +58,9 @@ def balanced_oracle(input_size, num_qubits):
     for qubit in range(input_size):
         if b_str[qubit] == '1':
             qc.append(cirq.X(qr[qubit]))
-
+            
     for qubit in range(input_size):
-        qc.append(cirq.CX(control=qr[qubit], target=qr[input_size]))
+        qc.append(cirq.CX(qr[qubit], qr[input_size]))
 
     for qubit in range(input_size):
         if b_str[qubit] == '1':
@@ -175,7 +175,7 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1):
-    
+            
         input_size = num_qubits - 1
         
         # determine number of circuits to execute for this group

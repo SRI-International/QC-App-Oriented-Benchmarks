@@ -3,15 +3,14 @@ This script is an example illustrating the process of estimating the accuracy of
 The script simulates hydrogen chains of different lengths (num_qubits), constructs the corresponding pUCCD circuits, and then computes their expectation values using a noiseless simulation.
 """
 import sys
-sys.path[1:1] = [ "Dev", "hydrogen-lattice/Dev" ]
-sys.path[1:1] = [ "../../Dev", "../../Dev", "../../hydrogen-lattice/Dev/" ]
+
+sys.path[1:1] = ["Dev", "hydrogen-lattice/Dev"]
+sys.path[1:1] = ["../../Dev", "../../Dev", "../../hydrogen-lattice/Dev/"]
 
 import numpy as np
-import ansatz,simulator
-from ansatz import PUCCD 
-from simulator import Simulator 
-
-
+import ansatz, simulator
+from ansatz import PUCCD
+from simulator import Simulator
 
 # Create an instance of the Simulator class for noiseless simulations
 ideal_backend = Simulator()
@@ -40,13 +39,11 @@ for num_qubits in range(2, 5):
         inplace=True,
     )
 
-    # Generate a mock Hamiltonian for the pUCCD algorithm. In a real-world scenario, you would replace this with a 
+    # Generate a mock Hamiltonian for the pUCCD algorithm. In a real-world scenario, you would replace this with a
     # Hamiltonian from a physical system or from a pre-generated file.
     operator = puccd.generate_mock_hamiltonian(num_qubits)
 
     # Compute and print the expectation value of the circuit with respect to the Hamiltonian,
     # using the noiseless backend
-    ideal_energy = ideal_backend.compute_expectation(
-        circuit, operator=operator, shots=shots
-    )
+    ideal_energy = ideal_backend.compute_expectation(circuit, operator=operator, shots=shots)
     print(ideal_energy)

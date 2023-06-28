@@ -95,9 +95,7 @@ class PUCCD(object):
                     ]:
                         add_term(label_str)
                         added_terms.add(label_str)
-                    elif (
-                        all([x in ("I", "X") for x in label]) and label.count("X") == 2
-                    ):
+                    elif all([x in ("I", "X") for x in label]) and label.count("X") == 2:
                         coeff = np.random.uniform(0, 0.05)  # from hydrogen chain
                         add_term(label_str, coeff)
                         added_terms.add(label_str)
@@ -134,9 +132,7 @@ class PUCCD(object):
             The constructed quantum circuit for the pUCCD ansatz.
         """
         if num_occ_pairs is None:
-            self.num_occ_pairs = (
-                num_qubits // 2
-            )  # e.g., half-filling, which is a reasonable chemical case
+            self.num_occ_pairs = num_qubits // 2  # e.g., half-filling, which is a reasonable chemical case
 
         # do all possible excitations if not passed a list of excitations directly
         excitation_pairs = []
