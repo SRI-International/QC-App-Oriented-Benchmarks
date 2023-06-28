@@ -6,8 +6,9 @@
 
 import os
 import json
+import numpy as np
 
-INSTANCE_DIR = 'instances'
+INSTANCE_DIR = "instances"
 
 # Utility functions for processing Max-Cut data files
 # If _instances is None, read from data file.  If a dict, extract from a named field
@@ -15,77 +16,170 @@ INSTANCE_DIR = 'instances'
 
 # DEVNOTE: change these as needed for VQE and hydrogen lattice
 
-def read_maxcut_instance(file_path, _instances=None):
 
+def read_vqe_instance(file_path: str) -> dict:
+    """Generate a dictionary containing JSON problem instance information."""
+
+    with open(file_path, "r") as file:
+        instance = json.load(file)
+    return instance
+
+
+def read_paired_instance(
+    file_path: str, _instances: dict | None = None
+) -> tuple[list[str], list[float]] | tuple[None, None]:
+    """Return the paired hamiltonian operators and their coefficients."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
-        return _instances.get(inst, {}).get("instance", (None, None))
-        
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        with open(file_path, 'r') as file:
-            nodes = int(file.readline())
-            edges = []
-            for line in file.readlines():
-                parts = line.split()
-                edges.append((int(parts[0]), int(parts[1])))
+        return _instances.get(inst, {}).get(
+            "instance",
+            (
+                None,
+                None,
+            ),
+        )
 
-        return nodes, edges
-        
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        # read .json file
+        instance = read_vqe_instance(file_path)
+
+        # get paired hamiltonian ops and coefficient lists
+        paired_hamiltonian = instance["paired_hamiltonian"]
+        paired_hamiltonian_ops = list(paired_hamiltonian.keys())
+        paired_hamiltonian_coeffs = list(paired_hamiltonian.values())
+
+        return (
+            paired_hamiltonian_ops,
+            paired_hamiltonian_coeffs,
+        )
     else:
         return None, None
 
-def read_maxcut_solution(file_path, _instances=None):
+
+def read_jw_instance(
+    file_path: str, _instances: dict | None = None
+) -> tuple[list[str], list[float]] | tuple[None, None]:
+    """Return the Jordon Wigner hamiltonian operators and their coefficients."""
+    if isinstance(_instances, dict):
+        inst = os.path.splitext(os.path.basename(file_path))[0]
+        return _instances.get(inst, {}).get(
+            "instance",
+            (
+                None,
+                None,
+            ),
+        )
+
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        # read .json file
+        instance = read_vqe_instance(file_path)
+
+        # get jordan wigner ops and coefficient lists
+        jordan_wigner_hamiltonian = instance["jordan_wigner_hamiltonian"]
+        jordan_wigner_ops = list(jordan_wigner_hamiltonian.keys())
+        jordan_wigner_coeffs = list(jordan_wigner_hamiltonian.values())
+
+        return (
+            jordan_wigner_ops,
+            jordan_wigner_coeffs,
+        )
+    else:
+        return (
+            None,
+            None,
+        )
+
+
+def read_geometry_instance(
+    file_path: str, _instances: dict | None = None
+) -> tuple[np.ndarray, list[str]] | tuple[None, None]:
+    """Return geometry information from a file path. The xyz information is returned as a (n, 3) array."""
+    if isinstance(_instances, dict):
+        inst = os.path.splitext(os.path.basename(file_path))[0]
+        return _instances.get(inst, {}).get(
+            "instance",
+            (
+                None,
+                None,
+            ),
+        )
+
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        # read .json file
+        instance = read_vqe_instance(file_path)
+
+        # create a (n,3) array containing atomic lattice xyz positions
+        atoms = instance["geometry"]["atoms"]
+
+        # form a (n,3) array. use the length of x pos. to get n
+        xyz = np.zeros((len(instance["geometry"]["x"]), 3))
+        xyz[:, 0] = instance["geometry"]["x"]
+        xyz[:, 1] = instance["geometry"]["y"]
+        xyz[:, 2] = instance["geometry"]["z"]
+
+        return (xyz, atoms)
+    else:
+        return (
+            None,
+            None,
+        )
+
+
+def read_puccd_solution(
+    file_path: str, _instances: dict | None = None
+) -> tuple[list[str], list[float]] | tuple[None, None]:
+    """Return solution information from a file path. Information includes the method used to generate
+    the solution and also the numerical value of the solution itself."""
 
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
-        return _instances.get(inst, {}).get("sol", (None, None))
-        
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        with open(file_path, 'r') as file:
-            objective = int(file.readline())
-            solution = [int(v) for v in file.readline().split()]
+        return _instances.get(inst, {}).get("sol", (None))
 
-        return objective, solution
-    
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        with open(file_path, "r") as file:
+            solution_method_names = []
+            solution_values = []
+
+            # go through file now and insert them into the list
+            for index, line in enumerate(file):
+                line = (
+                    line.strip()
+                )  # remove leading/trailing whitespace and newline characters
+                if line:
+                    name, number = line.split(":")
+                    solution_method_names.append(str(name.strip()))
+                    solution_values.append(number)
+
+        return (
+            solution_method_names,
+            solution_values,
+        )  # for now this is the doci and fci energies
+
     else:
         return None, None
 
-def eval_cut(nodes, edges, solution, reverseStep = 1):
-    assert(nodes == len(solution))
-    solution = solution[::reverseStep] # If reverseStep is -1, the solution string is reversed before evaluating the cut size
-    cut_size = 0
-    for i,j in edges:
-        if solution[i] != solution[j]:
-            cut_size += 1
 
-    return cut_size
+# debugging line
+if __name__ == "__main__":
+    file_path = "instances/h2_chain_0.75"
 
-# Load from given filename and return a list of lists
-# containing fixed angles (betas, gammas) for multiple degrees and rounds
-def read_fixed_angles(file_path, _instances=None):
+    print(f"File is named {file_path}. Now test printing some common.py functions.")
 
-    if isinstance(_instances, dict):
-        #inst = os.path.splitext(os.path.basename(file_path))[0]
-        #return _instances.get(inst, {}).get("fixed_angles", (None, None))
-        return _instances.get("fixed_angles", (None, None))
+    methods_to_print = [read_paired_instance, read_jw_instance]
 
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        with open(file_path, 'r') as json_file:
-        
-            # 'thetas_array', 'approx_ratio_list', 'num_qubits_list
-            fixed_angles = json.load(json_file)
+    for method in methods_to_print:
+        print(f"printing {method.__name__} hamiltonian information:")
 
-        return fixed_angles
-    
-    else:
-        return None
+        print(
+            method(
+                file_path + ".json",
+            )
+        )
 
-# return the thetas array containing betas and gammas for specific degree and rounds     
-def get_fixed_angles_for(fixed_angles, degree, rounds):
+    print("now printing solution information:")
 
-    if str(degree) in fixed_angles and str(rounds) in fixed_angles[str(degree)]:
-        param_pairs = fixed_angles[str(degree)][str(rounds)]
-        return [param_pairs['beta'] + param_pairs['gamma']]
-    else:
-        return None 
-        
+    print(
+        read_puccd_solution(
+            file_path + ".sol",
+        )
+    )
