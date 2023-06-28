@@ -40,15 +40,17 @@ def as_xyz(atoms, xyz, description="\n"):
     pretty_xyz = str(n) + "\n"
     pretty_xyz += description
     for i in range(n):
-        pretty_xyz += "{0:s} {1:10.4f} {2:10.4f} {3:10.4f}\n".format(atoms[i], xyz[i, 0], xyz[i, 1], xyz[i, 2])
+        pretty_xyz += "{0:s} {1:10.4f} {2:10.4f} {3:10.4f}\n".format(
+            atoms[i], xyz[i, 0], xyz[i, 1], xyz[i, 2]
+        )
 
     return pretty_xyz
 
 
-def molecule_to_hamiltonian(
+def molecule_to_problem(
     atoms: list[str],
     xyz: np.ndarray,
-) -> ElectronicEnergy:
+) -> ElectronicEnergyProblem:
     """
     Creates an ElectronicEnergy object corresponding to a list of atoms and xyz positions.
 
@@ -63,7 +65,7 @@ def molecule_to_hamiltonian(
     quantum_molecule = molecule_driver.run()
 
     # acquire fermionic hamiltonian
-    return quantum_molecule.hamiltonian
+    return quantum_molecule
 
 
 def generate_jordan_wigner_hamiltonian(hamiltonian: ElectronicEnergy) -> PauliSumOp:
@@ -80,7 +82,10 @@ def generate_jordan_wigner_hamiltonian(hamiltonian: ElectronicEnergy) -> PauliSu
 
     # hamiltonian does not include scalar nuclear energy constant, so we add it back here for consistency in benchmarks
     qubit_hamiltonian += PauliSumOp(
-        SparsePauliOp("I" * qubit_hamiltonian.num_qubits, coeffs=hamiltonian.nuclear_repulsion_energy)
+        SparsePauliOp(
+            "I" * qubit_hamiltonian.num_qubits,
+            coeffs=hamiltonian.nuclear_repulsion_energy,
+        )
     )
     return qubit_hamiltonian.reduce()
 
@@ -91,7 +96,9 @@ def generate_paired_qubit_hamiltonian(hamiltonian: ElectronicEnergy) -> PauliSum
     """
 
     one_body_integrals = hamiltonian.electronic_integrals.alpha["+-"]
-    two_body_integrals = hamiltonian.electronic_integrals.alpha["++--"].transpose((0, 3, 2, 1))
+    two_body_integrals = hamiltonian.electronic_integrals.alpha["++--"].transpose(
+        (0, 3, 2, 1)
+    )
     core_energy = hamiltonian.nuclear_repulsion_energy
 
     num_orbitals = len(one_body_integrals)
@@ -127,17 +134,43 @@ def generate_paired_qubit_hamiltonian(hamiltonian: ElectronicEnergy) -> PauliSum
     # loop to create paired electron Hamiltonian
     # last term is from p = p case in (I - Zp) * (I - Zp)* (pp|qq)
     gpq = (
-        one_body_integrals - 0.5 * np.einsum("prrq->pq", two_body_integrals) + np.einsum("ppqq->pq", two_body_integrals)
+        one_body_integrals
+        - 0.5 * np.einsum("prrq->pq", two_body_integrals)
+        + np.einsum("ppqq->pq", two_body_integrals)
     )
     for p in range(num_orbitals):
         terms.append((I(), gpq[p, p]))
         terms.append((Z(p), -gpq[p, p]))
         for q in range(num_orbitals):
             if p != q:
-                terms.append((I(), 0.5 * two_body_integrals[p, p, q, q] + 0.25 * two_body_integrals[p, q, q, p]))
-                terms.append((Z(p), -0.5 * two_body_integrals[p, p, q, q] - 0.25 * two_body_integrals[p, q, q, p]))
-                terms.append((Z(q), -0.5 * two_body_integrals[p, p, q, q] + 0.25 * two_body_integrals[p, q, q, p]))
-                terms.append((ZZ(p, q), 0.5 * two_body_integrals[p, p, q, q] - 0.25 * two_body_integrals[p, q, q, p]))
+                terms.append(
+                    (
+                        I(),
+                        0.5 * two_body_integrals[p, p, q, q]
+                        + 0.25 * two_body_integrals[p, q, q, p],
+                    )
+                )
+                terms.append(
+                    (
+                        Z(p),
+                        -0.5 * two_body_integrals[p, p, q, q]
+                        - 0.25 * two_body_integrals[p, q, q, p],
+                    )
+                )
+                terms.append(
+                    (
+                        Z(q),
+                        -0.5 * two_body_integrals[p, p, q, q]
+                        + 0.25 * two_body_integrals[p, q, q, p],
+                    )
+                )
+                terms.append(
+                    (
+                        ZZ(p, q),
+                        0.5 * two_body_integrals[p, p, q, q]
+                        - 0.25 * two_body_integrals[p, q, q, p],
+                    )
+                )
                 terms.append((XX(p, q), 0.25 * two_body_integrals[p, q, p, q]))
                 terms.append((YY(p, q), 0.25 * two_body_integrals[p, q, p, q]))
 
@@ -162,6 +195,16 @@ def make_pauli_dict(hamiltonian):
     return pauli_dict
 
 
+def make_energy_orbital_dict(hamiltonian):
+    d = {
+        "hf energy": hamiltonian.reference_energy,
+        "nuclear repulsion energy": hamiltonian.nuclear_repulsion_energy,
+        "spatial orbitals": hamiltonian.num_spatial_orbitals,
+        "alpha electrons": hamiltonian.num_alpha,
+        "beta electrons": hamiltonian.num_beta,
+    }
+
+
 if __name__ == "__main__":
     """
     generate various hydrogen lattice pUCCD hamiltonians
@@ -177,15 +220,25 @@ if __name__ == "__main__":
                 # print to console the lattice info
                 print(as_xyz(atoms, xyz, description))
                 # create hamiltonian from lattice info
-                fermionic_hamiltonian = molecule_to_hamiltonian(atoms, xyz)
+                electronic_problem = molecule_to_problem(atoms, xyz)
+
+                fermionic_hamiltonian = electronic_problem.hamiltonian
+
+                # generate information on number of orbitals and nuclear + HF energies
+                orbital_energy_info = make_energy_orbital_dict(electronic_problem)
 
                 # generate hamiltonian in paired basis (i.e., hard-core boson)
-                paired_hamiltonian = make_pauli_dict(generate_paired_qubit_hamiltonian(fermionic_hamiltonian))
+                paired_hamiltonian = make_pauli_dict(
+                    generate_paired_qubit_hamiltonian(fermionic_hamiltonian)
+                )
 
                 # generate hamiltonian in spin-orbital (Jordan-Wigner) basis
-                jordan_wigner_hamiltonian = make_pauli_dict(generate_jordan_wigner_hamiltonian(fermionic_hamiltonian))
+                jordan_wigner_hamiltonian = make_pauli_dict(
+                    generate_jordan_wigner_hamiltonian(fermionic_hamiltonian)
+                )
 
                 # begin JSON file creation
+                # this JSON file format can be changed to add/remove categories in the future
                 d = {
                     "geometry": {
                         "atoms": atoms,
@@ -193,8 +246,11 @@ if __name__ == "__main__":
                         "y": xyz[:, 1].tolist(),
                         "z": xyz[:, 2].tolist(),
                     },
-                    "paired_hamiltonian": paired_hamiltonian,
-                    "jordan_wigner_hamiltonian": jordan_wigner_hamiltonian,
+                    "hamiltonians": {
+                        "paired_hamiltonian": paired_hamiltonian,
+                        "jordan_wigner_hamiltonian": jordan_wigner_hamiltonian,
+                    },
+                    "orbital info": orbital_energy_info,
                 }
                 with open(file_name, "w") as f:
                     json.dump(d, f, indent=4)
