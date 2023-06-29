@@ -158,28 +158,3 @@ def read_puccd_solution(
     else:
         return None, None
 
-
-# debugging line
-if __name__ == "__main__":
-    file_path = "instances/h2_chain_0.75"
-
-    print(f"File is named {file_path}. Now test printing some common.py functions.")
-
-    methods_to_print = [read_paired_instance, read_jw_instance]
-
-    for method in methods_to_print:
-        print(f"printing {method.__name__} hamiltonian information:")
-
-        print(
-            method(
-                file_path + ".json",
-            )
-        )
-
-    print("now printing solution information:")
-
-    print(
-        read_puccd_solution(
-            file_path + ".sol",
-        )
-    )
