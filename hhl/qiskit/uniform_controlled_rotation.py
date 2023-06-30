@@ -84,21 +84,29 @@ def uni_con_rot_recursive_step(qc, qubits, anc, theta):
     
     return qc
     
+def uniformly_controlled_rot(n, theta):
+    qubits = QuantumRegister(n)
+    anc_reg = QuantumRegister(1)
+    qc = QuantumCircuit(qubits, anc_reg, name = 'INV_ROT')
+    qc = uni_con_rot_recursive_step(qc, qubits, anc_reg, theta)
+    qc.cx(qubits[0], anc_reg[0])
 
-def uniformly_controlled_rot(qc, qubits, anc, theta):
-    """
-    
-    qc : qiskit QuantumCircuit object
-    qubits : qiskit QuantumRegister object
-    anc : ancilla qubit register on which rotation acts
-    theta : list of angles specifying rotations for 0, ..., 2^(n-1)
-    
-    """
-    
-    qc = uni_con_rot_recursive_step(qc, qubits, anc, theta)
-    qc.cx(qubits[0], anc[0])
-    
     return qc
+
+
+# def uniformly_controlled_rot(qc, qubits, anc, theta):
+#     """
+    
+#     qc : qiskit QuantumCircuit object
+#     qubits : qiskit QuantumRegister object
+#     anc : ancilla qubit register on which rotation acts
+#     theta : list of angles specifying rotations for 0, ..., 2^(n-1)
+    
+#     """
+#     qc = uni_con_rot_recursive_step(qc, qubits, anc, theta)
+#     qc.cx(qubits[0], anc[0])
+    
+#     return qc
 
 
 def test_circuit(n):

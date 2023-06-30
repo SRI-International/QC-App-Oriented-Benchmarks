@@ -16,6 +16,7 @@ from qiskit import Aer, execute
 
 import sparse_Ham_sim as shs
 import uniform_controlled_rotation as ucr
+import unicodeit
 
 # include QFT in this list, so we can refer to the QFT sub-circuit definition
 #sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
@@ -42,6 +43,8 @@ U_ = None
 UI_ = None
 QFT_ = None
 QFTI_ = None
+HP_ = None
+INVROT_ = None
 
 
 ############### Circuit Definitions 
@@ -93,8 +96,8 @@ def IQFT(qc, qreg):
     n = int(qreg.size)
     
     for i in reversed(range(n)):
-        for j in range(i+1,n):
-            phase = -pi/2**(j-i)
+        for j in range(i+1,n): 
+            phase = -pi/2**(j-i) 
             qc.cp(phase, qreg[i], qreg[j])
         qc.h(qreg[i])
     
@@ -125,7 +128,7 @@ def inv_qft_gate(input_size, method=1):
     #global QFT_
     qr = QuantumRegister(input_size);
     #qc = QuantumCircuit(qr, name="qft")
-    qc = QuantumCircuit(qr, name="QFT†")
+    qc = QuantumCircuit(qr, name="IQFT")
     
     if method == 1:
     
@@ -142,7 +145,7 @@ def inv_qft_gate(input_size, method=1):
                     divisor = 2 ** (num_crzs - j)
                     #qc.crz( math.pi / divisor , qr[hidx], qr[input_size - j - 1])
                     ##qc.crz( -np.pi / divisor , qr[hidx], qr[input_size - j - 1])
-                    qc.cu1(-np.pi / divisor, qr[hidx], qr[input_size - j - 1]);
+                    qc.cp(-np.pi / divisor, qr[hidx], qr[input_size - j - 1]);
                 
             # followed by an H gate (applied to all qubits)
             qc.h(qr[hidx])
@@ -157,7 +160,6 @@ def inv_qft_gate(input_size, method=1):
         
     qc.barrier()
     
-        
     return qc
 
 ############### Inverse QFT Circuit
@@ -186,7 +188,7 @@ def qft_gate(input_size, method=1):
                     divisor = 2 ** (num_crzs - j)
                     #qc.crz( -math.pi / divisor , qr[hidx], qr[input_size - j - 1])
                     ##qc.crz( np.pi / divisor , qr[hidx], qr[input_size - j - 1])
-                    qc.cu1( np.pi / divisor , qr[hidx], qr[input_size - j - 1])
+                    qc.cp( np.pi / divisor , qr[hidx], qr[input_size - j - 1])
     
     elif method == 2:
         # apply QFT to register
@@ -197,7 +199,7 @@ def qft_gate(input_size, method=1):
                 qc.cp(phase, qr[i], qr[j])
                 
     qc.barrier()   
-        
+
     return qc
 
  
@@ -442,9 +444,36 @@ def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
     
         # measure the input, which now contains the answer
         qc.measure(input_qubits, measurement[1])
-    
 
+    
+    # # save smaller circuit example for display
+    # global QC_, U_, UI_, QFT_, QFTI_
+    # if QC_ == None or num_qubits <= 6:
+    #     if num_qubits < 9: 
+    #         QC_ = qc
+    # if U_ == None or num_qubits <= 6:    
+    #     _, U_ = ctrl_u(1)
+    #     #U_ = ctrl_u(np.pi/2, 2, 0, 1)
+        
+    # if UI_ == None or num_qubits <= 6:    
+    #     _, UI_ = ctrl_ui(1)
+    #     #UI_ = ctrl_ui(np.pi/2, 2, 0, 1)
+        
+    # if QFT_ == None or num_qubits <= 5:
+    #     if num_qubits < 9: QFT_ = qft_gate(len(clock))
+    # if QFTI_ == None or num_qubits <= 5:
+    #     if num_qubits < 9: QFTI_ = inv_qft_gate(len(clock))
+    
     # return a handle on the circuit
+    return qc
+
+def hamiltonian_phase(n_t):
+    qr_t = QuantumRegister(n_t)
+    qc = QuantumCircuit(qr_t, name = 'H⊗n' )
+    # Hadamard phase estimation register
+    for q in range(n_t):
+        qc.h(qr_t[q])
+
     return qc
 
 
@@ -455,6 +484,9 @@ def make_circuit(A, b, num_clock_qubits):
         b (int): between 0,...,2^n-1. Initial basis state |b>
     """
     
+    # save smaller circuit example for display
+    global QC_, U_, UI_, QFT_, QFTI_, HP_, INVROT_
+
     # read in number of qubits
     N = len(A)
     n = int(np.log2(N))
@@ -476,18 +508,42 @@ def make_circuit(A, b, num_clock_qubits):
     # initialize the |b> state
     qc = initialize_state(qc, qr, b)
     
+    qc.barrier()
+
     # Hadamard phase estimation register
-    for q in range(n_t):
-        qc.h(qr_t[q])
+    qc_hp = hamiltonian_phase(n_t)
+    qc.append(qc_hp, qr_t)
+
+    if HP_ == None:
+        HP_ = qc_hp
+
+    qc.barrier()
         
     # perform controlled e^(i*A*t)
     for q in range(n_t):
         control = qr_t[q]
+        anc = qr_a[0]
         phase = -(2*pi)*2**q  
-        qc = shs.control_Ham_sim(qc, A, phase, control, qr, qr_b, qr_a[0])
-    
+        qc_u = shs.control_Ham_sim(n, A, phase)
+        if phase <= 0:
+            qc_u.name = "e^{" + str(q) + "iAt}"
+        else:
+            qc_u.name = "e^{-" + str(q) + "iAt}"
+        if U_ == None:
+            U_ = qc_u
+        qc.append(qc_u, qr[0:len(qr)] + qr_b[0:len(qr_b)] + [control] + [anc])
+
+    qc.barrier()
     # inverse QFT
-    qc = IQFT(qc, qr_t)
+    #qc = IQFT(qc, qr_t)
+
+    qc_qfti = inv_qft_gate(n_t, method=2)
+    qc.append(qc_qfti, qr_t)
+
+    if QFTI_ == None:
+        QFTI_ = qc_qfti
+
+    qc.barrier()
     
     # reset ancilla
     qc.reset(qr_a[0])
@@ -504,29 +560,56 @@ def make_circuit(A, b, num_clock_qubits):
     theta = ucr.alpha2theta(alpha)
         
     # do inversion step and measure ancilla
-    qc = ucr.uniformly_controlled_rot(qc, qr_t, qr_a, theta)
+
+
+    INVROT_ = ucr.uniformly_controlled_rot(n_t, theta)
+    qc.append(INVROT_, qr_t[0:len(qr_t)] + [qr_a[0]])
     qc.measure(qr_a[0], cr_a[0])
     qc.reset(qr_a[0])
-    
 
     # QFT
-    qc = QFT(qc, qr_t)
+    #qc = QFT(qc, qr_t)
+
+    qc.barrier()
+
+    qc_qft = qft_gate(n_t, method=2)
+    qc.append(qc_qft, qr_t)
+
+    if QFT_ == None:
+        QFT_ = qc_qft
+    qc.barrier()
     
     # uncompute phase estimation
     # perform controlled e^(-i*A*t)
     for q in reversed(range(n_t)):
         control = qr_t[q]
         phase = (2*pi)*2**q  
-        qc = shs.control_Ham_sim(qc, A, phase, control, qr, qr_b, qr_a[0])
+        qc_ui = shs.control_Ham_sim(n, A, phase)
+        if phase <= 0:
+            qc_ui.name = "e^{" + str(q) + "iAt}"
+        else:
+            qc_ui.name = "e^{-" + str(q) + "iAt}"
+        if UI_ == None:
+            UI_ = qc_ui
+        qc.append(qc_ui, qr[0:len(qr)] + qr_b[0:len(qr_b)] + [control] + [anc])
+
+    qc.barrier()
     
+
     # Hadamard phase estimation register
-    for q in range(n_t):
-        qc.h(qr_t[q])
+    qc_hp = hamiltonian_phase(n_t)
+    qc.append(qc_hp, qr_t)
+
+    if HP_ == None:
+        HP_ = qc_hp
     
     # measure ancilla and main register
     qc.barrier()
     qc.measure(qr[0:], cr[0:])
-    
+
+    if QC_ == None:
+        QC_ = qc
+
     return qc
 
 
@@ -658,11 +741,45 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
 
 ################ Benchmark Loop
 
-# Execute program with default parameters
-def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2, 
-        max_clock_qubits=3, max_circuits=3, num_shots=100, 
+def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
+        method = 1, 
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
+    
+
+        max_qubits = max(6, max_qubits)
+        min_qubits = min(max(4, min_qubits), max_qubits)
+
+        min_input_qubits = min_qubits//2
+        if min_qubits%2 == 1:
+            min_clock_qubits = min_qubits//2 + 1
+        else:
+            min_clock_qubits = min_qubits//2
+
+        max_input_qubits = max_qubits//2
+        if max_qubits%2 == 1:
+            max_clock_qubits = max_qubits//2 + 1
+        else:
+            max_clock_qubits = max_qubits//2
+
+        return run(min_input_qubits, max_input_qubits, min_clock_qubits, 
+        max_clock_qubits, max_circuits, num_shots, 
+        backend_id, provider_backend,
+        hub, group, project, exec_options)
+
+
+# Execute program with default parameters
+def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2, 
+        max_clock_qubits=3, max_circuits=3, num_shots=100,
+        backend_id='qasm_simulator', provider_backend=None,
+        hub="ibm-q", group="open", project="main", exec_options=None):
+    
+
+    min_input_qubits= min(max(1, min_input_qubits), max_input_qubits)
+    max_input_qubits=max(3, max_input_qubits)
+    min_clock_qubits= min(max(2, min_clock_qubits), max_clock_qubits)
+    max_clock_qubits= max(3, max_clock_qubits)
+
 
     print("HHL Benchmark Program - Qiskit")
     
@@ -737,12 +854,14 @@ def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2,
     ex.finalize_execution(metrics.finalize_group)
 
     # print a sample circuit
-    #print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
-    #print("\nU Circuit ="); print(U_ if U_ != None else "  ... too large!")
-    #print("\nU^-1 Circuit ="); print(UI_ if UI_ != None else "  ... too large!")
-    #print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
-    #print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
+    print("\nU Circuit ="); print(U_ if U_ != None else "  ... too large!")
+    print("\nU^-1 Circuit ="); print(UI_ if UI_ != None else "  ... too large!")
+    print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
+    print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
+    print("\nHamiltonian Phase Estimation Circuit ="); print(HP_ if HP_ != None else "  ... too large!")
+    print("\nControlled Rotation Circuit ="); print(INVROT_ if INVROT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
     metrics.plot_metrics("Benchmark Results - HHL - Qiskit",
