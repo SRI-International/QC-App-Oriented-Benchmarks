@@ -199,12 +199,14 @@ def make_pauli_dict(hamiltonian):
 
 def make_energy_orbital_dict(hamiltonian):
     d = {
-        "hf energy": hamiltonian.reference_energy,
-        "nuclear repulsion energy": hamiltonian.nuclear_repulsion_energy,
-        "spatial orbitals": hamiltonian.num_spatial_orbitals,
-        "alpha electrons": hamiltonian.num_alpha,
-        "beta electrons": hamiltonian.num_beta,
+        "hf_energy": float(hamiltonian.reference_energy),
+        "nuclear_repulsion_energy": float(hamiltonian.nuclear_repulsion_energy),
+        "spatial_orbitals": int(hamiltonian.num_spatial_orbitals),
+        "alpha_electrons": int(hamiltonian.num_alpha),
+        "beta_electrons": int(hamiltonian.num_beta),
     }
+
+    return d
 
 
 if __name__ == "__main__":
@@ -241,19 +243,20 @@ if __name__ == "__main__":
 
                 # begin JSON file creation
                 # this JSON file format can be changed to add/remove categories in the future
+
+                #create a dict and merge it with the orbital energy dict
                 d = {
-                    "geometry": {
-                        "atoms": atoms,
-                        "x": xyz[:, 0].tolist(),
-                        "y": xyz[:, 1].tolist(),
-                        "z": xyz[:, 2].tolist(),
-                    },
-                    "hamiltonians": {
-                        "paired_hamiltonian": paired_hamiltonian,
-                        "jordan_wigner_hamiltonian": jordan_wigner_hamiltonian,
-                    },
-                    "orbital info": orbital_energy_info,
+                    "atoms": atoms,
+                    "x": xyz[:, 0].tolist(),
+                    "y": xyz[:, 1].tolist(),
+                    "z": xyz[:, 2].tolist(),
+                    "paired_hamiltonian": paired_hamiltonian,
+                    "jordan_wigner_hamiltonian": jordan_wigner_hamiltonian,
                 }
+
+                d = {**d, **orbital_energy_info}
+
+                #save file in the working directory
                 with open(file_name, "w") as f:
                     json.dump(d, f, indent=4)
                 # end JSON file creation

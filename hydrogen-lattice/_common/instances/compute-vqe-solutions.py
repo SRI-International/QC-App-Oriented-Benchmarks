@@ -1,15 +1,19 @@
-!/usr/bin/env python3
+#!/usr/bin/env python3
 
 import os
-import json
-from qiskit.quantum_info import SparsePauliOp
+import sys
+
+import pathlib
 import numpy as np
+from qiskit.quantum_info import SparsePauliOp
 
-def read_vqe_instance(file_path):
-    with open(file_path, "r") as file:
-        instance = json.load(file)
-    return instance
+# import from common.py
+# to avoid working directory issues, go via folder path with pathlib
+common_folder = pathlib.Path(__file__).parent / '..'
+common_folder = common_folder.resolve()
+sys.path.append(str(common_folder))
 
+from common import read_vqe_instance
 
 instance_files = []
 for root, dirs, files in os.walk("."):
@@ -26,14 +30,19 @@ for path in instance_files:
     instance = read_vqe_instance(path)
 
     paired_hamiltonian = instance["paired_hamiltonian"]
-    paired_matrix = SparsePauliOp(list(paired_hamiltonian.keys()), coeffs=list(paired_hamiltonian.values())).to_matrix()
+    paired_matrix = SparsePauliOp(
+        list(paired_hamiltonian.keys()), coeffs=list(paired_hamiltonian.values())
+    ).to_matrix()
 
     jordan_wigner_hamiltonian = instance["jordan_wigner_hamiltonian"]
     jordan_wigner_matrix = SparsePauliOp(
-        list(jordan_wigner_hamiltonian.keys()), coeffs=list(jordan_wigner_hamiltonian.values())
+        list(jordan_wigner_hamiltonian.keys()),
+        coeffs=list(jordan_wigner_hamiltonian.values()),
     ).to_matrix()
 
     solution_path = path.replace(".json", ".sol")
+
     with open(solution_path, "w") as file:
         file.write(f"doci_energy: {np.linalg.eigvalsh(paired_matrix)[0]}\n")
         file.write(f"fci_energy: {np.linalg.eigvalsh(jordan_wigner_matrix)[0]}\n")
+        file.write(f"hf_energy: {instance['hf_energy']}\n")
