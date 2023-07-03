@@ -1,8 +1,9 @@
-#
 # hydrogen_lattice/_common
 #
 # This file contains code that can be shared by all API instances of this benchmark,
 # e.g. loading of problem instances and expected solution
+
+from __future__ import annotations
 
 import os
 import json
