@@ -10,14 +10,20 @@ import numpy as np
 
 INSTANCE_DIR = "instances"
 
+
 # Utility functions for processing Max-Cut data files
 # If _instances is None, read from data file.  If a dict, extract from a named field
 # (second form used for Qiskit Runtime and similar systems)
 
-# DEVNOTE: change these as needed for VQE and hydrogen lattice
+# DEVNOTE: Python 3.10 will support the following argument syntax in all the methods below. 
+#          However, for backwards compatibility with 3.8 and 3.9, we reduce the type checking (for now)
+#
+#   def read_paired_instance(
+#       file_path: str, _instances: dict | None = None
+#   ) -> tuple[list[str], list[float]] | tuple[None, None]:
 
 
-def read_vqe_instance(file_path: str) -> dict:
+def read_vqe_instance(file_path) -> dict:
     """Generate a dictionary containing JSON problem instance information."""
 
     with open(file_path, "r") as file:
@@ -25,9 +31,7 @@ def read_vqe_instance(file_path: str) -> dict:
     return instance
 
 
-def read_paired_instance(
-    file_path: str, _instances: dict | None = None
-) -> tuple[list[str], list[float]] | tuple[None, None]:
+def read_paired_instance(file_path: str, _instances: dict = None) -> tuple:
     """Return the paired hamiltonian operators and their coefficients."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
@@ -56,9 +60,7 @@ def read_paired_instance(
         return None, None
 
 
-def read_jw_instance(
-    file_path: str, _instances: dict | None = None
-) -> tuple[list[str], list[float]] | tuple[None, None]:
+def read_jw_instance(file_path: str, _instances: dict = None) -> tuple:
     """Return the Jordon Wigner hamiltonian operators and their coefficients."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
@@ -90,9 +92,7 @@ def read_jw_instance(
         )
 
 
-def read_geometry_instance(
-    file_path: str, _instances: dict | None = None
-) -> tuple[np.ndarray, list[str]] | tuple[None, None]:
+def read_geometry_instance(file_path: str, _instances: dict = None) -> tuple:
     """Return geometry information from a file path. The xyz information is returned as a (n, 3) array."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
@@ -125,9 +125,8 @@ def read_geometry_instance(
         )
 
 
-def read_puccd_solution(
-    file_path: str, _instances: dict | None = None
-) -> tuple[list[str], list[float]] | tuple[None, None]:
+
+def read_puccd_solution(file_path: str, _instances: dict = None) -> tuple:
     """Return solution information from a file path. Information includes the method used to generate
     the solution and also the numerical value of the solution itself."""
 
@@ -158,28 +157,3 @@ def read_puccd_solution(
     else:
         return None, None
 
-
-# debugging line
-if __name__ == "__main__":
-    file_path = "instances/h2_chain_0.75"
-
-    print(f"File is named {file_path}. Now test printing some common.py functions.")
-
-    methods_to_print = [read_paired_instance, read_jw_instance]
-
-    for method in methods_to_print:
-        print(f"printing {method.__name__} hamiltonian information:")
-
-        print(
-            method(
-                file_path + ".json",
-            )
-        )
-
-    print("now printing solution information:")
-
-    print(
-        read_puccd_solution(
-            file_path + ".sol",
-        )
-    )
