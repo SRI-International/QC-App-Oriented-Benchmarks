@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+from __future__ import annotations
+
 import json
 
 import numpy as np
@@ -8,8 +9,9 @@ from qiskit.quantum_info import SparsePauliOp
 
 from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.formats.molecule_info import MoleculeInfo
-from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
+from qiskit_nature.second_q.problems import ElectronicStructureProblem
 from qiskit_nature.second_q.mappers import JordanWignerMapper
+from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
 
 
 def chain(
@@ -50,7 +52,7 @@ def as_xyz(atoms, xyz, description="\n"):
 def molecule_to_problem(
     atoms: list[str],
     xyz: np.ndarray,
-) -> ElectronicEnergyProblem:
+) -> ElectronicStructureProblem:
     """
     Creates an ElectronicEnergy object corresponding to a list of atoms and xyz positions.
 
