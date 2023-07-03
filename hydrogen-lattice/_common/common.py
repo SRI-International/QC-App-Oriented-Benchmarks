@@ -110,13 +110,13 @@ def read_geometry_instance(
         instance = read_vqe_instance(file_path)
 
         # create a (n,3) array containing atomic lattice xyz positions
-        atoms = instance["geometry"]["atoms"]
+        atoms = instance["atoms"]
 
         # form a (n,3) array. use the length of x pos. to get n
-        xyz = np.zeros((len(instance["geometry"]["x"]), 3))
-        xyz[:, 0] = instance["geometry"]["x"]
-        xyz[:, 1] = instance["geometry"]["y"]
-        xyz[:, 2] = instance["geometry"]["z"]
+        xyz = np.zeros((len(instance["x"]), 3))
+        xyz[:, 0] = instance["x"]
+        xyz[:, 1] = instance["y"]
+        xyz[:, 2] = instance["z"]
 
         return (xyz, atoms)
     else:
@@ -158,4 +158,3 @@ def read_puccd_solution(
 
     else:
         return None, None
-
