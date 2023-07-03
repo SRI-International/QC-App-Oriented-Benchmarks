@@ -17,7 +17,7 @@ INSTANCE_DIR = "instances"
 # DEVNOTE: change these as needed for VQE and hydrogen lattice
 
 
-def read_vqe_instance(file_path: str) -> dict:
+def read_vqe_instance(file_path) -> dict:
     """Generate a dictionary containing JSON problem instance information."""
 
     with open(file_path, "r") as file:
@@ -25,9 +25,7 @@ def read_vqe_instance(file_path: str) -> dict:
     return instance
 
 
-def read_paired_instance(
-    file_path: str, _instances: dict | None = None
-) -> tuple[list[str], list[float]] | tuple[None, None]:
+def read_paired_instance(file_path: str, _instances: dict = None) -> tuple:
     """Return the paired hamiltonian operators and their coefficients."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
@@ -56,9 +54,7 @@ def read_paired_instance(
         return None, None
 
 
-def read_jw_instance(
-    file_path: str, _instances: dict | None = None
-) -> tuple[list[str], list[float]] | tuple[None, None]:
+def read_jw_instance(file_path: str, _instances: dict = None) -> tuple:
     """Return the Jordon Wigner hamiltonian operators and their coefficients."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
@@ -90,9 +86,7 @@ def read_jw_instance(
         )
 
 
-def read_geometry_instance(
-    file_path: str, _instances: dict | None = None
-) -> tuple[np.ndarray, list[str]] | tuple[None, None]:
+def read_geometry_instance(file_path: str, _instances: dict = None) -> tuple:
     """Return geometry information from a file path. The xyz information is returned as a (n, 3) array."""
     if isinstance(_instances, dict):
         inst = os.path.splitext(os.path.basename(file_path))[0]
@@ -125,9 +119,8 @@ def read_geometry_instance(
         )
 
 
-def read_puccd_solution(
-    file_path: str, _instances: dict | None = None
-) -> tuple[list[str], list[float]] | tuple[None, None]:
+
+def read_puccd_solution(file_path: str, _instances: dict = None) -> tuple:
     """Return solution information from a file path. Information includes the method used to generate
     the solution and also the numerical value of the solution itself."""
 

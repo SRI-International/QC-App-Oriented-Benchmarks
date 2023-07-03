@@ -42,7 +42,7 @@ shots = 10_000
 lowest_energy_values = []
 
 # objective Function to compute the energy of a circuit with given parameters and operator
-def compute_energy(circuit, operator, shots, parameters):
+def compute_energy(circuit, operator, shots, parameters): 
     
     # Bind the parameters to the circuit
     bound_circuit = circuit.bind_parameters(parameters)
@@ -65,95 +65,91 @@ problem_files = list(instance_folder_path.glob("**/*.json"))
 solution_files = list(instance_folder_path.glob("**/*.sol"))
 
 # Extract the number of qubits from the problem file names and store them in a list
-num_qubits = [int(problem.name.split("_")[0][1:]) for problem in problem_files]
+num_qubits_array = list(set([int(problem.name.split("_")[0][1:]) for problem in problem_files]))
 
-# Print the number of qubits
-print(f"num_qubits: {num_qubits}")
+# Print the number of qubits 
+# Dev Note :- Here you cannot see multiple same qubit numbers even though you have multiple same qubit file for optimization
+print(f"num_qubits array: {num_qubits_array}")
 
-# Create an empty list to store PauliSumOps
-pauli_ops = []
-
-""" Loop through each problem file path and read the paired instance from the problem file and
- Create a list of tuples, each containing an operator and its coefficient  and then 
- convert the list to a PauliSumOp objects and add them to the pauli_ops list"""
-
-# Reading paired instances from the problem files
-for file_path in problem_files:
-    ops, coefs = common.read_paired_instance(file_path)
-    paired_hamiltonians = list(zip(ops, coefs))
-    pauli_ops.append(PauliSumOp.from_list(paired_hamiltonians))
-    
-# Reading energes from the solution files
-solutions = []
-for file_path in solution_files:
-    method_names, values = common.read_puccd_solution(file_path)
-    solution = list(zip(method_names, values))
-    solutions.append(solution)
-    
-    
-# Loop over hydrogen chains with different numbers of qubits (from 2 to 4 in this example)
-for index, pauli_op in enumerate(pauli_ops):
-      
-    # Construct the pUCCD circuit for the current mock hydrogen chain
-    circuit = puccd.build_circuit(num_qubits[index])
-    
-    # Set the PauliSumOp object as the operator or Hamiltonian of the circuit
-    operator = pauli_op
-     
-    # Initialize initial_parameters as an ndarray with shape (n,)
-    initial_parameters = np.random.random(size=len(circuit.parameters))
-
-    """Set the maximum number of iterations, tolerance, and display options and initialize 
-       the COBYLA optimizerOptimize the circuit parameters using the optimizer"""
-    optimized_parameters = minimize(
-        lambda parameters: compute_energy(circuit, operator, shots=shots, parameters=parameters),
-        x0=initial_parameters.ravel(),
-        method='COBYLA',
-        tol=1e-3,
-        options={'maxiter': 100, 'disp': False}
-    )
-
-    # Extract the parameter values from the optimizer result
-    optimized_values = optimized_parameters.x
-
-    # Create a dictionary of {parameter: value} pairs
-    parameter_values = {
-        param: value for param, value in zip(circuit.parameters, optimized_values)
-    }
-
-    # Assign the optimized values to the circuit parameters
-    circuit.assign_parameters(parameter_values, inplace=True)
-
-    ideal_energy = ideal_backend.compute_expectation(circuit, operator=operator, shots=shots)
-
-    print(f"PUCCD calculated energy : {ideal_energy}")
-
-    # classical_energy is calculated using np.linalg.eigvalsh 
-    solution = solutions[index]
-    doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
-    fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
-    
-    print(f"DOCI calculated energy : {doci_energy}")
-    print(f"FCI calculated energy : {fci_energy}")
     
 
-    plt.figure()
-    plt.plot(range(len(lowest_energy_values)), lowest_energy_values, label='Quantum Energy')
-    plt.axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
-    plt.axhline(y=fci_energy, color='g', linestyle='solid', label='FCI Energy for given Hamiltonian')
-    plt.xlabel('Number of Iterations')
-    plt.ylabel('Energy')
-    plt.title('Energy Comparison: Quantum vs. Classical')
-    plt.legend()
-    # Generate the text to display
-    energy_text = f'Quantum Energy: {ideal_energy:.2f}  |  DOCI Energy: {doci_energy:.2f}  |  \
-    FCI Energy: {fci_energy:.2f}  |  Num of Qubits: {num_qubits[index]}'
+""" We will loop through 2,4 as of now but will change it as required in original implementation of run method
+      and even initialize according to it """
+min_qubits = min(num_qubits_array) #2
+max_qubits = max(num_qubits_array) #4
 
-    # Add the text annotation at the top of the plot
-    plt.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
-    plt.show()
+# For paired electrons it should be incremented 2 at a time
+for num_qubits in range(min_qubits , max_qubits + 1, 2):
     
+    # Reading instances from the problem files
+    for file_path in problem_files:
+        # To optimize the loop we can only loop at our qubit number to avoid looping for all instances
+        if int(file_path.name.split("_")[0][1:]) > num_qubits:
+            break
+        elif int(file_path.name.split("_")[0][1:]) == num_qubits:
+            
+            # Building PUCCD Ansatz circuit for currnt number of qubits
+            circuit = puccd.build_circuit(num_qubits)
+            
+            # Initialize initial_parameters as an ndarray with shape (n,)
+            initial_parameters = np.random.random(size=len(circuit.parameters))
+            
+            # Here we are reading the paired instances from the problem files
+            ops, coefs = common.read_paired_instance(file_path)
+            operator = PauliSumOp.from_list(list(zip(ops, coefs)))
+            """Set the maximum number of iterations, tolerance, and display options and initialize 
+            the COBYLA optimizerOptimize the circuit parameters using the optimizer"""
+            optimized_parameters = minimize(
+                lambda parameters: compute_energy(circuit, operator, shots=shots, parameters=parameters),
+                x0=initial_parameters.ravel(),
+                method='COBYLA',
+                tol=1e-3,
+                options={'maxiter': 100, 'disp': False}
+            )
+            
+            # Extract the parameter values from the optimizer result
+            optimized_values = optimized_parameters.x
+            
+            # Create a dictionary of {parameter: value} pairs
+            parameter_values = {param: value for param, value in zip(circuit.parameters, optimized_values) }
+            
+            # Assign the optimized values to the circuit parameters
+            circuit.assign_parameters(parameter_values, inplace=True)
+            
+            ideal_energy = ideal_backend.compute_expectation(circuit, operator=operator, shots=shots)
+            print(f"\nBelow Energies are for problem file {os.path.basename(file_path)} is for {num_qubits} qubits of paired hamiltions")
+            print(f"PUCCD calculated energy : {ideal_energy}")
+        
+            # classical_energy is calculated using np.linalg.eigvalsh 
+            # solution is calculated using sol file created using sol file of current instance
+            sol_file_name = os.path.splitext(file_path)[0] + ".sol"
+            method_names, values = common.read_puccd_solution(sol_file_name)
+            solution = list(zip(method_names, values))
+            
+            # Doci_energy and Fci energy is extracted from Solution file
+            print(f"\nBelow Classical Energies are in solution file {os.path.basename(sol_file_name)} is for {num_qubits} qubits of paired hamiltions")
+            doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
+            fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
+            
+            print(f"DOCI calculated energy : {doci_energy}")
+            print(f"FCI calculated energy : {fci_energy}")
+            
+            print(len(lowest_energy_values))
+            # pLotting each instance of qubit count given 
+            plt.figure()
+            plt.plot(range(len(lowest_energy_values)), lowest_energy_values, label='Quantum Energy')
+            plt.axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
+            plt.axhline(y=fci_energy, color='g', linestyle='solid', label='FCI Energy for given Hamiltonian')
+            plt.xlabel('Number of Iterations')
+            plt.ylabel('Energy')
+            plt.title('Energy Comparison: Quantum vs. Classical')
+            plt.legend()
+            # Generate the text to display
+            energy_text = f'Quantum Energy: {ideal_energy:.2f}  |  DOCI Energy: {doci_energy:.2f}  |  FCI Energy: {fci_energy:.2f}  |  Num of Qubits: {num_qubits}'
+
+            # Add the text annotation at the top of the plot
+            plt.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
+            plt.show()
+            
     lowest_energy_values.clear()
-    
-    
-    
+ 
