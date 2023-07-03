@@ -10,11 +10,17 @@ import numpy as np
 
 INSTANCE_DIR = "instances"
 
+
 # Utility functions for processing Max-Cut data files
 # If _instances is None, read from data file.  If a dict, extract from a named field
 # (second form used for Qiskit Runtime and similar systems)
 
-# DEVNOTE: change these as needed for VQE and hydrogen lattice
+# DEVNOTE: Python 3.10 will support the following argument syntax in all the methods below. 
+#          However, for backwards compatibility with 3.8 and 3.9, we reduce the type checking (for now)
+#
+#   def read_paired_instance(
+#       file_path: str, _instances: dict | None = None
+#   ) -> tuple[list[str], list[float]] | tuple[None, None]:
 
 
 def read_vqe_instance(file_path) -> dict:

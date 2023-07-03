@@ -77,17 +77,22 @@ print(f"num_qubits array: {num_qubits_array}")
       and even initialize according to it """
 min_qubits = min(num_qubits_array) #2
 max_qubits = max(num_qubits_array) #4
+max_circuits = 3
 
 # For paired electrons it should be incremented 2 at a time
 for num_qubits in range(min_qubits , max_qubits + 1, 2):
     
+    instance_count = 0
     # Reading instances from the problem files
     for file_path in problem_files:
         # To optimize the loop we can only loop at our qubit number to avoid looping for all instances
         if int(file_path.name.split("_")[0][1:]) > num_qubits:
             break
-        elif int(file_path.name.split("_")[0][1:]) == num_qubits:
+        elif int(file_path.name.split("_")[0][1:]) == num_qubits and instance_count < max_circuits:
             
+            # Not using ennumerate as may even have loop of other files
+            instance_count += 1      
+                      
             # Building PUCCD Ansatz circuit for currnt number of qubits
             circuit = puccd.build_circuit(num_qubits)
             
@@ -116,8 +121,9 @@ for num_qubits in range(min_qubits , max_qubits + 1, 2):
             # Assign the optimized values to the circuit parameters
             circuit.assign_parameters(parameter_values, inplace=True)
             
+            radius = os.path.basename(file_path).split('_')[2][:4]
             ideal_energy = ideal_backend.compute_expectation(circuit, operator=operator, shots=shots)
-            print(f"\nBelow Energies are for problem file {os.path.basename(file_path)} is for {num_qubits} qubits of paired hamiltions")
+            print(f"\nBelow Energies are for problem file {os.path.basename(file_path)} is for {num_qubits} qubits and radius {radius} of paired hamiltionians")
             print(f"PUCCD calculated energy : {ideal_energy}")
         
             # classical_energy is calculated using np.linalg.eigvalsh 
@@ -127,14 +133,13 @@ for num_qubits in range(min_qubits , max_qubits + 1, 2):
             solution = list(zip(method_names, values))
             
             # Doci_energy and Fci energy is extracted from Solution file
-            print(f"\nBelow Classical Energies are in solution file {os.path.basename(sol_file_name)} is for {num_qubits} qubits of paired hamiltions")
+            print(f"\nBelow Classical Energies are in solution file {os.path.basename(sol_file_name)} is {num_qubits} qubits and radius {radius} of paired hamiltionians")
             doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
             fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
             
             print(f"DOCI calculated energy : {doci_energy}")
             print(f"FCI calculated energy : {fci_energy}")
             
-            print(len(lowest_energy_values))
             # pLotting each instance of qubit count given 
             plt.figure()
             plt.plot(range(len(lowest_energy_values)), lowest_energy_values, label='Quantum Energy')
@@ -145,7 +150,7 @@ for num_qubits in range(min_qubits , max_qubits + 1, 2):
             plt.title('Energy Comparison: Quantum vs. Classical')
             plt.legend()
             # Generate the text to display
-            energy_text = f'Quantum Energy: {ideal_energy:.2f}  |  DOCI Energy: {doci_energy:.2f}  |  FCI Energy: {fci_energy:.2f}  |  Num of Qubits: {num_qubits}'
+            energy_text = f'Ideal Energy: {ideal_energy:.2f} | DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {radius}'
 
             # Add the text annotation at the top of the plot
             plt.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
