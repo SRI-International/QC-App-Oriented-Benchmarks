@@ -66,6 +66,11 @@ verbose_time = False
 # specify whether to execute using sessions (and currently using Sampler only)
 use_sessions = False
 
+# internal session variables: users do not access
+service = None
+session = None
+sampler = None
+
 # logger for this module
 logger = logging.getLogger(__name__)
 
@@ -928,7 +933,8 @@ def process_step_times(job, result, active_circuit):
     # this attribute not available for some providers and only for circuit-runner model;
     if not use_sessions and "time_per_step" in dir(job) and callable(job.time_per_step):
         time_per_step = job.time_per_step()
-        #print(time_per_step)
+        if verbose:
+            print(f"... job.time_per_step() = {time_per_step}")
         
         creating_time = time_per_step.get("CREATING")
         validating_time = time_per_step.get("VALIDATING")
@@ -936,7 +942,7 @@ def process_step_times(job, result, active_circuit):
         running_time = time_per_step.get("RUNNING")
         completed_time = time_per_step.get("COMPLETED")
         
-        # for testing, since hard to reproduce on systems
+        # for testing, since hard to reproduce on some systems
         #running_time = None
         
         # make these all slightly non-zero so averaging code is triggered (> 0.001 required)
@@ -944,8 +950,11 @@ def process_step_times(job, result, active_circuit):
         exec_validating_time = 0.001
         exec_queued_time = 0.001
         exec_running_time = 0.001
-        exec_quantum_classical_time =0.001
+        
+        # this is note used
+        exec_quantum_classical_time = 0.001
 
+        # compute the detailed time metrics
         if validating_time and creating_time:
             exec_creating_time = (validating_time - creating_time).total_seconds()
         if queued_time and validating_time:
@@ -1101,8 +1110,17 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
     # indicate we are done collecting metrics (called once at end of app)
     if report_end:
         metrics.end_metrics()
-    
-    
+        
+    # also, close any active session at end of the app
+    global session
+    if report_end and use_sessions and session != None:
+        if verbose:
+            print("... closing active session!\n")
+        
+        session.close()
+        session = None
+        
+
 # Check if any active jobs are complete - process if so
 # Before returning, launch any batched jobs that will keep active circuits < max
 # When any job completes, aggregate and report group metrics if all circuits in group are done
