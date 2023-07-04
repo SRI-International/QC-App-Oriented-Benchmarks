@@ -69,14 +69,21 @@ def Ham_sim(H, t):
     return qc
 
 
-def control_Ham_sim(qc, H, t, control, qreg, qreg_b, anc):
+def control_Ham_sim(n, H, t):
     """
         H : sparse matrix
         t : time parameter
         
         returns : QuantumCircuit for control-e^(-i*H*t)
     """
-    
+    qreg = QuantumRegister(n)
+    qreg_b = QuantumRegister(n)
+    control_reg = QuantumRegister(1)
+    anc_reg = QuantumRegister(1)
+    qc = QuantumCircuit(qreg, qreg_b, control_reg, anc_reg)
+    control = control_reg[0]
+    anc = anc_reg[0]
+
     
     # read in number of qubits
     N = len(H)
@@ -107,7 +114,7 @@ def control_Ham_sim(qc, H, t, control, qreg, qreg_b, anc):
         
     # phase
     qc.cp((sign*2*t*off_diag_el), control, anc)
-    
+     
     # uncompute
     for q in range(n):
         j = n-1-q
