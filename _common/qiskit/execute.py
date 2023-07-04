@@ -867,7 +867,7 @@ def job_complete(job):
         metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
         
         # process additional detailed step times, if they exist (this might override exec_time too)
-        process_step_times(job, active_circuit)
+        process_step_times(job, result, active_circuit)
     
     # remove from list of active circuits
     del active_circuits[job]
@@ -916,7 +916,7 @@ def job_complete(job):
                 print(traceback.format_exc())
 
 # Process detailed step times, if they exist
-def process_step_times(job, active_circuit):
+def process_step_times(job, result, active_circuit):
     #print("... processing step times")
     
     exec_creating_time = 0
@@ -925,7 +925,7 @@ def process_step_times(job, active_circuit):
     exec_running_time = 0
         
     # get breakdown of execution time, if method exists 
-    # this attribute not available for some providers;
+    # this attribute not available for some providers and only for circuit-runner model;
     if not use_sessions and "time_per_step" in dir(job) and callable(job.time_per_step):
         time_per_step = job.time_per_step()
         #print(time_per_step)
@@ -955,10 +955,12 @@ def process_step_times(job, active_circuit):
         if completed_time and running_time:
             exec_running_time = (completed_time - running_time).total_seconds()
 
+    # when sessions and sampler used, we obtain metrics differently
     if use_sessions:
         job_timestamps= job.metrics()['timestamps']
         if verbose:
-            print(job.metrics())
+            print(f"... job.metrics() = {job.metrics()}")
+            print(f"... job.result().metadata[0] = {result.metadata[0]}")
 
         created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
         created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
@@ -966,12 +968,17 @@ def process_step_times(job, active_circuit):
         finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
         running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
         running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
-
-        exec_creating_time = (running_time_delta - created_time_delta).seconds
-        exec_running_time = (finished_time_delta - running_time_delta).seconds
-        #exec_quantum_classical_time = job.metrics()['bss']
+        
+        # compute the total seconds for creating and running the circuit
+        exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
+        exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
+        
+        # these do not seem to be avaiable
         exec_validating_time = 0.001
         exec_queued_time = 0.001
+        
+        # DEVNOTE: we do not compute this yet
+        # exec_quantum_classical_time = job.metrics()['bss']
         #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
         
         # when using sessions, the 'running_time' is the 'quantum exec time' - override it.
@@ -990,7 +997,7 @@ def process_step_times(job, active_circuit):
 
     #print("... time_per_step = ", str(time_per_step))
     if verbose:
-        print(f"... exec times, creating = {exec_creating_time}, validating = {exec_validating_time}, queued = {exec_queued_time}, running = {exec_running_time}") 
+        print(f"... computed exec times: queued = {exec_queued_time}, creating/transpiling = {exec_creating_time}, validating = {exec_validating_time}, running = {exec_running_time}") 
 
 # Process a job, whose status cannot be obtained
 def job_status_failed(job):
