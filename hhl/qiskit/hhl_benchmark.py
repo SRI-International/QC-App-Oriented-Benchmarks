@@ -16,7 +16,6 @@ from qiskit import Aer, execute
 
 import sparse_Ham_sim as shs
 import uniform_controlled_rotation as ucr
-import unicodeit
 
 # include QFT in this list, so we can refer to the QFT sub-circuit definition
 #sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
@@ -561,9 +560,9 @@ def make_circuit(A, b, num_clock_qubits):
         
     # do inversion step and measure ancilla
 
-
-    INVROT_ = ucr.uniformly_controlled_rot(n_t, theta)
-    qc.append(INVROT_, qr_t[0:len(qr_t)] + [qr_a[0]])
+    qc_invrot = ucr.uniformly_controlled_rot(n_t, theta)
+    INVROT_ = qc_invrot
+    qc.append(qc_invrot, qr_t[0:len(qr_t)] + [qr_a[0]])
     qc.measure(qr_a[0], cr_a[0])
     qc.reset(qr_a[0])
 
@@ -702,6 +701,8 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
+
+    print(counts)
     
     # post-select counts where ancilla was measured as |1>
     post_counts, rate = postselect(counts)
@@ -735,6 +736,9 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     
     # use TVD as infidelity
     fidelity = 1 - tvd
+    #fidelity = metrics.polarization_fidelity(post_counts, ideal_distr)
+
+    print(fidelity)
     
     
     return post_counts, fidelity
@@ -807,7 +811,7 @@ def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2,
             hub=hub, group=group, project=project, exec_options=exec_options)
 
     # for noiseless simulation, set noise model to be None
-    ex.set_noise_model(None)
+    #ex.set_noise_model(None)
     
     # temporarily fix diag and off-diag matrix elements
     diag_el = 0.5
