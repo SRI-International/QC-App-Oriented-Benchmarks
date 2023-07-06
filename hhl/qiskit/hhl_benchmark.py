@@ -676,15 +676,11 @@ def TVD(distr1, distr2):
     """ compute total variation distance between distr1 and distr2
         which are represented as dictionaries of bitstrings and probabilities
     """
-
-    print(distr1)
-    print(distr2)
     
     tvd = 0.0
     for out1 in distr1:
         if out1 in distr2:
             p1, p2 = distr1[out1], distr2[out1]
-            print(p1, p2)
             tvd += np.abs(p1-p2)/2
         else:
             p1 = distr1[out1]
