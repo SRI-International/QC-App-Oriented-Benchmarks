@@ -415,18 +415,12 @@ def compute_probabilities(circuits, parameters=None, shots=None):
     Compute the probabilities for a list of circuits with given parameters.
     """
     probabilities = list()
-    print("--" * 20)
-    print(circuits)
     for my_circuit in circuits:
-        
-        print(my_circuit)
         if parameters is not None:
             # circuit = my_circuit.assign_parameters(parameters, inplace=False)
             circuit = my_circuit.bind_parameters(parameters)
         else:
             circuit = my_circuit.copy()
-        print(type(my_circuit))
-        print("abc", type(circuit))
         result = expectation_run(circuit, shots)
         probabilities.append(result)
 
@@ -971,13 +965,10 @@ def run (min_qubits=2, max_qubits=4, max_circuits=1, num_shots=100,
             if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-                print("abc")
             # DEVNOTE:  Primary focus is on method 2
                 thetas_array_0 = thetas_array
                 qc, params = HydrogenLattice(num_qubits,operator,thetas_array_0, parameterized)
                 metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
-                print(qc,"qc")
-                print(params,"params")
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
                 qc2 = qc.decompose()
 
@@ -1132,12 +1123,8 @@ def run (min_qubits=2, max_qubits=4, max_circuits=1, num_shots=100,
                 # # objective Function to compute the energy of a circuit with given parameters and operator
                 def compute_energy(qc, operator, shots, parameters): 
                     
-                    print("parameters",parameters)
                     # Bind the parameters to the circuit
-                    print(len(parameters),"len(parameters)")
-                    print(qc,"qc")
                     bound_circuit = qc.bind_parameters(parameters)
-                    print(bound_circuit,"bound_circuit")
                     # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
                     energy = calculate_expectation(bound_circuit, operator=operator, shots=shots)
                     
@@ -1147,9 +1134,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=1, num_shots=100,
                     return energy               
                 
                 
-                initial_parameters = np.random.random(size=1)
-                print(initial_parameters,"initial_parameters")
-                
+                initial_parameters = np.random.random(size=1)                
                 optimized_parameters = minimize(lambda parameters: objective_function(thetas_array= thetas_array,\
                     operator=operator, parameters=parameters),
                 # x0=initial_parameters.ravel(),
