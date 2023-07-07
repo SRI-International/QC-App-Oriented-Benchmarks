@@ -701,8 +701,6 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
-
-    print(counts)
     
     # post-select counts where ancilla was measured as |1>
     post_counts, rate = postselect(counts)
@@ -731,15 +729,14 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     ideal_distr = true_distr(A, b)
     
     
-    # compute total variation distance
-    tvd = TVD(ideal_distr, post_counts)
+    # # compute total variation distance
+    # tvd = TVD(ideal_distr, post_counts)
     
-    # use TVD as infidelity
-    fidelity = 1 - tvd
-    #fidelity = metrics.polarization_fidelity(post_counts, ideal_distr)
+    # # use TVD as infidelity
+    # fidelity = 1 - tvd
+    # #fidelity = metrics.polarization_fidelity(post_counts, ideal_distr)
 
-    print(fidelity)
-    
+    fidelity = metrics.polarization_fidelity(post_counts, ideal_distr)
     
     return post_counts, fidelity
 
