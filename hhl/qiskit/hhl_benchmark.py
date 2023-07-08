@@ -410,6 +410,8 @@ def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
     
     if method == 1:
     
+        print(num_clock_qubits)
+        print(num_input_qubits)
         # Create the various registers needed
         clock = QuantumRegister(num_clock_qubits, name='clock')
         input_qubits = QuantumRegister(num_input_qubits, name='b')
@@ -495,11 +497,11 @@ def make_circuit(A, b, num_clock_qubits):
     C = 1/4
     
     # create quantum registers
-    qr = QuantumRegister(n)
-    qr_b = QuantumRegister(n) # ancillas for Hamiltonian simulation
+    qr = QuantumRegister(n, name='hmmm')
+    qr_b = QuantumRegister(n, name='input') # ancillas for Hamiltonian simulation
     cr = ClassicalRegister(n)
-    qr_t = QuantumRegister(n_t) # for phase estimation
-    qr_a = QuantumRegister(1) # ancilla qubit
+    qr_t = QuantumRegister(n_t, name='clock') # for phase estimation
+    qr_a = QuantumRegister(1, name='ancilla') # ancilla qubit
     cr_a = ClassicalRegister(1)
     
     qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a)
@@ -608,6 +610,7 @@ def make_circuit(A, b, num_clock_qubits):
 
     if QC_ == None:
         QC_ = qc
+        #print(f"... made circuit = \n{QC_}")
 
     return qc
 
@@ -702,14 +705,15 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     # obtain counts from the result object
     counts = result.get_counts(qc)
 
-    print(counts)
+    if verbose:
+        print(f"... counts = {counts}")
     
     # post-select counts where ancilla was measured as |1>
     post_counts, rate = postselect(counts)
     num_input_qubits = len(list(post_counts.keys())[0])
     
     if verbose: 
-        print(f'Ratio of counts with ancilla measured |1> : {round(rate, 4)}')
+        print(f'... ratio of counts with ancilla measured |1> : {round(rate, 4)}')
     
     # compute true distribution from secret int
     off_diag_index = 0
@@ -729,31 +733,38 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
                               diag_el=diag_el, off_diag_el=off_diag_el)
     ideal_distr = true_distr(A, b)
+      
+    # # compute total variation distance
+    # tvd = TVD(ideal_distr, post_counts)
     
-    
-    # compute total variation distance
-    tvd = TVD(ideal_distr, post_counts)
-    
-    # use TVD as infidelity
-    fidelity = 1 - tvd
-    #fidelity = metrics.polarization_fidelity(post_counts, ideal_distr)
+    # # use TVD as infidelity
+    # fidelity = 1 - tvd
+    # #fidelity = metrics.polarization_fidelity(post_counts, ideal_distr)
 
-    print(fidelity)
-    
+    fidelity = metrics.polarization_fidelity(post_counts, ideal_distr)
     
     return post_counts, fidelity
 
+
 ################ Benchmark Loop
+
+# Execute program with default parameters (based on min and max_qubits)
+# This routine computes a reasonable min and max input and clock qubit range to sweep
+# from the given min and max qubit sizes using the formula below and making the 
+# assumption that num_input_qubits ~= num_clock_qubits and num_input_qubits < num_clock_qubits:
+#      num_qubits = 2 * num_input_qubits + num_clock_qubits + 1 (the ancilla)
 
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         method = 1, 
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
-    
+        hub="ibm-q", group="open", project="main", exec_options=None):  
 
-        max_qubits = max(6, max_qubits)
+        # we must have at least 4 qubits and min must be less than max
+        max_qubits = max(4, max_qubits)
         min_qubits = min(max(4, min_qubits), max_qubits)
-
+        #print(f"... using min_qubits = {min_qubits} and max_qubits = {max_qubits}")
+        
+        ''' first attempt ..
         min_input_qubits = min_qubits//2
         if min_qubits%2 == 1:
             min_clock_qubits = min_qubits//2 + 1
@@ -765,28 +776,46 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
             max_clock_qubits = max_qubits//2 + 1
         else:
             max_clock_qubits = max_qubits//2
+        '''
+        
+        # the calculation below is based on the formula described above, where I = input, C = clock:
+        
+        # I = int((N - 1) / 3)
+        min_input_qubits = int((min_qubits - 1) / 3)
+        max_input_qubits = int((max_qubits - 1) / 3)
+        
+        # C = N - 1 - 2 * I
+        min_clock_qubits = min_qubits - 1 - 2 * min_input_qubits
+        max_clock_qubits = max_qubits - 1 - 2 * max_input_qubits
+        
+        #print(f"... input, clock qubit width range: {min_input_qubits} : {max_input_qubits}, {min_clock_qubits} : {max_clock_qubits}")
 
-        return run(min_input_qubits, max_input_qubits, min_clock_qubits, 
-        max_clock_qubits, max_circuits, num_shots, 
-        backend_id, provider_backend,
-        hub, group, project, exec_options)
+        return run2(min_input_qubits, max_input_qubits, min_clock_qubits, 
+                max_clock_qubits, max_circuits, num_shots, 
+                method,
+                backend_id, provider_backend,
+                hub, group, project, exec_options)
 
 
-# Execute program with default parameters
-def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2, 
+# Execute program with default parameters and permitting the user to specify an
+# arbitrary range of input and clock qubit widths
+# The benchmark sweeps over all input widths and clock widths in the range specified
+
+def run2 (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=1, 
         max_clock_qubits=3, max_circuits=3, num_shots=100,
+        method=2,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None):  
     
-
-    min_input_qubits= min(max(1, min_input_qubits), max_input_qubits)
-    max_input_qubits=max(3, max_input_qubits)
-    min_clock_qubits= min(max(2, min_clock_qubits), max_clock_qubits)
-    max_clock_qubits= max(3, max_clock_qubits)
-
-
     print("HHL Benchmark Program - Qiskit")
-    
+
+    # ensure valid input an clock qubit widths
+    min_input_qubits = min(max(1, min_input_qubits), max_input_qubits)
+    max_input_qubits = max(min_input_qubits, max_input_qubits)
+    min_clock_qubits = min(max(1, min_clock_qubits), max_clock_qubits)
+    max_clock_qubits = max(min_clock_qubits, max_clock_qubits)
+    #print(f"... in, clock: {min_input_qubits}, {max_input_qubits}, {min_clock_qubits}, {max_clock_qubits}")
+
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -795,6 +824,7 @@ def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2,
      
         # determine fidelity of result set
         num_qubits = int(num_qubits)
+        
         #counts, fidelity = analyze_and_print_result(qc, result, num_qubits, ideal_distr)
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
@@ -839,15 +869,15 @@ def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2,
                                           diag_el=diag_el, off_diag_el=off_diag_el)
                 
                 # define secret_int
-                s_int = (2**off_diag_index)*(3**b)
-                
+                s_int = (2**off_diag_index)*(3**b)             
                 
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
                 qc = make_circuit(A, b, num_clock_qubits)
                 metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
     
-    
+                #print(qc)
+                
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
                 ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
         
