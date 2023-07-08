@@ -1,5 +1,5 @@
 """
-HHL Benchmark Program - Qiskit
+HHL Benchmark Program - Qiskit   (KM initial version 220402)
 
 TODO:
     - switch from total variation distance to Hellinger fidelity
@@ -42,8 +42,6 @@ U_ = None
 UI_ = None
 QFT_ = None
 QFTI_ = None
-HP_ = None
-INVROT_ = None
 
 
 ############### Circuit Definitions 
@@ -77,9 +75,6 @@ def initialize_state(qc, qreg, b):
     
     n = qreg.size
     b_bin = np.binary_repr(b, width=n)
-    if verbose:
-        print(f"... initializing |b> to {b}, binary repr = {b_bin}")
-    
     for q in range(n):
         if b_bin[n-1-q] == '1':
             qc.x(qreg[q])
@@ -98,8 +93,8 @@ def IQFT(qc, qreg):
     n = int(qreg.size)
     
     for i in reversed(range(n)):
-        for j in range(i+1,n): 
-            phase = -pi/2**(j-i) 
+        for j in range(i+1,n):
+            phase = -pi/2**(j-i)
             qc.cp(phase, qreg[i], qreg[j])
         qc.h(qreg[i])
     
@@ -130,7 +125,7 @@ def inv_qft_gate(input_size, method=1):
     #global QFT_
     qr = QuantumRegister(input_size);
     #qc = QuantumCircuit(qr, name="qft")
-    qc = QuantumCircuit(qr, name="IQFT")
+    qc = QuantumCircuit(qr, name="QFT†")
     
     if method == 1:
     
@@ -147,7 +142,7 @@ def inv_qft_gate(input_size, method=1):
                     divisor = 2 ** (num_crzs - j)
                     #qc.crz( math.pi / divisor , qr[hidx], qr[input_size - j - 1])
                     ##qc.crz( -np.pi / divisor , qr[hidx], qr[input_size - j - 1])
-                    qc.cp(-np.pi / divisor, qr[hidx], qr[input_size - j - 1]);
+                    qc.cu1(-np.pi / divisor, qr[hidx], qr[input_size - j - 1]);
                 
             # followed by an H gate (applied to all qubits)
             qc.h(qr[hidx])
@@ -162,6 +157,7 @@ def inv_qft_gate(input_size, method=1):
         
     qc.barrier()
     
+        
     return qc
 
 ############### Inverse QFT Circuit
@@ -190,7 +186,7 @@ def qft_gate(input_size, method=1):
                     divisor = 2 ** (num_crzs - j)
                     #qc.crz( -math.pi / divisor , qr[hidx], qr[input_size - j - 1])
                     ##qc.crz( np.pi / divisor , qr[hidx], qr[input_size - j - 1])
-                    qc.cp( np.pi / divisor , qr[hidx], qr[input_size - j - 1])
+                    qc.cu1( np.pi / divisor , qr[hidx], qr[input_size - j - 1])
     
     elif method == 2:
         # apply QFT to register
@@ -201,7 +197,7 @@ def qft_gate(input_size, method=1):
                 qc.cp(phase, qr[i], qr[j])
                 
     qc.barrier()   
-
+        
     return qc
 
  
@@ -367,7 +363,7 @@ def inv_qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1
             qubits = [control] + [q for q in target] + [q for q in extra_qubits] + [ancilla[0]]
             qc.append(con_H_sim, qubits)
     
-'''   
+    
 
 def hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits=None, A=None, method=1):
     
@@ -406,14 +402,13 @@ def hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits=None
     
     qc.barrier()
     inv_qpe(qc, clock, input_qubits, extra_qubits, ancilla, A, method)
-   
+    
+
 
 def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
     
     if method == 1:
     
-        print(num_clock_qubits)
-        print(num_input_qubits)
         # Create the various registers needed
         clock = QuantumRegister(num_clock_qubits, name='clock')
         input_qubits = QuantumRegister(num_input_qubits, name='b')
@@ -447,38 +442,10 @@ def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
     
         # measure the input, which now contains the answer
         qc.measure(input_qubits, measurement[1])
+    
 
-    
-    # # save smaller circuit example for display
-    # global QC_, U_, UI_, QFT_, QFTI_
-    # if QC_ == None or num_qubits <= 6:
-    #     if num_qubits < 9: 
-    #         QC_ = qc
-    # if U_ == None or num_qubits <= 6:    
-    #     _, U_ = ctrl_u(1)
-    #     #U_ = ctrl_u(np.pi/2, 2, 0, 1)
-        
-    # if UI_ == None or num_qubits <= 6:    
-    #     _, UI_ = ctrl_ui(1)
-    #     #UI_ = ctrl_ui(np.pi/2, 2, 0, 1)
-        
-    # if QFT_ == None or num_qubits <= 5:
-    #     if num_qubits < 9: QFT_ = qft_gate(len(clock))
-    # if QFTI_ == None or num_qubits <= 5:
-    #     if num_qubits < 9: QFTI_ = inv_qft_gate(len(clock))
-    
     # return a handle on the circuit
     return qc
-
-def hamiltonian_phase(n_t):
-    qr_t = QuantumRegister(n_t)
-    qc = QuantumCircuit(qr_t, name = 'H⊗n' )
-    # Hadamard phase estimation register
-    for q in range(n_t):
-        qc.h(qr_t[q])
-
-    return qc
-'''
 
 # Make the HHL circuit (this is the one aactually used right now)
 def make_circuit(A, b, num_clock_qubits):
@@ -488,9 +455,6 @@ def make_circuit(A, b, num_clock_qubits):
         b (int): between 0,...,2^n-1. Initial basis state |b>
     """
     
-    # save smaller circuit example for display
-    global QC_, U_, UI_, QFT_, QFTI_, HP_, INVROT_
-
     # read in number of qubits
     N = len(A)
     n = int(np.log2(N))
@@ -499,61 +463,31 @@ def make_circuit(A, b, num_clock_qubits):
     # lower bound on eigenvalues of A. Fixed for now
     C = 1/4
     
-    ''' Define sets of qubits for this algorithm '''
-    
-    # create 'input' quantum and classical measurement register
-    qr = QuantumRegister(n, name='input')
-    qr_b = QuantumRegister(n, name='in_anc') # ancillas for Hamiltonian simulation (?)
+    # create quantum registers
+    qr = QuantumRegister(n)
+    qr_b = QuantumRegister(n) # ancillas for Hamiltonian simulation
     cr = ClassicalRegister(n)
-    
-    # create 'clock' quantum register
-    qr_t = QuantumRegister(n_t, name='clock') # for phase estimation
-    
-    # create 'ancilla' quantum and classical measurement register
-    qr_a = QuantumRegister(1, name='ancilla') # ancilla qubit
+    qr_t = QuantumRegister(n_t) # for phase estimation
+    qr_a = QuantumRegister(1) # ancilla qubit
     cr_a = ClassicalRegister(1)
     
-    # create the top-level HHL circuit, with all the registers
     qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a)
 
-    ''' Populate the circuit with gate sequences '''
-    
-    # initialize the |b> state - the 'input'
+    # initialize the |b> state
     qc = initialize_state(qc, qr, b)
     
-    #qc.barrier()
-
-    # Hadamard the phase estimation register - the 'clock'
+    # Hadamard phase estimation register
     for q in range(n_t):
         qc.h(qr_t[q])
-
-    qc.barrier()
         
     # perform controlled e^(i*A*t)
     for q in range(n_t):
         control = qr_t[q]
-        anc = qr_a[0]
         phase = -(2*pi)*2**q  
-        qc_u = shs.control_Ham_sim(n, A, phase)
-        if phase <= 0:
-            qc_u.name = "e^{" + str(q) + "iAt}"
-        else:
-            qc_u.name = "e^{-" + str(q) + "iAt}"
-        if U_ == None:
-            U_ = qc_u
-        qc.append(qc_u, qr[0:len(qr)] + qr_b[0:len(qr_b)] + [control] + [anc])
-
-    qc.barrier()
+        qc = shs.control_Ham_sim(qc, A, phase, control, qr, qr_b, qr_a[0])
+    
     # inverse QFT
-    #qc = IQFT(qc, qr_t)
-
-    qc_qfti = inv_qft_gate(n_t, method=2)
-    qc.append(qc_qfti, qr_t)
-
-    if QFTI_ == None:
-        QFTI_ = qc_qfti
-
-    qc.barrier()
+    qc = IQFT(qc, qr_t)
     
     # reset ancilla
     qc.reset(qr_a[0])
@@ -570,53 +504,29 @@ def make_circuit(A, b, num_clock_qubits):
     theta = ucr.alpha2theta(alpha)
         
     # do inversion step and measure ancilla
-
-    qc_invrot = ucr.uniformly_controlled_rot(n_t, theta)
-    INVROT_ = qc_invrot
-    qc.append(qc_invrot, qr_t[0:len(qr_t)] + [qr_a[0]])
+    qc = ucr.uniformly_controlled_rot(qc, qr_t, qr_a, theta)
     qc.measure(qr_a[0], cr_a[0])
     qc.reset(qr_a[0])
+    
 
     # QFT
-    #qc = QFT(qc, qr_t)
-
-    qc.barrier()
-
-    qc_qft = qft_gate(n_t, method=2)
-    qc.append(qc_qft, qr_t)
-
-    if QFT_ == None:
-        QFT_ = qc_qft
-    qc.barrier()
+    qc = QFT(qc, qr_t)
     
     # uncompute phase estimation
     # perform controlled e^(-i*A*t)
     for q in reversed(range(n_t)):
         control = qr_t[q]
         phase = (2*pi)*2**q  
-        qc_ui = shs.control_Ham_sim(n, A, phase)
-        if phase <= 0:
-            qc_ui.name = "e^{" + str(q) + "iAt}"
-        else:
-            qc_ui.name = "e^{-" + str(q) + "iAt}"
-        if UI_ == None:
-            UI_ = qc_ui
-        qc.append(qc_ui, qr[0:len(qr)] + qr_b[0:len(qr_b)] + [control] + [anc])
-
-    qc.barrier()
+        qc = shs.control_Ham_sim(qc, A, phase, control, qr, qr_b, qr_a[0])
     
-    # Hadamard (again) the phase estimation register - the 'clock'
+    # Hadamard phase estimation register
     for q in range(n_t):
         qc.h(qr_t[q])
     
     # measure ancilla and main register
     qc.barrier()
     qc.measure(qr[0:], cr[0:])
-
-    if QC_ == None:
-        QC_ = qc
-        #print(f"... made circuit = \n{QC_}")
-
+    
     return qc
 
 
@@ -680,7 +590,6 @@ def true_distr(A, b=0):
     return distr
 
 
-# DEVNOTE: This is not used any more and possibly should be removed
 def TVD(distr1, distr2):  
     """ compute total variation distance between distr1 and distr2
         which are represented as dictionaries of bitstrings and probabilities
@@ -710,16 +619,13 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
-
-    if verbose:
-        print(f"... counts = {counts}")
     
     # post-select counts where ancilla was measured as |1>
     post_counts, rate = postselect(counts)
     num_input_qubits = len(list(post_counts.keys())[0])
     
     if verbose: 
-        print(f'... ratio of counts with ancilla measured |1> : {round(rate, 4)}')
+        print(f'Ratio of counts with ancilla measured |1> : {round(rate, 4)}')
     
     # compute true distribution from secret int
     off_diag_index = 0
@@ -739,99 +645,27 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
                               diag_el=diag_el, off_diag_el=off_diag_el)
     ideal_distr = true_distr(A, b)
-      
-    # # compute total variation distance
-    # tvd = TVD(ideal_distr, post_counts)
     
-    # # use TVD as infidelity
-    # fidelity = 1 - tvd
-    # #fidelity = metrics.polarization_fidelity(post_counts, ideal_distr)
-
-    fidelity = metrics.polarization_fidelity(post_counts, ideal_distr)
+    
+    # compute total variation distance
+    tvd = TVD(ideal_distr, post_counts)
+    
+    # use TVD as infidelity
+    fidelity = 1 - tvd
+    
     
     return post_counts, fidelity
 
-
 ################ Benchmark Loop
 
-# Execute program with default parameters (based on min and max_qubits)
-# This routine computes a reasonable min and max input and clock qubit range to sweep
-# from the given min and max qubit sizes using the formula below and making the 
-# assumption that num_input_qubits ~= num_clock_qubits and num_input_qubits < num_clock_qubits:
-#      num_qubits = 2 * num_input_qubits + num_clock_qubits + 1 (the ancilla)
-
-def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method = 1, 
+# Execute program with default parameters
+def run (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=2, 
+        max_clock_qubits=3, max_circuits=3, num_shots=100, 
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):  
+        hub="ibm-q", group="open", project="main", exec_options=None):
 
-        # we must have at least 4 qubits and min must be less than max
-        max_qubits = max(4, max_qubits)
-        min_qubits = min(max(4, min_qubits), max_qubits)
-        #print(f"... using min_qubits = {min_qubits} and max_qubits = {max_qubits}")
-        
-        ''' first attempt ..
-        min_input_qubits = min_qubits//2
-        if min_qubits%2 == 1:
-            min_clock_qubits = min_qubits//2 + 1
-        else:
-            min_clock_qubits = min_qubits//2
-
-        max_input_qubits = max_qubits//2
-        if max_qubits%2 == 1:
-            max_clock_qubits = max_qubits//2 + 1
-        else:
-            max_clock_qubits = max_qubits//2
-        '''
-        
-        # the calculation below is based on the formula described above, where I = input, C = clock:
-        
-        # I = int((N - 1) / 3)
-        min_input_qubits = int((min_qubits - 1) / 3)
-        max_input_qubits = int((max_qubits - 1) / 3)
-        
-        # C = N - 1 - 2 * I
-        min_clock_qubits = min_qubits - 1 - 2 * min_input_qubits
-        max_clock_qubits = max_qubits - 1 - 2 * max_input_qubits
-        
-        #print(f"... input, clock qubit width range: {min_input_qubits} : {max_input_qubits}, {min_clock_qubits} : {max_clock_qubits}")
-
-        return run2(min_input_qubits, max_input_qubits, min_clock_qubits, 
-                max_clock_qubits, max_circuits, num_shots, 
-                method,
-                backend_id, provider_backend,
-                hub, group, project, exec_options)
-
-
-# Execute program with default parameters and permitting the user to specify an
-# arbitrary range of input and clock qubit widths
-# The benchmark sweeps over all input widths and clock widths in the range specified
-
-def run2 (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=1, 
-        max_clock_qubits=3, max_circuits=3, num_shots=100,
-        method=2,
-        backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):  
-    
     print("HHL Benchmark Program - Qiskit")
-
-    # ensure valid input an clock qubit widths
-    min_input_qubits = min(max(1, min_input_qubits), max_input_qubits)
-    max_input_qubits = max(min_input_qubits, max_input_qubits)
-    min_clock_qubits = min(max(1, min_clock_qubits), max_clock_qubits)
-    max_clock_qubits = max(min_clock_qubits, max_clock_qubits)
-    #print(f"... in, clock: {min_input_qubits}, {max_input_qubits}, {min_clock_qubits}, {max_clock_qubits}")
     
-    # initialize saved circuits for display
-    global QC_, U_, UI_, QFT_, QFTI_, HP_, INVROT_
-    QC_ = None
-    U_ = None
-    UI_ = None
-    QFT_ = None
-    QFTI_ = None
-    HP_ = None
-    INVROT_ = None
-
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -840,7 +674,6 @@ def run2 (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=1,
      
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        
         #counts, fidelity = analyze_and_print_result(qc, result, num_qubits, ideal_distr)
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
         metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
@@ -879,27 +712,21 @@ def run2 (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=1,
             
             # loop over randomly generated problem instances
             for i in range(num_circuits):
-
-                # generate a non-zero value < N
-                #b = np.random.choice(range(N))           # orig code, gens 0 sometimes
-                b = np.random.choice(range(1, N))
-                
-                # and a non-zero index
-                off_diag_index = np.random.choice(range(1, N))
-                
+                b = np.random.choice(range(N))
+                off_diag_index = np.random.choice(range(1,N))
                 A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
                                           diag_el=diag_el, off_diag_el=off_diag_el)
                 
                 # define secret_int
-                s_int = (2**off_diag_index)*(3**b)             
+                s_int = (2**off_diag_index)*(3**b)
+                
                 
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
                 qc = make_circuit(A, b, num_clock_qubits)
                 metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
     
-                #print(qc)
-                
+    
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
                 ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
         
@@ -910,14 +737,12 @@ def run2 (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=1,
     ex.finalize_execution(metrics.finalize_group)
 
     # print a sample circuit
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+    #print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
-    print("\nU Circuit ="); print(U_ if U_ != None else "  ... too large!")
-    print("\nU^-1 Circuit ="); print(UI_ if UI_ != None else "  ... too large!")
-    print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
-    print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
-    print("\nHamiltonian Phase Estimation Circuit ="); print(HP_ if HP_ != None else "  ... too large!")
-    print("\nControlled Rotation Circuit ="); print(INVROT_ if INVROT_ != None else "  ... too large!")
+    #print("\nU Circuit ="); print(U_ if U_ != None else "  ... too large!")
+    #print("\nU^-1 Circuit ="); print(UI_ if UI_ != None else "  ... too large!")
+    #print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
+    #print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
     metrics.plot_metrics("Benchmark Results - HHL - Qiskit",
