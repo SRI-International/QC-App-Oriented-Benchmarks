@@ -578,11 +578,15 @@ def make_circuit(A, b, num_clock_qubits):
             alpha.append(2*np.arcsin(C/lam))
     theta = ucr.alpha2theta(alpha)
         
-    # do inversion step and measure ancilla
+    # do inversion step
 
     qc_invrot = ucr.uniformly_controlled_rot(n_t, theta)
-    INVROT_ = qc_invrot
     qc.append(qc_invrot, qr_t[0:len(qr_t)] + [qr_a[0]])
+    
+    if INVROT_ == None:
+        INVROT_ = qc_invrot
+    
+    # and measure ancilla
     
     qc.measure(qr_a[0], cr_a[0])
     qc.reset(qr_a[0])
