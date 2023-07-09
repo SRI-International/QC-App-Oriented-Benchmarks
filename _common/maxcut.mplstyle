@@ -1,0 +1,28 @@
+# Set default figure size
+figure.figsize : 6.8, 5.0
+
+# X and Y axis ticks
+xtick.direction : in
+ytick.direction : in
+
+# Save as 'tight'
+savefig.bbox : tight
+savefig.pad_inches : 0.05
+savefig.dpi : 300
+savefig.facecolor: white
+
+axes.titlepad : 5.0
+# Use serif fonts
+# font.family : sans-serif
+# mathtext.fontset: dejavusans
+
+# Use LaTeX for math formatting
+# text.usetex : True
+# text.latex.preamble : \usepackage{amsmath} \usepackage{amssymb}
+
+# Grid properties
+grid.color : 'k'
+grid.linestyle: -. 
+grid.alpha : 0.5
+grid.linewidth : 0.5
+

@@ -148,25 +148,52 @@ def Ctrl_Q(num_state_qubits, A_circ):
     return Ctrl_Q_, qc
 
 # Analyze and print measured results
-# Expected result is always the secret_int, so fidelity calc is simple
+# Expected result is always the secret_int (which encodes alpha), so fidelity calc is simple
 def analyze_and_print_result(qc, result, num_counting_qubits, s_int, num_shots):
     
-    counts = bitstring_to_a(result.get_counts(qc), num_counting_qubits)
-    a = a_from_s_int(s_int, num_counting_qubits)    
-    
-    if verbose: print(f"For amplitude {a} measured: {counts}")
-    
-    # correct distribution is measuring amplitude a 100% of the time
-    correct_dist = {a: 1.0}
+    # get results as measured counts
+    counts = result.get_counts(qc) 
+        
+    # calculate expected output histogram
+    a = a_from_s_int(s_int, num_counting_qubits)
+    correct_dist = a_to_bitstring(a, num_counting_qubits)  
 
-    # generate thermal_dist with amplitudes instead, to be comparable to correct_dist
-    bit_thermal_dist = metrics.uniform_dist(num_counting_qubits)
-    thermal_dist = bitstring_to_a(bit_thermal_dist, num_counting_qubits)
+    # generate thermal_dist for polarization calculation
+    thermal_dist = metrics.uniform_dist(num_counting_qubits)
+    
+    # convert counts, expectation, and thermal_dist to app form for visibility
+    # app form of correct distribution is measuring amplitude a 100% of the time
+    app_counts = bitstring_to_a(counts, num_counting_qubits)
+    app_correct_dist = {a: 1.0}
+    app_thermal_dist = bitstring_to_a(thermal_dist, num_counting_qubits)
 
-    # use our polarization fidelity rescaling
+    if verbose:
+        print(f"For amplitude {a}, expected: {correct_dist} measured: {counts}")
+        print(f"   ... For amplitude {a} thermal_dist: {thermal_dist}")
+        print(f"For amplitude {a}, app expected: {app_correct_dist} measured: {app_counts}")
+        print(f"   ... For amplitude {a} app_thermal_dist: {app_thermal_dist}")
+
+    # use polarization fidelity with rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
+    #fidelity = metrics.polarization_fidelity(app_counts, app_correct_dist, app_thermal_dist)
+    
+    hf_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
+
+    if verbose: print(f"  ... fidelity: {fidelity}  hf_fidelity: {hf_fidelity}")
     
     return counts, fidelity
+
+def a_to_bitstring(a, num_counting_qubits):
+    m = num_counting_qubits
+
+    # solution 1
+    num1 = round(np.arcsin(np.sqrt(a)) / np.pi * 2**m)
+    num2 = round( (np.pi - np.arcsin(np.sqrt(a))) / np.pi * 2**m)
+    if num1 != num2 and num2 < 2**m and num1 < 2**m:
+        counts = {format(num1, "0"+str(m)+"b"): 0.5, format(num2, "0"+str(m)+"b"): 0.5}
+    else:
+        counts = {format(num1, "0"+str(m)+"b"): 1}
+    return counts
 
 def bitstring_to_a(counts, num_counting_qubits):
     est_counts = {}
@@ -234,6 +261,9 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1):
+
+        # reset random seed
+        np.random.seed(0)
         
         # as circuit width grows, the number of counting qubits is increased
         num_counting_qubits = num_qubits - num_state_qubits - 1
@@ -242,6 +272,8 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
         num_circuits = min(2 ** (num_counting_qubits), max_circuits)
         
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        if verbose:
+            print(f"              with num_state_qubits = {num_state_qubits}  num_counting_qubits = {num_counting_qubits}")
         
         # determine range of secret strings to loop over
         if 2**(num_counting_qubits) <= max_circuits:
