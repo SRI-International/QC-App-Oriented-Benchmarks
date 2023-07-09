@@ -142,10 +142,11 @@ class BenchmarkResult(object):
 def default_noise_model():
 
     noise = NoiseModel()
-    # Add depolarizing error to all single qubit gates with error rate 0.3%
-    #                    and to all two qubit gates with error rate 3.0%
-    depol_one_qb_error = 0.003
-    depol_two_qb_error = 0.03
+    
+    # Add depolarizing error to all single qubit gates with error rate 0.05%
+    #                    and to all two qubit gates with error rate 0.5%
+    depol_one_qb_error = 0.0005
+    depol_two_qb_error = 0.005
     noise.add_all_qubit_quantum_error(depolarizing_error(depol_one_qb_error, 1), ['rx', 'ry', 'rz'])
     noise.add_all_qubit_quantum_error(depolarizing_error(depol_two_qb_error, 2), ['cx'])
 
@@ -166,6 +167,9 @@ def default_noise_model():
     p1given0_error = 0.000
     error_meas = ReadoutError([[1 - p1given0_error, p1given0_error], [p0given1_error, 1 - p0given1_error]])
     noise.add_all_qubit_readout_error(error_meas)
+    
+    # assign a quantum volume (measured using the values below)
+    noise.QV = 2048
     
     return noise
 
@@ -440,6 +444,10 @@ def execute_circuit(circuit):
 
             logger.info(f"Performing noisy simulation, shots = {shots}")
             
+            # if the noise model has associated QV value, copy it to metrics module for plotting
+            if hasattr(this_noise, "QV"):
+                metrics.QV = this_noise.QV
+                   
             simulation_circuits = circuit["qc"]
 
             # we already have the noise model, just need to remove it from the options
