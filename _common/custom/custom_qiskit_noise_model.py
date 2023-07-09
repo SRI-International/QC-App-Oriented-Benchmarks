@@ -11,6 +11,7 @@ from qiskit.providers.aer.noise import depolarizing_error, reset_error
 def my_noise_model():
     
     noise = NoiseModel()
+    
     # Add depolarizing error to all single qubit gates with error rate 0.3%
     #                    and to all two qubit gates with error rate 3.0%
     depol_one_qb_error = 0.003
@@ -35,6 +36,9 @@ def my_noise_model():
     p1given0_error = 0.000
     error_meas = ReadoutError([[1 - p1given0_error, p1given0_error], [p0given1_error, 1 - p0given1_error]])
     noise.add_all_qubit_readout_error(error_meas)
+    
+    # assign a quantum volume (measured using the values below)
+    noise.QV = 32
     
     #print("... using custom noise model")
     return noise

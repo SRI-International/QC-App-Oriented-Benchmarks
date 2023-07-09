@@ -82,7 +82,7 @@ do_app_charts_with_all_metrics = False
 max_depth_log = 22
 
 # Quantum Volume to display on volumetric background
-QV = 32
+QV = 256
 
 # Algorithmic Qubits (defaults)
 AQ = 22
