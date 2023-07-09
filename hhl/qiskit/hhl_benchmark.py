@@ -786,7 +786,7 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
 #      num_qubits = 2 * num_input_qubits + num_clock_qubits + 1 (the ancilla)
 
 def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        method = 1, 
+        method = 1, use_best_widths=True,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):  
 
@@ -821,20 +821,22 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
         
         #print(f"... input, clock qubit width range: {min_input_qubits} : {max_input_qubits}, {min_clock_qubits} : {max_clock_qubits}")
 
-        return run2(min_input_qubits, max_input_qubits, min_clock_qubits, 
-                max_clock_qubits, max_circuits, num_shots, 
-                method,
-                backend_id, provider_backend,
-                hub, group, project, exec_options)
+        return run2(min_input_qubits=min_input_qubits,max_input_qubits= max_input_qubits,
+                min_clock_qubits=min_clock_qubits, max_clock_qubits=max_clock_qubits,
+                max_circuits=max_circuits, num_shots=num_shots, 
+                method=method, use_best_widths=use_best_widths,
+                backend_id=backend_id, provider_backend=provider_backend,
+                hub=hub, group=group, project=project, exec_options=exec_options)
 
 
 # Execute program with default parameters and permitting the user to specify an
 # arbitrary range of input and clock qubit widths
 # The benchmark sweeps over all input widths and clock widths in the range specified
 
-def run2 (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=1, 
-        max_clock_qubits=3, max_circuits=3, num_shots=100,
-        method=2,
+def run2 (min_input_qubits=1, max_input_qubits=3,
+        min_clock_qubits=1, max_clock_qubits=3,
+        max_circuits=3, num_shots=100,
+        method=2, use_best_widths=False,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):  
     
@@ -899,7 +901,15 @@ def run2 (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=1,
         
             # determine number of circuits to execute for this group
             num_circuits = max_circuits
-            
+
+            # if flagged to use best input and clock for specific num_qubits, check against formula
+            if use_best_widths:
+                if num_input_qubits != int((num_qubits - 1) / 3) or num_clock_qubits != (num_qubits - 1 - 2 * num_input_qubits):
+                
+                    if verbose:   
+                        print(f"... SKIPPING {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
+                    continue
+                    
             print(f"************\nExecuting {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
             
             # loop over randomly generated problem instances
