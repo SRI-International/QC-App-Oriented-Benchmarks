@@ -209,9 +209,9 @@ def aggregate_metrics_for_group (group):
         group_metrics["avg_create_times"].append(avg_create_time)
         group_metrics["avg_elapsed_times"].append(avg_elapsed_time)
         group_metrics["avg_exec_times"].append(avg_exec_time)
-        group_metrics["avg_fidelities"].append(avg_fidelity)
+        group_metrics["avg_fidelities"].append(avg_fidelity)        
         group_metrics["avg_hf_fidelities"].append(avg_hf_fidelity)
-        
+
         # skip these if there is not a real circuit for this group
         if avg_depth > 0:
             group_metrics["avg_depths"].append(avg_depth)
