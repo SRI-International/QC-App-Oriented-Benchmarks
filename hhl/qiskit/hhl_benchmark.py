@@ -236,6 +236,9 @@ def ctrl_ui(exponent):
     return cu_gate, qc
 
 
+####### DEVNOTE: The following functions (up until the make_circuit) are from the first inccarnation
+#       of this benchmark and are not used here.  Should be removed, but kept here for reference for now
+
 
 ############# Quantum Phase Estimation
    
@@ -516,7 +519,7 @@ def make_circuit(A, b, num_clock_qubits):
     # create the top-level HHL circuit, with all the registers
     qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a)
 
-    ''' Populate the circuit with gate sequences '''
+    ''' Initialize the input and clock qubits '''
     
     # initialize the |b> state - the 'input'
     qc = initialize_state(qc, qr, b)
@@ -528,7 +531,9 @@ def make_circuit(A, b, num_clock_qubits):
         qc.h(qr_t[q])
 
     qc.barrier()
-        
+     
+    ''' Perform Quantum Phase Estimation on input (b), clock, and ancilla '''
+    
     # perform controlled e^(i*A*t)
     for q in range(n_t):
         control = qr_t[q]
@@ -544,20 +549,24 @@ def make_circuit(A, b, num_clock_qubits):
         qc.append(qc_u, qr[0:len(qr)] + qr_b[0:len(qr_b)] + [control] + [anc])
 
     qc.barrier()
-    # inverse QFT
+    
+    ''' Perform Inverse Quantum Fourier Transform on clock qubits '''
+    
     #qc = IQFT(qc, qr_t)
-
+    
     qc_qfti = inv_qft_gate(n_t, method=2)
     qc.append(qc_qfti, qr_t)
 
     if QFTI_ == None:
         QFTI_ = qc_qfti
-
+    
     qc.barrier()
+    
+    ''' Perform inverse rotation with ancilla '''
     
     # reset ancilla
     qc.reset(qr_a[0])
-        
+    
     # compute angles for inversion rotations
     alpha = [2*np.arcsin(C)]
     for x in range(1,2**n_t):
@@ -574,20 +583,25 @@ def make_circuit(A, b, num_clock_qubits):
     qc_invrot = ucr.uniformly_controlled_rot(n_t, theta)
     INVROT_ = qc_invrot
     qc.append(qc_invrot, qr_t[0:len(qr_t)] + [qr_a[0]])
+    
     qc.measure(qr_a[0], cr_a[0])
     qc.reset(qr_a[0])
 
-    # QFT
-    #qc = QFT(qc, qr_t)
-
     qc.barrier()
-
+    
+    ''' Perform Quantum Fourier Transform on clock qubits '''
+   
+    #qc = QFT(qc, qr_t)
+    
     qc_qft = qft_gate(n_t, method=2)
     qc.append(qc_qft, qr_t)
 
     if QFT_ == None:
         QFT_ = qc_qft
+    
     qc.barrier()
+    
+    ''' Perform Inverse Quantum Phase Estimation on input (b), clock, and ancilla '''
     
     # uncompute phase estimation
     # perform controlled e^(-i*A*t)
@@ -609,8 +623,11 @@ def make_circuit(A, b, num_clock_qubits):
     for q in range(n_t):
         qc.h(qr_t[q])
     
-    # measure ancilla and main register
     qc.barrier()
+    
+    ''' Perform final measurements '''
+    
+    # measure ancilla and main register
     qc.measure(qr[0:], cr[0:])
 
     if QC_ == None:
@@ -618,7 +635,6 @@ def make_circuit(A, b, num_clock_qubits):
         #print(f"... made circuit = \n{QC_}")
 
     return qc
-
 
 
 def sim_circuit(qc, shots):
@@ -653,9 +669,7 @@ def postselect(outcomes, return_probs=True):
  
 ############### Result Data Analysis
 
-
 saved_result = None
-
 
 def true_distr(A, b=0):
     
@@ -681,6 +695,7 @@ def true_distr(A, b=0):
 
 
 # DEVNOTE: This is not used any more and possibly should be removed
+'''
 def TVD(distr1, distr2):  
     """ compute total variation distance between distr1 and distr2
         which are represented as dictionaries of bitstrings and probabilities
@@ -701,7 +716,7 @@ def TVD(distr1, distr2):
             tvd += p2/2
     
     return tvd
-
+'''
 
 def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     
@@ -712,7 +727,7 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     counts = result.get_counts(qc)
 
     if verbose:
-        print(f"... counts = {counts}")
+        print(f"... for circuit = {num_qubits} {s_int}, counts = {counts}")
     
     # post-select counts where ancilla was measured as |1>
     post_counts, rate = postselect(counts)
@@ -724,15 +739,25 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     # compute true distribution from secret int
     off_diag_index = 0
     b = 0
+    
+    # remove instance index from s_int
+    s_int = s_int - 1000 * int(s_int/1000)
+    
+    # get off_diag_index and b
     s_int_o = int(s_int)
-    s_int_b = int(s_int)
+    s_int_b = int(s_int)   
+    
     while (s_int_o % 2) == 0:
         s_int_o = int(s_int_o/2)
         off_diag_index += 1
+        
     while (s_int_b % 3) == 0:
         s_int_b = int(s_int_b/3)
         b += 1
     
+    if verbose:
+        print(f"... rem(s_int) = {s_int}, b = {b}, odi = {off_diag_index}")
+        
     # temporarily fix diag and off-diag matrix elements
     diag_el = 0.5
     off_diag_el = -0.25
@@ -868,14 +893,14 @@ def run2 (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=1,
     #for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
     for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
         N = 2**num_input_qubits # matrix size
-        
+                    
         for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1):      
             num_qubits = 2*num_input_qubits + num_clock_qubits + 1
         
             # determine number of circuits to execute for this group
             num_circuits = max_circuits
             
-            print(f"************\nExecuting {num_circuits} circuits with {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
+            print(f"************\nExecuting {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
             
             # loop over randomly generated problem instances
             for i in range(num_circuits):
@@ -887,17 +912,21 @@ def run2 (min_input_qubits=1, max_input_qubits=3, min_clock_qubits=1,
                 # and a non-zero index
                 off_diag_index = np.random.choice(range(1, N))
                 
-                A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
-                                          diag_el=diag_el, off_diag_el=off_diag_el)
+                # define secret_int (include 'i' since b and off_diag_index don't need to be unique)
+                s_int = 1000 * (i+1) + (2**off_diag_index)*(3**b)
+                #s_int = (2**off_diag_index)*(3**b)
                 
-                # define secret_int
-                s_int = (2**off_diag_index)*(3**b)             
+                if verbose:
+                    print(f"... create A for b = {b}, off_diag_index = {off_diag_index}, s_int = {s_int}")
+                
+                A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
+                                          diag_el=diag_el, off_diag_el=off_diag_el)             
                 
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
                 qc = make_circuit(A, b, num_clock_qubits)
                 metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
-    
+                
                 #print(qc)
                 
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)

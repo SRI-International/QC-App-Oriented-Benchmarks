@@ -209,13 +209,13 @@ def aggregate_metrics_for_group (group):
         group_metrics["avg_exec_times"].append(avg_exec_time)
         group_metrics["avg_fidelities"].append(avg_fidelity)
         
-        if avg_depth > 0:
+        if avg_depth >= 0:
             group_metrics["avg_depths"].append(avg_depth)
-        if avg_xi > 0:
+        if avg_xi >= 0:
             group_metrics["avg_xis"].append(avg_xi)
-        if avg_tr_depth > 0:
+        if avg_tr_depth >= 0:
             group_metrics["avg_tr_depths"].append(avg_tr_depth)
-        if avg_tr_xi > 0:
+        if avg_tr_xi >= 0:
             group_metrics["avg_tr_xis"].append(avg_tr_xi)
         
         if avg_exec_creating_time > 0:
