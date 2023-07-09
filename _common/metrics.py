@@ -158,10 +158,12 @@ def aggregate_metrics_for_group (group):
         group_elapsed_time = 0
         group_exec_time = 0
         group_fidelity = 0
+        group_hf_fidelity = 0
         group_depth = 0
         group_xi = 0
         group_tr_depth = 0
         group_tr_xi = 0
+        group_tr_n2q = 0
         group_exec_creating_time = 0
         group_exec_validating_time = 0
         group_exec_running_time = 0
@@ -208,6 +210,7 @@ def aggregate_metrics_for_group (group):
         group_metrics["avg_elapsed_times"].append(avg_elapsed_time)
         group_metrics["avg_exec_times"].append(avg_exec_time)
         group_metrics["avg_fidelities"].append(avg_fidelity)
+        group_metrics["avg_hf_fidelities"].append(avg_hf_fidelity)
         
         # skip these if there is not a real circuit for this group
         if avg_depth > 0:
@@ -220,6 +223,8 @@ def aggregate_metrics_for_group (group):
         group_metrics["avg_xis"].append(avg_xi)
         #if avg_tr_xi > 0:
         group_metrics["avg_tr_xis"].append(avg_tr_xi)
+        #if avg_tr_n2q > 0:
+        group_metrics["avg_tr_n2qs"].append(avg_tr_n2q)
         
         if avg_exec_creating_time > 0:
             group_metrics["avg_exec_creating_times"].append(avg_exec_creating_time)
