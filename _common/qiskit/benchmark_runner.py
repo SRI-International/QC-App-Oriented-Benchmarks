@@ -19,6 +19,16 @@ benchmark_algorithms = [
     "vqe",
 ]
 
+# find the path of the script
+scriptPath = os.path.realpath(os.path.dirname(sys.argv[0]))
+
+# environment variable for the path of the project
+os.environ["QEDC_BENCHMARK_TOP"] = scriptPath+"/../../"
+
+# set the current working directory to the top level of the project
+os.chdir(os.environ["QEDC_BENCHMARK_TOP"])
+
+
 # Add algorithms to path:
 for algorithm in benchmark_algorithms:
     sys.path.insert(1, os.path.join(f"{algorithm}", "qiskit"))
