@@ -30,7 +30,12 @@ def rebase_pass():
     return auto_rebase_pass({OpType.CX, OpType.X, OpType.SX, OpType.Rz})
 
 
-def tket_transformer_generator(quick=False, cx_fidelity=1.0, pauli_simp=False):
+def tket_transformer_generator(
+    cx_fidelity=1.0,
+    pauli_simp=False,
+    remove_barriers=True,
+    resynthesise=True,
+):
     """Generator for transformer using TKET passes
 
     :param quick: Perform quick optimisation, defaults to False
@@ -55,8 +60,8 @@ def tket_transformer_generator(quick=False, cx_fidelity=1.0, pauli_simp=False):
         """
 
         tk_circuit = qiskit_to_tk(circuit)
-        # RemoveImplicitQubitPermutation().apply(tk_circuit)
-        RemoveBarriers().apply(tk_circuit)
+        if remove_barriers:
+            RemoveBarriers().apply(tk_circuit)
         DecomposeBoxes().apply(tk_circuit)
 
         # Obtain device data for noise aware placement.
@@ -76,7 +81,7 @@ def tket_transformer_generator(quick=False, cx_fidelity=1.0, pauli_simp=False):
             PauliSimp().apply(tk_circuit)
 
         # Initialise pass list and perform thorough optimisation.
-        if not quick:
+        if resynthesise:
             FullPeepholeOptimise().apply(tk_circuit)
 
         # Add noise aware placement and routing to pass list.
@@ -95,20 +100,20 @@ def tket_transformer_generator(quick=False, cx_fidelity=1.0, pauli_simp=False):
                 delay_measures=False,
             ).apply(tk_circuit)
 
-        if not quick:
+        if resynthesise:
             KAKDecomposition(cx_fidelity=cx_fidelity).apply(tk_circuit)
-            CliffordSimp().apply(tk_circuit)
-            SynthesiseTket().apply(tk_circuit)
+        
+        CliffordSimp().apply(tk_circuit)
+        SynthesiseTket().apply(tk_circuit)
 
         # Rebase to backend gate set and perform basic optimisation
         rebase_pass().apply(tk_circuit)
 
-        if not quick:
-            RemoveRedundancies().apply(tk_circuit)
-            SimplifyInitial(
-                allow_classical=False,
-                create_all_qubits=True,
-            ).apply(tk_circuit)
+        RemoveRedundancies().apply(tk_circuit)
+        SimplifyInitial(
+            allow_classical=False,
+            create_all_qubits=True,
+        ).apply(tk_circuit)
 
         circuit = tk_to_qiskit(tk_circuit)
 
