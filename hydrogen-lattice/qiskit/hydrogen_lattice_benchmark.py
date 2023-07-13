@@ -83,6 +83,14 @@ vqe_parameter = namedtuple('vqe_parameter','theta')
 # Qiskit uses the little-Endian convention. Hence, measured bit-strings need to be reversed while evaluating cut sizes
 reverseStep = -1
 
+# DEBUG prints
+# give argument to the python script as "debug" or "true" or "1" to enable debug prints
+if len(sys.argv) > 1:
+    DEBUG = (sys.argv[1].lower() in ['debug', 'true', '1'])
+else:
+    DEBUG = False
+
+
 # Create the  ansatz quantum circuit for the VQE algorithm.
 def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = None, *args, **kwargs) -> QuantumCircuit:
     # Generate the ansatz circuit for the VQE algorithm.
@@ -174,7 +182,7 @@ def HydrogenLattice (num_qubits, secret_int, thetas_array, parameterized):
     #     _qc.assign_parameters([np.random.choice([-1e-3, 1e-3]) for _ in range(len(_qc.parameters))],inplace=True)
     
     # add the measure here, only after circuit is created
-    _qc.measure_all()
+    #_qc.measure_all()
     
     # params = {theta: thetas_array[1]}   
     #logger.info(f"Binding parameters {params = }")
@@ -340,6 +348,8 @@ def expectation_run(circuit: QuantumCircuit, shots: Optional[int] = None) -> Dic
             probs = Statevector(statevector).probabilities_dict(qargs=measured_qubits)
         elif isinstance(shots, int):
             counts = (execute(circuit, backend= qasm_backend, shots=shots).result().get_counts())
+            if DEBUG:
+                print("DEBUG : \n method: expectation_run \n\t counts: "+str(counts) + "\n\t circuit: "+str(circuit))
             probs = normalize_counts(counts, num_qubits=circuit.num_qubits)
         # else:
         #     raise TypeError(ErrorMessages.UNRECOGNIZED_SHOTS.value.format(shots=shots))
@@ -385,8 +395,14 @@ def calculate_expectation(base_circuit, operator, parameters=None, shots=None):
     measurable_expression = StateFn(operator, is_measurement=True)
     observables = PauliExpectation().convert(measurable_expression)
     circuits, formatted_observables = prepare_circuits(base_circuit, observables)
+
+    if DEBUG:
+        print("DEBUG : \n method: calculate_expectation \n\t base_circuit: "+str(base_circuit))
+
     probabilities = compute_probabilities(circuits, parameters, shots)
     expectation_values = calculate_expectation_values(probabilities, formatted_observables)
+    if DEBUG:
+        print("DEBUG : \n method: calculate_expectation \n\t probabilities: "+str(probabilities) + "\n\t expectation_values: "+str(expectation_values))
     return sum(expectation_values)
     
 def prepare_circuits(base_circuit, observables):
@@ -400,6 +416,7 @@ def prepare_circuits(base_circuit, observables):
     for obs in observables:
         circuit = base_circuit.copy()
         circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
+        circuit.measure_all()
         circuits.append(circuit)
     return circuits, observables
 
@@ -414,6 +431,8 @@ def compute_probabilities(circuits, parameters=None, shots=None):
         else:
             circuit = my_circuit.copy()
         result = expectation_run(circuit, shots)
+        if DEBUG:
+            print("DEBUG : \n method: compute_probabilities \n\t result_probabilities: "+str(result))
         probabilities.append(result)
 
     return probabilities
@@ -438,6 +457,8 @@ lowest_energy_values = []
 
 def compute_energy(qc, operator, shots, parameters): 
     
+    if DEBUG:
+        print("DEBUG : \n method: compute_energy \n\t binding parameters: "+str(parameters))
     # Bind the parameters to the circuit
     bound_circuit = qc.bind_parameters(parameters)
     # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
@@ -754,7 +775,7 @@ MAX_QUBITS = 24
 
 
 
-def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
+def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=10_000,
         method=2, radius=None, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, plot_results = True,
@@ -1095,7 +1116,9 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 
                     qc, params = HydrogenLattice(num_qubits, unique_id, thetas_array, parameterized)
                     # collapse the sub-circuit levels used in this benchmark (for qiskit)
+                    #TODO why are we decomposing the circuit?
                     qc2 = qc.decompose()
+
                     
                     # Circuit Creation and Decomposition end
                     #************************************************
@@ -1103,11 +1126,15 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                     #************************************************
                     #*** Quantum Part: Execution of Circuits ***
                     # submit circuit for execution on target with the current parameters
+                    
                     ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots, params=params)
+
                     
                     # Must wait for circuit to complete
                     #ex.throttle_execution(metrics.finalize_group)
-                    ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
+
+                    #TODO commenting the execution part because it throws an exception when measurement is performed later
+                    #ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                     
                     # after first execution and thereafter, no need for transpilation if parameterized
                     if parameterized:
@@ -1130,15 +1157,23 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                     
                     return energy
                            
-                
+                def callback_thetas_array(thetas_array):
+                    if DEBUG:
+                        print("callback_thetas_array" + str(thetas_array))
+                    else:
+                        pass
                 
                 initial_parameters = np.random.random(size=1)     
                 # objective_function(thetas_array=None)       
+                if DEBUG:
+                    print("The initial parameters are : "+ str(initial_parameters))
+
                 thetas_array = minimize(objective_function,
                 x0=initial_parameters.ravel(),
                 method='COBYLA',
                 tol=1e-3,
-                options={'maxiter': 100, 'disp': False} )
+                options={'maxiter': 100, 'disp': False},
+                 callback=callback_thetas_array) 
                 
                 ideal_energy = objective_function(thetas_array.x)
                 current_radius = os.path.basename(instance_filepath).split('_')[2][:4]
@@ -1168,7 +1203,13 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
 
                 # Add the text annotation at the top of the plot
                 plt.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
-                plt.show()
+
+                #block plot until closed for the last iteration
+                if instance_num == max_circuits:
+                    print("Close plots to continue")
+                    plt.show(block=True)
+                else:
+                    plt.show(block=False)
                 
             lowest_energy_values.clear()
                     
