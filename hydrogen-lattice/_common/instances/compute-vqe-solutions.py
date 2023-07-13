@@ -9,7 +9,7 @@ from qiskit.quantum_info import SparsePauliOp
 
 # import from common.py
 # to avoid working directory issues, go via folder path with pathlib
-common_folder = pathlib.Path(__file__).parent / '..'
+common_folder = pathlib.Path(__file__).parent / ".."
 common_folder = common_folder.resolve()
 sys.path.append(str(common_folder))
 
@@ -28,6 +28,11 @@ print("instances found: {}".format(len(instance_files)))
 for path in instance_files:
     print("working on: {}".format(path))
     instance = read_vqe_instance(path)
+
+    num_atoms = len(instance["atoms"])
+
+    if num_atoms > 8:
+        continue  # too many qubits to solve below
 
     paired_hamiltonian = instance["paired_hamiltonian"]
     paired_matrix = SparsePauliOp(

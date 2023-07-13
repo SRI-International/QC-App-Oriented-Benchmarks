@@ -216,7 +216,9 @@ if __name__ == "__main__":
     for shape in [chain]:
         for n in [2, 4, 6, 8, 10, 12, 14]:
             for r in [0.75, 1.00, 1.25]:
-                file_name = f"h{n}_{shape.__name__}_{r}.json"
+                file_name = f"h{n}_{shape.__name__}_{r}"
+                file_name = file_name.replace(".", "_")
+                file_name = file_name + ".json"
                 print(f"Working on {shape.__name__} for n={n} and r={r}")
 
                 # get lattice info from a particular shape
@@ -244,7 +246,7 @@ if __name__ == "__main__":
                 # begin JSON file creation
                 # this JSON file format can be changed to add/remove categories in the future
 
-                #create a dict and merge it with the orbital energy dict
+                # create a dict and merge it with the orbital energy dict
                 d = {
                     "atoms": atoms,
                     "x": xyz[:, 0].tolist(),
@@ -256,7 +258,7 @@ if __name__ == "__main__":
 
                 d = {**d, **orbital_energy_info}
 
-                #save file in the working directory
+                # save file in the working directory
                 with open(file_name, "w") as f:
                     json.dump(d, f, indent=4)
                 # end JSON file creation
