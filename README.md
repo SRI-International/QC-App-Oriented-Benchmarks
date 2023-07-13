@@ -96,45 +96,10 @@ There you will have access to a cell for each of the benchmarks in the repositor
 
 Some benchmarks, such as MaxCut, include a notebook for running advanced tests, specifically the iterative execution of interleaved class/quantum code for a hybrid algorithm. See the instructions in the README for those benchmarks for procedures and options that are available. 
 
-## Executing the Application Benchmark Programs via the Qiskit Runner
+## Executing the Application Benchmark Programs via the Qiskit Runner (Qiskit Environment only)
 
-It is possible to run the benchmarks from the top level directory in a generaized way on the command line.
-
-For instance, here is an example of running the default QFT algorithm from the
-`quantum-fourier-transform` directory:
-
-```
-python _common/qiskit/benchmark_runner.py -algorithm quantum-fourier-transform
-```
-
-Alternatively, one can supply custom arguments to this call if they differ from
-the defaults. For instance:
-
-```
- python _common/qiskit/benchmark_runner.py 
-    --algorithm 'quantum-fourier-transform'
-    --min_qubits 2 
-    --max_qubits 8 
-    --max_circuits 3 
-    --num_shots 100 
-    --method 2 
-    --backend_id 'qasm_simulator' 
-    --provider_backend None 
-    --hub "ibm-q" 
-    --group "open" 
-    --project "main" 
-    --exec_options '{"noise_model": "custom_qiskit_noise_model.my_noise_model()"}'
-```
-
-Note that any arguments of type `dict` must be provided as a string where both
-the key and value pair are also string values.
-
-In general, the arguments one can supply for a given algorithm are defined by
-the associated `run` method are described when executing the runner with only the algorithm argument:
-
-```
-python _common/qiskit/benchmark_runner ALGORITHM_NAME -h
-```
+It is possible to run the benchmarks from the top level directory in a generalized way on the command line 
+  [`Qiskit_Runner`](./_common/qiskit/README.md)
 
 ## Enabling Compiler Optimizations
 

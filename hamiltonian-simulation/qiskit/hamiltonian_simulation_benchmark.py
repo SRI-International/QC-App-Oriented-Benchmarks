@@ -200,7 +200,7 @@ def analyze_and_print_result(qc, result, num_qubits, type, num_shots):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run(min_qubits=2, max_qubits=8, max_circuits=3, num_shots=100,
+def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100,
         use_XX_YY_ZZ_gates = False,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
@@ -236,13 +236,13 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, num_shots=100,
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
 
         # reset random seed
         np.random.seed(0)
 
         # determine number of circuits to execute for this group
-        num_circuits = min(1, max_circuits)
+        num_circuits = max(1, max_circuits)
         
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
 
@@ -258,6 +258,8 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, num_shots=100,
 
         # loop over only 1 circuit
         for circuit_id in range(num_circuits):
+        
+            #print(circuit_id)
         
             # create the circuit for given qubit size and simulation parameters, store time metric
             ts = time.time()
