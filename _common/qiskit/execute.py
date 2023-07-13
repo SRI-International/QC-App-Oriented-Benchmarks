@@ -32,6 +32,7 @@ from collections import Counter
 import logging
 import numpy as np
 
+from datetime import datetime, timedelta
 from qiskit import execute, Aer, transpile
 from qiskit import IBMQ
 from qiskit.providers.jobstatus import JobStatus
@@ -40,6 +41,37 @@ from qiskit.providers.jobstatus import JobStatus
 from qiskit.providers.aer.noise import NoiseModel, ReadoutError
 from qiskit.providers.aer.noise import depolarizing_error, reset_error
 
+
+##########################
+# JOB MANAGEMENT VARIABLES 
+
+# these are defined globally currently, but will become class variables later
+
+#### these variables are currently accessed as globals from user code
+
+# maximum number of active jobs
+max_jobs_active = 5
+
+# job mode: False = wait, True = submit multiple jobs
+job_mode = False
+
+# Print progress of execution
+verbose = False
+
+# Print additional time metrics for each stage of execution
+verbose_time = False
+
+#### the following variables are accessed only through functions ...
+
+# specify whether to execute using sessions (and currently using Sampler only)
+use_sessions = False
+
+# internal session variables: users do not access
+service = None
+session = None
+sampler = None
+
+# logger for this module
 logger = logging.getLogger(__name__)
 
 # Use Aer qasm_simulator by default
@@ -48,67 +80,16 @@ backend = Aer.get_backend("qasm_simulator")
 # Execution options, passed to transpile method
 backend_exec_options = None
 
-# Cached transpiled circuit, used for parameterized execution
-cached_circuits = {}
-
-#####################
-# DEFAULT NOISE MODEL 
-
-# default noise model, can be overridden using set_noise_model
-def default_noise_model():
-
-    noise = NoiseModel()
-    # Add depolarizing error to all single qubit gates with error rate 0.3%
-    #                    and to all two qubit gates with error rate 3.0%
-    depol_one_qb_error = 0.003
-    depol_two_qb_error = 0.03
-    noise.add_all_qubit_quantum_error(depolarizing_error(depol_one_qb_error, 1), ['rx', 'ry', 'rz'])
-    noise.add_all_qubit_quantum_error(depolarizing_error(depol_two_qb_error, 2), ['cx'])
-
-    # Add amplitude damping error to all single qubit gates with error rate 0.0%
-    #                         and to all two qubit gates with error rate 0.0%
-    amp_damp_one_qb_error = 0.0
-    amp_damp_two_qb_error = 0.0
-    noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_one_qb_error, 1), ['rx', 'ry', 'rz'])
-    noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_two_qb_error, 2), ['cx'])
-
-    # Add reset noise to all single qubit resets
-    reset_to_zero_error = 0.005
-    reset_to_one_error = 0.005
-    noise.add_all_qubit_quantum_error(reset_error(reset_to_zero_error, reset_to_one_error),["reset"])
-
-    # Add readout error
-    p0given1_error = 0.000
-    p1given0_error = 0.000
-    error_meas = ReadoutError([[1 - p1given0_error, p1given0_error], [p0given1_error, 1 - p0given1_error]])
-    noise.add_all_qubit_readout_error(error_meas)
-    
-    return noise
-
-noise = default_noise_model()
-
-##########################
-# JOB MANAGEMENT VARIABLES 
-
 # Create array of batched circuits and a dict of active circuits
 batched_circuits = []
 active_circuits = {}
 
-# maximum number of active jobs
-max_jobs_active = 5;
+# Cached transpiled circuit, used for parameterized execution
+cached_circuits = {}
 
 # Configure a handler for processing circuits on completion
 # user-supplied result handler
 result_handler = None
-
-# job mode: False = wait, True = submit multiple jobs
-job_mode = False
-
-# Print progress of execution
-verbose = False;
-
-# Print additional time metrics for each stage of execution
-verbose_time = False;
 
 # Option to perform explicit transpile to collect depth metrics
 do_transpile_metrics = True
@@ -131,6 +112,69 @@ basis_gates_array = [
     ['h', 'p', 'cx'],               # another common basis set
     ['u', 'cx']                     # general unitaries basis gates
 ]
+
+
+#######################
+# SUPPORTING CLASSES
+
+# class BenchmarkResult is made for sessions runs. This is because
+# qiskit primitive job result instances don't have a get_counts method 
+# like backend results do. As such, a get counts method is calculated
+# from the quasi distributions and shots taken.
+class BenchmarkResult(object):
+
+    def __init__(self, qiskit_result):
+        super().__init__()
+        self.qiskit_result = qiskit_result
+        self.metadata = qiskit_result.metadata
+
+    def get_counts(self, qc=0):
+        counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
+        for key in counts.keys():
+            counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])        
+        return counts
+
+
+#####################
+# DEFAULT NOISE MODEL 
+
+# default noise model, can be overridden using set_noise_model()
+def default_noise_model():
+
+    noise = NoiseModel()
+    
+    # Add depolarizing error to all single qubit gates with error rate 0.05%
+    #                    and to all two qubit gates with error rate 0.5%
+    depol_one_qb_error = 0.0005
+    depol_two_qb_error = 0.005
+    noise.add_all_qubit_quantum_error(depolarizing_error(depol_one_qb_error, 1), ['rx', 'ry', 'rz'])
+    noise.add_all_qubit_quantum_error(depolarizing_error(depol_two_qb_error, 2), ['cx'])
+
+    # Add amplitude damping error to all single qubit gates with error rate 0.0%
+    #                         and to all two qubit gates with error rate 0.0%
+    amp_damp_one_qb_error = 0.0
+    amp_damp_two_qb_error = 0.0
+    noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_one_qb_error, 1), ['rx', 'ry', 'rz'])
+    noise.add_all_qubit_quantum_error(depolarizing_error(amp_damp_two_qb_error, 2), ['cx'])
+
+    # Add reset noise to all single qubit resets
+    reset_to_zero_error = 0.005
+    reset_to_one_error = 0.005
+    noise.add_all_qubit_quantum_error(reset_error(reset_to_zero_error, reset_to_one_error),["reset"])
+
+    # Add readout error
+    p0given1_error = 0.000
+    p1given0_error = 0.000
+    error_meas = ReadoutError([[1 - p1given0_error, p1given0_error], [p0given1_error, 1 - p0given1_error]])
+    noise.add_all_qubit_readout_error(error_meas)
+    
+    # assign a quantum volume (measured using the values below)
+    noise.QV = 2048
+    
+    return noise
+
+noise = default_noise_model()
+
 
 ######################################################################
 # INITIALIZATION METHODS
@@ -168,9 +212,10 @@ def set_execution_target(backend_id='qasm_simulator',
                         provider_name='Honeywell')
     """
     global backend
-    authentication_error_msg = "No credentials for {0} backend found.  Using the simulator instead."
-    
+    authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
+
     # if a custom provider backend is given, use it ...
+    # in this case, the backend_id is an arbitrary identifier that shows up in plots
     if provider_backend != None:
         backend = provider_backend
     
@@ -178,6 +223,7 @@ def set_execution_target(backend_id='qasm_simulator',
     elif backend_id == 'qasm_simulator':
         backend = Aer.get_backend("qasm_simulator") 
 
+    # handle 'fake' backends here
     elif 'fake' in backend_id:
         backend = getattr(
             importlib.import_module(
@@ -188,30 +234,46 @@ def set_execution_target(backend_id='qasm_simulator',
         backend = backend()
         logger.info(f'Set {backend = }')   
 
-    # otherwise use the given backend_id to find the backend
+    # otherwise use the given provider and backend_id to find the backend
     else:
-        if provider_module_name and provider_name:
-            # if provider_module and provider_name is provided, assume a custom provider
+    
+        # if provider_module name and provider_name are provided, obtain a custom provider
+        if provider_module_name and provider_name:  
             provider = getattr(importlib.import_module(provider_module_name), provider_name)
             try:
-                # not all custom providers have the .stored_account() method
+                # try, since not all custom providers have the .stored_account() method
                 provider.load_account()
                 backend = provider.get_backend(backend_id)
             except:
                 print(authentication_error_msg.format(provider_name))
+                
+        # otherwise, assume the backend_id is given and assume it is IBMQ device
         else:
-            # otherwise, assume IBMQ
             if IBMQ.stored_account():
+            
                 # load a stored account
                 IBMQ.load_account()
-                
-                # then create backend from selected provider
-                provider = IBMQ.get_provider(hub=hub, group=group, project=project)
-                backend = provider.get_backend(backend_id)
+
+                # if use sessions, setup runtime service, Session, and Sampler
+                if use_sessions:
+                    from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session
+                    global service
+                    service = QiskitRuntimeService()
+                    global session
+                    global sampler
+                    backend = service.backend(backend_id)
+                    session= Session(service=service, backend=backend_id)
+                    sampler = Sampler(session=session)
+                    
+                # otherwise, use provider and old style backend
+                # for IBM, create backend from IBMQ provider and given backend_id
+                else: 
+                    provider = IBMQ.get_provider(hub=hub, group=group, project=project)
+                    backend = provider.get_backend(backend_id)
             else:
                 print(authentication_error_msg.format("IBMQ"))
 
-    # create an informative device name
+    # create an informative device name for plots
     device_name = backend_id
     metrics.set_plot_subtitle(f"Device = {device_name}")
     #metrics.set_properties( { "api":"qiskit", "backend_id":backend_id } )
@@ -254,6 +316,13 @@ def set_noise_model(noise_model = None):
     
     global noise
     noise = noise_model
+
+
+# set flag to control use of sessions
+def set_use_sessions(val = False):
+    global use_sessions
+    use_sessions = val
+
 
 ######################################################################
 # CIRCUIT EXECUTION METHODS
@@ -363,14 +432,22 @@ def execute_circuit(circuit):
         postprocessors = backend_exec_options_copy.pop("postprocessor", None)
         if postprocessors:
             result_processor, width_processor = postprocessors
-            
-        logger.info(f"Executing on backend: {backend.name()}")
-            
+
+        if use_sessions:
+            logger.info(f"Executing on backend: {backend.name}")
+        else:
+            logger.info(f"Executing on backend: {backend.name()}")
+
         #************************************************
         # Initiate execution (with noise if specified and this is a simulator backend)
-        if this_noise is not None and backend.name().endswith("qasm_simulator"):
+        if this_noise is not None and not use_sessions and backend.name().endswith("qasm_simulator"):
+
             logger.info(f"Performing noisy simulation, shots = {shots}")
             
+            # if the noise model has associated QV value, copy it to metrics module for plotting
+            if hasattr(this_noise, "QV"):
+                metrics.QV = this_noise.QV
+                   
             simulation_circuits = circuit["qc"]
 
             # we already have the noise model, just need to remove it from the options
@@ -439,9 +516,12 @@ def execute_circuit(circuit):
             # perform circuit execution on backend
             logger.info(f'Running trans_qc, shots={shots}')
             st = time.time() 
-            
-            job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
-            
+
+            if use_sessions:
+                job = sampler.run(trans_qc, shots=shots, **backend_exec_options_copy)
+            else:
+                job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
+
             logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
             if verbose_time: print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
             
@@ -468,6 +548,9 @@ def execute_circuit(circuit):
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_xi', qc_tr_xi)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_n2q', qc_tr_n2q)
 
+    # also store the job_id for future reference
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'job_id', job.job_id())
+    
     if verbose:
         print(f"... executing job {job.job_id()}")
     
@@ -734,6 +817,10 @@ def job_complete(job):
     
     # report exec time as 0 unless valid measure returned
     exec_time = 0.0
+    
+    # store these initial time measures now, in case job had error
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'elapsed_time', elapsed_time)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
 
     # get job result (DEVNOTE: this might be different for diff targets)
     result = None
@@ -741,42 +828,62 @@ def job_complete(job):
     if job.status() == JobStatus.DONE:
         result = job.result()
         # print("... result = ", str(result))
-        
-        # process step times, if they exist
-        process_step_times(job, active_circuit)
 
         # counts = result.get_counts(qc)
         # print("Total counts are:", counts)
         
-        # obtain timing info from the results object
-        result_obj = result.to_dict()
-        results_obj = result.to_dict()['results'][0]
+        # if we are using sessions, structure of result object is different;
+        # use a BenchmarkResult object to hold session result and provide a get_counts()
+        # that returns counts to the benchmarks in the same form as without sessions
+        if use_sessions:
+            result = BenchmarkResult(result)
+            #counts = result.get_counts()
+            
+            actual_shots = result.metadata[0]['shots']
+            result_obj = result.metadata[0]
+            results_obj = result.metadata[0]
+        else:
+            result_obj = result.to_dict()
+            results_obj = result.to_dict()['results'][0]
+            
+            # get the actual shots and convert to int if it is a string
+            # DEVNOTE: this summation currently applies only to randomized compiling 
+            # and may cause problems with other use cases (needs review)
+            actual_shots = 0
+            for experiment in result_obj["results"]:
+                actual_shots += experiment["shots"]
+
         #print(f"result_obj = {result_obj}")
         #print(f"results_obj = {results_obj}")
         #print(f'shots = {results_obj["shots"]}')
-        
-        # get the actual shots and convert to int if it is a string
-        actual_shots = 0
-        for experiment in result_obj["results"]:
-            actual_shots += experiment["shots"]
-            
+
+        # convert actual_shots to int if it is a string
         if type(actual_shots) is str:
             actual_shots = int(actual_shots)
         
+        # check for mismatch of requested shots and actual shots
         if actual_shots != active_circuit["shots"]:
             print(f'WARNING: requested shots not equal to actual shots: {active_circuit["shots"]} != {actual_shots} ')
-        
+            
+            # allow processing to continue, but use the requested shot count
+            actual_shots = active_circuit["shots"]
+            
+        # obtain timing info from the results object
+        # the data has been seen to come from both places below
         if "time_taken" in result_obj:
             exec_time = result_obj["time_taken"]
         
         elif "time_taken" in results_obj:
             exec_time = results_obj["time_taken"]
+        
+        # override the initial value with exec_time returned from successful execution
+        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
+        
+        # process additional detailed step times, if they exist (this might override exec_time too)
+        process_step_times(job, result, active_circuit)
     
     # remove from list of active circuits
     del active_circuits[job]
-
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'elapsed_time', elapsed_time)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
 
     # If a result handler has been established, invoke it here with result object
     if result != None and result_handler:
@@ -790,7 +897,7 @@ def job_complete(job):
         # <result> contains results from multiple circuits
         # DEVNOTE: This will need to change; currently the only case where we have multiple result counts
         # is when using randomly_compile; later, there will be other cases
-        if type(result.get_counts()) == list:
+        if not use_sessions and type(result.get_counts()) == list:
             total_counts = dict()
             for count in result.get_counts():
                 total_counts = dict(Counter(total_counts) + Counter(count))
@@ -821,8 +928,8 @@ def job_complete(job):
             if verbose:
                 print(traceback.format_exc())
 
-# Process step times, if they exist
-def process_step_times(job, active_circuit):
+# Process detailed step times, if they exist
+def process_step_times(job, result, active_circuit):
     #print("... processing step times")
     
     exec_creating_time = 0
@@ -831,10 +938,11 @@ def process_step_times(job, active_circuit):
     exec_running_time = 0
         
     # get breakdown of execution time, if method exists 
-    # this attribute not available for some providers;
-    if "time_per_step" in dir(job) and callable(job.time_per_step):
+    # this attribute not available for some providers and only for circuit-runner model;
+    if not use_sessions and "time_per_step" in dir(job) and callable(job.time_per_step):
         time_per_step = job.time_per_step()
-        #print(time_per_step)
+        if verbose:
+            print(f"... job.time_per_step() = {time_per_step}")
         
         creating_time = time_per_step.get("CREATING")
         validating_time = time_per_step.get("VALIDATING")
@@ -842,7 +950,7 @@ def process_step_times(job, active_circuit):
         running_time = time_per_step.get("RUNNING")
         completed_time = time_per_step.get("COMPLETED")
         
-        # for testing, since hard to reproduce on systems
+        # for testing, since hard to reproduce on some systems
         #running_time = None
         
         # make these all slightly non-zero so averaging code is triggered (> 0.001 required)
@@ -850,7 +958,11 @@ def process_step_times(job, active_circuit):
         exec_validating_time = 0.001
         exec_queued_time = 0.001
         exec_running_time = 0.001
-    
+        
+        # this is note used
+        exec_quantum_classical_time = 0.001
+
+        # compute the detailed time metrics
         if validating_time and creating_time:
             exec_creating_time = (validating_time - creating_time).total_seconds()
         if queued_time and validating_time:
@@ -859,18 +971,50 @@ def process_step_times(job, active_circuit):
             exec_queued_time = (running_time - queued_time).total_seconds()
         if completed_time and running_time:
             exec_running_time = (completed_time - running_time).total_seconds()
+
+    # when sessions and sampler used, we obtain metrics differently
+    if use_sessions:
+        job_timestamps= job.metrics()['timestamps']
+        if verbose:
+            print(f"... job.metrics() = {job.metrics()}")
+            print(f"... job.result().metadata[0] = {result.metadata[0]}")
+
+        created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
+        created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
+        finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
+        finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
+        running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
+        running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
         
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', exec_validating_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', exec_queued_time)
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
-    
+        # compute the total seconds for creating and running the circuit
+        exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
+        exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
+        
+        # these do not seem to be avaiable
+        exec_validating_time = 0.001
+        exec_queued_time = 0.001
+        
+        # DEVNOTE: we do not compute this yet
+        # exec_quantum_classical_time = job.metrics()['bss']
+        #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
+        
+        # when using sessions, the 'running_time' is the 'quantum exec time' - override it.
+        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
+
+    # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
+    exec_creating_time = max(0.001, exec_creating_time)
+    exec_validating_time = max(0.001, exec_validating_time)
+    exec_queued_time = max(0.001, exec_queued_time)
+    exec_running_time = max(0.001, exec_running_time)
+
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', 0.001)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', 0.001)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
+
     #print("... time_per_step = ", str(time_per_step))
     if verbose:
-        print(f"... exec times, creating = {exec_creating_time}, validating = {exec_validating_time}, queued = {exec_queued_time}, running = {exec_running_time}") 
-    
-    #print(f"... exec times, creating = {exec_creating_time}, validating = {exec_validating_time}, queued = {exec_queued_time}, running = {exec_running_time}")
-        
+        print(f"... computed exec times: queued = {exec_queued_time}, creating/transpiling = {exec_creating_time}, validating = {exec_validating_time}, running = {exec_running_time}") 
 
 # Process a job, whose status cannot be obtained
 def job_status_failed(job):
@@ -974,8 +1118,17 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
     # indicate we are done collecting metrics (called once at end of app)
     if report_end:
         metrics.end_metrics()
-    
-    
+        
+    # also, close any active session at end of the app
+    global session
+    if report_end and use_sessions and session != None:
+        if verbose:
+            print("... closing active session!\n")
+        
+        session.close()
+        session = None
+        
+
 # Check if any active jobs are complete - process if so
 # Before returning, launch any batched jobs that will keep active circuits < max
 # When any job completes, aggregate and report group metrics if all circuits in group are done
