@@ -214,7 +214,7 @@ if __name__ == "__main__":
     generate various hydrogen lattice pUCCD hamiltonians
     """
     for shape in [chain]:
-        for n in [2, 4]:
+        for n in [2, 4, 6, 8, 10, 12, 14]:
             for r in [0.75, 1.00, 1.25]:
                 file_name = f"h{n}_{shape.__name__}_{r}.json"
                 print(f"Working on {shape.__name__} for n={n} and r={r}")
