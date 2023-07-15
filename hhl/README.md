@@ -1,7 +1,12 @@
 # HHL Algorithm - Linear Equation Solver
 
-The HHL (HHL) algorithm [[1]](#references) is ... 
-The HHL algorithm demonstrates a quantum speedup over its classical counterpart for solving linear equations. 
+The HHL (HHL) quantum algorithm [[1]](#references) may demonstrate a quantum speedup over its classical counterpart for solving linear equations. 
+
+The HHL offers a more complex algorithm that uses a combination of Quantum Phase Estimation and Quantum Fourier Transform along with state initialization and a new and unique, scalable, inverse rotation algorithm. The combination of the component routines taken together provides an extension to the benchmark suite that fills a gap between the QFT and Amplitude Estimation algorithms.
+
+
+
+This is also a benchmark that can measure fidelity of circuit execution, but can also provide an application specific metric based on how well the algorithm solves the linear equation.
 
 NOTE: The remainder of this README needs to be modifed with content for HHL.
 
@@ -166,16 +171,24 @@ two qubit circuit used with mid circuit measurements to represent the quantum ci
 [2] Hector Jose Morell Jr, Anika Zaman, Hiu Yung Wong. (2023).
     A Step-by-Step HHL Algorithm Walkthrough to Enhance Understanding of Critical Quantum Computing Concepts.
     (https://arxiv.org/abs/2108.09004)
-
-[3] Yudong Cao, Anmer Daskin, Steven Frankel, Sabre Kais. (2011).
-    Quantum Circuit Design for Solving Linear Systems of Equations
-    (https://arxiv.org/abs/1110.2232v2)
-
+    
+[3] Andrew M. Childs, Richard Cleve, Enrico Deotto, Edward Farhi, Sam Gutmann, Daniel A. Spielman. (2010).
+    Exponential algorithmic speedup by quantum walk.
+    (https://arxiv.org/abs/quant-ph/0209131)
+    
 [4] Mikko Mottonen, Juha J. Vartiainen, Ville Bergholm, Martti M. Salomaa. (2004).
     Transformation of quantum states using uniformly controlled rotations.
     (https://arxiv.org/abs/quant-ph/0407010)
 
-[5] Yonghae Lee, Jaewoo Joo, and Soojoon Lee. (2019).
+[5] Yudong Cao, Anmer Daskin, Steven Frankel, Sabre Kais. (2011).
+    Quantum Circuit Design for Solving Linear Systems of Equations
+    (https://arxiv.org/abs/1110.2232v2)
+    
+[6] Yonghae Lee, Jaewoo Joo, and Soojoon Lee. (2019).
     Hybrid quantum linear equation algorithm and its experimental test on IBM Quantum Experience.
     (https://www.nature.com/articles/s41598-019-41324-9)
+
+[7] Ana Martin, Ruben Ibarrondo, Mikel Sanz. (2022).
+    Digital-analog co-design of the Harrow-Hassidim-Lloyd algorithm.
+    (https://arxiv.org/abs/2207.13528)
     
