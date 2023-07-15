@@ -256,14 +256,25 @@ def set_execution_target(backend_id='qasm_simulator',
 
                 # if use sessions, setup runtime service, Session, and Sampler
                 if use_sessions:
-                    from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session
+                    from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session, Options
                     global service
                     service = QiskitRuntimeService()
                     global session
                     global sampler
+                    
                     backend = service.backend(backend_id)
                     session= Session(service=service, backend=backend_id)
-                    sampler = Sampler(session=session)
+                    
+                    # get Sampler resilience level and transpiler optimization level from exec_options
+                    options = Options()
+                    options.resilience_level  = exec_options.get("resilience_level", 1)
+                    options.optimization_level = exec_options.get("optimization_level", 3)
+                    
+                    if verbose:
+                        print(f"... create Sampler with options = {options}")
+                    
+                    # create the Qiskit Sampler with these options
+                    sampler = Sampler(session=session, options=options)
                     
                 # otherwise, use provider and old style backend
                 # for IBM, create backend from IBMQ provider and given backend_id
@@ -422,10 +433,18 @@ def execute_circuit(circuit):
         # extract execution options if set
         if backend_exec_options_copy == None: backend_exec_options_copy = {}
         
+        # used in Sampler setup, here remove it for execution
+        resilience_level  = backend_exec_options_copy.pop("resilience_level", None)
+        
+        # standard Qiskit transpiler options
         optimization_level = backend_exec_options_copy.pop("optimization_level", None)
         layout_method = backend_exec_options_copy.pop("layout_method", None)
         routing_method = backend_exec_options_copy.pop("routing_method", None)
+        
+        # option to transpile multiple times to find best one
         transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
+        
+        # gneeralized transformer method, custom to user
         transformer = backend_exec_options_copy.pop("transformer", None)
         
         global result_processor, width_processor
