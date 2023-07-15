@@ -1,4 +1,4 @@
-# HHL Algorithm - Prototype Benchmark Program
+# HHL Algorithm - Linear Equation Solver
 
 The HHL (HHL) algorithm [[1]](#references) is ... 
 The HHL algorithm demonstrates a quantum speedup over its classical counterpart for solving linear equations. 
@@ -159,25 +159,23 @@ two qubit circuit used with mid circuit measurements to represent the quantum ci
 
 ## References
 
-https://arxiv.org/abs/0811.3171
+[1] Aram W. Harrow, Avinatan Hassidim, Seth Lloyd. (2008).
+    Quantum algorithm for solving linear systems of equations.
+    (https://arxiv.org/abs/0811.3171)
 
-https://arxiv.org/abs/2108.09004
+[2] Hector Jose Morell Jr, Anika Zaman, Hiu Yung Wong. (2023).
+    A Step-by-Step HHL Algorithm Walkthrough to Enhance Understanding of Critical Quantum Computing Concepts.
+    (https://arxiv.org/abs/2108.09004)
 
-https://arxiv.org/abs/1110.2232v2
+[3] Yudong Cao, Anmer Daskin, Steven Frankel, Sabre Kais. (2011).
+    Quantum Circuit Design for Solving Linear Systems of Equations
+    (https://arxiv.org/abs/1110.2232v2)
 
-not correct for HHL:
+[4] Mikko Mottonen, Juha J. Vartiainen, Ville Bergholm, Martti M. Salomaa. (2004).
+    Transformation of quantum states using uniformly controlled rotations.
+    (https://arxiv.org/abs/quant-ph/0407010)
 
-[1] Ethan Bernstein and Umesh Vazirani. (1997).
-    Quantum Complexity Theory
-    [`doi/10.1137/S0097539796300921`](https://epubs.siam.org/doi/10.1137/S0097539796300921)
-
-[2] Michael A. Nielsen and Isaac L. Chuang. (2011).
-    Quantum Computation and Quantum Information: 10th Anniversary Edition (10th ed.). 
-    Cambridge University Press, New York, NY, USA.
-
-[3] Abraham Asfaw, Antonio Córcoles, Luciano Bello, Yael Ben-Haim, Mehdi Bozzo-Rey, Sergey Bravyi, Nicholas Bronn, Lauren Capelluto, Almudena Carrera Vazquez, Jack Ceroni, Richard Chen, Albert Frisch, Jay Gambetta, Shelly Garion, Leron Gil, Salvador De La Puente Gonzalez, Francis Harkins, Takashi Imamichi, Hwajung Kang, Amir h. Karamlou, Robert Loredo, David McKay, Antonio Mezzacapo, Zlatko Minev, Ramis Movassagh, Giacomo Nannicini, Paul Nation, Anna Phan, Marco Pistoia, Arthur Rattew, Joachim Schaefer, Javad Shabani, John Smolin, John Stenger, Kristan Temme, Madeleine Tod, Stephen Wood, and James Wootton. (2020).
-    [`Bernstein-Vazirani Algorithm`](https://qiskit.org/textbook/ch-algorithms/bernstein-vazirani.html)
-
-[4] Paul Nation and Blake Johnson. (2021).
-    How to measure and reset a qubit in the middle of circuit execution.
-    [`Qiskit Blog: Mid Circuit Measurements`](https://www.ibm.com/blogs/research/2021/02/quantum-mid-circuit-measurement/)
+[5] Yonghae Lee, Jaewoo Joo, and Soojoon Lee. (2019).
+    Hybrid quantum linear equation algorithm and its experimental test on IBM Quantum Experience.
+    (https://www.nature.com/articles/s41598-019-41324-9)
+    
