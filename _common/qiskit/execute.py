@@ -979,27 +979,34 @@ def process_step_times(job, result, active_circuit):
             print(f"... job.metrics() = {job.metrics()}")
             print(f"... job.result().metadata[0] = {result.metadata[0]}")
 
-        created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
-        created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
-        finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
-        finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
-        running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
-        running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
+        # occasionally, these metrics come back as None, so try to use them
+        try:
+            created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
+            created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
+            finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
+            finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
+            running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
+            running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
+            
+            # compute the total seconds for creating and running the circuit
+            exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
+            exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
+            
+            # these do not seem to be avaiable
+            exec_validating_time = 0.001
+            exec_queued_time = 0.001
+            
+            # DEVNOTE: we do not compute this yet
+            # exec_quantum_classical_time = job.metrics()['bss']
+            #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
+            
+            # when using sessions, the 'running_time' is the 'quantum exec time' - override it.
+            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
         
-        # compute the total seconds for creating and running the circuit
-        exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
-        exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
-        
-        # these do not seem to be avaiable
-        exec_validating_time = 0.001
-        exec_queued_time = 0.001
-        
-        # DEVNOTE: we do not compute this yet
-        # exec_quantum_classical_time = job.metrics()['bss']
-        #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
-        
-        # when using sessions, the 'running_time' is the 'quantum exec time' - override it.
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
+        except Exception as e:
+            if verbose:
+                print(f'WARNING: incomplete time metrics for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+                print(f"... job = {job.job_id()}  exception = {e}")
 
     # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
     exec_creating_time = max(0.001, exec_creating_time)
