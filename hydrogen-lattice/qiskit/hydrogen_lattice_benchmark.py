@@ -942,12 +942,13 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
             # if radius is given we should do same radius for max_circuits times
             if radius is not None:
                 instance_filepath = os.path.join(os.path.dirname(__file__),"..", "_common",
-                common.INSTANCE_DIR, f"h{num_qubits}_chain_{radius:.2f}.json")   
+                        common.INSTANCE_DIR, f"h{num_qubits:03}_chain_{radius:06.2f}.json")   
             # if radius is not given we should do all the radius for max_circuits times
             else:
                instance_filepath_list = [file \
                for file in glob.glob(os.path.join(os.path.dirname(__file__), "..", "_common", \
-               common.INSTANCE_DIR, f"h{num_qubits}_*_*.*.json"))]
+               common.INSTANCE_DIR, f"h{num_qubits:03}_*_*_*.json"))]
+               print(instance_filepath_list)
                if len(instance_filepath_list) >= instance_num :
                    instance_filepath = instance_filepath_list[instance_num-1]
                else:
@@ -1141,7 +1142,10 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 options={'maxiter': 100, 'disp': False} )
                 
                 ideal_energy = objective_function(thetas_array.x)
-                current_radius = os.path.basename(instance_filepath).split('_')[2][:4]
+
+                current_radius = float(os.path.basename(instance_filepath).split('_')[2])
+                current_radius += float(os.path.basename(instance_filepath).split('_')[3][:2])*.01
+
                 print(f"\nBelow Energies are for problem file {os.path.basename(instance_filepath)} is for {num_qubits} qubits and radius {current_radius} of paired hamiltionians")
                 print(f"PUCCD calculated energy : {ideal_energy}")
 
