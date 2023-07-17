@@ -1,8 +1,9 @@
-#
 # hydrogen_lattice/_common
 #
 # This file contains code that can be shared by all API instances of this benchmark,
 # e.g. loading of problem instances and expected solution
+
+from __future__ import annotations
 
 import os
 import json
@@ -109,13 +110,13 @@ def read_geometry_instance(file_path: str, _instances: dict = None) -> tuple:
         instance = read_vqe_instance(file_path)
 
         # create a (n,3) array containing atomic lattice xyz positions
-        atoms = instance["geometry"]["atoms"]
+        atoms = instance["atoms"]
 
         # form a (n,3) array. use the length of x pos. to get n
-        xyz = np.zeros((len(instance["geometry"]["x"]), 3))
-        xyz[:, 0] = instance["geometry"]["x"]
-        xyz[:, 1] = instance["geometry"]["y"]
-        xyz[:, 2] = instance["geometry"]["z"]
+        xyz = np.zeros((len(instance["x"]), 3))
+        xyz[:, 0] = instance["x"]
+        xyz[:, 1] = instance["y"]
+        xyz[:, 2] = instance["z"]
 
         return (xyz, atoms)
     else:
@@ -156,4 +157,3 @@ def read_puccd_solution(file_path: str, _instances: dict = None) -> tuple:
 
     else:
         return None, None
-
