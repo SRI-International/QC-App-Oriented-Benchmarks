@@ -147,7 +147,7 @@ def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = Non
 
 # Create the benchmark program circuit
 # Accepts optional rounds and array of thetas (betas and gammas)
-def HydrogenLattice (num_qubits, secret_int, thetas_array, parameterized, operator):
+def HydrogenLattice (num_qubits, operator, secret_int = 000000, thetas_array = None, parameterized = None):
     # if no thetas_array passed in, create defaults 
     
     # here we are filling this th
@@ -1010,10 +1010,11 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=10_000,
                 ts = time.time()
             # DEVNOTE:  Primary focus is on method 2
                 thetas_array_0 = thetas_array
-                qc_array, frmt_obs, params = HydrogenLattice(num_qubits,operator,thetas_array_0, parameterized)
+                qc_array, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,operator = operator, thetas_array= thetas_array_0, parameterized= parameterized)
                 for qc in qc_array:
                     metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
                     # collapse the sub-circuit levels used in this benchmark (for qiskit)
+                    qc.bind_parameters(params)
                     qc2 = qc.decompose()
 
                     # submit circuit for execution on target (simulator, cloud simulator, or hardware)
@@ -1129,7 +1130,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=10_000,
                     unique_id = instance_num * 1000 + minimizer_loop_index
                     res = []
                 
-                    qc_array, frmt_obs, params = HydrogenLattice(num_qubits, unique_id, thetas_array, parameterized, operator=operator)
+                    qc_array, frmt_obs, params = HydrogenLattice(num_qubits=num_qubits, secret_int=unique_id, thetas_array= thetas_array, parameterized= parameterized, operator=operator)
                     # collapse the sub-circuit levels used in this benchmark (for qiskit)
                     for qc in qc_array:
                         
