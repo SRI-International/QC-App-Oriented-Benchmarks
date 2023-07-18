@@ -147,7 +147,7 @@ def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = Non
 
 # Create the benchmark program circuit
 # Accepts optional rounds and array of thetas (betas and gammas)
-def HydrogenLattice (num_qubits, secret_int, thetas_array, parameterized):
+def HydrogenLattice (num_qubits, secret_int, thetas_array, parameterized, operator):
     # if no thetas_array passed in, create defaults 
     
     # here we are filling this th
@@ -173,7 +173,11 @@ def HydrogenLattice (num_qubits, secret_int, thetas_array, parameterized):
         # gammas = ParameterVector("𝞬", p)
         # params = {betas: thetas_array[:p], gammas: thetas_array[p:]}   
 
-        _qc,parameter_vector,thetas_array = VQE_ansatz(num_qubits=num_qubits, thetas_array=thetas_array, num_occ_pairs = None )
+        _qc ,parameter_vector,thetas_array = VQE_ansatz(num_qubits=num_qubits, thetas_array=thetas_array, num_occ_pairs = None )
+
+    _measurable_expression = StateFn(operator, is_measurement=True)
+    _observables = PauliExpectation().convert(_measurable_expression)
+    _qc_array, _formatted_observables = prepare_circuits(_qc, observables=_observables)
 
     # Here Parametee
     params = {parameter_vector: thetas_array}
@@ -204,7 +208,7 @@ def HydrogenLattice (num_qubits, secret_int, thetas_array, parameterized):
         if num_qubits < 9: QC_ = qc
 
     # return a handle on the circuit
-    return qc, params
+    return _qc_array, _formatted_observables, params
 
 
 # ############### Circuit Definition - Parameterized version   
@@ -455,17 +459,26 @@ def calculate_expectation_values(probabilities, observables):
 # # Initialize an empty list to store the lowest energy values
 lowest_energy_values = []
 
-def compute_energy(qc, operator, shots, parameters): 
+def compute_energy(result_array, formatted_observables, num_qubits): 
     
-    if DEBUG:
-        print("DEBUG : \n method: compute_energy \n\t binding parameters: "+str(parameters))
-    # Bind the parameters to the circuit
-    bound_circuit = qc.bind_parameters(parameters)
+    
     # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
-    energy = calculate_expectation(bound_circuit, operator=operator, shots=shots)
-    
+
+    _probabilities = list()
+
+    for _res in result_array:
+        _counts = _res.get_counts()
+        _probs = normalize_counts(_counts, num_qubits=num_qubits)
+        _probabilities.append(_probs)
+
+
+    _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
+
+    energy = sum(_expectation_values)
+
     # Append the energy value to the list
     lowest_energy_values.append(energy)
+
     
     return energy    
 # # ------------------Simulation Function------------------
@@ -997,13 +1010,14 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=10_000,
                 ts = time.time()
             # DEVNOTE:  Primary focus is on method 2
                 thetas_array_0 = thetas_array
-                qc, params = HydrogenLattice(num_qubits,operator,thetas_array_0, parameterized)
-                metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
-                # collapse the sub-circuit levels used in this benchmark (for qiskit)
-                qc2 = qc.decompose()
+                qc_array, frmt_obs, params = HydrogenLattice(num_qubits,operator,thetas_array_0, parameterized)
+                for qc in qc_array:
+                    metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
+                    # collapse the sub-circuit levels used in this benchmark (for qiskit)
+                    qc2 = qc.decompose()
 
-                # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc2, num_qubits, instance_num, shots=num_shots, params=params)
+                    # submit circuit for execution on target (simulator, cloud simulator, or hardware)
+                    ex.submit_circuit(qc2, num_qubits, instance_num, shots=num_shots, params=params)
 
             if method == 2:
                 # a unique circuit index used inside the inner minimizer loop as identifier
@@ -1113,47 +1127,57 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=10_000,
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                     global minimizer_loop_index
                     unique_id = instance_num * 1000 + minimizer_loop_index
+                    res = []
                 
-                    qc, params = HydrogenLattice(num_qubits, unique_id, thetas_array, parameterized)
+                    qc_array, frmt_obs, params = HydrogenLattice(num_qubits, unique_id, thetas_array, parameterized, operator=operator)
                     # collapse the sub-circuit levels used in this benchmark (for qiskit)
-                    #TODO why are we decomposing the circuit?
-                    qc2 = qc.decompose()
+                    for qc in qc_array:
+                        
+                        if DEBUG:
+                            print("DEBUG : \n method: compute_energy \n\t binding parameters: "+str(params))
+
+                        qc.bind_parameters(params)
+                        qc2 = qc.decompose()
 
                     
-                    # Circuit Creation and Decomposition end
-                    #************************************************
-                    
-                    #************************************************
-                    #*** Quantum Part: Execution of Circuits ***
-                    # submit circuit for execution on target with the current parameters
-                    
-                    ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots, params=params)
-
-                    
-                    # Must wait for circuit to complete
-                    #ex.throttle_execution(metrics.finalize_group)
-
-                    #TODO commenting the execution part because it throws an exception when measurement is performed later
-                    #ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
-                    
-                    # after first execution and thereafter, no need for transpilation if parameterized
-                    if parameterized:
-                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                        logger.info(f'**** First execution complete, disabling transpile')
-                    #************************************************
-                    
-                    global saved_result
-                    # Fidelity Calculation and Storage
-                    # _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, unique_id, num_shots) 
-                    
-                    #************************************************
-                    #*** Classical Processing of Results - essential to optimizer ***
+                        # Circuit Creation and Decomposition end
+                        #************************************************
+                        
+                        #************************************************
+                        #*** Quantum Part: Execution of Circuits ***
+                        # submit circuit for execution on target with the current parameters
+                        
+                        ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots, params=params)
+    
+                        
+                        # Must wait for circuit to complete
+                        #ex.throttle_execution(metrics.finalize_group)
+    
+                        #TODO commenting the execution part because it throws an exception when measurement is performed later
+                        ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
+                        
+                        # after first execution and thereafter, no need for transpilation if parameterized
+                        if parameterized:
+                            ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                            logger.info(f'**** First execution complete, disabling transpile')
+                        #************************************************
+                        
+                        global saved_result
+                        res.append(saved_result)
+                        if DEBUG:
+                            print("saved result: "+ str(saved_result))
+                        
+                        # Fidelity Calculation and Storage
+                        # _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, unique_id, num_shots) 
+                        
+                        #************************************************
+                        #*** Classical Processing of Results - essential to optimizer ***
                     global opt_ts
                     dict_of_vals = dict()
                     # Start counting classical optimizer time here again
                     tc1 = time.time()
 
-                    energy = compute_energy(qc2, operator,num_shots,parameters=params)
+                    energy = compute_energy(result_array = res, formatted_observables = frmt_obs, num_qubits=num_qubits)
                     
                     return energy
                            
