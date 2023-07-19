@@ -1,0 +1,247 @@
+
+# Importing the required libraries for the project
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import fetch_openml
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
+from qiskit.algorithms.optimizers import SPSA
+from scipy.optimize import minimize
+from qiskit import QuantumCircuit, Aer, transpile,execute
+from qiskit.circuit.library import RealAmplitudes
+from sklearn.metrics import accuracy_score
+from qiskit.circuit import ParameterVector
+
+
+# Dev Note :- Each image has Intensity from 0 to 255
+
+''' All steps are explained below
+    1. Fetch the MNIST dataset
+    2. Access the data and target  
+        i) filter the data with 7 and 9 ( for initial development we are doing binary classification )
+    3. Split the data into train and test data ( 80% for training and 20% for testing )
+    4. pca for dimensionality reduction (x_scaled_data is the scaled data)
+    5. batching the data ( we are not using batching for now)
+    6. custom varational circuit is defined for now instead of QCNN (var_circuit)
+        i)   it will be updated once we have the QCNN
+    7. Input data is encoded into quantum state and then passed through the custom variational circuit(qcnn_model)
+    8. loss function is defined (loss) as our objective is to minimize the loss ( Pending )
+        i)   Function to predict the label ( 7 or 9 i.e, 0,1) from circuit output is pending
+        ii)  loss function is pending and will be updated once the above function is done
+        iii) need to check if to use classical neural network to extract labels from the circuit output
+    9. Optimizer is defined (optimizer) 
+    10. Testing the model ( Pending )
+    '''
+
+# Fetch the MNIST dataset from openml
+mnist = fetch_openml('mnist_784', parser='auto')
+
+# Access the data and target
+# x has all the pixel values of image and has Data shape of (70000, 784)  here 784 is 28*28
+x = mnist.data
+print("shape of x:",x.shape)
+
+# y has all the labels of the images and has Target shape of (70000,)
+y = mnist.target
+print("shape of y:",y.shape)
+
+# convert the given y data to integers so that we can filter the data
+y = y.astype(int)
+
+# Filtering only values with 7 or 9 as we are doing binary classification for now and we will extend it to multi-class classification
+binary_filter = (y == 7) | (y == 9)
+
+# Filtering the x and y data with the binary filter
+x = x[binary_filter]
+y = y[binary_filter]
+
+# create a new y data with 0 and 1 values with 7 as 0 and 9 as 1 so that we can use it for binary classification
+y = (y == 9).astype(int)
+
+
+''' Here X_train has all the training pixel values of image (i.e, 80% ) and has Data shape of (56000, 784) here 784 is 28*28
+    Here y_train has all the training labels of the images (i.e, 80% ) and has Target shape of (56000,)
+    
+    Here X_test has all the testing pixel values of images (i.e, 20% ) and has Data shape of (14000, 784) 
+    Here y_test has all the testing labels of the images (i.e, 20% ) and has Target shape of (14000,)'''
+    
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+print(x.shape, y.shape, x_train.shape, y_train.shape, x_test.shape, y_test.shape)
+
+# Reduce the size of the dataset to 200 training samples and 50 test samples for faster execution 
+# will be removed once the code is ready for final execution
+x_train = x_train[:200]
+y_train = y_train[:200]
+x_test  = x_test[:50]
+y_test  = y_test[:50]
+
+
+# To visualize if prinicipal components are enough and to decide the number of principal components to keep 
+pca_check = False 
+if pca_check == True:
+    cumulative_variance_ratio = np.cumsum(pca.explained_variance_ratio_)
+
+    plt.plot(range(1, len(cumulative_variance_ratio) + 1), cumulative_variance_ratio)
+    plt.xlabel('Number of Principal Components')
+    plt.ylabel('Cumulative Explained Variance Ratio')
+    plt.show()
+
+
+# Number of qubits for the quantum circuit
+num_qubits = 14
+
+# After initial development  below code will be move to qubit loop
+# -------------- PCA Compression -----------------
+# Number of principal components to keep as of now it is 14 
+pca = PCA(n_components = num_qubits)
+# pca = PCA( ) if pca_check == True else PCA(n_components = num_qubits)
+
+
+# Apply PCA on the data to reduce the dimensions and it is in the form of 'numpy.ndarray'
+x_train_pca = pca.fit_transform(x_train)
+x_test_pca =  pca.fit_transform(x_test)
+
+# To visualize if prinicipal components are enough and to decide the number of principal components to keep 
+pca_check = False 
+if pca_check == True:
+    cumulative_variance_ratio = np.cumsum(pca.explained_variance_ratio_)
+
+    plt.plot(range(1, len(cumulative_variance_ratio) + 1), cumulative_variance_ratio)
+    plt.xlabel('Number of Principal Components')
+    plt.ylabel('Cumulative Explained Variance Ratio')
+    plt.show()
+
+
+# Create an instance of MinMaxScaler
+scaler = MinMaxScaler(feature_range=(0, 1))
+
+# 2PIE
+
+# Apply min-max scaling to the data to bring the values between 0 and 1
+x_scaled_test =  scaler.fit_transform(x_test_pca)
+x_scaled_train = scaler.fit_transform(x_train_pca)
+
+# ------------Dev Note Currently we are not using batching-----------------
+
+# Number of samples per batch
+samples_per_batch = 10
+
+# Calculate the total number of batches needed
+num_batches = len(x_scaled_train) // samples_per_batch
+
+# Batch the x_scaled_data array
+x_scaled_test_batches = np.array_split(x_scaled_test, num_batches)
+
+print(x_scaled_test_batches[0].shape)
+
+# for batch in x_scaled_test_batches[:3]:
+#     print("batch",batch)
+
+#----------- Dev Note Currently we are not using batching------------------
+
+# Data frame here to just to visualize the data and Not needed once model is defined
+pca_vis = False
+if pca_vis == True:
+    x_vis = pd.DataFrame(x_scaled_train)
+    stats = x_vis.describe()
+    print(stats)
+
+
+# Variational circuit  used in below model which has parameters optimized during training
+# Dev Note will be replaced with QCNN 
+def var_circ(num_qubits=num_qubits):
+    
+    # reps is Number of times ry and cx gates are repeated
+    reps = 2 
+    qc = QuantumCircuit(num_qubits)
+    parameter_vector = ParameterVector("t", length=num_qubits)
+    
+    for _ in range(reps):
+      for i in range(num_qubits):
+          theta = parameter_vector[i]
+          qc.ry(theta, i)
+      for j in range(0, num_qubits - 1, 2):
+          qc.cx(j, j + 1)
+    return qc
+
+
+# var_circ for reference
+#      ┌──────────┐ ░            ░ ┌──────────┐ ░            
+# q_0: ┤ RY(θ[0]) ├─░───■────────░─┤ RY(θ[3]) ├─░───■────────
+#      ├──────────┤ ░ ┌─┴─┐      ░ ├──────────┤ ░ ┌─┴─┐      
+# q_1: ┤ RY(θ[1]) ├─░─┤ X ├──■───░─┤ RY(θ[4]) ├─░─┤ X ├──■───
+#      ├──────────┤ ░ └───┘┌─┴─┐ ░ ├──────────┤ ░ └───┘┌─┴─┐ 
+# q_2: ┤ RY(θ[2]) ├─░──────┤ X ├─░─┤ RY(θ[5]) ├─░──────┤ X ├─
+#      └──────────┘ ░      └───┘ ░ └──────────┘ ░      └───┘ 
+
+
+
+
+# model to be used for training which has input data encoded and variational circuit is appended to it
+def qcnn_model(theta, x):
+    qc = QuantumCircuit(num_qubits)
+    
+    # Encode the pixel data into the quantum circuit here  x is the input data which is list of 14 values
+    for j in range(num_qubits):
+        qc.ry(x[j], j )
+        
+    # Append the variational circuit
+    qcnn_circ = var_circ(num_qubits)
+    qcnn_circ.assign_parameters(theta, inplace=True)
+    qc.compose(qcnn_circ, inplace=True)
+    qc.measure_all()  # Measure all qubits will be changed to measure only 7 qubits if needed
+    return qc
+
+
+# Define the quantum instance to be used for training
+backend = Aer.get_backend('qasm_simulator')
+
+# function to calculate the loss function
+def loss_function(theta):
+
+    for data_point, label in zip(x_train, y_train):
+        # Create the quantum circuit for the data point
+        qc = qcnn_model(theta, data_point)
+
+        # Simulate the quantum circuit and get the result 
+        job = backend.run(qc, shots=2)
+        result = job.result().get_counts(qc)
+        
+        # Extract the measurement outcome for the first 7 qubits
+        # measurement_outcome = list(result.keys())[0][:7]
+        
+        # loss code for optimization
+    # return ce_loss
+
+
+# Initialize  epochs
+num_epochs = 2
+
+
+# Initialize the weights for the QNN model
+weights = np.random.rand(num_qubits)
+
+for epoch in range(num_epochs):
+    # Minimize the loss using SPSA optimizer
+    theta = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, options={'maxiter': 20, 'disp': False} )
+    loss = theta.fun
+    print(f"Epoch {epoch+1}/{num_epochs}, loss = {loss:.4f}")
+    
+    
+# last step is to test the model on test data
+# Perform inference with the trained QNN
+predictions = []
+for data_point in x_test:
+    qc = qcnn_model(theta.x, data_point)
+    job = backend.run(qc, shots=1)
+    result = job.result().get_counts(qc)
+    # ----- Predict label based on the above result and currently pending as we need to define function to extract label
+    predicted_label = np.random.randint(0, 1)  # for testing will be removed
+    predictions.append(predicted_label)
+
+# Evaluate the QCNN accuracy on the test set once the model is trained and tested
+accuracy = accuracy_score(y_test, predictions)
+print("Accuracy:", accuracy)
