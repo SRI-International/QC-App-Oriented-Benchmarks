@@ -202,7 +202,7 @@ backend = Aer.get_backend('qasm_simulator')
 # function to calculate the loss function
 def loss_function(theta):
 
-    for data_point, label in zip(x_train, y_train):
+    for data_point, label in zip(x_scaled_train, y_train):
         # Create the quantum circuit for the data point
         qc = qcnn_model(theta, data_point)
 
@@ -234,7 +234,7 @@ for epoch in range(num_epochs):
 # last step is to test the model on test data
 # Perform inference with the trained QNN
 predictions = []
-for data_point in x_test:
+for data_point in x_scaled_test:
     qc = qcnn_model(theta.x, data_point)
     job = backend.run(qc, shots=1)
     result = job.result().get_counts(qc)
