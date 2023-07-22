@@ -1,8 +1,6 @@
 """
 HHL Benchmark Program - Qiskit
 
-TODO:
-    - switch from total variation distance to Hellinger fidelity
 """
 
 import sys
@@ -370,122 +368,12 @@ def inv_qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1
             qubits = [control] + [q for q in target] + [q for q in extra_qubits] + [ancilla[0]]
             qc.append(con_H_sim, qubits)
     
-'''   
 
-def hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits=None, A=None, method=1):
-    
-    qpe(qc, clock, input_qubits, extra_qubits, ancilla, A, method)
-    qc.reset(ancilla)
+############### Make HHL Circuit
 
-    qc.barrier()
-    
-    if method == 1:
-        # This section is to test and implement C = 1   
-        # since we are not swapping after the QFT, reverse order of qubits from what is in papers
-        qc.cry(np.pi, clock[1], ancilla)
-        qc.cry(np.pi/3, clock[0], ancilla)
-    
-    # uniformly-controlled rotation
-    elif method == 2:
-        
-        n_clock = clock.size
-        C = 1/2**n_clock # constant in rotation (lower bound on eigenvalues A)
-        
-        # compute angles for inversion rotations
-        alpha = [2*np.arcsin(C)]
-        for x in range(1,2**n_clock):
-            x_bin_rev = np.binary_repr(x, width=n_clock)[::-1]
-            lam = int(x_bin_rev,2)/(2**n_clock)
-            alpha.append(2*np.arcsin(C/lam))
-        theta = ucr.alpha2theta(alpha)
-        
-        # do inversion step
-        qc = ucr.uniformly_controlled_rot(qc, clock, ancilla, theta)
-        
-    qc.barrier()
-    
-    qc.measure(ancilla, measurement[0])
-    qc.reset(ancilla)
-    
-    qc.barrier()
-    inv_qpe(qc, clock, input_qubits, extra_qubits, ancilla, A, method)
-   
-
-def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
-    
-    if method == 1:
-    
-        print(num_clock_qubits)
-        print(num_input_qubits)
-        # Create the various registers needed
-        clock = QuantumRegister(num_clock_qubits, name='clock')
-        input_qubits = QuantumRegister(num_input_qubits, name='b')
-        ancilla = QuantumRegister(1, name='ancilla')
-        measurement = ClassicalRegister(2, name='c')
-    
-        # Create an empty circuit with the specified registers
-        qc = QuantumCircuit(ancilla, clock, input_qubits, measurement)
-            
-        # State preparation. (various initial values, done with initialize method)
-        # intial_state = [0,1]
-        # intial_state = [1,0]
-        # intial_state = [1/np.sqrt(2),1/np.sqrt(2)]
-        # intial_state = [np.sqrt(0.9),np.sqrt(0.1)]
-        ##intial_state = [np.sqrt(1 - beta), np.sqrt(beta)]
-        ##qc.initialize(intial_state, 3)
-        
-        # use an RY rotation to initialize the input state between 0 and 1
-        qc.ry(2 * np.arcsin(beta), input_qubits)
-    
-        # Put clock qubits into uniform superposition
-        qc.h(clock)
-    
-        # Perform the HHL routine
-        hhl_routine(qc, ancilla, clock, input_qubits, measurement)
-    
-        # Perform a Hadamard Transform on the clock qubits
-        qc.h(clock)
-    
-        qc.barrier()
-    
-        # measure the input, which now contains the answer
-        qc.measure(input_qubits, measurement[1])
-
-    
-    # # save smaller circuit example for display
-    # global QC_, U_, UI_, QFT_, QFTI_
-    # if QC_ == None or num_qubits <= 6:
-    #     if num_qubits < 9: 
-    #         QC_ = qc
-    # if U_ == None or num_qubits <= 6:    
-    #     _, U_ = ctrl_u(1)
-    #     #U_ = ctrl_u(np.pi/2, 2, 0, 1)
-        
-    # if UI_ == None or num_qubits <= 6:    
-    #     _, UI_ = ctrl_ui(1)
-    #     #UI_ = ctrl_ui(np.pi/2, 2, 0, 1)
-        
-    # if QFT_ == None or num_qubits <= 5:
-    #     if num_qubits < 9: QFT_ = qft_gate(len(clock))
-    # if QFTI_ == None or num_qubits <= 5:
-    #     if num_qubits < 9: QFTI_ = inv_qft_gate(len(clock))
-    
-    # return a handle on the circuit
-    return qc
-
-def hamiltonian_phase(n_t):
-    qr_t = QuantumRegister(n_t)
-    qc = QuantumCircuit(qr_t, name = 'H⊗n' )
-    # Hadamard phase estimation register
-    for q in range(n_t):
-        qc.h(qr_t[q])
-
-    return qc
-'''
-
-# Make the HHL circuit (this is the one aactually used right now)
+# Make the HHL circuit 
 def make_circuit(A, b, num_clock_qubits):
-    """ circuit for HHL algo A|x>=|b>
+    """ Generate top-level circuit for HHL algo A|x>=|b>
     
         A : sparse Hermitian matrix
         b (int): between 0,...,2^n-1. Initial basis state |b>
@@ -640,41 +528,12 @@ def make_circuit(A, b, num_clock_qubits):
 
     return qc
 
-
-def sim_circuit(qc, shots):
-    
-    simulator = Aer.get_backend('qasm_simulator')
-    result = execute(qc, simulator, shots=shots).result()
-    outcomes = result.get_counts(qc)
-
-    return outcomes
-
-
-def postselect(outcomes, return_probs=True):
-    
-    mar_out = {}
-    for b_str in outcomes:
-        if b_str[0] == '1':
-            counts = outcomes[b_str]
-            mar_out[b_str[2:]] = counts
-            
-    # compute postselection rate
-    ps_shots = sum(mar_out.values())
-    shots = sum(outcomes.values())
-    rate = ps_shots/shots
-    
-    # convert to probability distribution
-    if return_probs == True:
-        mar_out = {b_str:round(mar_out[b_str]/ps_shots, 4) for b_str in mar_out}
-    
-    
-    return mar_out, rate
-
  
 ############### Result Data Analysis
 
 saved_result = None
 
+# Compute the expected distribution, given the matrix A and input value b
 def true_distr(A, b=0):
     
     N = len(A)
@@ -697,31 +556,27 @@ def true_distr(A, b=0):
     
     return distr
 
-
-# DEVNOTE: This is not used any more and possibly should be removed
-'''
-def TVD(distr1, distr2):  
-    """ compute total variation distance between distr1 and distr2
-        which are represented as dictionaries of bitstrings and probabilities
-    """
+ # post-select counts where ancilla was measured as |1>
+def postselect(outcomes, return_probs=True):
     
-    tvd = 0.0
-    for out1 in distr1:
-        if out1 in distr2:
-            p1, p2 = distr1[out1], distr2[out1]
-            tvd += np.abs(p1-p2)/2
-        else:
-            p1 = distr1[out1]
-            tvd += p1/2
+    mar_out = {}
+    for b_str in outcomes:
+        if b_str[0] == '1':
+            counts = outcomes[b_str]
+            mar_out[b_str[2:]] = counts
+            
+    # compute postselection rate
+    ps_shots = sum(mar_out.values())
+    shots = sum(outcomes.values())
+    rate = ps_shots/shots
     
-    for out2 in distr2:
-        if out2 not in distr1:
-            p2 = distr2[out2]
-            tvd += p2/2
+    # convert to probability distribution
+    if return_probs == True:
+        mar_out = {b_str:round(mar_out[b_str]/ps_shots, 4) for b_str in mar_out}  
     
-    return tvd
-'''
-
+    return mar_out, rate
+    
+# Analyze the quality of the result obtained from executing circuit qc 
 def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     
     global saved_result
