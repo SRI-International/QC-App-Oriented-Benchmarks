@@ -156,14 +156,17 @@ def var_circ(num_qubits=num_qubits):
     # reps is Number of times ry and cx gates are repeated
     reps = 3
     qc = QuantumCircuit(num_qubits)
-    parameter_vector = ParameterVector("t", length=num_qubits)
-    
-    for _ in range(reps):
+    parameter_vector = ParameterVector("t", length=num_qubits*reps)
+    # print("parameter_vector",parameter_vector)
+    counter = 0
+    for rep in range(reps):
       for i in range(num_qubits):
-          theta = parameter_vector[i]
+          theta = parameter_vector[counter]
           qc.ry(theta, i)
+          counter += 1
       for j in range(0, num_qubits - 1, 2):
           qc.cx(j, j + 1)
+    # print("counter",counter)
     return qc
 
 
@@ -184,6 +187,7 @@ def qcnn_model(theta, x):
     qc = QuantumCircuit(num_qubits, num_qubits//2)
     
     # Encode the pixel data into the quantum circuit here  x is the input data which is list of 14 values
+    
     
     # feature mapping 
     for j in range(num_qubits):
@@ -255,19 +259,20 @@ def loss_function(theta):
         prediction_label.append(predicted_label)
         
     # Cross entropy loss
-    # loss = log_loss(y_train, prediction_label)
-  
+    loss = log_loss(y_train, prediction_label)
+    print("cross entropy loss:", loss)
     loss = square_loss(y_train, prediction_label)
     print("loss:", loss)
     return loss
 
 # Initialize  epochs
-num_epochs = 2
+num_epochs = 10
+reps = 3
 
 # Initialize the weights for the QNN model
 np.random.seed(0)
-weights = np.random.rand(num_qubits)
-
+weights = np.random.rand(num_qubits * reps )
+print(len(weights))
 # Will increase the number of epochs once the code is fine tuned to get convergance 
 for epoch in range(num_epochs):
     # Minimize the loss using SPSA optimizer
