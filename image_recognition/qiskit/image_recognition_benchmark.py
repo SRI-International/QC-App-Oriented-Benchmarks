@@ -77,8 +77,7 @@ QC_ = None
 Uf_ = None
 
 # #theta parameters
-vqe_parameter = namedtuple('vqe_parameter','theta')
-# QAOA_Parameter  = namedtuple('QAOA_Parameter', ['beta', 'gamma'])
+classifier_parameter = namedtuple('classifier_param','theta')
 
 # Qiskit uses the little-Endian convention. Hence, measured bit-strings need to be reversed while evaluating cut sizes
 reverseStep = -1
@@ -92,56 +91,11 @@ else:
 
 
 # Create the  ansatz quantum circuit for the VQE algorithm.
-def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = None, *args, **kwargs) -> QuantumCircuit:
+def classification_ansatz(num_qubits: int, thetas_array, *args, **kwargs) -> QuantumCircuit:
     # Generate the ansatz circuit for the VQE algorithm.
-    if num_occ_pairs is None:
-        num_occ_pairs = (num_qubits // 2)  # e.g., half-filling, which is a reasonable chemical case
-
-        # do all possible excitations if not passed a list of excitations directly
-    excitation_pairs = []
-    for i in range(num_occ_pairs):
-        for a in range(num_occ_pairs, num_qubits):
-            excitation_pairs.append([i, a])
-
-    circuit = QuantumCircuit(num_qubits)
     
-    # Hartree Fock initial state
-    for occ in range(num_occ_pairs):
-        circuit.x(occ)
-    
-    # if thetas_array is not None:
-    #     parameter_vector = ParameterVector(thetas_array)
-    # else:
-    parameter_vector = ParameterVector("t", length=len(excitation_pairs))
-    
-    thetas_array = np.repeat(thetas_array, len(excitation_pairs))
-    # Hartree Fock initial state
 
-
-    for idx, pair in enumerate(excitation_pairs):
-        # parameter
-        
-        theta = parameter_vector[idx]            
-        # apply excitation
-        i, a = pair[0], pair[1]
-
-        # implement the magic gate
-        circuit.s(i)
-        circuit.s(a)
-        circuit.h(a)
-        circuit.cx(a, i)
-
-        # Ry rotation
-        circuit.ry(theta, i)
-        circuit.ry(theta, a)
-
-        # implement M^-1
-        circuit.cx(a, i)
-        circuit.h(a)
-        circuit.sdg(a)
-        circuit.sdg(i)
-
-    return circuit,parameter_vector,thetas_array
+    return circuit
     
 
 

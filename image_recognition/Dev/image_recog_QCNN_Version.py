@@ -42,10 +42,10 @@ def fetch_filter_mnist_data():
 
 def preprocess_data(x_train, x_test,y_train, y_test):
     # Reduce the size of the dataset for faster execution
-    x_train = x_train[:500]
-    y_train = y_train[:500]
-    x_test = x_test[:75]
-    y_test = y_test[:75]
+    x_train = x_train[:200]
+    y_train = y_train[:200]
+    x_test = x_test[:50]
+    y_test = y_test[:50]
 
     # Number of qubits for the quantum circuit
     num_qubits = 8
