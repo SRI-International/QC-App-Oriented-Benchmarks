@@ -268,6 +268,33 @@
    "cell_type": "markdown",
    "metadata": {},
    "source": [
+    "### HHL Linear Solver"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [],
+   "source": [
+    "import sys\n",
+    "sys.path.insert(1, \"hhl/qiskit\")\n",
+    "import hhl_benchmark\n",
+    "\n",
+    "hhl_benchmark.verbose=False\n",
+    "\n",
+    "hhl_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,\n",
+    "                method=1, use_best_widths=True,\n",
+    "                backend_id=backend_id, provider_backend=provider_backend,\n",
+    "                hub=hub, group=group, project=project, exec_options=exec_options)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
     "### Amplitude Estimation"
    ]
   },
