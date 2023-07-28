@@ -1164,7 +1164,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                         # Must wait for circuit to complete
                         #ex.throttle_execution(metrics.finalize_group)
     
-                        #TODO commenting the execution part because it throws an exception when measurement is performed later
+                        # finalize execution of group of circuits
                         ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                         
                         # after first execution and thereafter, no need for transpilation if parameterized
@@ -1358,20 +1358,32 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
     """
     #TODO not all functions can handle an array of score_metric. Need to modify functions to accept an array as input
 
-    if detailed_save_names:
-        # If detailed names are desired for saving plots, put date of creation, etc.
-        cur_time=datetime.datetime.now()
-        dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
-        #short_obj_func_str = metrics.score_label_save_str["compute_energy"]
-        short_obj_func_str = metrics.score_label_save_str["solution_quality"]
-        suffix = f'-s{num_shots}_r{radius}_mi{max_iter}_of-{short_obj_func_str}_{dt}' #of=objective function
-    else:
-        #short_obj_func_str = metrics.score_label_save_str["compute_energy"]
-        short_obj_func_str = metrics.score_label_save_str["solution_quality"]
-        suffix = f'of-{short_obj_func_str}' #of=objective function
+    if type(score_metric) == str:
+            score_metric = [score_metric]
+    suffix = []
+    options = []
+
+    
+
+    for sm in score_metric:
+        if sm not in metrics.score_label_save_str:
+            raise Exception(f"score_metric {sm} not found in metrics.score_label_save_str")
         
-    obj_str = metrics.known_score_labels["solution_quality"]
-    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
+        if detailed_save_names:
+            # If detailed names are desired for saving plots, put date of creation, etc.
+            cur_time=datetime.datetime.now()
+            dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
+            #short_obj_func_str = metrics.score_label_save_str["compute_energy"]
+            short_obj_func_str = (metrics.score_label_save_str[sm])
+            suffix.append(f'-s{num_shots}_r{radius}_mi{max_iter}_of-{short_obj_func_str}_{dt}') #of=objective function
+
+        else:
+            #short_obj_func_str = metrics.score_label_save_str["compute_energy"]
+            short_obj_func_str = metrics.score_label_save_str[sm]
+            suffix.append(f'of-{short_obj_func_str}') #of=objective function
+
+        obj_str = (metrics.known_score_labels[sm])
+        options.append({'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits, '\nObjective Function' : obj_str})
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
     
     metrics.plot_all_area_metrics(f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit",
@@ -1379,7 +1391,7 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
                 fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
                 x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
                 offset_flag=offset_flag,
-                options=options, suffix=suffix, which_metric='solution_quality')
+                options=options, suffix=suffix, which_metric='solution_quality', save_metric_label_flag=True)
     
 #     metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type)
     

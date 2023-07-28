@@ -1586,7 +1586,7 @@ def plot_all_area_metrics(suptitle='',
             score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
             fixed_metrics={}, num_x_bins=100,
             y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
-            options=None, suffix='', which_metric = 'approx_ratio'):
+            options=None, suffix='', which_metric = 'approx_ratio', save_metric_label_flag = False):
 
     if type(score_metric) == str:
         score_metric = [score_metric]
@@ -1596,11 +1596,18 @@ def plot_all_area_metrics(suptitle='',
         y_metric = [y_metric]
     
     # loop over all the given X and Score metrics, generating a plot for each combination
-    for s_m in score_metric:
-        for x_m in x_metric:
-            for y_m in y_metric:
-                #print("plotting area metrics for " + s_m + " " + x_m + " " + y_m)
-                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=options, suffix=suffix, which_metric=which_metric)
+    if save_metric_label_flag:
+        for s_m, opt, sfx in zip(score_metric, options, suffix):
+            for x_m in x_metric:
+                for y_m in y_metric:
+                    #print("plotting area metrics for " + s_m + " " + x_m + " " + y_m)
+                    plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=opt, suffix=sfx, which_metric=which_metric)
+    else:
+        for s_m in score_metric:
+            for x_m in x_metric:
+                for y_m in y_metric:
+                    #print("plotting area metrics for " + s_m + " " + x_m + " " + y_m)
+                    plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=options, suffix=suffix, which_metric=which_metric)
 
 def get_best_restart_ind(group, which_metric = 'approx_ratio'):
     """
