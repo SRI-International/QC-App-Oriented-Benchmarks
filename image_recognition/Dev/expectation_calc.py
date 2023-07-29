@@ -102,9 +102,5 @@ def calculate_expectation(base_circuit, shots=None ,num_qubits=None):
     circuits, formatted_observables = prepare_circuits(base_circuit, observables)
     probabilities = compute_probabilities(circuits, shots)
     expectation_values = calculate_expectation_values(probabilities, formatted_observables)
-    print("expectation_values",expectation_values)
-    if sum(expectation_values) > 0:
-        return 1
-    else:
-        return 0
     
+    return sum(expectation_values)
