@@ -1173,6 +1173,8 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
 
                     # calculate the solution quality
                     solution_quality, accuracy_volume = calculate_quality_metric(energy, fci_energy)
+                    metrics.store_metric(num_qubits, unique_id, 'energy', energy)
+                    metrics.store_metric(num_qubits, unique_id, 'fci_energy', fci_energy)
                     metrics.store_metric(num_qubits, unique_id, 'solution_quality', solution_quality)
                     metrics.store_metric(num_qubits, unique_id, 'accuracy_volume', accuracy_volume)
                     
