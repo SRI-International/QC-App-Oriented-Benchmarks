@@ -1562,7 +1562,10 @@ known_score_labels = {
     'bestcut_ratio' : 'Best Measurement Ratio',
     'fidelity' : 'Result Fidelity',
     'max_fidelity' : 'Max. Result Fidelity',
-    'hf_fidelity' : 'Hellinger Fidelity'
+    'hf_fidelity' : 'Hellinger Fidelity',
+    'solution_quality' : 'Solution Quality',
+    'accuracy_volume' : 'Accuracy Volume'
+    
 }
 
 # string that will go into the name of the figure when saved
@@ -1572,7 +1575,9 @@ score_label_save_str = {
     'bestcut_ratio' : 'bestCut',
     'gibbs_ratio' : 'gibbs',
     'fidelity' : 'fidelity',
-    'hf_fidelity' : 'hf'
+    'hf_fidelity' : 'hf',
+    'solution_quality' : 'solution_quality', 
+    'accuracy_volume' : 'accuracy_volume'
 }
 
  
@@ -1581,7 +1586,7 @@ def plot_all_area_metrics(suptitle='',
             score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
             fixed_metrics={}, num_x_bins=100,
             y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
-            options=None, suffix=''):
+            options=None, suffix='', which_metric = 'approx_ratio', save_metric_label_flag = False):
 
     if type(score_metric) == str:
         score_metric = [score_metric]
@@ -1591,10 +1596,18 @@ def plot_all_area_metrics(suptitle='',
         y_metric = [y_metric]
     
     # loop over all the given X and Score metrics, generating a plot for each combination
-    for s_m in score_metric:
-        for x_m in x_metric:
-            for y_m in y_metric:
-                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=options, suffix=suffix)
+    if save_metric_label_flag:
+        for s_m, opt, sfx in zip(score_metric, options, suffix):
+            for x_m in x_metric:
+                for y_m in y_metric:
+                    #print("plotting area metrics for " + s_m + " " + x_m + " " + y_m)
+                    plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=opt, suffix=sfx, which_metric=which_metric)
+    else:
+        for s_m in score_metric:
+            for x_m in x_metric:
+                for y_m in y_metric:
+                    #print("plotting area metrics for " + s_m + " " + x_m + " " + y_m)
+                    plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=options, suffix=suffix, which_metric=which_metric)
 
 def get_best_restart_ind(group, which_metric = 'approx_ratio'):
     """
@@ -1618,7 +1631,7 @@ def get_best_restart_ind(group, which_metric = 'approx_ratio'):
 def plot_area_metrics(suptitle='',
             score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={}, num_x_bins=100,
             y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
-            options=None, suffix=''):
+            options=None, suffix='', which_metric = 'approx_ratio'):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -1643,6 +1656,7 @@ def plot_area_metrics(suptitle='',
     x_label = known_x_labels[x_metric]
     y_label = known_y_labels[y_metric]
     score_label = known_score_labels[score_metric]
+    #print("plotting area metrics for " + score_label + " " + x_label + " " + y_label)
     
     # process cumulative and maximum options
     xs, x, y, scores = [], [], [], []
@@ -1666,7 +1680,7 @@ def plot_area_metrics(suptitle='',
         x_size_groups, x_groups, y_groups, score_groups = [], [], [], []
         
         # Get the best AR index
-        restart_index = get_best_restart_ind(group, which_metric = 'approx_ratio')
+        restart_index = get_best_restart_ind(group, which_metric = which_metric)
         
         # Each problem instance at size num_qubits; need to collate across iterations
         for circuit_id in [restart_index]:#circuit_metrics_detail_2[group]:
