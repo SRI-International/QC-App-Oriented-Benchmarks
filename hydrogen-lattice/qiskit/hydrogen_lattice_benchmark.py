@@ -482,74 +482,17 @@ def compute_energy(result_array, formatted_observables, num_qubits):
 
     
     return energy    
-# # ------------------Simulation Function------------------
-# # #%% Storing final iteration data to json file, and to metrics.circuit_metrics_final_iter
-
-# def save_runtime_data(result_dict): # This function will need changes, since circuit metrics dictionaries are now different
-#     cm = result_dict.get('circuit_metrics')
-#     detail = result_dict.get('circuit_metrics_detail', None)
-#     detail_2 = result_dict.get('circuit_metrics_detail_2', None)
-#     benchmark_inputs = result_dict.get('benchmark_inputs', None)
-#     final_iter_metrics = result_dict.get('circuit_metrics_final_iter')
-#     backend_id = result_dict.get('benchmark_inputs').get('backend_id')
-    
-#     metrics.circuit_metrics_detail_2 = detail_2
- 
- 
-#  #----------------------Removed restart index from here----------------------   
-# def save_runtime_data(result_dict):
-#     cm = result_dict.get('circuit_metrics')
-#     detail = result_dict.get('circuit_metrics_detail', None)
-#     detail_2 = result_dict.get('circuit_metrics_detail_2', None)
-#     benchmark_inputs = result_dict.get('benchmark_inputs', None)
-#     final_iter_metrics = result_dict.get('circuit_metrics_final_iter')
-#     backend_id = result_dict.get('benchmark_inputs').get('backend_id')
-
-#     metrics.circuit_metrics_detail_2 = detail_2
-
-#     for width in detail_2:
-#         degree = cm[width]['1']['degree']
-#         opt = final_iter_metrics[width]['1']['optimal_value']
-#         instance_filename = os.path.join(os.path.dirname(__file__),
-#             "..", "_common", common.INSTANCE_DIR, f"mc_{int(width):03d}_{int(degree):03d}_000.txt")
-#         metrics.circuit_metrics[width] = detail.get(width)
-#         metrics.circuit_metrics['subtitle'] = cm.get('subtitle')
-        
-#         finIterDict = final_iter_metrics[width]['1']
-#         if benchmark_inputs['save_final_counts']:
-#             iter_dist = {'cuts': finIterDict['cuts'], 'counts': finIterDict['counts'], 'sizes': finIterDict['sizes']}
-#         else:
-#             iter_dist = None
-
-#         iter_size_dist = {'unique_sizes': finIterDict['unique_sizes'], 'unique_counts': finIterDict['unique_counts'], 'cumul_counts': finIterDict['cumul_counts']}
-
-#         converged_thetas_list = finIterDict.get('converged_thetas_list')
-#         parent_folder_save = os.path.join('__data', f'{backend_id}')
-#         store_final_iter_to_metrics_json(
-#             num_qubits=int(width),
-#             degree=int(degree),
-#             num_shots=int(benchmark_inputs['num_shots']),
-#             converged_thetas_list=converged_thetas_list,
-#             opt=opt,
-#             iter_size_dist=iter_size_dist,
-#             iter_dist=iter_dist,
-#             dict_of_inputs=benchmark_inputs,
-#             parent_folder_save=parent_folder_save,
-#             save_final_counts=False,
-#             save_res_to_file=True,
-#             _instances=None
-#         )
 
 
-
+# Function to save final iteration data to file
 def store_final_iter_to_metrics_json(num_qubits,
-                                     degree,
-                                     restart_ind,
+                                     radius,
+                                     instance_num,
                                      num_shots,
                                      converged_thetas_list,
-                                     opt,
-                                     iter_size_dist,
-                                     iter_dist,
+                                     energy,
+                                     #iter_size_dist,
+                                     #iter_dist,
                                      parent_folder_save,
                                      dict_of_inputs,
                                      save_final_counts,
@@ -570,211 +513,232 @@ def store_final_iter_to_metrics_json(num_qubits,
         opt (int) : Max Cut value
     """
     # In order to compare with uniform random sampling, get some samples
+    '''
     unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif = uniform_cut_sampling(
         num_qubits, degree, num_shots, _instances)
     unif_dict = {'unique_counts_unif': unique_counts_unif,
                  'unique_sizes_unif': unique_sizes_unif,
                  'cumul_counts_unif': cumul_counts_unif}  # store only the distribution of cut sizes, and not the cuts themselves
+    '''
     # Store properties such as (cuts, counts, sizes) of the final iteration, the converged theta values, as well as the known optimal value for the current problem, in metrics.circuit_metrics_final_iter. Also store uniform cut sampling results
-    metrics.store_props_final_iter(num_qubits, restart_ind, 'optimal_value', opt)
-    metrics.store_props_final_iter(num_qubits, restart_ind, None, iter_size_dist)
-    metrics.store_props_final_iter(num_qubits, restart_ind, 'converged_thetas_list', converged_thetas_list)
-    metrics.store_props_final_iter(num_qubits, restart_ind, None, unif_dict)
-    # metrics.store_props_final_iter(num_qubits, restart_ind, None, iter_dist) # do not store iter_dist, since it takes a lot of memory for larger widths, instead, store just iter_size_dist
-    global radius
+    metrics.store_props_final_iter(num_qubits, instance_num, 'energy', energy)
+    #metrics.store_props_final_iter(num_qubits, instance_num, None, iter_size_dist)
+    metrics.store_props_final_iter(num_qubits, instance_num, 'converged_thetas_list', converged_thetas_list)
+    #metrics.store_props_final_iter(num_qubits, instance_num, None, unif_dict)
+    # metrics.store_props_final_iter(num_qubits, instance_num, None, iter_dist) # do not store iter_dist, since it takes a lot of memory for larger widths, instead, store just iter_size_dist
+    #global radius
     if save_res_to_file:
         # Save data to a json file
         dump_to_json(parent_folder_save, num_qubits,
-                     radius, restart_ind, iter_size_dist, iter_dist, dict_of_inputs, converged_thetas_list, opt, unif_dict,
+                     radius, instance_num, 
+                     #iter_size_dist, 
+                     #iter_dist, 
+                     dict_of_inputs, 
+                     converged_thetas_list, 
+                     energy,
+                     #unif_dict,
                      save_final_counts=save_final_counts)
 
-def dump_to_json(parent_folder_save, num_qubits, radius, restart_ind, iter_size_dist, iter_dist,
-                 dict_of_inputs, converged_thetas_list, opt, unif_dict, save_final_counts=False):
+def dump_to_json(parent_folder_save, num_qubits, radius, instance_num, 
+                 #iter_size_dist, iter_dist,
+                 dict_of_inputs, 
+                 converged_thetas_list, energy,
+                 #unif_dict,
+                 save_final_counts=False):
     """
-    For a given problem (specified by number of qubits and graph degree) and restart_index, 
+    For a given problem (specified by number of qubits and graph degree) and instance_numex, 
     save the evolution of various properties in a json file.
     Items stored in the json file: Data from all iterations (iterations), inputs to run program ('general properties'), converged theta values ('converged_thetas_list'), max cut size for the graph (optimal_value), distribution of cut sizes for random uniform sampling (unif_dict), and distribution of cut sizes for the final iteration (final_size_dist)
     if save_final_counts is True, then also store the distribution of cuts 
     """
+    
+    print(f"... saving data for width {num_qubits} radius {radius} instance_num {instance_num}")
+    
     if not os.path.exists(parent_folder_save): os.makedirs(parent_folder_save)
-    store_loc = os.path.join(parent_folder_save,'width_{}_restartInd_{}.json'.format(num_qubits, restart_ind))
-  
-    # Obtain dictionary with iterations data corresponding to given restart_ind 
+    store_loc = os.path.join(parent_folder_save,'width_{}_instance_{}.json'.format(num_qubits, instance_num))
+
+    print(f"  ... to file {store_loc}")
+    
+    # Obtain dictionary with iterations data corresponding to given instance_num 
     all_restart_ids = list(metrics.circuit_metrics[str(num_qubits)].keys())
-    ids_this_restart = [r_id for r_id in all_restart_ids if int(r_id) // 1000 == restart_ind]
+    ids_this_restart = [r_id for r_id in all_restart_ids if int(r_id) // 1000 == instance_num]
     iterations_dict_this_restart =  {r_id : metrics.circuit_metrics[str(num_qubits)][r_id] for r_id in ids_this_restart}
     # Values to be stored in json file
     dict_to_store = {'iterations' : iterations_dict_this_restart}
     dict_to_store['general_properties'] = dict_of_inputs
     dict_to_store['converged_thetas_list'] = converged_thetas_list
-    dict_to_store['optimal_value'] = opt
-    dict_to_store['unif_dict'] = unif_dict
-    dict_to_store['final_size_dist'] = iter_size_dist
+    dict_to_store['energy'] = energy
+    #dict_to_store['unif_dict'] = unif_dict
+    #dict_to_store['final_size_dist'] = iter_size_dist
     # Also store the value of counts obtained for the final counts
+    '''
     if save_final_counts:
         dict_to_store['final_counts'] = iter_dist
-                                        #iter_dist.get_counts()
+    '''                                   #iter_dist.get_counts()
     # Now save the output
     with open(store_loc, 'w') as outfile:
         json.dump(dict_to_store, outfile)
+        
 # %% Loading saved data (from json files)
 
-# def load_data_and_plot(folder, backend_id=None, **kwargs):
-#     """
-#     The highest level function for loading stored data from a previous run
-#     and plotting optgaps and area metrics
+def load_data_and_plot(folder, backend_id=None, **kwargs):
+    """
+    The highest level function for loading stored data from a previous run
+    and plotting optgaps and area metrics
 
-#     Parameters
-#     ----------
-#     folder : string
-#         Directory where json files are saved.
-#     """
-#     _gen_prop = load_all_metrics(folder, backend_id=backend_id)
-#     if _gen_prop != None:
-#         gen_prop = {**_gen_prop, **kwargs}
-#         plot_results_from_data(**gen_prop)
+    Parameters
+    ----------
+    folder : string
+        Directory where json files are saved.
+    """
+    _gen_prop = load_all_metrics(folder, backend_id=backend_id)
+    if _gen_prop != None:
+        gen_prop = {**_gen_prop, **kwargs}
+        plot_results_from_data(**gen_prop)
 
 
-# def load_all_metrics(folder, backend_id=None):
-#     """
-#     Load all data that was saved in a folder.
-#     The saved data will be in json files in this folder
+def load_all_metrics(folder, backend_id=None):
+    """
+    Load all data that was saved in a folder.
+    The saved data will be in json files in this folder
 
-#     Parameters
-#     ----------
-#     folder : string
-#         Directory where json files are saved.
+    Parameters
+    ----------
+    folder : string
+        Directory where json files are saved.
 
-#     Returns
-#     -------
-#     gen_prop : dict
-#         of inputs that were used in maxcut_benchmark.run method
-#     """
-#     # Note: folder here should be the folder where only the width=... files are stored, and not a folder higher up in the directory
-#     assert os.path.isdir(folder), f"Specified folder ({folder}) does not exist."
+    Returns
+    -------
+    gen_prop : dict
+        of inputs that were used in maxcut_benchmark.run method
+    """
+    # Note: folder here should be the folder where only the width=... files are stored, and not a folder higher up in the directory
+    assert os.path.isdir(folder), f"Specified folder ({folder}) does not exist."
     
-#     metrics.init_metrics()
+    metrics.init_metrics()
     
-#     list_of_files = os.listdir(folder)
-#     width_restart_file_tuples = [(*get_width_restart_tuple_from_filename(fileName), fileName)
-#                                  for (ind, fileName) in enumerate(list_of_files) if fileName.startswith("width")]  # list with elements that are tuples->(width,restartInd,filename)
-
-#     width_restart_file_tuples = sorted(width_restart_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by restartInd
-#     distinct_widths = list(set(it[0] for it in width_restart_file_tuples)) 
-#     list_of_files = [
-#         [tup[2] for tup in width_restart_file_tuples if tup[0] == width] for width in distinct_widths
-#         ]
+    list_of_files = os.listdir(folder)
+    print(list_of_files)
     
-#     # connot continue without at least one dataset
-#     if len(list_of_files) < 1:
-#         print("ERROR: No result files found")
-#         return None
+    width_restart_file_tuples = [(*get_width_restart_tuple_from_filename(fileName), fileName)
+                                 for (ind, fileName) in enumerate(list_of_files) if fileName.startswith("width")]  # list with elements that are tuples->(width,restartInd,filename)
+    
+    width_restart_file_tuples = sorted(width_restart_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by restartInd
+    distinct_widths = list(set(it[0] for it in width_restart_file_tuples)) 
+    list_of_files = [
+        [tup[2] for tup in width_restart_file_tuples if tup[0] == width] for width in distinct_widths
+        ]
+    
+    # connot continue without at least one dataset
+    if len(list_of_files) < 1:
+        print("ERROR: No result files found")
+        return None
         
-#     # for width_files in list_of_files:
-#     #     # For each width, first load all the restart files
-#     #     for fileName in width_files:
-#     #         gen_prop = load_from_width_restart_file(folder, fileName)
-        
-#     #     # next, do processing for the width
-#     #     method = gen_prop['method']
-#     #     if method == 2:
-#     #         num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
-#     #         metrics.process_circuit_metrics_2_level(num_qubits)
-#     #         metrics.finalize_group(str(num_qubits))
-            
-#     # override device name with the backend_id if supplied by caller
-#     if backend_id != None:
-#         metrics.set_plot_subtitle(f"Device = {backend_id}")
-            
-#     return gen_prop
+    for width_files in list_of_files:
+        # For each width, first load all the restart files
+        for fileName in width_files:
+            gen_prop = load_from_width_restart_file(folder, fileName)
+      
+        # next, do processing for the width
+        method = gen_prop['method']
+        if method == 2:
+            num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
+            metrics.process_circuit_metrics_2_level(num_qubits)
+            metrics.finalize_group(str(num_qubits))
+          
+    # override device name with the backend_id if supplied by caller
+    if backend_id != None:
+        metrics.set_plot_subtitle(f"Device = {backend_id}")
+          
+    return gen_prop
 
 
 # # ----------------need to revise the below code------------------
 
-# # def load_from_width_restart_file(folder, fileName):
-# #     """
-# #     Given a folder name and a file in it, load all the stored data and store the values in metrics.circuit_metrics.
-# #     Also return the converged values of thetas, the final counts and general properties.
+def load_from_width_restart_file(folder, fileName):
+    """
+    Given a folder name and a file in it, load all the stored data and store the values in metrics.circuit_metrics.
+    Also return the converged values of thetas, the final counts and general properties.
 
-# #     Parameters
-# #     ----------
-# #     folder : string
-# #         folder where the json file is located
-# #     fileName : string
-# #         name of the json file
+    Parameters
+    ----------
+    folder : string
+        folder where the json file is located
+    fileName : string
+        name of the json file
 
-# #     Returns
-# #     -------
-# #     gen_prop : dict
-# #         of inputs that were used in maxcut_benchmark.run method
-# #     """
+    Returns
+    -------
+    gen_prop : dict
+        of inputs that were used in maxcut_benchmark.run method
+    """
     
-# #     # Extract num_qubits and s from file name
-# #     num_qubits, restart_ind = get_width_restart_tuple_from_filename(fileName)
-# #     print(f"Loading from {fileName}, corresponding to {num_qubits} qubits and restart index {restart_ind}")
-# #     with open(os.path.join(folder, fileName), 'r') as json_file:
-# #         data = json.load(json_file)
-# #         gen_prop = data['general_properties']
-# #         converged_thetas_list = data['converged_thetas_list']
-# #         unif_dict = data['unif_dict']
-# #         opt = data['optimal_value']
-# #         if gen_prop['save_final_counts']:
-# #             # Distribution of measured cuts
-# #             final_counts = data['final_counts']
-# #         final_size_dist = data['final_size_dist']
+    # Extract num_qubits and s from file name
+    num_qubits, restart_ind = get_width_restart_tuple_from_filename(fileName)
+    print(f"Loading from {fileName}, corresponding to {num_qubits} qubits and restart index {restart_ind}")
+    with open(os.path.join(folder, fileName), 'r') as json_file:
+        data = json.load(json_file)
+        gen_prop = data['general_properties']
+        converged_thetas_list = data['converged_thetas_list']
+        #unif_dict = data['unif_dict']
+        energy = data['energy']
+        if gen_prop['save_final_counts']:
+            # Distribution of measured cuts
+            final_counts = data['final_counts']
+        #final_size_dist = data['final_size_dist']
         
-# #         backend_id = gen_prop.get('backend_id')
-# #         metrics.set_plot_subtitle(f"Device = {backend_id}")
+        backend_id = gen_prop.get('backend_id')
+        metrics.set_plot_subtitle(f"Device = {backend_id}")
         
-# #         # Update circuit metrics
-# #         for circuit_id in data['iterations']:
-# #             # circuit_id = restart_ind * 1000 + minimizer_loop_ind
-# #             for metric, value in data['iterations'][circuit_id].items():
-# #                 metrics.store_metric(num_qubits, circuit_id, metric, value)
+        # Update circuit metrics
+        for circuit_id in data['iterations']:
+            # circuit_id = restart_ind * 1000 + minimizer_loop_ind
+            for metric, value in data['iterations'][circuit_id].items():
+                metrics.store_metric(num_qubits, circuit_id, metric, value)
                 
-# #         method = gen_prop['method']
-# #         if method == 2:
-# #             metrics.store_props_final_iter(num_qubits, restart_ind, 'optimal_value', opt)
-# #             metrics.store_props_final_iter(num_qubits, restart_ind, None, final_size_dist)
-# #             metrics.store_props_final_iter(num_qubits, restart_ind, 'converged_thetas_list', converged_thetas_list)
-# #             metrics.store_props_final_iter(num_qubits, restart_ind, None, unif_dict)
-# #             if gen_prop['save_final_counts']:
-# #                 metrics.store_props_final_iter(num_qubits, restart_ind, None, final_counts)
+        method = gen_prop['method']
+        if method == 2:
+            metrics.store_props_final_iter(num_qubits, restart_ind, 'energy', energy)
+            #metrics.store_props_final_iter(num_qubits, restart_ind, None, final_size_dist)
+            metrics.store_props_final_iter(num_qubits, restart_ind, 'converged_thetas_list', converged_thetas_list)
+            #metrics.store_props_final_iter(num_qubits, restart_ind, None, unif_dict)
+            if gen_prop['save_final_counts']:
+                metrics.store_props_final_iter(num_qubits, restart_ind, None, final_counts)
 
-# #     return gen_prop
+    return gen_prop
     
 
-# # def get_width_restart_tuple_from_filename(fileName):
-# #     """
-# #     Given a filename, extract the corresponding width and degree it corresponds to
-# #     For example the file "width=4_degree=3.json" corresponds to 4 qubits and degree 3
+def get_width_restart_tuple_from_filename(fileName):
+    """
+    Given a filename, extract the corresponding width and degree it corresponds to
+    For example the file "width=4_degree=3.json" corresponds to 4 qubits and degree 3
 
-# #     Parameters
-# #     ----------
-# #     fileName : TYPE
-# #         DESCRIPTION.
+    Parameters
+    ----------
+    fileName : TYPE
+        DESCRIPTION.
 
-# #     Returns
-# #     -------
-# #     num_qubits : int
-# #         circuit width
-# #     degree : int
-# #         graph degree.
+    Returns
+    -------
+    num_qubits : int
+        circuit width
+    degree : int
+        graph degree.
 
-# #     """
-# #     pattern = 'width_([0-9]+)_restartInd_([0-9]+).json'
-# #     match = re.search(pattern, fileName)
+    """
+    pattern = 'width_([0-9]+)_instance_([0-9]+).json'
+    match = re.search(pattern, fileName)
+    print(match)
 
-# #     # assert match is not None, f"File {fileName} found inside folder. All files inside specified folder must be named in the format 'width_int_restartInd_int.json"
-# #     num_qubits = int(match.groups()[0])
-# #     degree = int(match.groups()[1])
-# #     return (num_qubits,degree)
+    # assert match is not None, f"File {fileName} found inside folder. All files inside specified folder must be named in the format 'width_int_restartInd_int.json"
+    num_qubits = int(match.groups()[0])
+    degree = int(match.groups()[1])
+    return (num_qubits,degree)
 
 # # ----------------need to revise the above code------------------
 
 
-
-
+################ Run Method
 
 MAX_QUBITS = 24
 # # iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
@@ -783,8 +747,6 @@ MAX_QUBITS = 24
 # instance_filename = None
 
 #radius = None
-
-
 
 def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
         method=2, radius=None, thetas_array=None, parameterized= False, do_fidelities=True,
@@ -1202,6 +1164,10 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
 
                     # increment the minimizer loop index, the index is increased by one for three circuits created ( three measurement basis circuits)
                     minimizer_loop_index += 1
+                    
+                    if comfort:
+                        if minimizer_loop_index == 1: print("")
+                        print(".", end ="")
 
                     energy = compute_energy(result_array = res, formatted_observables = frmt_obs, num_qubits=num_qubits)
 
@@ -1219,17 +1185,20 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                     else:
                         pass
                 
+                if comfort:
+                    print("")
+                    
                 initial_parameters = np.random.random(size=1)     
                 # objective_function(thetas_array=None)       
                 if DEBUG:
                     print("The initial parameters are : "+ str(initial_parameters))
 
                 thetas_array = minimize(objective_function,
-                x0=initial_parameters.ravel(),
-                method='COBYLA',
-                tol=1e-3,
-                options={'maxiter': 100, 'disp': False},
-                 callback=callback_thetas_array) 
+                        x0=initial_parameters.ravel(),
+                        method='COBYLA',
+                        tol=1e-3,
+                        options={'maxiter': max_iter, 'disp': False},
+                        callback=callback_thetas_array) 
                 
                 ideal_energy = objective_function(thetas_array.x)
 
@@ -1296,29 +1265,29 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                     plt.show(block=True)
                 else:
                     plt.show(block=False)
-                
-            lowest_energy_values.clear()
-                    
-                
+
+                # DEVNOTE: not yet capturing classical time, to do
                 # unique_id = instance_num * 1000 + 0
                 # metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
-                
-#                 if comfort:
-#                     print("")
 
-#                 # Save final iteration data to metrics.circuit_metrics_final_iter
-#                 # This data includes final counts, cuts, etc.
-#                 store_final_iter_to_metrics_json(num_qubits=num_qubits, 
-#                                                 #  degree=degree,
-#                                                  radius = radius,
-#                                                  restart_ind=restart_ind,
-#                                                  num_shots=num_shots, 
-#                                                 #  converged_thetas_list=res.x.tolist(),
-#                                                 #  opt=opt,
-#                                                  enegy = lowest_energy_values[-1],
-#                                                 #  iter_size_dist=iter_size_dist, iter_dist=iter_dist, parent_folder_save=parent_folder_save,
-#                                                  dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
-#                                                  save_res_to_file=save_res_to_file, _instances=_instances)
+
+                # Save final iteration data to metrics.circuit_metrics_final_iter
+                # This data includes final counts, cuts, etc.
+                parent_folder_save = os.path.join('__data', f'{backend_id}')
+            
+                # sve the data for this qubit width and instance number
+                store_final_iter_to_metrics_json(num_qubits=num_qubits, 
+                              radius = radius,
+                              instance_num=instance_num,
+                              num_shots=num_shots, 
+                              converged_thetas_list=thetas_array.x.tolist(),
+                              energy = lowest_energy_values[-1],
+                             #  iter_size_dist=iter_size_dist, iter_dist=iter_dist,
+                              parent_folder_save=parent_folder_save,
+                              dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
+                              save_res_to_file=save_res_to_file, _instances=_instances)
+
+            lowest_energy_values.clear()
 
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
