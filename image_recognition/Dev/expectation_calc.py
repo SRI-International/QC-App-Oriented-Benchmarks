@@ -94,9 +94,15 @@ def calculate_expectation_values(probabilities, observables):
 
 # main function
 def calculate_expectation(base_circuit, shots=None ,num_qubits=None):
+     
+    # operator = "I"  * num_qubits
+    pauli_x = PauliSumOp(SparsePauliOp("X" * num_qubits))
+    pauli_y = PauliSumOp(SparsePauliOp("Y" * num_qubits))
+    pauli_z = PauliSumOp(SparsePauliOp("Z" * num_qubits))
+    operator = 0.5 * pauli_x + 0.3 * pauli_y - 0.7 * pauli_z
+    # operator = PauliSumOp(SparsePauliOp("Z" * num_qubits))
     
-    z_operator = PauliSumOp(SparsePauliOp("Z" * num_qubits))
-    measurable_expression = StateFn(z_operator, is_measurement=True)
+    measurable_expression = StateFn(operator, is_measurement=True)
     # print("measurable_expression",measurable_expression)
     observables = PauliExpectation().convert(measurable_expression)
     circuits, formatted_observables = prepare_circuits(base_circuit, observables)

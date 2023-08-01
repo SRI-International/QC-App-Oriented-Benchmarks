@@ -26,7 +26,7 @@ debug = False
 ''' All steps are explained below
     1. Fetch the MNIST dataset
     2. Access the data and target  
-        i) filter the data with 7 and 9 ( for initial development we are doing binary classification )
+        i) filter the data with 0 and 1 ( for initial development we are doing binary classification )
     3. Split the data into train and test data ( 80% for training and 20% for testing )
     4. pca for dimensionality reduction (x_scaled_data is the scaled data)
     5. batching the data ( we are not using batching for now)
@@ -54,7 +54,7 @@ debug = False
 import expectation_calc
 
 # Number of qubits for the quantum circuit
-num_qubits = 8
+num_qubits = 4
 
 # Fetch the MNIST dataset from openml
 mnist = fetch_openml('mnist_784')
@@ -278,13 +278,13 @@ global num_iter_plot
 
 
 # function to calculate the loss function
-def loss_function(theta, is_draw_circ=False, is_print=True):
+def loss_function(theta, x_batch, y_batch, is_draw_circ=False, is_print=False):
     # predicted_label = []
     total_loss = 0
     epsilon = 1e-15  # small value to avoid log(0) errors
     prediction_label = []
     i_draw = 0
-    for data_point, label in zip(x_scaled_train, y_train):
+    for data_point, label in zip(x_batch, y_batch):
         # Create the quantum circuit for the data point
         qc = qcnn_model(theta, data_point, num_qubits, reps)
 
@@ -306,26 +306,28 @@ def loss_function(theta, is_draw_circ=False, is_print=True):
     if debug == True:
         print(prediction_label)
     # Cross entropy loss
-    loss = log_loss(y_train, prediction_label)
+    loss = log_loss(y_batch, prediction_label)
     #print("cross entropy loss:", loss)
     #print("theta:", theta)
     #loss = square_loss(y_train, prediction_label)
     #print("loss:", loss)
-
+    is_print = True
     if is_print:
         predictions = []
-        for i in range(len(y_train)):
+        for i in range(len(y_batch)):
             if prediction_label[i] > 0.5:
                 predictions.append(1)
             else:
                 predictions.append(0)
         if debug == True:
             print(predictions)
-        accuracy = accuracy_score(y_train, predictions)
-        print("Accuracy:", accuracy, "loss:", loss)
+        accuracy = accuracy_score(y_batch, predictions)
+        # print("Accuracy:", accuracy, "loss:", loss)
         train_loss_history.append(loss)
         train_accuracy_history.append(accuracy)
     
+    print("Accuracy:", accuracy, "loss:", loss)
+
     return loss
 
 # print(len(train_loss_history))
@@ -336,7 +338,7 @@ def callback(theta):
     pass
 
 # Initialize  epochs
-num_epochs = 1
+num_epochs = 2
 reps = 3
 
 # Number of shots to run the program (experiment)
@@ -348,10 +350,35 @@ weights = np.random.rand(num_qubits * reps *2 )
 #weights = np.zeros(num_qubits * reps)
 print(len(weights))
 
-# Will increase the number of epochs once the code is fine tuned to get convergance 
+# Mini Batch taining batch size 
+batch_size = 35
+
+# training samples data size 
+data_size  = len(x_scaled_train)
+
+# Number of batches 
+batch_count =  (data_size + batch_size - 1) // batch_size
+
+
 for epoch in range(num_epochs):
+    
+    #  Looping batch count
+    for batch in range(batch_count):
+      
+      # start and end indeces for current_batch( Here batch is index of above batch)
+        start_index = batch * batch_size   # batch will be 0 for first index
+        end_index   = min((batch + 1 ) * batch_size, data_size)
+      
+      # batch extraction 
+        x_batch = x_scaled_train[start_index:end_index]
+        y_batch = y_train[start_index:end_index]
+      
+      
+        print(f"Current batch is {batch}")
     # Minimize the loss using SPSA optimizer
-    theta = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, callback=callback, options={'maxiter': 100, 'disp': False} )
+        is_draw,is_print = False,True
+        theta = minimize(loss_function, x0 = weights, args=(x_batch,y_batch,is_draw,is_print), method="COBYLA", tol=0.001, 
+                                callback=callback, options={'maxiter': 100, 'disp': False} )
     #theta=SPSA(maxiter=100).minimize(loss_function, x0=weights)
 
     loss = theta.fun
