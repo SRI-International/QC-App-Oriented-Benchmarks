@@ -152,7 +152,7 @@ With this in mind, the pUCCD ansatz will generally consist of this quantum circu
 ### Algorithmic Visualization
 
 <p align="center">
-<img align=center src="../_doc/images/hydrogen-lattice/algorithm.png"  width="600" />
+<img align=center src="../_doc/images/hydrogen-lattice/puccd_qiskit.png"  width="600" />
 </p>
 
 The pUCCD ansatz on four physical qubits, which can map onto eight simulation qubits. The first section marked by the barriers is the initial Hartree Fock State, wheras the sections after represent the pair excitations operations implemented via the Givens rotations. The parameterizations with which optimizations occur are in the $R_Y$ gates. Using this circuit in combination with a a paired-electron mapping for the Hamiltonian allows for a constant number of circuit measurements (3), as well as halving the number of physical qubits needed to simulate a system.
