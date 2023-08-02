@@ -1370,7 +1370,7 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
         options.append({'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits, '\nObjective Function' : obj_str})
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
 
-    h_metrics.plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_volume"], x_vals=["iteration_count", "cumulative_exec_time"])
+    h_metrics.plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_volume"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True)
     
     metrics.plot_all_area_metrics(f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
