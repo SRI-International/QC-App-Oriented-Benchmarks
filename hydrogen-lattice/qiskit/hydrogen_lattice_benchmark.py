@@ -1089,6 +1089,10 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
                 fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
                 cumlative_iter_time = [0]
+
+                current_radius = float(os.path.basename(instance_filepath).split('_')[2])
+                current_radius += float(os.path.basename(instance_filepath).split('_')[3][:2])*.01
+
                 def objective_function(thetas_array):
                     
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
@@ -1178,19 +1182,15 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
 
                     # calculate the solution quality
                     solution_quality, accuracy_volume = calculate_quality_metric(energy, fci_energy, precision=0.5)
-                    metrics.store_metric(num_qubits, unique_id, 'energy', energy)
-                    metrics.store_metric(num_qubits, unique_id, 'fci_energy', fci_energy)
-                    metrics.store_metric(num_qubits, unique_id, 'solution_quality', solution_quality)
-                    metrics.store_metric(num_qubits, unique_id, 'accuracy_volume', accuracy_volume)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'energy', energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'solution_quality', solution_quality)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'accuracy_volume', accuracy_volume)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'doci_energy', doci_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'radius', current_radius)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'iteration_count', minimizer_loop_index)
                     
-                    h_metrics.store_metric(str(num_qubits), str(unique_id), 'energy', energy)
-                    h_metrics.store_metric(str(num_qubits), str(unique_id), 'iteration_count', minimizer_loop_index)
-                    h_metrics.store_metric(str(num_qubits), str(unique_id), 'exec_time', quantum_execution_time)
-                    h_metrics.store_metric(str(num_qubits), str(unique_id), 'elapsed_time', quantum_elapsed_time)
-                    h_metrics.store_metric(num_qubits, unique_id, 'solution_quality', solution_quality)
-                    h_metrics.store_metric(num_qubits, unique_id, 'accuracy_volume', accuracy_volume)
-                    h_metrics.store_metric(num_qubits, unique_id, 'fci_energy', fci_energy)
-                    h_metrics.store_metric(num_qubits, unique_id, 'doci_energy', doci_energy)
 
                     return energy
                 

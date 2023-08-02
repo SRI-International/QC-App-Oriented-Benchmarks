@@ -50,50 +50,11 @@ sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-latti
 # import the metrics module
 import metrics as metrics
 
-# h_lattice_metrics dictionary
-h_lattice_metrics = {}
+h_lattice_metrics = metrics.circuit_metrics_detail
 
-# define know x labels
-known_x_labels = {"iteration_count" : "Iteration Count",
-                    "cumulative_exec_time" : "Cumulative Execution Time (s)",
-                    "cumulative_elapsed_time" : "Cumulative Elapsed Time (s)"
-                  }
-
-# define known score labels
-known_score_labels = {"energy" : "Energy (Hartree)",
-                      "solution_quality" : "Solution Quality",
-                      "accuracy_volume" : "Accuracy Volume"
-                      
-                      }
 
 # save plot images flag
 save_plot_images = True
-
-# function to initialize the metrics module
-def init_metrics():
-    global h_lattice_metrics
-    h_lattice_metrics.clear()
-
-# function to add a metric to the metrics dictionary
-def store_metric( group, circuit_id, metric_name, metric_value ):
-    global h_lattice_metrics
-
-    group = str(group)
-    circuit_id = str(circuit_id)
-    if group not in h_lattice_metrics:
-        h_lattice_metrics[group] = { }
-    if circuit_id not in h_lattice_metrics[group]:
-        h_lattice_metrics[group][circuit_id] = { }
-        
-    # if the metric_value is a dict, store each metric provided
-    if type(metric_value) is dict:
-        for key in metric_value:
-            # If you want to store multiple metrics in one go,
-            # then simply provide these in the form of a dictionary under the metric_value input
-            # In this case, the metric input will be ignored
-            store_metric(group, circuit_id, key, metric_value[key]) 
-    else:
-        h_lattice_metrics[group][circuit_id][metric_name] = metric_value
 
 # function to take input the title of plot, the x and y axis labels, and the data to plot as a line plot
 def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="energy", x_val='cumulative_exec_time'):
@@ -105,7 +66,8 @@ def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="e
     backend_id = subtitle[9:]
 
     # set the full title
-    fulltitle = suptitle + f" " + known_score_labels[metric_name] + f"\nDevice={backend_id}  {metrics.get_timestr()}"
+    fulltitle = suptitle + f" " + metrics.known_score_labels[metric_name] + f"\nDevice={backend_id}  {metrics.get_timestr()}"
+    fulltitle = f"{metrics.known_score_labels[metric_name]} vs. {metrics.known_x_labels[x_val]} "
 
     
 
@@ -124,8 +86,7 @@ def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="e
     # iterate over all groups
     for group in h_lattice_metrics:
 
-
-
+        num_qubits = int(group)
         # iterate over all circuits
 
         circuit_ids = [int(x) for x in (h_lattice_metrics[group])]
@@ -137,19 +98,19 @@ def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="e
         for instance in range(1, total_instances + 1):
 
             # define the figure and axis
-            fig, ax = plt.subplots()
-            ax.cla()
+            fig, ax = plt.subplots(1,1)
         
             y_data = []
             x_data = []
 
+            current_radius = 0
 
             for circuit_id in h_lattice_metrics[group]:
                 if np.floor(int(circuit_id)/1000) == instance:
                     # get the metric value
                     metric_value = h_lattice_metrics[group][circuit_id][metric_name]
                     # set the y label 
-                    y_label = known_score_labels[metric_name]
+                    y_label = metrics.known_score_labels[metric_name]
 
                     # append the metric value to the y_data list
                     y_data.append(metric_value)
@@ -157,13 +118,14 @@ def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="e
                     # get the x metric value
                     x_metric_value = h_lattice_metrics[group][circuit_id][x_metric_name]
                     # set the x label
-                    x_label = known_x_labels[x_val]
+                    x_label = metrics.known_x_labels[x_val]
 
                     # append the x metric value to the x_data list
                     x_data.append(x_metric_value)
 
                     doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
                     fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
+                    current_radius = h_lattice_metrics[group][circuit_id]['radius']
 
                 else:
                     continue
@@ -201,7 +163,7 @@ def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="e
             else:
                 ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm)
 
-            ax.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=12)
+            ax.plot(x_data, y_data, linestyle='-.', linewidth=2, markersize=12)
 
 
             # set the title
@@ -219,9 +181,14 @@ def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="e
             if metric_name == 'energy':
                 ax.axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
                 ax.axhline(y=fci_energy, color='g', linestyle='solid', label='FCI Energy for given Hamiltonian')
+            energy_text = f'DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
+            ax.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
+            
+            
 
             ax.legend()
-            plt.tight_layout()
+            fig.show()
+            
 
             if save_plot_images:
                 metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-line-"
@@ -229,6 +196,7 @@ def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="e
                                                     + str(instance) + '-'
                                                     + str(metric_name) + '-'
                                                     + str(x_metric_name) + '-'), backend_id)
+    plt.show(block=True)
 
 
 
