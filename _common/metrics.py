@@ -3097,8 +3097,8 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
         cmap = ListedColormap(cmap_colors)
 
     else:
-        set_custom_cmap_norm(0.0, 0.0)
-
+        global cmap
+        cmap = cmap_spectral
 
 
     # add colorbar to right of plot (scale if normalize function installed)    
