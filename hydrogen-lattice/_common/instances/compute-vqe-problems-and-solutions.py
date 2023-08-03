@@ -14,6 +14,8 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper
 from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
 from qiskit_nature_pyscf import PySCFGroundStateSolver
 
+import time 
+
 import qiskit_nature
 
 import pyscf
@@ -228,11 +230,15 @@ if __name__ == "__main__":
     generate various hydrogen lattice pUCCD hamiltonians
     """
     for shape in [chain]:
-        for n in [2]:  # 2, 4, 6, 8, 10, 12]:
+        for n in [2,4,6,8,10,12,14,16]:
             for r in [0.75, 1.00, 1.25]:
                 file_name = f"h{n:03}_{shape.__name__}_{r:06.2f}"
                 file_name = file_name.replace(".", "_")
                 file_name = file_name + ".json"
+
+                #start timing to check scaling of problem + solution generation
+                start_time = time.time() 
+
                 print(f"Working on {shape.__name__} for n={n} and r={r}")
 
                 print("First working on Json file creation.")
@@ -292,8 +298,15 @@ if __name__ == "__main__":
                 print("Solutions will be stored at ", solution_path)
                 print("Starting work on solution generation.")
 
+                fci_time_start = time.time()
                 fci_energy = fci(electronic_problem)
+                fci_time_end = time.time()
+                print(f"FCI solution generation took {fci_time_end-fci_time_start}")
+
+                doci_time_start = time.time()
                 doci_energy = doci(electronic_problem)
+                doci_time_end = time.time()
+                print(f"DOCI solution generation took {doci_time_end-doci_time_end}")
 
                 print(f"Generation done. Acquired FCI energy of {fci_energy} and DOCI energy of {doci_energy}.") 
 
@@ -302,4 +315,4 @@ if __name__ == "__main__":
                     file.write(f"fci_energy: {fci_energy}\n")
                     file.write(f"hf_energy: {d['hf_energy']}\n")
 
-                print("All done writing .sol file- now looking for next file or done.")
+                print("All done writing .sol file- now looking for next file or done. \n \n \n")
