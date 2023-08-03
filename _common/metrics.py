@@ -2536,6 +2536,9 @@ cmap_custom_spectral = None
 # the default colormap is the spectral map
 cmap = cmap_spectral
 
+# create a copy of cmap 
+cmap_orig = cmap
+
 # current cmap normalization function (default None)
 cmap_norm = None
 
@@ -2560,10 +2563,11 @@ def set_custom_cmap_style(
             fade_rate=default_fade_rate):
             
     print("... set custom map style")
-    global cmap, cmap_custom_spectral
+    global cmap, cmap_custom_spectral, cmap_orig
     cmap_custom_spectral = create_custom_spectral_cmap(
                 fade_low_fidelity_level=fade_low_fidelity_level, fade_rate=fade_rate)
     cmap = cmap_custom_spectral
+    cmap_orig = cmap_custom_spectral
        
 # Create the custom spectral colormap from the base spectral
 def create_custom_spectral_cmap(
@@ -3097,8 +3101,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
         cmap = ListedColormap(cmap_colors)
 
     else:
-        global cmap
-        cmap = cmap_spectral
+        cmap = cmap_orig
 
 
     # add colorbar to right of plot (scale if normalize function installed)    
