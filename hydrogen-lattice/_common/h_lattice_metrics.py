@@ -150,7 +150,13 @@ def plot_line_metric(suptitle:str="Circuit Width (Number of Qubits)", metric_nam
     # if the score metric is energy or solution quality, plot the FCI and DOCI energy lines
     if metric_name == 'energy':
         ax.axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
-        ax.axhline(y=fci_energy, color='g', linestyle='solid', label='FCI Energy for given Hamiltonian')
+        ax.axhline(y=fci_energy, color='g', linestyle='-.', label='FCI Energy for given Hamiltonian')
+    # add a horizontal line at y=1 for solution quality
+    elif metric_name == 'solution_quality':
+        ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
+    # add a horizontal line at y=0 for accuracy volume
+    elif metric_name == 'accuracy_volume':
+        ax.axhline(y=0, color='r', linestyle='--', label='Ideal Solution')
     energy_text = f'DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
     ax.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
     
@@ -170,7 +176,7 @@ def plot_line_metric(suptitle:str="Circuit Width (Number of Qubits)", metric_nam
 
 
 # function to plot all line metrics
-def plot_all_line_metrics(score_metrics="energy", x_vals='cumulative_exec_time', subplot=True):
+def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_volume"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True):
     # if score_metrics and x_val are strings, convert to lists
     if type(score_metrics) is str:
         score_metrics = [score_metrics]
@@ -189,10 +195,11 @@ def plot_all_line_metrics(score_metrics="energy", x_vals='cumulative_exec_time',
 
             if subplot:
                 # create subplots equal to the number of score metrics times the number of x_vals, figsize proportional to the number of subplots
-                fig, axs = plt.subplots(len(score_metrics), len(x_vals), figsize=(len(x_vals)*5, len(score_metrics)*3))
-                fig.tight_layout(pad=4.0)
+            #    fig, axs = plt.subplots(len(score_metrics), len(x_vals), figsize=(len(x_vals)*5, len(score_metrics)*3))
+                fig, axs = plt.subplots(2, 2, figsize=(14, 8))
+                fig.tight_layout(pad=4.0, w_pad=6.0)
                 fig.subplots_adjust(top=0.88)
-
+            '''
             # iterate over score metrics
             for i, score_metric in enumerate(score_metrics):
                 # iterate over x_vals
@@ -203,6 +210,14 @@ def plot_all_line_metrics(score_metrics="energy", x_vals='cumulative_exec_time',
                         # create a new figure for each plot
                         fig = plt.figure()
                         plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name=score_metric, x_val=x_val, num_qubits=qubit_count, instance=instance, ax=fig.gca(), subplot=subplot)
+            '''
+            plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="energy", x_val="iteration_count", num_qubits=qubit_count, instance=instance, ax=axs[0, 0], subplot=subplot)
+            plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="energy", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[0, 1], subplot=subplot)
+            plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="solution_quality", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 0], subplot=subplot)
+            plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="accuracy_volume", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 1], subplot=subplot)
+
+            # start the y-ticks of solution quality at 0 and end at 1
+            axs[1, 0].set_ylim([0, 1.1])
 
             if not subplot:
                 plt.show(block=True)
