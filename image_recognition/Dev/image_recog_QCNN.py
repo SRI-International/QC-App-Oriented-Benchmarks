@@ -127,28 +127,28 @@ x_scaled_train = scaler.fit_transform(x_train_pca)
 
 
 # Define the convolutional circuits
-def conv_circ_1(params, first, second):
+def conv_circ_1(thetas, first, second):
     # Your implementation for conv_circ_1 function here
     conv_circ = QuantumCircuit(8)
-    conv_circ.rx(params[0], first)
-    conv_circ.rx(params[1], second)
-    conv_circ.rz(params[2], first)
-    conv_circ.rz(params[3], second)
-    conv_circ.crx(params[4], second, first)  
-    conv_circ.crx(params[5], first, second)
-    conv_circ.rx(params[6], first)
-    conv_circ.rx(params[7], second)
-    conv_circ.rz(params[8], first)
-    conv_circ.rz(params[9], second)
+    conv_circ.rx(thetas[0], first)
+    conv_circ.rx(thetas[1], second)
+    conv_circ.rz(thetas[2], first)
+    conv_circ.rz(thetas[3], second)
+    conv_circ.crx(thetas[4], second, first)  
+    conv_circ.crx(thetas[5], first, second)
+    conv_circ.rx(thetas[6], first)
+    conv_circ.rx(thetas[7], second)
+    conv_circ.rz(thetas[8], first)
+    conv_circ.rz(thetas[9], second)
     return conv_circ
 
 # Define the pooling circuits
-def pool_circ_1(params, first, second):
+def pool_circ_1(thetas, first, second):
     # Your implementation for pool_circ_1 function here
     pool_circ = QuantumCircuit(8)
-    pool_circ.crz(params[0], first, second)
+    pool_circ.crz(thetas[0], first, second)
     pool_circ.x(second)
-    pool_circ.crx(params[1], first, second)
+    pool_circ.crx(thetas[1], first, second)
     return pool_circ
 
 def pool_circ_2(first, second):
@@ -157,56 +157,56 @@ def pool_circ_2(first, second):
     return pool_circ
 
 # Quantum Circuits for Convolutional layers
-def conv_layer_1(qc, params):
-    qc = qc.compose(conv_circ_1(params, 0, 1))
-    qc = qc.compose(conv_circ_1(params, 2, 3))
-    qc = qc.compose(conv_circ_1(params, 4, 5))
-    qc = qc.compose(conv_circ_1(params, 6, 7))
+def conv_layer_1(qc, thetas):
+    qc = qc.compose(conv_circ_1(thetas, 0, 1))
+    qc = qc.compose(conv_circ_1(thetas, 2, 3))
+    qc = qc.compose(conv_circ_1(thetas, 4, 5))
+    qc = qc.compose(conv_circ_1(thetas, 6, 7))
     return qc
 
-def conv_layer_2(qc, params):
-    qc = qc.compose(conv_circ_1(params, 0, 2))
-    qc = qc.compose(conv_circ_1(params, 4, 6))
+def conv_layer_2(qc, thetas):
+    qc = qc.compose(conv_circ_1(thetas, 0, 2))
+    qc = qc.compose(conv_circ_1(thetas, 4, 6))
     return qc
 
-def conv_layer_3(qc, params):
-    qc = qc.compose(conv_circ_1(params, 0, 4))
+def conv_layer_3(qc, thetas):
+    qc = qc.compose(conv_circ_1(thetas, 0, 4))
     return qc
 
 # Quantum Circuits for Pooling layers
-def pooling_layer_1(qc, params):
-    qc = qc.compose(pool_circ_1(params, 1, 0))
-    qc = qc.compose(pool_circ_1(params, 3, 2))
-    qc = qc.compose(pool_circ_1(params, 5, 4))
-    qc = qc.compose(pool_circ_1(params, 7, 6))
+def pooling_layer_1(qc, thetas):
+    qc = qc.compose(pool_circ_1(thetas, 1, 0))
+    qc = qc.compose(pool_circ_1(thetas, 3, 2))
+    qc = qc.compose(pool_circ_1(thetas, 5, 4))
+    qc = qc.compose(pool_circ_1(thetas, 7, 6))
     return qc
 
-def pooling_layer_2(qc, params):
-    qc = qc.compose(pool_circ_1(params, 0, 2))
-    qc = qc.compose(pool_circ_1(params, 4, 6))
+def pooling_layer_2(qc, thetas):
+    qc = qc.compose(pool_circ_1(thetas, 0, 2))
+    qc = qc.compose(pool_circ_1(thetas, 4, 6))
     return qc
 
-def pooling_layer_3(qc, params):
-    qc = qc.compose(pool_circ_1(params, 0, 4))
+def pooling_layer_3(qc, thetas):
+    qc = qc.compose(pool_circ_1(thetas, 0, 4))
     return qc
 
 # Variational circuit used in below model which has parameters optimized during training
-def qcnn_circ(num_qubits, params, U_params=10):
+def qcnn_circ(num_qubits, thetas, layer_size = 10):
     qc = QuantumCircuit(num_qubits,1)  # just to measure the 5 th qubit (4 indexed)
-    param1 = params[0:U_params]
-    param2 = params[U_params: 2 * U_params]
-    param3 = params[2 * U_params: 3 * U_params]
-    param4 = params[3 * U_params: 3 * U_params + 2]
-    param5 = params[3 * U_params + 2: 3 * U_params + 4]
-    param6 = params[3 * U_params + 4: 3 * U_params + 6]
+    theta1 = thetas[0:layer_size]
+    theta2 = thetas[layer_size: 2 * layer_size]
+    theta3 = thetas[2 * layer_size: 3 * layer_size]
+    theta4 = thetas[3 * layer_size: 3 * layer_size + 2]
+    theta5 = thetas[3 * layer_size + 2: 3 * layer_size + 4]
+    theta6 = thetas[3 * layer_size + 4: 3 * layer_size + 6]
 
     # Pooling Ansatz1 is used by default
-    qc = conv_layer_1(qc, param1)
-    qc = pooling_layer_1(qc, param4)
-    qc = conv_layer_2(qc, param2)
-    qc = pooling_layer_2(qc, param5)
-    qc = conv_layer_3(qc, param3)
-    qc = pooling_layer_3(qc, param6)
+    qc = conv_layer_1(qc, theta1)
+    qc = pooling_layer_1(qc, theta4)
+    qc = conv_layer_2(qc, theta2)
+    qc = pooling_layer_2(qc, theta5)
+    qc = conv_layer_3(qc, theta3)
+    qc = pooling_layer_3(qc, theta6)
 
     return qc
 
@@ -221,8 +221,8 @@ def qcnn_model(theta, x, num_qubits, reps):
     for j in range(num_qubits):
         qc.rx(x[j], j )
     # Append the variational circuit ( Ansatz ) to the quantum circuit
-    params = theta.tolist()
-    qcnn_circ_temp = qcnn_circ(num_qubits, params)
+    thetas = theta.tolist()
+    qcnn_circ_temp = qcnn_circ(num_qubits, thetas)
     qc.compose(qcnn_circ_temp, inplace=True)
     return qc
 
