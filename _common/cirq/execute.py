@@ -26,6 +26,7 @@
 import time
 import copy
 import metrics
+import numpy as np
 
 import cirq
 backend = cirq.Simulator()      # Use Cirq Simulator by default
@@ -41,6 +42,7 @@ batched_circuits = [ ]
 active_circuits = { }
 result_handler = None
 
+device_name = 'simulator'
 device=None
 
 # Special object class to hold job information and used as a dict key
@@ -71,7 +73,7 @@ def set_execution_target(backend_id='simulator', provider_backend=None):
     set_execution_target(backend_id='aqt_qasm_simulator', 
                         provider_backende=aqt.backends.aqt_qasm_simulator)
     """
-    global backend   
+    global backend, device_name
     
     # if a custom provider backend is given, use it ...
     if provider_backend != None:
@@ -80,6 +82,11 @@ def set_execution_target(backend_id='simulator', provider_backend=None):
     # otherwise test for simulator
     elif backend_id == 'simulator':
         backend = cirq.Simulator()
+    # BlueQubit backend
+    elif backend_id == 'BlueQubit-CPU' or backend_id == 'BlueQubit-GPU':
+        import bluequbit
+        bq = bluequbit.init("imINbOlj5ZUTXsStR92qpF7PcBXwtrm4") # Get a personal token by signing up at app.bluequbit.io
+        backend = bq
        
     # nothing else is supported yet, default to simulator       
     else:
@@ -140,7 +147,14 @@ def execute_circuit (batched_circuit):
         circuit.device=device
         device.validate_circuit(circuit)
 
-    job.result = backend.run(circuit, repetitions=shots)
+    if device_name == 'BlueQubit-CPU':
+        qc = cirq.Circuit(cirq.decompose(circuit)) # decompose since custom to_gate() can't be serializde :/
+        job.result = backend.run(qc, device='cpu', shots=shots)
+    elif device_name == 'BlueQubit-GPU':
+        qc = cirq.Circuit(cirq.decompose(circuit))
+        job.result = backend.run(qc, device='gpu', shots=shots)
+    else:
+        job.result = backend.run(circuit, repetitions=shots)
     
     # put job into the active circuits with circuit info
     active_circuits[job] = active_circuit
@@ -162,10 +176,14 @@ def job_complete (job):
     # counts = result.get_counts(qc)
     # print("Total counts are:", counts)
     
-    # get measurement array and shot count
-    measurements = result.measurements['result']
-    actual_shots = len(measurements)
-    #print(f"actual_shots = {actual_shots}")
+    if device_name == 'BlueQubit-CPU' or device_name == 'BlueQubit-GPU':
+        result.counts = result.get_counts()
+        actual_shots = np.sum(list(result.counts.values()))
+    else:
+        # get measurement array and shot count
+        measurements = result.measurements['result']
+        actual_shots = len(measurements)
+        #print(f"actual_shots = {actual_shots}")
     
     if actual_shots != active_circuit["shots"]:
         print(f"WARNING: requested shots not equal to actual shots: {actual_shots}")

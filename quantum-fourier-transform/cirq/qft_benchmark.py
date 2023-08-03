@@ -1,7 +1,6 @@
 """
 Quantum Fourier Transform Benchmark Program - Cirq
 """
-
 from collections import defaultdict
 import math
 import sys
@@ -198,14 +197,17 @@ def expected_dist(num_qubits, secret_int, counts):
 # Expected result is always the secret_int, so fidelity calc is simple
 def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots, method):
     
-    # get measurement array and shot count
-    measurements = result.measurements['result']
-    num_shots = len(measurements)
+    if hasattr(result, 'counts'):
+        counts = result.counts
+    else:
+        # get measurement array and shot count
+        measurements = result.measurements['result']
+        num_shots = len(measurements)
 
-    # create counts distribution
-    counts = defaultdict(lambda: 0)
-    for row in measurements:
-        counts["".join([str(x) for x in reversed(row)])] += 1
+        # create counts distribution
+        counts = defaultdict(lambda: 0)
+        for row in measurements:
+            counts["".join([str(x) for x in reversed(row)])] += 1
         
     # For method 1, expected result is always the secret_int
     if method==1:
@@ -335,4 +337,4 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, num_shots=100,
     metrics.plot_metrics("Benchmark Results - Quantum Fourier Transform - Cirq")
 
 # if main, execute method    
-if __name__ == '__main__': run()
+if __name__ == '__main__': run(18, 20, backend_id='BlueQubit-CPU')
