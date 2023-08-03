@@ -12,11 +12,9 @@ Using a variational optimization loop, the VQE algorithm calculates the ground s
 
 ## Benchmarking
 
-As an extension to the MaxCut frameworks, several comparisons are easily made and may help in understanding how VQE benchmarking is performed. Similar to the MaxCut benchmarks, there are two primary benchmarking methods, denoted by methods 1 and 2. Method 1 runs a VQE ansatz at various lengths and widths, testing target system execution fidelities in a fashion very similar to method 1 of the MaxCut Framework. Method 2 runs the entire VQE algorithm, in which a paramaterized quantum system works in conjunction with a classical optimizer to approximate the ground state energy. While again very similar to the MaxCut framework, there are several key differences. In addition to iterating over the same circuit like in the MaxCut framework, the VQE benchmarks must iterate through multiple circuits to find the expectation value for each Pauli term in the hamiltonian. Additionally, over the same number of qubits, we might want to run differnent hamiltonians that describe lattices with different radii. These differences have led to metric collection and running of the benchmarks to behave differently than the MaxCut ones. 
+As an extension to the MaxCut frameworks, several comparisons are easily made and may help in understanding how VQE benchmarking is performed. Similar to the MaxCut benchmarks, there are two primary benchmarking methods, denoted by methods 1 and 2. Method 1 runs a VQE ansatz at various lengths and widths, testing target system execution fidelities in a fashion very similar to method 1 of the MaxCut Framework. Method 2 runs the entire VQE algorithm, in which a paramaterized quantum system works in conjunction with a classical optimizer to approximate the ground state energy. While again very similar to the MaxCut framework, there are several key differences. In addition to iterating over the same circuit like in the MaxCut framework, the VQE benchmarks must iterate through multiple circuits to find the expectation value for each Pauli term in the Hamiltonian. Additionally, over the same number of qubits, we might want to run differnent Hamiltonians that describe lattices with different radii. These differences have led to metric collection and running of the benchmarks to behave differently than the MaxCut ones. 
 
 In the run() method for the benchmark, there are a number of optional arguments that can be specified. While kept similar to MaxCut's own run() method, note that some argumenents have been necessarily changed. All of the arguments can be examined in the source code, but the key arguments that would typically be modifed from defaults are the following:
-
-(note these need to be modifed for the VQE ...)
 
 ```
     Parameters
@@ -49,9 +47,9 @@ In the run() method for the benchmark, there are a number of optional arguments 
 
 ## Problem Instances and Solutions
 
-The framework used for hydrogen lattice benchmarking is reliant on problem `.json` files and solution `.sol` files. These files are stored within the `_common/instances` folder, and are used in the main benchmarking files to draw information on the hamiltonians used for each hydrogen lattice, as well as classical solutions for the ground state energy of each hydrogen lattice.
+The framework used for hydrogen lattice benchmarking is reliant on problem `.json` files and solution `.sol` files. These files are stored within the `_common/instances` folder, and are used in the main benchmarking files to draw information on the Hamiltonians used for each hydrogen lattice, as well as classical solutions for the ground state energy of each hydrogen lattice.
 
-Currently, the problem files contain information on the type and position of each atom, the electronic Hamiltonian in the pure qubit basis as well as the Hamiltonian in the hardcore bosonic mapping, and other metadata. The `.sol` file currently contains the ground state energy calculated by the FCI and DOCI methods, as well as the pure hartree-fock energy.
+Currently, the problem files contain information on the type and position of each atom, the electronic Hamiltonian in the pure qubit basis as well as the the hardcore bosonic mapping, and other metadata. The `.sol` file currently contains the ground state energy calculated by the FCI and DOCI methods, as well as the pure hartree-fock energy.
 
 The problem and solution file names are formatted similarly as follows into 4 blocks separated by the `_` character:
 
@@ -65,15 +63,15 @@ The `[000-999]` number in the first block represents the number of qubits. The s
 
 There are currently two ways to produce both problem instances/solution files. 
 
-The most efficient method currently would be to run the `compute-vqe-problems-and-solutions.py` file located in the instances folder. This file computes both problem file .json and solution .sol files, and is currently configured to generate hydrogen lattice chains from 2 to 16 qubits, with distance parameter $r$ set to .75, 1.00, and 1.25. 
+The most efficient method currently would be to run the `compute-vqe-problems-and-solutions.py` file located in the instances folder. This file computes both problem file `.json` and solution `.sol` files, and is currently configured to generate hydrogen lattice chains from 2 to 16 qubits, with distance parameter $r$ set to .75, 1.00, and 1.25. 
 
-The second method, which is more inefficient, would be to first run the file compute-instances.py, which will generate hydrogen lattice chains problem files from 2 to 12 qubits with $r$ set to .75, 1.00, and 1.25. Next, run the generate-instances.py file, which will generate the .sol files over the previously generated problem files.  
+The second method, which is more inefficient, would be to first run the file `compute-instances.py`, which will generate hydrogen lattice chains problem files from 2 to 12 qubits with $r$ set to .75, 1.00, and 1.25. Next, run the `generate-instances.py` file, which will generate the `.sol` files using the previously generated problem files.  
 
 Future versions of the code may allow for specifying the generation of problem and/or solution files from the terminal or through a GUI.
 
 ## Classical algorithm
 
-Classical methods to solve the dynamics of quantum systems have been in development for many years, some of which are capable of finding ground state energies to chemical accuracy. Unfortunately, these chemically accurate methods tend to be very costly. We currently use the full-configuration interaction (FCI) as well as the doubly occupied configuration interaction (DOCI) to compute ground state energies, storing them in .sol files corresponding to each problem instance .json. Both methods, while exact, suffer from exponential scaling in time as system size grows, and it is the goal of the VQE to avoid this scaling problem. These energies are used to create comparative metrics. 
+Classical methods to solve the dynamics of quantum systems have been in development for many years, some of which are capable of finding ground state energies to chemical accuracy. Unfortunately, these chemically accurate methods tend to be very costly. We currently use the full-configuration interaction (FCI) as well as the doubly occupied configuration interaction (DOCI) to compute ground state energies, storing them in `.sol` files corresponding to each problem instance `.json`. Both methods, while exact, suffer from exponential scaling in time as system size grows, and it is the goal of the VQE to avoid this scaling problem. These energies are used to create comparative metrics. 
 
 ## Quantum algorithm
 
@@ -89,15 +87,15 @@ $$ E = \frac{<\Psi(\theta) | H | \Psi(\theta) >}{< \Psi(\theta) | \Psi(\theta) >
 
 Where H is the Hamiltonian of a system of interest. By varying the parameters $\theta$ to minimize the energy E, the ground state energy of H is approximated since by the variational principle, $E \geq E_{min}$, where $E_{min}$ is the ground state energy. This minimalization occurs in a hybrid fashion using a classical computer with classical optimization algorithms. 
 
-Very generally speaking, systems of interest may be defined in bases other than the computational (qubit) basis. As an example, a Hamiltonian or ansatz might be defined in the fermionic basis, which is useful for chemistry problems, where one is trying to solve the dynamics of electrons. In this case, the Jordan-Wigner Transformation (JWT) is used: 
+Very generally speaking, systems of interest may be defined in bases other than the computational (qubit) basis. As an example, a Hamiltonian or ansatz might be defined in the fermionic basis, which is useful for chemistry problems. In this case, the Jordan-Wigner Transformation (JWT) is used: 
 
 $a_p \mapsto \frac{1}{2}\left(X_p+\mathrm{i} Y_p\right) Z_1 \cdots Z_{p-1}$ [1]
 
-The Hamiltonian therefore becomes a sum of weighed pauli operators: 
+The Hamiltonian therefore becomes a sum of weighed Pauli operators: 
 
 $H=\sum_p g_p P_p$
 
-Where $g_p$ are the ampltiudes and $P_p$ are the Pauli operators, and the ansatz itself will be transformed, resulting in it being in terms of the same Pauli operators.  
+Where $g_p$ are the ampltiudes and $P_p$ are the Pauli operators. The ansatz itself will be transformed into a different basis, resulting in it being in terms of the same Pauli operators.  
 
 ### General Quantum Circuit
 
@@ -155,7 +153,7 @@ With this in mind, the pUCCD ansatz will generally consist of this quantum circu
 <img align=center src="../_doc/images/hydrogen-lattice/puccd_qiskit.png"  width="600" />
 </p>
 
-The pUCCD ansatz on four physical qubits, which can map onto eight simulation qubits. The first section marked by the barriers is the initial Hartree Fock State, wheras the sections after represent the pair excitations operations implemented via the Givens rotations. The parameterizations with which optimizations occur are in the $R_Y$ gates. Using this circuit in combination with a a paired-electron mapping for the Hamiltonian allows for a constant number of circuit measurements (3), as well as halving the number of physical qubits needed to simulate a system.
+The pUCCD ansatz on four physical qubits. The first section marked by the barriers is the initial Hartree Fock State, wheras the sections after represent the pair excitations operations implemented via the Givens rotations. The parameterizations with which optimizations occur are in the $R_Y$ gates. Using this circuit in combination with a a paired-electron mapping for the Hamiltonian allows for a constant number of circuit measurements (3), as well as theoretically being able to simulate eight qubit systems. 
 
 ### Algorithm Steps
 
