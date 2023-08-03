@@ -57,7 +57,7 @@ h_lattice_metrics = metrics.circuit_metrics_detail
 save_plot_images = True
 
 # function to take input the title of plot, the x and y axis labels, and the data to plot as a line plot
-def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="energy", x_val='cumulative_exec_time'):
+def plot_line_metric(suptitle:str="Circuit Width (Number of Qubits)", metric_name:str="energy", x_val:str='cumulative_exec_time', num_qubits:int=None, instance:str=None , ax=None ,  subplot:bool=False):
     
     # get subtitle from metrics
     subtitle = metrics.circuit_metrics['subtitle']
@@ -82,136 +82,133 @@ def plot_line_metric(suptitle="Circuit Width (Number of Qubits)", metric_name="e
         x_metric_name = x_val
         cumulative_flag = False
     
-
-    # iterate over all groups
-    for group in h_lattice_metrics:
-
-        num_qubits = int(group)
-        # iterate over all circuits
-
-        circuit_ids = [int(x) for x in (h_lattice_metrics[group])]
+    group = str(num_qubits)
 
 
-        total_instances = int(np.floor(circuit_ids[-1]/1000))
+
+    
+    y_data = []
+    x_data = []
+
+    current_radius = 0
+
+    for circuit_id in h_lattice_metrics[group]:
+        if np.floor(int(circuit_id)/1000) == instance:
+            # get the metric value
+            metric_value = h_lattice_metrics[group][circuit_id][metric_name]
+            # set the y label 
+            y_label = metrics.known_score_labels[metric_name]
+
+            # append the metric value to the y_data list
+            y_data.append(metric_value)
+
+            # get the x metric value
+            x_metric_value = h_lattice_metrics[group][circuit_id][x_metric_name]
+            # set the x label
+            x_label = metrics.known_x_labels[x_val]
+
+            # append the x metric value to the x_data list
+            x_data.append(x_metric_value)
+
+            doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
+            fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
+            current_radius = h_lattice_metrics[group][circuit_id]['radius']
+
+        else:
+            continue
         
-
-        for instance in range(1, total_instances + 1):
-
-            # define the figure and axis
-            fig, ax = plt.subplots(1,1)
         
-            y_data = []
-            x_data = []
+        
+    # make the x_data cumulative if the cumulative flag is on
+    if cumulative_flag:
+        x_data = cumulative_sum(x_data)
 
-            current_radius = 0
+    # plot the data as a line with the color of line depending on the y value
+    #ax.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=12)
 
-            for circuit_id in h_lattice_metrics[group]:
-                if np.floor(int(circuit_id)/1000) == instance:
-                    # get the metric value
-                    metric_value = h_lattice_metrics[group][circuit_id][metric_name]
-                    # set the y label 
-                    y_label = metrics.known_score_labels[metric_name]
+    # plot the data as a scatter plot with the color of the point depending on the y value, the scatter points are connected with a line
+    # plot if the metric is solution quality invert the color map
+    if metric_name == 'solution_quality':
+        ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm_r)
+    else:
+        ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm)
 
-                    # append the metric value to the y_data list
-                    y_data.append(metric_value)
-
-                    # get the x metric value
-                    x_metric_value = h_lattice_metrics[group][circuit_id][x_metric_name]
-                    # set the x label
-                    x_label = metrics.known_x_labels[x_val]
-
-                    # append the x metric value to the x_data list
-                    x_data.append(x_metric_value)
-
-                    doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
-                    fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
-                    current_radius = h_lattice_metrics[group][circuit_id]['radius']
-
-                else:
-                    continue
+    ax.plot(x_data, y_data, linestyle='-.', linewidth=2, markersize=12)
 
 
-        #if x_val not in known_x_labels:
-        # for circuit_id in metrics.circuit_metrics[group]:
-            
+    # set the title
+    ax.set_title(fulltitle)
 
-        #     # get x_metric_value from metrics module
-        #     x_metric_value = metrics.circuit_metrics[group][circuit_id][x_metric_name]
-        #     # set the x label from metrics module
-        #     x_label = metrics.known_x_labels[x_val]
+    ax.set_xlabel(x_label)
 
-        #     # append the x metric value to the x_data list
-        #     x_data.append(x_metric_value)
+    ax.set_ylabel(y_label)
 
-        # else:
-            
-            
+    # if the x metric is iteration count, set x ticks to be integers
+    if x_metric_name == 'iteration_count':
+        ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
-            #print("y metric name is " + str(y_label) + " and the y data is " + str(y_data) + "\n and the x metric name is " + str(x_label) + " and the x data is " + str(x_data))
+    # if the score metric is energy or solution quality, plot the FCI and DOCI energy lines
+    if metric_name == 'energy':
+        ax.axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
+        ax.axhline(y=fci_energy, color='g', linestyle='solid', label='FCI Energy for given Hamiltonian')
+    energy_text = f'DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
+    ax.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
+    
+    
+    ax.grid(True)
 
-            # make the x_data cumulative if the cumulative flag is on
-            if cumulative_flag:
-                x_data = cumulative_sum(x_data)
+    ax.legend()
+    
 
-            # plot the data as a line with the color of line depending on the y value
-            #ax.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=12)
-
-            # plot the data as a scatter plot with the color of the point depending on the y value, the scatter points are connected with a line
-            # plot if the metric is solution quality invert the color map
-            if metric_name == 'solution_quality':
-                ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm_r)
-            else:
-                ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm)
-
-            ax.plot(x_data, y_data, linestyle='-.', linewidth=2, markersize=12)
-
-
-            # set the title
-            ax.set_title(fulltitle)
-
-            ax.set_xlabel(x_label)
-
-            ax.set_ylabel(y_label)
-
-            # if the x metric is iteration count, set x ticks to be integers
-            if x_metric_name == 'iteration_count':
-                ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
-
-            # if the score metric is energy or solution quality, plot the FCI and DOCI energy lines
-            if metric_name == 'energy':
-                ax.axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
-                ax.axhline(y=fci_energy, color='g', linestyle='solid', label='FCI Energy for given Hamiltonian')
-            energy_text = f'DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
-            ax.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
-            
-            
-
-            ax.legend()
-            fig.show()
-            
-
-            if save_plot_images:
-                metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-line-"
-                                                    + str(group) + '-'
-                                                    + str(instance) + '-'
-                                                    + str(metric_name) + '-'
-                                                    + str(x_metric_name) + '-'), backend_id)
-    plt.show(block=True)
+    if save_plot_images:
+        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-line-"
+                                            + str(group) + '-'
+                                            + str(instance) + '-'
+                                            + str(metric_name) + '-'
+                                            + str(x_metric_name) + '-'), backend_id)
 
 
 
 # function to plot all line metrics
-def plot_all_line_metrics(score_metrics="energy", x_vals='cumulative_exec_time'):
+def plot_all_line_metrics(score_metrics="energy", x_vals='cumulative_exec_time', subplot=True):
     # if score_metrics and x_val are strings, convert to lists
     if type(score_metrics) is str:
         score_metrics = [score_metrics]
     if type(x_vals) is str:
         x_vals = [x_vals]
+
+    global h_lattice_metrics
     
-    # iterate over score metrics and plot each
-    for score_metric in score_metrics:
-        for x_val in x_vals:
-            plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name=score_metric, x_val=x_val)
+    # iterate over number of qubits and score metrics and plot each
+    for qubit_count in h_lattice_metrics:
+
+        circuit_ids = [int(x) for x in (h_lattice_metrics[qubit_count])]
+        total_instances = int(np.floor(circuit_ids[-1]/1000))
+    
+        for instance in range(1, total_instances + 1):
+
+            if subplot:
+                # create subplots equal to the number of score metrics times the number of x_vals, figsize proportional to the number of subplots
+                fig, axs = plt.subplots(len(score_metrics), len(x_vals), figsize=(len(x_vals)*5, len(score_metrics)*3))
+                fig.tight_layout(pad=4.0)
+                fig.subplots_adjust(top=0.88)
+
+            # iterate over score metrics
+            for i, score_metric in enumerate(score_metrics):
+                # iterate over x_vals
+                for j, x_val in enumerate(x_vals):
+                    if subplot:
+                        plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name=score_metric, x_val=x_val, num_qubits=qubit_count, instance=instance, ax=axs[i, j], subplot=subplot)
+                    else:
+                        # create a new figure for each plot
+                        fig = plt.figure()
+                        plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name=score_metric, x_val=x_val, num_qubits=qubit_count, instance=instance, ax=fig.gca(), subplot=subplot)
+
+            if not subplot:
+                plt.show(block=True)
+
+        if subplot:
+            plt.show(block=True)
 
 # function to input a list of float and return a list of cumulative sums
 def cumulative_sum(input_list: list):

@@ -3088,14 +3088,14 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
 
     if ylabels != None:
         plt.yticks(ybasis, ylabels)
-    
+      
     # if score label is accuracy volume, get the cmap colors and invert them
     if score_label == 'Accuracy Volume':
         global cmap
-        cmap_colors = [cmap(v/10) for v in range(10)]
+        cmap_colors = [cmap_spectral(v/1000) for v in range(1000)]
         cmap_colors.reverse()
         cmap = ListedColormap(cmap_colors)
-        
+
     else:
         set_custom_cmap_norm(0.0, 0.0)
 
