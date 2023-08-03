@@ -10,7 +10,7 @@ from qiskit.opflow.primitive_ops import PauliSumOp
 from qiskit.quantum_info import SparsePauliOp
 from enum import Enum
 
-
+debug = True
 qasm_backend = Aer.get_backend("qasm_simulator")
 def get_measured_qubits(circuit: QuantumCircuit) -> List[int]:
     """
@@ -32,12 +32,17 @@ def expectation_run(circuit: QuantumCircuit, shots: Optional[int] = None) -> Dic
         # Refactored error check
         # if circuit.num_parameters != 0:
             # raise QiskitError(ErrorMessages.UNDEFINED_PARAMS.value)
-        if len(get_measured_qubits(circuit)) == 0:
-            circuit.measure_all()
+        qcnn_test = True
+        if qcnn_test:
+            circuit.measure(4,0)
+        # if len(get_measured_qubits(circuit)) == 0:
+        #     circuit.measure_all()
+          
 
         if isinstance(shots, int):
             counts = (execute(circuit, backend= qasm_backend, shots=shots).result().get_counts())
             probs = normalize_counts(counts, num_qubits=circuit.num_qubits)
+        print(probs)
         return probs
 
 def normalize_counts(counts, num_qubits=None):
@@ -68,10 +73,16 @@ def prepare_circuits(base_circuit, observables):
         observables = SummedOp([observables])    
     circuits = list()
     
+    # print(observables)
     for obs in observables:
         circuit = base_circuit.copy()
         circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
         circuits.append(circuit) 
+        if debug == True:
+            print("------------------------------------------------------------------------")
+            print(circuit)
+            print(">S:LDS------------------------------------------------------------------------")
+
     return circuits, observables
 
 def compute_probabilities(circuits, shots=None):
@@ -93,22 +104,19 @@ def calculate_expectation_values(probabilities, observables):
 
 
 # main function
-def calculate_expectation(base_circuit, shots=None , num_qubits=None):
-     
-    if  num_qubits == 4:
-        operator = PauliSumOp(SparsePauliOp("Z" * num_qubits))
-
-    elif num_qubits == 8:
-        pauli_x = PauliSumOp(SparsePauliOp("X" * num_qubits))
-        pauli_y = PauliSumOp(SparsePauliOp("Y" * num_qubits))
-        pauli_z = PauliSumOp(SparsePauliOp("Z" * num_qubits))
-        operator = 0.5 * pauli_x + 0.3 * pauli_y - 0.7 * pauli_z
+def calculate_expectation(base_circuit, shots=None ,num_qubits=None):
     
+    operator = PauliSumOp(SparsePauliOp("IIIIZIII"))
     measurable_expression = StateFn(operator, is_measurement=True)
-    # print("measurable_expression",measurable_expression)
+    if debug:
+        print("measurable_expression",measurable_expression)
     observables = PauliExpectation().convert(measurable_expression)
+    # print(observables)
     circuits, formatted_observables = prepare_circuits(base_circuit, observables)
+    # print(circuits)
+    for circ in circuits:
+        print(circ)
     probabilities = compute_probabilities(circuits, shots)
     expectation_values = calculate_expectation_values(probabilities, formatted_observables)
-    
     return sum(expectation_values)
+    
