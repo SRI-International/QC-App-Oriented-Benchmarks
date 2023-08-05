@@ -40,6 +40,10 @@ import execute as ex
 import metrics as metrics
 from matplotlib import cm
 
+# import h-lattice_metrics from _common folder
+import h_lattice_metrics as h_metrics
+
+
 logger = logging.getLogger(__name__)
 fname, _, ext = os.path.basename(__file__).partition(".")
 log_to_file = True
@@ -1085,6 +1089,10 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
                 fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
                 cumlative_iter_time = [0]
+
+                current_radius = float(os.path.basename(instance_filepath).split('_')[2])
+                current_radius += float(os.path.basename(instance_filepath).split('_')[3][:2])*.01
+
                 def objective_function(thetas_array):
                     
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
@@ -1171,13 +1179,19 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
 
                     energy = compute_energy(result_array = res, formatted_observables = frmt_obs, num_qubits=num_qubits)
 
+
                     # calculate the solution quality
-                    solution_quality, accuracy_volume = calculate_quality_metric(energy, fci_energy)
-                    metrics.store_metric(num_qubits, unique_id, 'energy', energy)
-                    metrics.store_metric(num_qubits, unique_id, 'fci_energy', fci_energy)
-                    metrics.store_metric(num_qubits, unique_id, 'solution_quality', solution_quality)
-                    metrics.store_metric(num_qubits, unique_id, 'accuracy_volume', accuracy_volume)
+                    solution_quality, accuracy_volume = calculate_quality_metric(energy, fci_energy, precision=0.5, num_electrons=num_qubits)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'energy', energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'solution_quality', solution_quality)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'accuracy_volume', accuracy_volume)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'doci_energy', doci_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'radius', current_radius)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'iteration_count', minimizer_loop_index)
                     
+
                     return energy
                 
                            
@@ -1229,44 +1243,44 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
 
                 approximation_ratio = (np.absolute(np.divide(np.subtract( np.array(lowest_energy_values), fci_energy), fci_energy)))
                 # precision factor
-                precision = 4
+                precision = 0.5
                 # take arctan of the approximation ratio and scale it to 0 to 1
                 approximation_ratio_scaled = np.subtract(1, np.divide(np.arctan(np.multiply(precision,approximation_ratio)), np.pi/2))
                 #print("approximation ratio" + str(approximation_ratio))
 
-                # plot two subplots in the same plot
-                fig, ax = plt.subplots(2, 1, figsize=(10, 10))
+                # # plot two subplots in the same plot
+                # fig, ax = plt.subplots(2, 1, figsize=(10, 10))
 
-                ax[0].plot(cumlative_iter_time, lowest_energy_values, label='Quantum Energy')
-                ax[0].axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
-                ax[0].axhline(y=fci_energy, color='g', linestyle='solid', label='FCI Energy for given Hamiltonian')
-                ax[0].set_xlabel('Quantum Execution time (s)')
-                ax[0].set_ylabel('Energy')
-                ax[0].set_title('Energy Comparison: Quantum vs. Classical')
+                # ax[0].plot(cumlative_iter_time, lowest_energy_values, label='Quantum Energy')
+                # ax[0].axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
+                # ax[0].axhline(y=fci_energy, color='g', linestyle='solid', label='FCI Energy for given Hamiltonian')
+                # ax[0].set_xlabel('Quantum Execution time (s)')
+                # ax[0].set_ylabel('Energy')
+                # ax[0].set_title('Energy Comparison: Quantum vs. Classical')
 
-                ax[1].plot(cumlative_iter_time, approximation_ratio_scaled, label='Solution Quality')
-                #ax[1].plot(cumlative_iter_time,approximation_ratio_scaled, c=cm.hot(np.abs(approximation_ratio_scaled)), edgecolor='none')
-                ax[1].set_xlabel('Quantum Execution time (s)')
-                ax[1].set_ylabel('Solution Quality')
-                ax[1].set_title('Solution Quality')
+                # ax[1].plot(cumlative_iter_time, approximation_ratio_scaled, label='Solution Quality')
+                # #ax[1].plot(cumlative_iter_time,approximation_ratio_scaled, c=cm.hot(np.abs(approximation_ratio_scaled)), edgecolor='none')
+                # ax[1].set_xlabel('Quantum Execution time (s)')
+                # ax[1].set_ylabel('Solution Quality')
+                # ax[1].set_title('Solution Quality')
 
-                ax[0].grid()
-                ax[1].grid()
+                # ax[0].grid()
+                # ax[1].grid()
                 
                 
-                plt.legend()
-                # Generate the text to display
-                energy_text = f'Ideal Energy: {ideal_energy:.2f} | DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
+                # plt.legend()
+                # # Generate the text to display
+                # energy_text = f'Ideal Energy: {ideal_energy:.2f} | DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
 
-                # Add the text annotation at the top of the plot
-                plt.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
+                # # Add the text annotation at the top of the plot
+                # plt.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
 
-                #block plot until closed for the last iteration
-                if instance_num == max_circuits:
-                    print("Close plots to continue")
-                    plt.show(block=True)
-                else:
-                    plt.show(block=False)
+                # #block plot until closed for the last iteration
+                # if instance_num == max_circuits:
+                #     print("Close plots to continue")
+                #     plt.show(block=True)
+                # else:
+                #     plt.show(block=False)
 
                 # DEVNOTE: not yet capturing classical time, to do
                 # unique_id = instance_num * 1000 + 0
@@ -1327,7 +1341,6 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
     """
     Plot results
     """
-    #TODO not all functions can handle an array of score_metric. Need to modify functions to accept an array as input
 
     if type(score_metric) == str:
             score_metric = [score_metric]
@@ -1356,6 +1369,8 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
         obj_str = (metrics.known_score_labels[sm])
         options.append({'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits, '\nObjective Function' : obj_str})
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
+
+    h_metrics.plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_volume"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True)
     
     metrics.plot_all_area_metrics(f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
@@ -1392,7 +1407,7 @@ def calculate_quality_metric(energy, fci_energy, precision = 4, num_electrons = 
     return _solution_quality, _accuracy_volume
 
 # # if main, execute method
-if __name__ == '__main__': run(max_circuits=2, max_qubits=6)
+if __name__ == '__main__': run(max_circuits=2, min_qubits=2,  max_qubits=4)
 
 # # %%
 

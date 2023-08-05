@@ -1536,7 +1536,8 @@ known_x_labels = {
     'cumulative_elapsed_time' : 'Cumulative Elapsed Quantum Execution Time (s)',
     'cumulative_exec_time' : 'Cumulative Quantum Execution Time (s)',
     'cumulative_opt_exec_time' : 'Cumulative Classical Optimization Time (s)',
-    'cumulative_depth' : 'Cumulative Circuit Depth'
+    'cumulative_depth' : 'Cumulative Circuit Depth',
+    'iteration_count' : 'Iterations'
 }
 
 x_label_save_str = {
@@ -1564,7 +1565,8 @@ known_score_labels = {
     'max_fidelity' : 'Max. Result Fidelity',
     'hf_fidelity' : 'Hellinger Fidelity',
     'solution_quality' : 'Solution Quality',
-    'accuracy_volume' : 'Accuracy Volume'
+    'accuracy_volume' : 'Accuracy Volume',
+    'energy' : 'Energy (Hartree)'
     
 }
 
@@ -2534,6 +2536,9 @@ cmap_custom_spectral = None
 # the default colormap is the spectral map
 cmap = cmap_spectral
 
+# create a copy of cmap 
+cmap_orig = cmap
+
 # current cmap normalization function (default None)
 cmap_norm = None
 
@@ -2558,10 +2563,11 @@ def set_custom_cmap_style(
             fade_rate=default_fade_rate):
             
     print("... set custom map style")
-    global cmap, cmap_custom_spectral
+    global cmap, cmap_custom_spectral, cmap_orig
     cmap_custom_spectral = create_custom_spectral_cmap(
                 fade_low_fidelity_level=fade_low_fidelity_level, fade_rate=fade_rate)
     cmap = cmap_custom_spectral
+    cmap_orig = cmap_custom_spectral
        
 # Create the custom spectral colormap from the base spectral
 def create_custom_spectral_cmap(
@@ -3086,9 +3092,22 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
 
     if ylabels != None:
         plt.yticks(ybasis, ylabels)
-    
-    # add colorbar to right of plot (scale if normalize function installed)
-    plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+      
+    # if score label is accuracy volume, get the cmap colors and invert them
+    if score_label == 'Accuracy Volume':
+        global cmap
+        cmap_colors = [cmap_spectral(v/1000) for v in range(1000)]
+        cmap_colors.reverse()
+        cmap = ListedColormap(cmap_colors)
+
+    else:
+        cmap = cmap_orig
+
+
+    # add colorbar to right of plot (scale if normalize function installed)    
+    cbar = plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+    if score_label == 'Accuracy Volume':
+        cbar.ax.invert_yaxis()
         
     return ax
 
