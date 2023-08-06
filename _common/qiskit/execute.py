@@ -253,6 +253,12 @@ def set_execution_target(backend_id='qasm_simulator',
             
                 # load a stored account
                 IBMQ.load_account()
+                
+                # set use_sessions in provided by user - NOTE: this will modify the global setting
+                global use_sessions
+                this_use_sessions = exec_options.get("use_sessions", None)
+                if this_use_sessions != None:
+                    use_sessions = this_use_sessions
 
                 # if use sessions, setup runtime service, Session, and Sampler
                 if use_sessions:
@@ -267,11 +273,11 @@ def set_execution_target(backend_id='qasm_simulator',
                     
                     # get Sampler resilience level and transpiler optimization level from exec_options
                     options = Options()
-                    options.resilience_level  = exec_options.get("resilience_level", 1)
+                    options.resilience_level = exec_options.get("resilience_level", 1)
                     options.optimization_level = exec_options.get("optimization_level", 3)
                     
                     if verbose:
-                        print(f"... create Sampler with options = {options}")
+                        print(f"... execute using Sampler on backend_id {backend_id} with options = {options}")
                     
                     # create the Qiskit Sampler with these options
                     sampler = Sampler(session=session, options=options)
@@ -279,6 +285,9 @@ def set_execution_target(backend_id='qasm_simulator',
                 # otherwise, use provider and old style backend
                 # for IBM, create backend from IBMQ provider and given backend_id
                 else: 
+                    if verbose:
+                        print(f"... execute using Circuit Runner on backend_id {backend_id}")
+                        
                     provider = IBMQ.get_provider(hub=hub, group=group, project=project)
                     backend = provider.get_backend(backend_id)
             else:
@@ -434,7 +443,8 @@ def execute_circuit(circuit):
         if backend_exec_options_copy == None: backend_exec_options_copy = {}
         
         # used in Sampler setup, here remove it for execution
-        resilience_level  = backend_exec_options_copy.pop("resilience_level", None)
+        this_use_sessions = backend_exec_options_copy.pop("use_sessions", None)
+        resilience_level = backend_exec_options_copy.pop("resilience_level", None)
         
         # standard Qiskit transpiler options
         optimization_level = backend_exec_options_copy.pop("optimization_level", None)

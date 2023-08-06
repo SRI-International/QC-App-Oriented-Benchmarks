@@ -732,7 +732,7 @@ def get_width_restart_tuple_from_filename(fileName):
     """
     pattern = 'width_([0-9]+)_instance_([0-9]+).json'
     match = re.search(pattern, fileName)
-    print(match)
+    #print(match)
 
     # assert match is not None, f"File {fileName} found inside folder. All files inside specified folder must be named in the format 'width_int_restartInd_int.json"
     num_qubits = int(match.groups()[0])
@@ -946,7 +946,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                instance_filepath_list = [file \
                for file in glob.glob(os.path.join(os.path.dirname(__file__), "..", "_common", \
                common.INSTANCE_DIR, f"h{num_qubits:03}_*_*_*.json"))]
-               print(instance_filepath_list)
+               #print(instance_filepath_list)
                if len(instance_filepath_list) >= instance_num :
                    instance_filepath = instance_filepath_list[instance_num-1]
                else:
@@ -993,98 +993,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 # Always start by enabling transpile ...
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
                     
-                logger.info(f'===============  Begin method 2 loop, enabling transpile')
-                
-
-                # def expectation(thetas_array):
-                    
-                #     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
-                #     global minimizer_loop_index
-                #     unique_id = instance_num * 1000 + minimizer_loop_index
-                #     # store thetas_array
-                #     metrics.store_metric(num_qubits, unique_id, 'thetas_array', thetas_array.tolist())
-                    
-                #     #************************************************
-                #     #*** Circuit Creation and Decomposition start ***
-                #     # create the circuit for given qubit size, secret string and params, store time metric
-                #     ts = time.time()
-                #     qc, params = HydrogenLattice(num_qubits, unique_id, thetas_array, parameterized)
-                #     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
-                    
-                #     # also store the 'rounds' and 'degree' for each execution
-                #     # DEVNOTE: Currently, this is stored for each iteration. Reduce this redundancy
-                #     # metrics.store_metric(num_qubits, unique_id, 'rounds', rounds)
-                #     metrics.store_metric(num_qubits, unique_id, 'radius', radius)
-                    
-                #     # collapse the sub-circuit levels used in this benchmark (for qiskit)
-                #     qc2 = qc.decompose()
-                    
-                #     # Circuit Creation and Decomposition end
-                #     #************************************************
-                    
-                #     #************************************************
-                #     #*** Quantum Part: Execution of Circuits ***
-                #     # submit circuit for execution on target with the current parameters
-                #     ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots, params=params)
-                    
-                #     # Must wait for circuit to complete
-                #     #ex.throttle_execution(metrics.finalize_group)
-                #     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
-                    
-                #     # after first execution and thereafter, no need for transpilation if parameterized
-                #     if parameterized:
-                #         ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                #         logger.info(f'**** First execution complete, disabling transpile')
-                #     #************************************************
-                    
-                #     global saved_result
-                #     # # Fidelity Calculation and Storage
-                #     # _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, unique_id, num_shots) 
-                #     # metrics.store_metric(num_qubits, unique_id, 'fidelity', fidelity)
-                    
-                #     #************************************************
-                #     #*** Classical Processing of Results - essential to optimizer ***
-                #     global opt_ts
-                #     dict_of_vals = dict()
-                #     # Start counting classical optimizer time here again
-                #     tc1 = time.time()
-                #     energy = compute_energy(qc2, operator,num_shots,parameters=params)
-                #     # Compute the value corresponding to the objective function first
-                #     # dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha)
-                #     # Store the optimizer time as current time- tc1 + ts - opt_ts, since the time between tc1 and ts is not time used by the classical optimizer.
-                #     metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
-                #     # Note: the first time it is stored it is just the initialization time for optimizer
-                    
-                #     return energy
-                
-                # # # objective Function to compute the energy of a circuit with given parameters and operator
-                # def compute_energy_temp(qc, operator, shots, parameters): 
-                    
-                #     # Bind the parameters to the circuit
-                #     bound_circuit = qc.bind_parameters(parameters)
-                    
-                #     # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
-                #     energy = calculate_expectation(bound_circuit, operator=operator, shots=shots)
-                    
-                #     # Append the energy value to the list
-                #     lowest_energy_values.append(energy)
-                    
-                #     return energy
-                
-                # # after first execution and thereafter, no need for transpilation if parameterized
-                # # DEVNOTE: this appears to NOT be needed, as we can turn these off after 
-                # def callback(xk):
-                #     if parameterized:
-                #         ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-
-                # opt_ts = time.time()
-                # # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
-                # ##res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
-
-                # # res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter})
-                # # To-do: Set bounds for the minimizer
-                
- #------------------------ end of old objective function ------------------------#               
+                logger.info(f'===============  Begin method 2 loop, enabling transpile')             
                 
                 doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
                 fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
@@ -1102,14 +1011,15 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                     quantum_execution_time = 0.0
                     quantum_elapsed_time = 0.0
 
-
+                    # create the ansatz from the ooperator, resulting in multiple circuits, one for each measured basis
                     ts = time.time()
                     qc_array, frmt_obs, params = HydrogenLattice(num_qubits=num_qubits, secret_int=unique_id, thetas_array= thetas_array, parameterized= parameterized, operator=operator)
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     if DEBUG:
                         print("create time:" + str(time.time() -ts))
                     #print("store metrics" +str(metrics.circuit_metrics[str(method)]['1000']))
-                    # collapse the sub-circuit levels used in this benchmark (for qiskit)
+                    
+                    # loop over each of the circuits that are generated with basis measurements and execute
                     for qc in qc_array:
                         
                         if DEBUG:
@@ -1201,7 +1111,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                     else:
                         pass
                 
-                if comfort:
+                if comfort and verbose:
                     print("")
                     
                 initial_parameters = np.random.random(size=1)     
