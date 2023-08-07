@@ -3,6 +3,7 @@
 
 import pandas as pd
 import numpy as np
+import sys
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
@@ -22,6 +23,21 @@ global expectation_calc_method
 
 # change the below variable to True if you want to use expectation_calc.py file for expectation value calculation
 expectation_calc_method = True
+
+from qiskit.primitives import Estimator
+
+estimator = Estimator()
+
+def exp_cal(state):
+    
+    op = SparsePauliOp("IIIIZIII")
+
+    expectation_value = estimator.run(state, op).result().values
+
+# for shot-based simulation:
+    expectation_value = estimator.run(state, op, shots=100).result().values
+
+    return expectation_value
 
 # Dev Note :- Each image has Intensity from 0 to 255
 
@@ -129,6 +145,7 @@ x_scaled_train = scaler.fit_transform(x_train_pca)
 # Define the convolutional circuits
 def conv_circ_1(thetas, first, second):
     # Your implementation for conv_circ_1 function here
+    # print(thetas)
     conv_circ = QuantumCircuit(8)
     conv_circ.rx(thetas[0], first)
     conv_circ.rx(thetas[1], second)
@@ -140,6 +157,7 @@ def conv_circ_1(thetas, first, second):
     conv_circ.rx(thetas[7], second)
     conv_circ.rz(thetas[8], first)
     conv_circ.rz(thetas[9], second)
+    # print(conv_circ)
     return conv_circ
 
 # Define the pooling circuits
@@ -190,9 +208,15 @@ def pooling_layer_3(qc, thetas):
     qc = qc.compose(pool_circ_1(thetas, 0, 4))
     return qc
 
+debug = False
 # Variational circuit used in below model which has parameters optimized during training
-def qcnn_circ(num_qubits, thetas, layer_size = 10):
-    qc = QuantumCircuit(num_qubits,1)  # just to measure the 5 th qubit (4 indexed)
+def qcnn_circ(num_qubits, layer_size = 10):
+    qc = QuantumCircuit(num_qubits,1)  # just to measure the 5 th qubit (4 indexed)\
+        
+    thetas = ParameterVector("t", length=36)
+    
+    if debug == True:
+        print(thetas)
     theta1 = thetas[0:layer_size]
     theta2 = thetas[layer_size: 2 * layer_size]
     theta3 = thetas[2 * layer_size: 3 * layer_size]
@@ -212,7 +236,7 @@ def qcnn_circ(num_qubits, thetas, layer_size = 10):
 
 
 # model to be used for training which has input data encoded and variational circuit is appended to it
-def qcnn_model(theta, x, num_qubits, reps):
+def qcnn_model( x, num_qubits):
     
     qc = QuantumCircuit(num_qubits)
       
@@ -221,8 +245,8 @@ def qcnn_model(theta, x, num_qubits, reps):
     for j in range(num_qubits):
         qc.rx(x[j], j )
     # Append the variational circuit ( Ansatz ) to the quantum circuit
-    thetas = theta.tolist()
-    qcnn_circ_temp = qcnn_circ(num_qubits, thetas)
+    # thetas = theta.tolist()
+    qcnn_circ_temp = qcnn_circ(num_qubits)
     qc.compose(qcnn_circ_temp, inplace=True)
     return qc
 
@@ -246,23 +270,33 @@ global num_iter_plot
 # function to calculate the loss function
 def loss_function(theta, is_draw_circ=True, is_print=True):
 
+    print("start----------------------------------------------------------------------------------")
+    print("theta",theta)
+    print("end------------------------------------------------------------------------------------")
+    
+    
     prediction_label = []
     i_draw = 0
     for data_point, label in zip(x_scaled_train, y_train):
         # Create the quantum circuit for the data point
-        qc = qcnn_model(theta, data_point, num_qubits, reps)
-
+        qc = qcnn_model( data_point, num_qubits)
+        
+        qc_upd = qc.bind_parameters(theta)
+        
         if i_draw==0 and is_draw_circ:
-            print(qc)
+            print(qc_upd)
             i_draw += 1
 
         # Simulate the quantum circuit and get the result
         if expectation_calc_method == True:
-            val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits)  
-            print(val)  
+            # val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits) 
+            val = exp_cal(qc_upd) 
+            # print(val)  
             val=(val+1)*0.5
-        prediction_label.append(val)
-        
+            # val = float(val[0])
+        prediction_label.append(float(val[0]))
+    
+    print(prediction_label)
     loss = log_loss(y_train, prediction_label)
 
     if is_print:
@@ -322,10 +356,13 @@ predictions = []
 # print(num_shots)
 test_accuracy_history = []
 for data_point in x_scaled_test:
-    qc = qcnn_model(theta.x, data_point, num_qubits, reps)
+    qc = qcnn_model(data_point, num_qubits)
         # Simulate the quantum circuit and get the result
+    
+    qc = qc.assign_parameters(theta.x)
     if expectation_calc_method == True:
-        val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits)   
+        # val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits)   
+        val = exp_cal(qc)   
         val=(val+1)*0.5
         if val > 0.5:
             predicted_label = 1
