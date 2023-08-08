@@ -73,7 +73,7 @@ save_plot_images = True
 show_plot_images = True
 
 # Option to show elapsed times in the metrics plots
-show_elapsed_times = True
+show_elapsed_times = False
 
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
