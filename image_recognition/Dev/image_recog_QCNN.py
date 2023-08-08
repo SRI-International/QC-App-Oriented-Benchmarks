@@ -165,7 +165,7 @@ def pool_circ_1(thetas, first, second):
     # Your implementation for pool_circ_1 function here
     pool_circ = QuantumCircuit(8)
     pool_circ.crz(thetas[0], first, second)
-    pool_circ.x(second)
+    # pool_circ.x(second)
     pool_circ.crx(thetas[1], first, second)
     return pool_circ
 
