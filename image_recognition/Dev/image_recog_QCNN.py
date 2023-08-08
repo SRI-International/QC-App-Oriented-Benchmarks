@@ -210,11 +210,8 @@ def pooling_layer_3(qc, thetas):
 
 debug = False
 # Variational circuit used in below model which has parameters optimized during training
-def qcnn_circ(num_qubits, layer_size = 10):
+def qcnn_circ(num_qubits, thetas, layer_size = 10):
     qc = QuantumCircuit(num_qubits,1)  # just to measure the 5 th qubit (4 indexed)\
-        
-    thetas = ParameterVector("t", length=36)
-    
     if debug == True:
         print(thetas)
     theta1 = thetas[0:layer_size]
@@ -236,7 +233,7 @@ def qcnn_circ(num_qubits, layer_size = 10):
 
 
 # model to be used for training which has input data encoded and variational circuit is appended to it
-def qcnn_model( x, num_qubits):
+def qcnn_model(theta, x, num_qubits, reps):
     
     qc = QuantumCircuit(num_qubits)
       
@@ -245,8 +242,8 @@ def qcnn_model( x, num_qubits):
     for j in range(num_qubits):
         qc.rx(x[j], j )
     # Append the variational circuit ( Ansatz ) to the quantum circuit
-    # thetas = theta.tolist()
-    qcnn_circ_temp = qcnn_circ(num_qubits)
+    thetas = theta.tolist()
+    qcnn_circ_temp = qcnn_circ(num_qubits, thetas)
     qc.compose(qcnn_circ_temp, inplace=True)
     return qc
 
@@ -268,7 +265,7 @@ global num_iter_plot
 
 
 # function to calculate the loss function
-def loss_function(theta, is_draw_circ=True, is_print=True):
+def loss_function(theta, is_draw_circ=False, is_print=True):
 
     print("start----------------------------------------------------------------------------------")
     print("theta",theta)
@@ -279,18 +276,16 @@ def loss_function(theta, is_draw_circ=True, is_print=True):
     i_draw = 0
     for data_point, label in zip(x_scaled_train, y_train):
         # Create the quantum circuit for the data point
-        qc = qcnn_model( data_point, num_qubits)
-        
-        qc_upd = qc.bind_parameters(theta)
+        qc = qcnn_model(theta, data_point, num_qubits, reps)
         
         if i_draw==0 and is_draw_circ:
-            print(qc_upd)
+            print(qc)
             i_draw += 1
 
         # Simulate the quantum circuit and get the result
         if expectation_calc_method == True:
             # val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits) 
-            val = exp_cal(qc_upd) 
+            val = exp_cal(qc) 
             # print(val)  
             val=(val+1)*0.5
             # val = float(val[0])
@@ -337,7 +332,7 @@ print(len(weights))
 # Will increase the number of epochs once the code is fine tuned to get convergance 
 for epoch in range(num_epochs):
     # Minimize the loss using SPSA optimizer
-    theta = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, callback=callback, options={'maxiter': 100, 'disp': False} )
+    theta = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, callback=callback, options={'maxiter': 100, 'rhobeg' : 0.5, 'disp': False} )
     #theta=SPSA(maxiter=100).minimize(loss_function, x0=weights)
 
     loss = theta.fun
@@ -356,10 +351,8 @@ predictions = []
 # print(num_shots)
 test_accuracy_history = []
 for data_point in x_scaled_test:
-    qc = qcnn_model(data_point, num_qubits)
+    qc = qcnn_model(theta.x, data_point, num_qubits, reps)
         # Simulate the quantum circuit and get the result
-    
-    qc = qc.assign_parameters(theta.x)
     if expectation_calc_method == True:
         # val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits)   
         val = exp_cal(qc)   
