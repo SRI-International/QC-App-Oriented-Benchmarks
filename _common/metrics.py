@@ -72,6 +72,9 @@ save_plot_images = True
 # Option to show plot images. Useful if it is desired to not show plots while running scripts
 show_plot_images = True
 
+# Option to show elapsed times in the metrics plots
+show_elapsed_times = True
+
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
 
@@ -666,6 +669,10 @@ def polarization_fidelity(counts, correct_dist, thermal_dist=None):
     
     # calculate hellinger fidelity between measured expectation values and correct distribution
     hf_fidelity = hellinger_fidelity_with_expected(counts, correct_dist)
+    
+    # to limit cpu and memory utilization, skip noise correction if more than 16 measured qubits
+    if num_measured_qubits > 16:
+        return { 'fidelity':hf_fidelity, 'hf_fidelity':hf_fidelity }
 
     # if not provided, generate thermal dist based on number of qubits
     if thermal_dist == None:
@@ -884,6 +891,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if max(group_metrics["avg_exec_times"]) < 0.1:
             axs[axi].set_ylim([0, 0.1])
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        
+        if show_elapsed_times:    # a global setting
+            axs[axi].bar(group_metrics["groups"], group_metrics["avg_elapsed_times"], 0.75, color='skyblue', alpha = 0.8, zorder = 3)
+            
         axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
         
