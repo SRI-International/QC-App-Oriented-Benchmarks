@@ -171,14 +171,14 @@ def HamiltonianSimulation(n_spins, K, t, method = 1, measure_x = False):
         for k in range(K):
             # the Pauli spin vector product
             for i in range(n_spins):
-                qc.rx(2 * tau * g, qr[i])
+                qc.rx(-2 * tau * g, qr[i])
             qc.barrier()
 
 
             # ZZ operation on each pair of qubits in linear chain
             for j in range(2):
-                for i in range(j%2, n_spins, 2):
-                    qc.append(zz_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+                for i in range(j%2, n_spins-1, 2):
+                    qc.append(zz_gate(-tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
             qc.barrier()
 
 
@@ -381,7 +381,7 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
             ts = time.time()
             h_x = precalculated_data['h_x'][:num_qubits] # precalculated random numbers between [-1, 1]
             h_z = precalculated_data['h_z'][:num_qubits]
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t, method=2, measure_x=True)
+            qc = HamiltonianSimulation(num_qubits, K=k, t=3, method=2, measure_x= False) 
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             
             # collapse the sub-circuits used in this benchmark (for qiskit)
