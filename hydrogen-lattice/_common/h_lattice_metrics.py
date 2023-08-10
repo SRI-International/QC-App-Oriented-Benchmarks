@@ -154,6 +154,10 @@ def plot_line_metric(suptitle:str="Circuit Width (Number of Qubits)", metric_nam
     # add a horizontal line at y=1 for solution quality
     elif metric_name == 'solution_quality':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
+
+        # start the y-ticks of solution quality at 0 and end at 1
+        ax.set_ylim([0, 1.1])
+
     # add a horizontal line at y=0 for accuracy volume
     elif metric_name == 'accuracy_volume':
         ax.axhline(y=0, color='r', linestyle='--', label='Ideal Solution')
@@ -215,9 +219,6 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="energy", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[0, 1], subplot=subplot)
             plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="solution_quality", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 0], subplot=subplot)
             plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="accuracy_volume", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 1], subplot=subplot)
-
-            # start the y-ticks of solution quality at 0 and end at 1
-            axs[1, 0].set_ylim([0, 1.1])
 
             if not subplot:
                 plt.show(block=True)
