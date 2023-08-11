@@ -39,7 +39,8 @@
     "\n",
     "# # *** This example shows how to specify the backend using a known \"backend_id\"\n",
     "# # Use 'sabre' layout for IBM backends\n",
-    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre' }\n",
+    "# exec_options = { \"optimization_level\":3, \"layout_method\":'sabre', \"routing_method\":'sabre',\n",
+    "#                  \"use_sessions\":True, \"resilience_level\":1}\n",
     "# backend_id=\"ibmq_belem\"\n",
     "\n",
     "# # *** Here's an example of using a typical custom provider backend (e.g. AQT simulator)\n",
@@ -70,10 +71,6 @@
    "source": [
     "# Custom optimization options can be specified in this cell (below is an example)\n",
     "\n",
-    "# # Example of TrueQ Randomized Compilation\n",
-    "# import _common.transformers.trueq_rc as trueq_rc\n",
-    "# exec_options = { \"optimization_level\": 3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": trueq_rc.local_rc } \n",
-    "\n",
     "# # Example of pytket Transformer\n",
     "# import _common.transformers.tket_optimiser as tket_optimiser\n",
     "# exec_options = { \"optimization_level\": 3, \"layout_method\":'sabre', \"routing_method\":'sabre', \"transformer\": tket_optimiser.high_optimisation }\n",
@@ -85,7 +82,11 @@
     "# # Example of mthree error mitigation\n",
     "# import _common.postprocessors.mthree.mthree_em as mthree_em\n",
     "# exec_options = { \"optimization_level\": 3, \"layout_method\":'sabre', \"routing_method\":'sabre',\n",
-    "#                         \"postprocessor\": mthree_em.get_mthree_handlers(backend_id, provider_backend) }\n"
+    "#                         \"postprocessor\": mthree_em.get_mthree_handlers(backend_id, provider_backend) }\n",
+    "\n",
+    "# # Example of a custom Executor (BlueQubit)\n",
+    "# import _common.executors.bluequbit_executor as bluequbit_executor\n",
+    "# exec_options = { \"executor\": bluequbit_executor.run }\n"
    ]
   },
   {

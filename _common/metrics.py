@@ -72,6 +72,9 @@ save_plot_images = True
 # Option to show plot images. Useful if it is desired to not show plots while running scripts
 show_plot_images = True
 
+# Option to show elapsed times in the metrics plots
+show_elapsed_times = False
+
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
 
@@ -666,6 +669,10 @@ def polarization_fidelity(counts, correct_dist, thermal_dist=None):
     
     # calculate hellinger fidelity between measured expectation values and correct distribution
     hf_fidelity = hellinger_fidelity_with_expected(counts, correct_dist)
+    
+    # to limit cpu and memory utilization, skip noise correction if more than 16 measured qubits
+    if num_measured_qubits > 16:
+        return { 'fidelity':hf_fidelity, 'hf_fidelity':hf_fidelity }
 
     # if not provided, generate thermal dist based on number of qubits
     if thermal_dist == None:
@@ -884,6 +891,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if max(group_metrics["avg_exec_times"]) < 0.1:
             axs[axi].set_ylim([0, 0.1])
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+        
+        if show_elapsed_times:    # a global setting
+            axs[axi].bar(group_metrics["groups"], group_metrics["avg_elapsed_times"], 0.75, color='skyblue', alpha = 0.8, zorder = 3)
+            
         axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
         
@@ -1536,7 +1547,8 @@ known_x_labels = {
     'cumulative_elapsed_time' : 'Cumulative Elapsed Quantum Execution Time (s)',
     'cumulative_exec_time' : 'Cumulative Quantum Execution Time (s)',
     'cumulative_opt_exec_time' : 'Cumulative Classical Optimization Time (s)',
-    'cumulative_depth' : 'Cumulative Circuit Depth'
+    'cumulative_depth' : 'Cumulative Circuit Depth',
+    'iteration_count' : 'Iterations'
 }
 
 x_label_save_str = {
@@ -1564,7 +1576,8 @@ known_score_labels = {
     'max_fidelity' : 'Max. Result Fidelity',
     'hf_fidelity' : 'Hellinger Fidelity',
     'solution_quality' : 'Solution Quality',
-    'accuracy_volume' : 'Accuracy Volume'
+    'accuracy_volume' : 'Accuracy Volume',
+    'energy' : 'Energy (Hartree)'
     
 }
 
@@ -2534,6 +2547,9 @@ cmap_custom_spectral = None
 # the default colormap is the spectral map
 cmap = cmap_spectral
 
+# create a copy of cmap 
+cmap_orig = cmap
+
 # current cmap normalization function (default None)
 cmap_norm = None
 
@@ -2558,10 +2574,11 @@ def set_custom_cmap_style(
             fade_rate=default_fade_rate):
             
     print("... set custom map style")
-    global cmap, cmap_custom_spectral
+    global cmap, cmap_custom_spectral, cmap_orig
     cmap_custom_spectral = create_custom_spectral_cmap(
                 fade_low_fidelity_level=fade_low_fidelity_level, fade_rate=fade_rate)
     cmap = cmap_custom_spectral
+    cmap_orig = cmap_custom_spectral
        
 # Create the custom spectral colormap from the base spectral
 def create_custom_spectral_cmap(
@@ -3086,9 +3103,22 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
 
     if ylabels != None:
         plt.yticks(ybasis, ylabels)
-    
-    # add colorbar to right of plot (scale if normalize function installed)
-    plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+      
+    # if score label is accuracy volume, get the cmap colors and invert them
+    if score_label == 'Accuracy Volume':
+        global cmap
+        cmap_colors = [cmap_spectral(v/1000) for v in range(1000)]
+        cmap_colors.reverse()
+        cmap = ListedColormap(cmap_colors)
+
+    else:
+        cmap = cmap_orig
+
+
+    # add colorbar to right of plot (scale if normalize function installed)    
+    cbar = plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+    if score_label == 'Accuracy Volume':
+        cbar.ax.invert_yaxis()
         
     return ax
 
