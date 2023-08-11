@@ -644,7 +644,7 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
 # assumption that num_input_qubits ~= num_clock_qubits and num_input_qubits < num_clock_qubits:
 #      num_qubits = 2 * num_input_qubits + num_clock_qubits + 1 (the ancilla)
 
-def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
+def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
         method = 1, use_best_widths=True,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):  
@@ -682,6 +682,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
         return run2(min_input_qubits=min_input_qubits,max_input_qubits= max_input_qubits,
                 min_clock_qubits=min_clock_qubits, max_clock_qubits=max_clock_qubits,
+                skip_qubits=skip_qubits,
                 max_circuits=max_circuits, num_shots=num_shots, 
                 method=method, use_best_widths=use_best_widths,
                 backend_id=backend_id, provider_backend=provider_backend,
@@ -692,7 +693,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 # arbitrary range of input and clock qubit widths
 # The benchmark sweeps over all input widths and clock widths in the range specified
 
-def run2 (min_input_qubits=1, max_input_qubits=3,
+def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
         min_clock_qubits=1, max_clock_qubits=3,
         max_circuits=3, num_shots=100,
         method=2, use_best_widths=False,
@@ -752,7 +753,7 @@ def run2 (min_input_qubits=1, max_input_qubits=3,
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     #for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
-    for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
+    for num_input_qubits in range(min_input_qubits, max_input_qubits + skip_qubits):
         N = 2**num_input_qubits # matrix size
                     
         for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1):      

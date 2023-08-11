@@ -137,7 +137,7 @@ def analyze_and_print_result (qc, result, num_qubits, type, num_shots):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
+def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
 
@@ -166,7 +166,7 @@ def run (min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + skip_qubits):
     
         input_size = num_qubits - 1
         
