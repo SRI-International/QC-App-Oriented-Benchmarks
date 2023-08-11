@@ -45,6 +45,41 @@ In the run() method for the benchmark, there are a number of optional arguments 
         Vertical axis for area plots. The default is 'num_qubits'.
 ```
 
+### Metrics
+
+Metrics generated for this benchmark suite generally compare the VQE energy at each iteration to some reference energy, such as those contained in the `.sol` files. Below is an explaination of the first three metrics, in addition to some examples. 
+
+The first is the VQE energy itself, given in hartree. This energy can be compared to the `.sol` file energies, although it may be difficult from the energies alone to tell how good a solution is.
+
+The second metric is known as the "solution quality", and is given by the following formula:
+
+$$
+\begin{aligned}
+& \text { relative energy difference }=\left|\frac{E-E_{\mathrm{FCI}}}{E_{\mathrm{FCI}}}\right| \\
+& \text { solution quality }=1-\frac{\arctan (\text { precision factor } \times \text { relative energy difference })}{\pi / 2}
+\end{aligned}
+$$
+
+The solution quality goes from 0 to 1, with 1 being the closest to the target energy (FCI, in this case.) It scales with an arctan function. The "precision" factor determines how quality this arctan function saturates, and is arbitrarily specified. 
+
+The third metric is known as the "accuracy" volume, and is given by the following formula:
+
+$$
+\text { accuracy volume }=\left|\frac{E_X-E_{\mathrm{FCI}}}{N}\right|
+$$
+
+where N is the number of electrons. This metric goes from 0 to infinity, with 0 being the most accurate to the target energy. 
+
+The following is an example of how these metrics are displayed after running the benchmarks 
+
+<p align="center">
+<img align=center src="../_doc/images/hydrogen-lattice/metric1.png"  width="600" />
+</p>
+
+<p align="center">
+<img align=center src="../_doc/images/hydrogen-lattice/metric2.png"  width="600" />
+</p>
+
 ## Problem Instances and Solutions
 
 The framework used for hydrogen lattice benchmarking is reliant on problem `.json` files and solution `.sol` files. These files are stored within the `_common/instances` folder, and are used in the main benchmarking files to draw information on the Hamiltonians used for each hydrogen lattice, as well as classical solutions for the ground state energy of each hydrogen lattice.
