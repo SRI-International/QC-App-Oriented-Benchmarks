@@ -80,6 +80,8 @@ The following is an example of how these metrics are displayed after running the
 <img align=center src="../_doc/images/hydrogen-lattice/metric2.png"  width="600" />
 </p>
 
+Note the several different types of plots. The top plot shows views of all three metrics with either the iteration number or cumulative quantum execution time on the X axis, while the bottom plot shows a different type of plot showing the accuracy volume as a function of the cumulative elapsed quantum time. 
+
 ## Problem Instances and Solutions
 
 The framework used for hydrogen lattice benchmarking is reliant on problem `.json` files and solution `.sol` files. These files are stored within the `_common/instances` folder, and are used in the main benchmarking files to draw information on the Hamiltonians used for each hydrogen lattice, as well as classical solutions for the ground state energy of each hydrogen lattice.
