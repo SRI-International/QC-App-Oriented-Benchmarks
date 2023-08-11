@@ -70,7 +70,7 @@ $$
 
 where N is the number of electrons. This metric goes from 0 to infinity, with 0 being the most accurate to the target energy. 
 
-The following is an example of how these metrics are displayed after running the benchmarks 
+The following is an example of how these metrics are displayed after running the benchmarks:
 
 <p align="center">
 <img align=center src="../_doc/images/hydrogen-lattice/metric1.png"  width="600" />
