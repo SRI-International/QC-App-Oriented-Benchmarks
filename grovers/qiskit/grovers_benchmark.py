@@ -218,7 +218,7 @@ def grovers_dist(num_qubits, marked_item):
 MAX_QUBITS=8
 
 # Execute program with default parameters
-def run(min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
+def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
         use_mcx_shim=False,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
@@ -259,7 +259,7 @@ def run(min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
         
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_qubits), max_circuits)

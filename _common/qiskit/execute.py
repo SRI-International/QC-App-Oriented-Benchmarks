@@ -23,9 +23,11 @@
 # execution, so they can be aggregated and presented to the user.
 #
 
+import sys
+import metrics
+
 import time
 import copy
-import metrics
 import importlib
 import traceback
 from collections import Counter
@@ -475,9 +477,9 @@ def execute_circuit(circuit):
         if executor:
             st = time.time()
             
-            # invoke custom executor function
+            # invoke custom executor function with backend options
             qc = circuit["qc"]
-            result = executor(qc, backend.name(), backend, shots=shots)
+            result = executor(qc, backend.name(), backend, shots=shots, **backend_exec_options_copy)
             
             if verbose_time:
                 print(f"  *** executor() time = {round(time.time() - st,4)}")
@@ -609,7 +611,7 @@ def execute_circuit(circuit):
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'job_id', job.job_id())
     
     if verbose:
-        print(f"... executing job {job.job_id()}")
+        print(f"  ... executing job {job.job_id()}")
     
     # special handling when only runnng one job at a time: wait for result here
     # so the status check called later immediately returns done and avoids polling
