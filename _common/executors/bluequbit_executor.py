@@ -7,6 +7,8 @@
 
 import bluequbit
 
+verbose = False
+
 # This class BlueQubitResult provides the return data from Blue Qubit runs. 
 # It simply adds a get_counts() method with the optional qc argument.
 # (the BQ Result object only has getcounts(), but the benchmarks require get_counts(qc))
@@ -21,15 +23,18 @@ class BlueQubitResult(object):
         counts = self.counts       
         return counts
 
-# This function is called by the QED-C execution pipeline when specified as the 'executor'       
-def run(qc, backend_name, backend_provider, shots=100):
-
-    if backend_name == 'BlueQubit-CPU': device = 'cpu'
-    if backend_name == 'BlueQubit-GPU': device = 'gpu'
+# This function is called by the QED-C execution pipeline when specified as the 'executor'  
+# The device argument is passed as an "execute option"     
+def run(qc, backend_name, backend, shots=100, device='cpu'):
     
-    bq_result = backend_provider.run(qc, device=device, shots=shots)
+    if verbose:
+        print(f"  ... executing circuit on backend={backend_name} device={device}")
     
-    #print(f"... result = {bq_result}\n{bq_result.__dir__()}")
+    # Perform execution of circuit on the BlueQubit device
+    bq_result = backend.run(qc, device=device, shots=shots)
+    
+    if verbose:
+        print(f"... result = {bq_result}")
     
     # wrap the BlueQubit result in a (semi-)standard Result object with a counts dict
     # This Result object will be passed to the result_handler callback for each benchmark
