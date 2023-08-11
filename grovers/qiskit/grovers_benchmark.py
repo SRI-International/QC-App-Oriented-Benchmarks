@@ -259,7 +259,7 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + skip_qubits):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
         
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_qubits), max_circuits)

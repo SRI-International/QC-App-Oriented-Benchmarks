@@ -753,10 +753,10 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     #for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
-    for num_input_qubits in range(min_input_qubits, max_input_qubits + skip_qubits):
+    for num_input_qubits in range(min_input_qubits, max_input_qubits + 1, skip_qubits):
         N = 2**num_input_qubits # matrix size
                     
-        for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1):      
+        for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1, skip_qubits):      
             num_qubits = 2*num_input_qubits + num_clock_qubits + 1
         
             # determine number of circuits to execute for this group
