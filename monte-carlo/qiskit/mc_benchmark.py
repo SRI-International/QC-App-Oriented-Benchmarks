@@ -354,7 +354,7 @@ MIN_STATE_QUBITS_M1 = 2
 MAX_QUBITS=10
 
 # Execute program with default parameters
-def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
+def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num_shots=100,
         epsilon=0.05, degree=2, num_state_qubits=MIN_STATE_QUBITS, method = 2, # default, not exposed to users
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None):
@@ -406,7 +406,7 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
 
         # reset random seed
         np.random.seed(0)
