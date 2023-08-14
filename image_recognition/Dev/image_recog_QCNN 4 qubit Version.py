@@ -50,7 +50,7 @@ def exp_cal(state):
     2. Access the data and target  
         i) filter the data with 7 and 9 ( for initial development we are doing binary classification )
     3. Split the data into train and test data ( 80% for training and 20% for testing )
-    4. pca for dimensionality reduction (x_scaled_data is the scaled data)
+    4. pca for dimensionality reduction (x_final_data is the scaled data)
     5. batching the data ( we are not using batching for now)
     6. custom varational circuit is defined for now instead of QCNN (var_circuit)
         i)   it will be updated once we have the QCNN
@@ -113,36 +113,43 @@ y = y[binary_filter]
     Here y_test has all the testing labels of the images (i.e, 20% ) and has Target shape of (14000,)'''
 
 # Here we have only two classes data out of above mentioned data    
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 50, train_size = 200, random_state=42)
 # print(x.shape, y.shape, x_train.shape, y_train.shape, x_test.shape, y_test.sha?pe)
 
 # Reduce the size of the dataset to 200 training samples and 50 test samples for faster execution 
 # will be removed once the code is ready for final execution
-x_train = x_train[:200]
-y_train = y_train[:200]
-x_test  = x_test[:50]
-y_test  = y_test[:50]
+# x_train = x_train[:200]
+# y_train = y_train[:200]
+# x_test  = x_test[:50]
+# y_test  = y_test[:50]
 
 # After initial development  below code will be move to qubit loop
 # -------------- PCA Compression -----------------
 # Number of principal components to keep as of now it is 14 
-pca = PCA(n_components = num_qubits)
-# pca = PCA( ) if pca_check == True else PCA(n_components = num_qubits)
+# pca = PCA(n_components = num_qubits)
+# # pca = PCA( ) if pca_check == True else PCA(n_components = num_qubits)
 
 
-# Apply PCA on the data to reduce the dimensions and it is in the form of 'numpy.ndarray'
-x_train_pca = pca.fit_transform(x_train)
-x_test_pca =  pca.transform(x_test)
+# # Apply PCA on the data to reduce the dimensions and it is in the form of 'numpy.ndarray'
+# x_train_pca = pca.fit_transform(x_train)
+# x_test_pca =  pca.transform(x_test)
 
-
+# print(len(x_train), len(y_train) , len(x_test), len(y_test))
 # Create an instance of MinMaxScaler
-scaler = MinMaxScaler(feature_range=(0, 2 * np.pi))
+# scaler = StandardScaler( ).fit(x)
+# x_scaled_train =  scaler.transform(x_train)
+# x_scaled_test =  scaler.transform(x_test)
 
+# Step 1: Apply PCA on the entire dataset
+pca = PCA(n_components = num_qubits).fit(x)
+x_pca = pca.transform(x)
+x_train_pca  = pca.transform(x_train)
+x_test_pca = pca.transform(x_test)
 
-# Apply min-max scaling to the data to bring the values between 0 and 1
-x_scaled_test =  scaler.fit_transform(x_test_pca)
-x_scaled_train = scaler.transform(x_train_pca)
-
+# Step 2: Apply MinMax scaling to the PCA-transformed data
+scaler = MinMaxScaler(feature_range=(0, 2 * np.pi)).fit(x_pca)
+x_final_train =  scaler.transform(x_train_pca)
+x_final_test  =  scaler.transform(x_test_pca)
 
 
 
@@ -341,7 +348,7 @@ print(len(weights))
 batch_size = 35
 
 # training samples data size 
-data_size  = len(x_scaled_train)
+data_size  = len(x_final_train)
 
 # Number of batches 
 batch_count =  (data_size + batch_size - 1) // batch_size
@@ -356,7 +363,7 @@ for epoch in range(num_epochs):
         end_index   = min((batch + 1 ) * batch_size, data_size)
       
       # batch extraction 
-        x_batch = x_scaled_train[start_index:end_index]
+        x_batch = x_final_train[start_index:end_index]
         y_batch = y_train[start_index:end_index]
       
       
@@ -380,11 +387,11 @@ print("theta function", theta.x)
 predictions = []
 
 # Loop over the test data and use theta obtained from training to get the predicted label
-#print("x_scaled_test",x_scaled_test)
+#print("x_final_test",x_final_test)
 # print(theta.x)
 # print(num_shots)
 test_accuracy_history = []
-for data_point in x_scaled_test:
+for data_point in x_final_test:
     qc = qcnn_model(data_point, num_qubits)
     qc_upd = qc.bind_parameters(theta.x)
         # Simulate the quantum circuit and get the result
@@ -430,7 +437,7 @@ plt.show()
 
 
 # testing accuracy after each data point
-plt.plot(range(1, len(x_scaled_test) + 1), test_accuracy_history)
+plt.plot(range(1, len(x_final_test) + 1), test_accuracy_history)
 plt.xlabel('Data Point')
 plt.ylabel('Test Accuracy')
 plt.title('Test Accuracy after Each Data Point')
