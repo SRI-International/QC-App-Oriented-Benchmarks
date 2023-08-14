@@ -57,6 +57,7 @@ def AmplitudeEstimation(num_state_qubits, num_counting_qubits, a, psi_zero=None,
     repeat = 1
     for j in reversed(range(num_counting_qubits)):
         for _ in range(repeat):
+            qc.barrier()
             qc.append(cQ, [qr_counting[j]] + [qr_state[l] for l in range(num_state_qubits+1)])
         repeat *= 2
     
@@ -120,9 +121,13 @@ def Ctrl_Q(num_state_qubits, A_circ):
     qc.x(num_state_qubits)
     qc.z(num_state_qubits)
     qc.x(num_state_qubits)
+
+    #qc.barrier()
         
     # A_circ_inverse
     qc.append(A_gate_inv, [i for i in range(num_state_qubits+1)])
+
+    #qc.barrier()
         
     # S_0
     for i in range(num_state_qubits+1):
@@ -135,6 +140,7 @@ def Ctrl_Q(num_state_qubits, A_circ):
     for i in range(num_state_qubits+1):
         qc.x(i)
         
+    #qc.barrier()
     # A_circ
     qc.append(A_gate, [i for i in range(num_state_qubits+1)])
     
@@ -286,7 +292,8 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
 
-            a_ = a_from_s_int(s_int, num_counting_qubits)
+            #a_ = a_from_s_int(s_int, num_counting_qubits)
+            a_ = np.random.uniform(0, np.pi, num_circuits)
 
             qc = AmplitudeEstimation(num_state_qubits, num_counting_qubits, a_)
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time() - ts)

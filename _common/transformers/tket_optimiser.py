@@ -12,7 +12,7 @@ from pytket.passes import (  # type: ignore
     KAKDecomposition,
     PauliSimp,
     RemoveBarriers,
-    RemoveImplicitQubitPermutation,
+    #RemoveImplicitQubitPermutation,
     RebaseTket,
 )
 from pytket.architecture import Architecture
@@ -49,7 +49,7 @@ def tket_transformer_generator(
 
     def transformation_method(
         circuit: QuantumCircuit, backend
-    ) -> list[QuantumCircuit]:
+    ) -> list([QuantumCircuit]):
         """Transformer using TKET optimisation passes.
 
         :param circuit: Circuit to be optimised
