@@ -217,7 +217,7 @@ debug = False
 # Variational circuit used in below model which has parameters optimized during training
 def qcnn_circ(num_qubits, layer_size = 10):
     qc = QuantumCircuit(num_qubits,1)  # just to measure the 5 th qubit (4 indexed)\
-    thetas = ParameterVector("t", length=36)
+    thetas = ParameterVector("t", length=24)
     if debug == True:
         print(thetas)
     theta1 = thetas[0:layer_size]
