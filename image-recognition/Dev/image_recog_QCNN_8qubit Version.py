@@ -261,6 +261,18 @@ def qcnn_circ(num_qubits, layer_size = 18):
 
     return qc
 
+def square_loss(labels, predictions):
+    loss = 0
+    for l, p in zip(labels, predictions):
+        if p < 0.5:
+            p = 0
+        else:
+            p = 1
+        loss = loss + (l - p) ** 2
+    loss = loss / len(labels)
+    return loss
+
+square_loss_check = False 
 
 # model to be used for training which has input data encoded and variational circuit is appended to it
 def qcnn_model(x, num_qubits):
@@ -319,7 +331,10 @@ def loss_function(theta, x_batch, y_batch, is_draw_circ=False, is_print=False):
     
     # print(prediction_label)
     # loss = log_loss(y_train, prediction_label)
-    loss = log_loss(y_batch, prediction_label)
+    if square_loss_check == True:
+        loss = square_loss(y_batch, prediction_label)
+    else:
+        loss = log_loss(y_batch, prediction_label)
 
     if is_print:
         predictions = []

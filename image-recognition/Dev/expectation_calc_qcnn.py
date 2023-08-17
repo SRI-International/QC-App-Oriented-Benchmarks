@@ -34,7 +34,7 @@ def expectation_run(circuit: QuantumCircuit, shots: Optional[int] = None) -> Dic
             # raise QiskitError(ErrorMessages.UNDEFINED_PARAMS.value)
         qcnn_test = True
         if qcnn_test:
-            circuit.measure(4,0)
+            circuit.measure(2,0)
         # if len(get_measured_qubits(circuit)) == 0:
         #     circuit.measure_all()
           
@@ -42,7 +42,7 @@ def expectation_run(circuit: QuantumCircuit, shots: Optional[int] = None) -> Dic
         if isinstance(shots, int):
             counts = (execute(circuit, backend= qasm_backend, shots=shots).result().get_counts())
             probs = normalize_counts(counts, num_qubits=circuit.num_qubits)
-        print(probs)
+        # print(probs)
         return probs
 
 def normalize_counts(counts, num_qubits=None):
@@ -106,16 +106,20 @@ def calculate_expectation_values(probabilities, observables):
 # main function
 def calculate_expectation(base_circuit, shots=None ,num_qubits=None):
     
-    operator = PauliSumOp(SparsePauliOp("IIIIZIII"))
+    if num_qubits == 8:
+        operator = PauliSumOp(SparsePauliOp("IIIIZIII"))
+    elif num_qubits == 4:
+        operator = PauliSumOp(SparsePauliOp("IIZI"))
     measurable_expression = StateFn(operator, is_measurement=True)
     if debug:
         print("measurable_expression",measurable_expression)
     observables = PauliExpectation().convert(measurable_expression)
     # print(observables)
     circuits, formatted_observables = prepare_circuits(base_circuit, observables)
-    # print(circuits)
-    for circ in circuits:
-        print(circ)
+    # print(circuits)]
+    if debug:
+        for circ in circuits:
+            print(circ)
     probabilities = compute_probabilities(circuits, shots)
     expectation_values = calculate_expectation_values(probabilities, formatted_observables)
     return sum(expectation_values)
