@@ -4,8 +4,6 @@ The HHL (HHL) quantum algorithm [[1]](#references) may demonstrate a quantum spe
 
 The HHL offers a more complex algorithm that uses a combination of Quantum Phase Estimation and Quantum Fourier Transform along with state initialization and a new and unique, scalable, inverse rotation algorithm. The combination of the component routines taken together provides an extension to the benchmark suite that fills a gap between the QFT and Amplitude Estimation algorithms.
 
-
-
 This is also a benchmark that can measure fidelity of circuit execution, but can also provide an application specific metric based on how well the algorithm solves the linear equation.
 
 NOTE: The remainder of this README needs to be modifed with content for HHL.
@@ -35,7 +33,7 @@ The state starts with the initial state, <img align="center" src="https://latex.
 The following circuit is the general quantum circuit for the HHL algorithm with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n_b"> b-register qubits, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n"> c-register(clock) qubits and 1 ancilla qubit. 
 
 <p align="center">
-   <img align=center src="../_doc/images/bernstein-vazirani/bv_circuit.png"  width="600" />
+   <img align=center src="../_doc/images/hhl/hhl_circuit.png"  width="600" />
 </p>
 
 *Fig 1. Diagram of general quantum circuit for Bernstein-Vazirani Algorithm [[2]](#references)*
@@ -88,7 +86,6 @@ As mentioned before since <img align=center src="https://latex.codecogs.com/svg.
    <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\Psi_{4}\rangle=b_j|u_j\rangle|\frac{N{\lambda_j}t}{2\pi}\rangle|0\rangle_{a}"/>
    </p>
 
-   
 Setting <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\tilde{\lambda_j}=\frac{N{\lambda_j}t}{2\pi}"> with general case <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}b=\sum_{j=0}^{2^{{n_b}-1}}|u_j\rangle">
 
    <p align="center">
@@ -138,16 +135,44 @@ The novelty in the QED's benchmark is the unique implementations of the controll
 
 
 - **RY rotation**:
-For a given bitstring <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\,s"/>, the quantum oracle <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\,U_f"/> for the function <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}f(x)=s\cdot\,x\end{align*}\"> is implemented as a product of CNOT gates according to
-<p align="center">
-    <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\,U_f=\bigotimes_{i:s_i=1}\text{CNOT}_{i,a}\">
-</p>
 
-where <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\,\text{CNOT}_{i,a}\"> is a CNOT gate controlled on data qubit <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\,i"/> and targeting the ancilla qubit.
+For the given bitstring with zeroed ancilla qubit, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\tilde{\lambda_j}\rangle|0\rangle_{a}">, apply a controlled RY gate on the ancilla qubit to get the state, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\tilde{\lambda_j}\rangle(\sqrt{1-\frac{C^2}{\tilde{\lambda_j^2}}}|0\rangle_{a}+\frac{C}{\tilde{\lambda_j}}|1\rangle_a)">.
 
-<p align="center">
-<img align=center src="../_doc/images/bernstein-vazirani/u_f.png" width="200"/>
-</p>
+This rotation process can be implemented by setting the angle of rotation: 
+
+   <p align="center">
+   <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\theta=2\arcsin(\frac{C}{\tilde{\lambda_{j}}})"/>
+   </p>
+
+   <p align="center">
+   <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}RY(\theta)=\cos(\frac{\theta}{2})|0\rangle_{a}+\sin(\frac{\theta}{2})|1\rangle_{a}"/>
+   </p>
+
+Controlled Rotations can be implemented like this,
+   <p align="center">
+   <img align=center src="../_doc/images/hhl/old_ry.png" width="200"/>
+   </p>
+
+However, it can also be implemented using single CNOT and rotation gates by changing the angles as can be seen below
+   <p align="center">
+   <img align=center src="../_doc/images/hhl/new_ry.png" width="200"/>
+   </p>
+
+To do this, the user needs to apply the following matrix to the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\alpha"> angles. 
+
+
+   <p align="center">
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}\begin{bmatrix}\theta_{1}\\\theta_{2}\\\vdots\\{\theta_{2^k}}\end{bmatrix}&=M\begin{bmatrix}\alpha_{1}\\\alpha_{2}\\\vdots\\{\alpha_{m}}\end{bmatrix}\end{align*}\">
+   </p>
+
+   where <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}M_{ij}=2^{-k}(-1)^{{b_{j-1}}\cdot{g_{i-1}}}\end{align*}\">. <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}g_m\end{align*}\"> stands for the binary reflected gray code representation of the integer m. How the gray code works can be read here https://en.wikipedia.org/wiki/Gray_code.
+
+   
+- **RY rotation**:
+
+
+
+
 
 ## Circuit Methods
 This benchmark contains two methods for generating the Bernstein-Vazirani circuit.
