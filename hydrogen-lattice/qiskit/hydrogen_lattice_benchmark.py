@@ -32,8 +32,19 @@ from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
 from qiskit.quantum_info import Statevector,Pauli
 from qiskit.result import sampled_expectation_value
 
-sys.path[1:1] = [ "_common", "_common/qiskit", "hydrogen-lattice/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
+search_paths = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
+
+# get the absolute path of current file
+current_file_path = os.path.realpath(__file__)
+
+# add multiple directories relative to the current path to search path
+for path in search_paths:
+    sys.path.append( os.path.dirname(os.path.abspath(current_file_path)) + "/" + path )
+
+# declare the random energy file path relative to the current file path
+random_energy_file_path = os.path.join(os.path.dirname(os.path.abspath(current_file_path)), "../_common/random_sampler/precomputed_random_energies.json")
+
+
 
 import common
 import execute as ex
@@ -254,23 +265,6 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simu
 # Return expected measurement array scaled to number of shots executed
 def get_expectation(num_qubits,  num_shots):
     pass
-    # find expectation counts for the given circuit 
-    # id = f"_{num_qubits}"
-    # if id in expectations:
-    #     counts = expectations[id]
-        
-    #     # scale to number of shots
-    #     for k in counts.items():
-    #         counts[k] = num_shots
-        
-    #     # delete from the dictionary
-    #     del expectations[id]
-        
-    #     return counts
-        
-    # else:
-    #     return None
-    
     
 # ############### Result Data Analysis
 
@@ -304,15 +298,6 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     return counts, fidelity
 
-
-# Not needed for initial execution
-def get_random_angles(num_occ_pairs):
-    """Create max_circuit number of random initial conditions"""
-    
-    thetas = []
-    for i in range(len(num_occ_pairs)):
-        thetas[i] = np.random.choice([-1e-3, 1e-3])
-    return thetas
 
 
 # For initial development
@@ -383,37 +368,6 @@ def normalize_counts(counts, num_qubits=None):
     assert abs(sum(probabilities.values()) - 1) < 1e-9
     return probabilities
 
-def calculate_expectation(base_circuit, operator, parameters=None, shots=None):
-    """
-    Compute the expected value of the operator given a base-circuit and pauli operator.
-
-    No checks are made to ensure consistency between operator and base circuit.
-
-    Parameters
-    ----------
-    base_circuit : :obj:`QuantumCircuit`
-        Base circuit in computational basis. Basis rotation gates will be appended as needed given the operator.
-    operator : :obj:`PauliSumOp`
-        Operator expressed as a sum of Pauli operators. This is assumed to be consistent with the base circuit.
-    parameters : :obj:`Optional[Union[List, ndarray]]`
-        Optional parameters to pass in if the circuit is parameterized
-    """
-    # if parameters is not None and base_circuit.num_parameters != len(parameters):
-    #     raise ValueError(f"Circuit has {base_circuit.num_parameters} but parameter length is {len(parameters)}.")
-
-    measurable_expression = StateFn(operator, is_measurement=True)
-    observables = PauliExpectation().convert(measurable_expression)
-    circuits, formatted_observables = prepare_circuits(base_circuit, observables)
-
-    if DEBUG:
-        print("DEBUG : \n method: calculate_expectation \n\t base_circuit: "+str(base_circuit))
-
-    probabilities = compute_probabilities(circuits, parameters, shots)
-    expectation_values = calculate_expectation_values(probabilities, formatted_observables)
-    if DEBUG:
-        print("DEBUG : \n method: calculate_expectation \n\t probabilities: "+str(probabilities) + "\n\t expectation_values: "+str(expectation_values))
-    return sum(expectation_values)
-    
 def prepare_circuits(base_circuit, observables):
     """
     Prepare the qubit-wise commuting circuits for a given operator.
@@ -487,7 +441,7 @@ def compute_energy(result_array, formatted_observables, num_qubits):
     
     return energy    
 
-
+# TODO : Discuss the need of this function, possibly remove this
 # Function to save final iteration data to file
 def store_final_iter_to_metrics_json(num_qubits,
                                      radius,
@@ -754,7 +708,7 @@ MAX_QUBITS = 24
 
 def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
         method=2, radius=None, thetas_array=None, parameterized= False, do_fidelities=True,
-        max_iter=30, score_metric=['solution_quality', 'accuracy_volume'], x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
+        max_iter=30, score_metric=['solution_quality', 'accuracy_ratio'], x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
         backend_id='qasm_simulator', provider_backend=None, eta=0.5,
@@ -828,8 +782,6 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     dict_of_inputs = locals()
     
     thetas = []   #Need to change
-    # # Get angles for restarts. Thetas = list of lists. Lengths are max_circuits and 2*rounds
-    # thetas, max_circuits = get_restart_angles(thetas_array, rounds, max_circuits)
     
     # Update the dictionary of inputs
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
@@ -864,10 +816,20 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     if save_res_to_file and not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
     
     # validate parameters
-    # max_qubits = max(2, max_qubits)
-    # max_qubits = min(MAX_QUBITS, max_qubits)
-    # min_qubits = min(max(2, min_qubits), max_qubits)
-    # radius = max(0.75, radius)
+    max_qubits = max(2, max_qubits)
+    max_qubits = min(MAX_QUBITS, max_qubits)
+    min_qubits = min(max(2, min_qubits), max_qubits)
+
+    try:
+        print("Validating user inputs...")
+        # raise an exception if either min_qubits or max_qubits is not even
+        if min_qubits % 2 != 0 or max_qubits % 2 != 0:
+            raise ValueError("min_qubits and max_qubits must be even. min_qubits = {}, max_qubits = {}".format(min_qubits, max_qubits))
+    except ValueError as err:
+        # display error message and stop execution if min_qubits or max_qubits is not even
+        logger.error(err)
+        raise
+
     
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
@@ -922,6 +884,15 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 for paired electron circuits
     global instance_filepath 
+
+    # read precomputed energies file from the random energies path
+    try:
+        with open(random_energy_file_path) as f:
+            random_energies_dict = json.load(f)
+    except:
+        print("Error reading precomputed random energies json file. Please create the file by running the script 'compute_random_energies.py' in the _common/random_sampler directory")
+        return
+
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
         
         if method == 1:
@@ -939,22 +910,33 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
             
             # if radius is given we should do same radius for max_circuits times
             if radius is not None:
-                instance_filepath = os.path.join(os.path.dirname(__file__),"..", "_common",
+                try:
+                    instance_filepath = os.path.join(os.path.dirname(__file__),"..", "_common",
                         common.INSTANCE_DIR, f"h{num_qubits:03}_chain_{radius:06.2f}.json")   
+                except ValueError as err:
+                    logger.error(err)
+                    raise
             # if radius is not given we should do all the radius for max_circuits times
             else:
-               instance_filepath_list = [file \
-               for file in glob.glob(os.path.join(os.path.dirname(__file__), "..", "_common", \
-               common.INSTANCE_DIR, f"h{num_qubits:03}_*_*_*.json"))]
-               #print(instance_filepath_list)
-               if len(instance_filepath_list) >= instance_num :
-                   instance_filepath = instance_filepath_list[instance_num-1]
-               else:
-                   print("problem not found")
+                instance_filepath_list = [file \
+                for file in glob.glob(os.path.join(os.path.dirname(__file__), "..", "_common", \
+                common.INSTANCE_DIR, f"h{num_qubits:03}_*_*_*.json"))]
+                try:
+                    if len(instance_filepath_list) >= instance_num :
+                        instance_filepath = instance_filepath_list[instance_num-1]
+                    else:
+                        raise ValueError("problem not found, please check the instances folder and generate the required problem and solution instances using provided scripts.")
+                except ValueError as err:
+                    logger.error(err)
+                    raise
+            
+            # get the filename from the instance_filepath and get the random energy from the dictionary
+            filename = os.path.basename(instance_filepath)
+            filename = filename.split('.')[0]
+            random_energy = random_energies_dict[filename]
 
             # operator is paired hamiltonian  for each instance in the loop  
             ops,coefs = common.read_paired_instance(instance_filepath)
-            # operator = Paulisumop(list(zip(ops, coefs)))
             operator = PauliSumOp.from_list(list(zip(ops, coefs)))
             # solution has list of classical solutions for each instance in the loop
             sol_file_name = instance_filepath[:-5] + ".sol"
@@ -966,9 +948,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 print(f"  ... problem not found.")
                 break
                 
-            # get thetas for each instance in the loop
-            # thetas_array = thetas[instance_num - 1]
-            # thetas_array = np.random.random(size=1) #len(circuit.parameters))
+
 
             if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
@@ -994,7 +974,8 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
                     
                 logger.info(f'===============  Begin method 2 loop, enabling transpile')             
-                
+
+                # define the radius and energy variables
                 doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
                 fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
                 cumlative_iter_time = [0]
@@ -1003,6 +984,14 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 current_radius += float(os.path.basename(instance_filepath).split('_')[3][:2])*.01
 
                 def objective_function(thetas_array):
+                    '''
+                    Objective function that calculates the expected energy for the given parameterized circuit
+
+                    Parameters
+                    ----------
+                    thetas_array : list
+                        list of theta values.
+                    '''
                     
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                     global minimizer_loop_index
@@ -1013,11 +1002,15 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
 
                     # create the ansatz from the ooperator, resulting in multiple circuits, one for each measured basis
                     ts = time.time()
+
+                    # call the HydrogenLattice ansatz to generate a parameterized hamiltonian
                     qc_array, frmt_obs, params = HydrogenLattice(num_qubits=num_qubits, secret_int=unique_id, thetas_array= thetas_array, parameterized= parameterized, operator=operator)
+                    
+                    # store the time it took to create the circuit
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
+
                     if DEBUG:
                         print("create time:" + str(time.time() -ts))
-                    #print("store metrics" +str(metrics.circuit_metrics[str(method)]['1000']))
                     
                     # loop over each of the circuits that are generated with basis measurements and execute
                     for qc in qc_array:
@@ -1025,8 +1018,8 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                         if DEBUG:
                             print("DEBUG : \n method: compute_energy \n\t binding parameters: "+str(params))
 
+                        # bind parameters
                         qc.bind_parameters(params)
-                        qc2 = qc.decompose()
 
                     
                         # Circuit Creation and Decomposition end
@@ -1034,9 +1027,10 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                         
                         #************************************************
                         #*** Quantum Part: Execution of Circuits ***
+
                         # submit circuit for execution on target with the current parameters
-                        
-                        ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots, params=params)
+                        ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
+
                         if DEBUG:
                             print("submit circuit id" + str(unique_id) )
     
@@ -1054,29 +1048,41 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                         #************************************************
                         
                         global saved_result
+
+                        # res array store the three results we measure along different Pauli basis.
                         res.append(saved_result)
+
                         if DEBUG:
                             print("saved result: "+ str(saved_result))
 
                         # tapping into circuit metric exect time:
                         if DEBUG:
                             print("circuit metrics method: " + str(num_qubits) + " id: " + str(unique_id) )
+
+                        # Execution and elapsed time is measure for running all three circuits corresponding to different measurements along the different Pauli basis
                         quantum_execution_time = quantum_execution_time + metrics.circuit_metrics[str(num_qubits)][str(unique_id)]['exec_time']
                         quantum_elapsed_time = quantum_elapsed_time + metrics.circuit_metrics[str(num_qubits)][str(unique_id)]['elapsed_time']
-                        
+
+                    if DEBUG:
+                        print("iteration time :" +str(quantum_execution_time))
+
                         # Fidelity Calculation and Storage
                         # _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, unique_id, num_shots) 
                         
                         #************************************************
                         #*** Classical Processing of Results - essential to optimizer ***
                     global opt_ts
-                    if DEBUG:
-                        print("iteration time :" +str(quantum_execution_time))
                     global cumulative_iter_time
+
+
                     cumlative_iter_time.append(cumlative_iter_time[-1] + quantum_execution_time)
+
+                    # store the new exec time and elapsed time back to metrics
                     metrics.store_metric(str(num_qubits), str(unique_id), 'exec_time', quantum_execution_time)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'elapsed_time', quantum_elapsed_time)
+                    
                     dict_of_vals = dict()
+
                     # Start counting classical optimizer time here again
                     tc1 = time.time()
 
@@ -1090,12 +1096,15 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                     energy = compute_energy(result_array = res, formatted_observables = frmt_obs, num_qubits=num_qubits)
 
 
-                    # calculate the solution quality
-                    solution_quality, accuracy_volume = calculate_quality_metric(energy, fci_energy, precision=0.5, num_electrons=num_qubits)
+                    # calculate the solution quality, accuracy volume and accuracy ratio
+                    solution_quality, accuracy_volume, accuracy_ratio = calculate_quality_metric(energy=energy, fci_energy=fci_energy, random_energy=random_energy, precision=0.5, num_electrons=num_qubits)
+
+                    # store the metrics
                     metrics.store_metric(str(num_qubits), str(unique_id), 'energy', energy)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'solution_quality', solution_quality)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'accuracy_volume', accuracy_volume)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'accuracy_ratio', accuracy_ratio)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'doci_energy', doci_energy)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'radius', current_radius)
@@ -1104,8 +1113,16 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
 
                     return energy
                 
-                           
+                
                 def callback_thetas_array(thetas_array):
+                    '''
+                    This function is called after each iteration of the optimizer. Can be used to debug.
+
+                    Parameters
+                    ----------
+                    thetas_array : list
+                        list of theta values.
+                    '''
                     if DEBUG:
                         print("callback_thetas_array" + str(thetas_array))
                     else:
@@ -1119,6 +1136,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 if DEBUG:
                     print("The initial parameters are : "+ str(initial_parameters))
 
+                # minimize the objective function
                 thetas_array = minimize(objective_function,
                         x0=initial_parameters.ravel(),
                         method='COBYLA',
@@ -1126,6 +1144,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                         options={'maxiter': max_iter, 'disp': False},
                         callback=callback_thetas_array) 
                 
+                # calculate the final energy calculated using the PUCCD ansatz
                 ideal_energy = objective_function(thetas_array.x)
 
                 current_radius = float(os.path.basename(instance_filepath).split('_')[2])
@@ -1139,62 +1158,11 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
             
                 print(f"DOCI calculated energy : {doci_energy}")
                 print(f"FCI calculated energy : {fci_energy}")
+                print(f"Random solution calculated energy : {random_energy}")
              
              
                 # pLotting each instance of qubit count given 
-                cumlative_iter_time = cumlative_iter_time[1:]
-                #print(len(lowest_energy_values), len(cumlative_iter_time))
-                #print("lowest energy array" + str(lowest_energy_values))
-                #print("cumutaltive : " + str(cumlative_iter_time))
-                #
-                #print("difference :" + str(np.subtract( np.array(lowest_energy_values), fci_energy)))
-                #print("relative difference" + str(np.divide(np.subtract( np.array(lowest_energy_values), fci_energy), fci_energy)))
-                #print("absolute relative difference :" + str(np.absolute(np.divide(np.subtract( np.array(lowest_energy_values), fci_energy), fci_energy))))
-
-                approximation_ratio = (np.absolute(np.divide(np.subtract( np.array(lowest_energy_values), fci_energy), fci_energy)))
-                # precision factor
-                precision = 0.5
-                # take arctan of the approximation ratio and scale it to 0 to 1
-                approximation_ratio_scaled = np.subtract(1, np.divide(np.arctan(np.multiply(precision,approximation_ratio)), np.pi/2))
-                #print("approximation ratio" + str(approximation_ratio))
-
-                # # plot two subplots in the same plot
-                # fig, ax = plt.subplots(2, 1, figsize=(10, 10))
-
-                # ax[0].plot(cumlative_iter_time, lowest_energy_values, label='Quantum Energy')
-                # ax[0].axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
-                # ax[0].axhline(y=fci_energy, color='g', linestyle='solid', label='FCI Energy for given Hamiltonian')
-                # ax[0].set_xlabel('Quantum Execution time (s)')
-                # ax[0].set_ylabel('Energy')
-                # ax[0].set_title('Energy Comparison: Quantum vs. Classical')
-
-                # ax[1].plot(cumlative_iter_time, approximation_ratio_scaled, label='Solution Quality')
-                # #ax[1].plot(cumlative_iter_time,approximation_ratio_scaled, c=cm.hot(np.abs(approximation_ratio_scaled)), edgecolor='none')
-                # ax[1].set_xlabel('Quantum Execution time (s)')
-                # ax[1].set_ylabel('Solution Quality')
-                # ax[1].set_title('Solution Quality')
-
-                # ax[0].grid()
-                # ax[1].grid()
-                
-                
-                # plt.legend()
-                # # Generate the text to display
-                # energy_text = f'Ideal Energy: {ideal_energy:.2f} | DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
-
-                # # Add the text annotation at the top of the plot
-                # plt.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
-
-                # #block plot until closed for the last iteration
-                # if instance_num == max_circuits:
-                #     print("Close plots to continue")
-                #     plt.show(block=True)
-                # else:
-                #     plt.show(block=False)
-
-                # DEVNOTE: not yet capturing classical time, to do
-                # unique_id = instance_num * 1000 + 0
-                # metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time()-opt_ts)
+                cumlative_iter_time = cumlative_iter_time[1:]                
 
 
                 # Save final iteration data to metrics.circuit_metrics_final_iter
@@ -1238,7 +1206,6 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
         metrics.plot_metrics(f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit",
                 options=dict(shots=num_shots))
     elif method == 2:
-        #metrics.print_all_circuit_metrics()
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
@@ -1280,8 +1247,10 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
         options.append({'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits, '\nObjective Function' : obj_str})
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
 
-    h_metrics.plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_volume"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True)
+    # plots all line metrics, including solution quality, accuracy volume, and accuracy ratio vs iteration count and cumulative execution time
+    h_metrics.plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_ratio"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True)
     
+    # plots all area metrics
     metrics.plot_all_area_metrics(f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit",
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
                 fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
@@ -1289,22 +1258,31 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
                 offset_flag=offset_flag,
                 options=options, suffix=suffix, which_metric='solution_quality', save_metric_label_flag=True)
     
-#     metrics.plot_metrics_optgaps(suptitle, options=options, suffix=suffix, objective_func_type = objective_func_type)
-    
-#     # this plot is deemed less useful
-#     #metrics.plot_ECDF(suptitle=suptitle, options=options, suffix=suffix)
-
-#     all_widths = list(metrics.circuit_metrics_final_iter.keys())
-#     all_widths = [int(ii) for ii in all_widths]
-#     list_of_widths = [all_widths[-1]]
-#     metrics.plot_cutsize_distribution(suptitle=suptitle,options=options, suffix=suffix, list_of_widths = list_of_widths)
-    
-    #metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
 
-def calculate_quality_metric(energy, fci_energy, precision = 4, num_electrons = 2):
+
+def calculate_quality_metric(energy=None, fci_energy=0, random_energy=0, precision = 4, num_electrons = 2):
     """
-    Returns the quality of the solution which is a number between zero and one indicating how close the energy is to the FCI energy.
+    Returns the quality metrics, namely solution quality, accuracy volume, and accuracy ratio. 
+    Solution quality is a value between zero and one. The other two metrics can take any value.
+
+    Parameters
+    ----------
+    energy : list
+        list of energies calculated for each iteration.
+
+    fci_energy : float
+        FCI energy for the problem.
+
+    random_energy : float
+        Random energy for the problem, precomputed and stored and read from json file   
+
+    precision : float
+        precision factor used in solution quality calculation
+        changes the behavior of the monotonic arctan function
+
+    num_electrons : int
+        number of electrons in the problem
     """
     _relative_energy = np.absolute(np.divide(np.subtract( np.array(energy), fci_energy), fci_energy))
     
@@ -1314,10 +1292,13 @@ def calculate_quality_metric(energy, fci_energy, precision = 4, num_electrons = 
     # define accuracy volume as the absolute energy difference between the FCI energy and the energy of the solution normalized per electron
     _accuracy_volume = np.divide(np.absolute(np.subtract( np.array(energy), fci_energy)), num_electrons)
 
-    return _solution_quality, _accuracy_volume
+    # define accuracy ratio as the difference between calculated energy and random energy divided by difference in random energy and FCI energy
+    _accuracy_ratio = np.divide(np.subtract( np.array(energy), random_energy), np.subtract(fci_energy, random_energy))
+
+    return _solution_quality, _accuracy_volume, _accuracy_ratio
 
 # # if main, execute method
-if __name__ == '__main__': run(max_circuits=2, min_qubits=2,  max_qubits=4)
+if __name__ == '__main__': run(max_circuits=3, min_qubits=2,  max_qubits=8)
 
 # # %%
 
