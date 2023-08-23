@@ -5,7 +5,9 @@ import random
 import sys
 import os
 from qiskit.opflow.primitive_ops import PauliSumOp
+from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
 import json
+from qiskit.result import sampled_expectation_value
 
 
 
@@ -16,7 +18,6 @@ current_folder_path = os.path.dirname(os.path.abspath(__file__))
 sys.path[1:1] = [ "../../qiskit/", "../../_common"]
 
 # import the hydrogen lattice module
-import hydrogen_lattice_benchmark as hlb
 import common
 
 """
@@ -86,6 +87,72 @@ def store_energies(energy_dict:dict):
         # close the file
         energy_file.close()
 
+# get formatted observables for computing the energy
+def get_formatted_observables(instance_filepath:str):
+    ops,coefs = common.read_paired_instance(instance_filepath)
+    operator = PauliSumOp.from_list(list(zip(ops, coefs)))
+    _measurable_expression = StateFn(operator, is_measurement=True)
+    _observables = PauliExpectation().convert(_measurable_expression)
+    if isinstance(_observables, ComposedOp):
+        observables = SummedOp([_observables])
+    else:
+        observables = _observables
+    return observables
+
+
+# method to calculate the expectation value of an operator given the probabilities
+def calculate_expectation_values(probabilities, observables):
+    """
+    Return the expectation values for an operator given the probabilities.
+    """
+    expectation_values = list()
+    for idx, op in enumerate(observables):
+        expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
+        expectation_values.append(expectation_value)
+
+    return expectation_values
+
+# method to normalize the counts
+
+def normalize_counts(counts, num_qubits=None):
+    """
+    Normalize the counts to get probabilities and convert to bitstrings.
+    """
+    normalizer = sum(counts.values())
+
+    try:
+        dict({str(int(key, 2)): value for key, value in counts.items()})
+        if num_qubits is None:
+            num_qubits = max(len(key) for key in counts)
+        bitstrings = {key.zfill(num_qubits): value for key, value in counts.items()}
+    except ValueError:
+        bitstrings = counts
+
+    probabilities = dict({key: value / normalizer for key, value in bitstrings.items()})
+    assert abs(sum(probabilities.values()) - 1) < 1e-9
+    return probabilities
+
+# method to calculate the expectation value of energy given the probabilities
+def compute_energy(result_array, formatted_observables, num_qubits): 
+    
+    
+    # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
+
+    _probabilities = list()
+
+    for _res in result_array:
+        _counts = _res.get_counts()
+        _probs = normalize_counts(_counts, num_qubits=num_qubits)
+        _probabilities.append(_probs)
+
+
+    _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
+
+    energy = sum(_expectation_values)
+
+
+    
+    return energy    
 
 # main code starts here
 
@@ -125,7 +192,7 @@ for qubit_count in np.arange(min_qubits, max_qubits + 2, 2):
 
         ops,coefs = common.read_paired_instance(instance_filepath)
         operator = PauliSumOp.from_list(list(zip(ops, coefs)))
-        qc_array, frmt_obs, params = hlb.HydrogenLattice(num_qubits = qubit_count,operator = operator, thetas_array= None, parameterized= None)
+        frmt_obs = get_formatted_observables(instance_filepath)
 
 
 
@@ -153,7 +220,7 @@ for qubit_count in np.arange(min_qubits, max_qubits + 2, 2):
 
 
             # compute the energy for this result
-            energy = hlb.compute_energy(result_array=result, formatted_observables = frmt_obs, num_qubits=qubit_count )
+            energy = compute_energy(result, frmt_obs, qubit_count)
             average_energy += energy
         
         average_energy /= average_over

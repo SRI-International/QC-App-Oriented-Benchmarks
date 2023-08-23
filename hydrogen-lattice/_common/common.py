@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import json
 import numpy as np
+import glob
 
 INSTANCE_DIR = "instances"
 
@@ -157,3 +158,29 @@ def read_puccd_solution(file_path: str, _instances: dict = None) -> tuple:
 
     else:
         return None, None
+
+#get a list of instance file paths
+def get_instance_filepaths(num_qubits=2, radius=None):
+    instance_filepath_list = [file \
+        for file in glob.glob(os.path.join(os.path.dirname(__file__), \
+        INSTANCE_DIR, f"h{num_qubits:03}_*_*_*.json"))]
+    
+    if radius is not None:
+        instance_filepath = os.path.join(os.path.dirname(__file__), \
+            INSTANCE_DIR, f"h{num_qubits:03}_chain_{radius:06.2f}.json")   
+        
+        return instance_filepath
+    
+    else:
+        return instance_filepath_list
+    
+
+# return the random energies dictionary
+def get_random_energies_dict():
+    # declare the random energy file path relative to the current file path
+    random_energy_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "random_sampler/precomputed_random_energies.json") 
+
+    with open(random_energy_file_path) as f:
+        random_energies_dict = json.load(f)
+
+    return random_energies_dict

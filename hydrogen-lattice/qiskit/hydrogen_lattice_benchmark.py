@@ -32,17 +32,10 @@ from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
 from qiskit.quantum_info import Statevector,Pauli
 from qiskit.result import sampled_expectation_value
 
-search_paths = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
+sys.path[1:1] = [ "_common", "_common/qiskit", "hydrogen-lattice/_common" ]
+sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
 
-# get the absolute path of current file
-current_file_path = os.path.realpath(__file__)
 
-# add multiple directories relative to the current path to search path
-for path in search_paths:
-    sys.path.append( os.path.dirname(os.path.abspath(current_file_path)) + "/" + path )
-
-# declare the random energy file path relative to the current file path
-random_energy_file_path = os.path.join(os.path.dirname(os.path.abspath(current_file_path)), "../_common/random_sampler/precomputed_random_energies.json")
 
 
 
@@ -698,7 +691,7 @@ def get_width_restart_tuple_from_filename(fileName):
 
 ################ Run Method
 
-MAX_QUBITS = 24
+MAX_QUBITS = 16
 # # iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
 # # iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 # saved_result = {  }
@@ -828,7 +821,13 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     except ValueError as err:
         # display error message and stop execution if min_qubits or max_qubits is not even
         logger.error(err)
-        raise
+        if min_qubits % 2 != 0:
+            min_qubits += 1
+        if max_qubits % 2 != 0:
+            max_qubits -= 1
+            max_qubits = min(max_qubits, MAX_QUBITS)
+        print(err.args[0] + "\n Running for for values min_qubits = {}, max_qubits = {}".format(min_qubits, max_qubits))
+        
 
     
     # don't compute exectation unless fidelity is is needed
@@ -886,12 +885,13 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     global instance_filepath 
 
     # read precomputed energies file from the random energies path
+
     try:
-        with open(random_energy_file_path) as f:
-            random_energies_dict = json.load(f)
-    except:
+        random_energies_dict = common.get_random_energies_dict()
+    except ValueError as err:
+        logger.error(err)
         print("Error reading precomputed random energies json file. Please create the file by running the script 'compute_random_energies.py' in the _common/random_sampler directory")
-        return
+        raise
 
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
         
@@ -911,16 +911,16 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
             # if radius is given we should do same radius for max_circuits times
             if radius is not None:
                 try:
-                    instance_filepath = os.path.join(os.path.dirname(__file__),"..", "_common",
-                        common.INSTANCE_DIR, f"h{num_qubits:03}_chain_{radius:06.2f}.json")   
+                    instance_filepath = common.get_instance_filepaths(num_qubits, radius)
                 except ValueError as err:
                     logger.error(err)
-                    raise
+
+                    print(f"  ... problem not found. Running default radius")
+                    instance_filepath = common.get_instance_filepaths(num_qubits)[0]
+
             # if radius is not given we should do all the radius for max_circuits times
             else:
-                instance_filepath_list = [file \
-                for file in glob.glob(os.path.join(os.path.dirname(__file__), "..", "_common", \
-                common.INSTANCE_DIR, f"h{num_qubits:03}_*_*_*.json"))]
+                instance_filepath_list = common.get_instance_filepaths(num_qubits)
                 try:
                     if len(instance_filepath_list) >= instance_num :
                         instance_filepath = instance_filepath_list[instance_num-1]
@@ -1298,7 +1298,7 @@ def calculate_quality_metric(energy=None, fci_energy=0, random_energy=0, precisi
     return _solution_quality, _accuracy_volume, _accuracy_ratio
 
 # # if main, execute method
-if __name__ == '__main__': run(max_circuits=3, min_qubits=2,  max_qubits=8)
+if __name__ == '__main__': run()
 
 # # %%
 
