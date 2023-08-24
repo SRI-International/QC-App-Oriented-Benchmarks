@@ -987,7 +987,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
     
     # Delete some entries from the dictionary
-    for key in ["hub", "group", "project", "provider_backend"]:
+    for key in ["hub", "group", "project", "provider_backend", "exec_options"]:
         dict_of_inputs.pop(key)
     
     global maxcut_inputs
