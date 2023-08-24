@@ -41,18 +41,6 @@ The following circuit is the general quantum circuit for the HHL algorithm with 
 References [[2]](#references) and [[3]](#references) both have overviews of the mathematical details of the 
 algorithm, but the key points will be reproduced here.
 
-### Algorithmic Visualization
-
-<p align="center">
-<img align=center src="../_doc/images/bernstein-vazirani/bv_gif.gif"  width="700" />
-</p>
-
-*Fig 2. Visualization of quantum circuit executing for Bernstein-Vazirani Algorithm. The visualization
-demonstrates how each qubit and state evolves throughout the algorithm. Visualization created
-with IBM's Quantum Composer and can be analyzed
-[here](https://quantum-computing.ibm.com/composer/files/new?initial=N4IgdghgtgpiBcIBCA1ABAQQDYHMD2ATgJYAuAFlCADQgCOEAzpYgPIAKAogHICKGAygFk0AJgB0ABgDcAHTBEwAYywBXACYw0MujCxEARgEYxCxdtlg5tAjBxpaAbQBsAXQuKbdxc7dy5%2BiAJiGAJ7BwlfMACgohCww0jo4NDHEUTA5LCAZnSYuMcAFkiADzCAVkiyMIiLKscE2rC0xsccloci9oqLJNiU8NzM%2BsG%2BppH8hzb-DNHC8f7uuSI1asjl%2BMjFUtSXKkdF%2BRXHGqWjhwbTsfdtyd39%2BdWemYmLqOf%2B5um8-qm377DOl8hg4DnUBu1XmDPmAwb8wYCYeUSkiLLBGCobKs0ABaAB8aG8JzAaIYGM0wxx%2BO8rxJZLGlIJDmhtMxrRcDO8vxZ5I67LxjM61BAGgYHiIAAcSEQ8GAECAQABfIA).*
-
-[//]: # (For more information about reading these circuit diagrams, visit internal documentation or link to qiskit circuit composer. We likely need to include information about Bloch sphere reading to really make this a useful visualization.)
 
 ### Algorithm Steps
 
@@ -150,12 +138,12 @@ This rotation process can be implemented by setting the angle of rotation:
 
 Controlled Rotations can be implemented like this,
    <p align="center">
-   <img align=center src="../_doc/images/hhl/old_ry.png" width="200"/>
+   <img align=center src="../_doc/images/hhl/old_ry.png" width="600"/>
    </p>
 
 However, it can also be implemented using single CNOT and rotation gates by changing the angles as can be seen below
    <p align="center">
-   <img align=center src="../_doc/images/hhl/new_ry.png" width="200"/>
+   <img align=center src="../_doc/images/hhl/new_ry.png" width="600"/>
    </p>
 
 To do this, the user needs to apply the following matrix to the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\alpha"> angles. 
