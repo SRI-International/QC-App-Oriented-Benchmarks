@@ -359,11 +359,11 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             acc_ratio_array.append(1 - acc_ratio)
 
         average_et = np.average(exec_time_array)
-        error_et = stats.sem(exec_time_array)
+        error_et = np.std(exec_time_array)/np.sqrt(len(exec_time_array))
         average_ar = np.average(acc_ratio_array)
-        error_ar = stats.sem(acc_ratio_array)
+        error_ar = np.std(acc_ratio_array)/np.sqrt(len(acc_ratio_array))
         average_sq = np.average(sol_quality_array)
-        error_sq = stats.sem(sol_quality_array)
+        error_sq = np.std(sol_quality_array)/np.sqrt(len(sol_quality_array))
 
         average_exec_time_per_iteration.append(average_et)
         average_exec_time_per_iteration_error.append(error_et)
