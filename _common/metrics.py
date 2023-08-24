@@ -1577,6 +1577,7 @@ known_score_labels = {
     'hf_fidelity' : 'Hellinger Fidelity',
     'solution_quality' : 'Solution Quality',
     'accuracy_volume' : 'Accuracy Volume',
+    'accuracy_ratio' : 'Accuracy Ratio',
     'energy' : 'Energy (Hartree)'
     
 }
@@ -1590,7 +1591,8 @@ score_label_save_str = {
     'fidelity' : 'fidelity',
     'hf_fidelity' : 'hf',
     'solution_quality' : 'solution_quality', 
-    'accuracy_volume' : 'accuracy_volume'
+    'accuracy_volume' : 'accuracy_volume', 
+    'accuracy_ratio' : 'accuracy_ratio'
 }
 
  

@@ -39,6 +39,7 @@ import matplotlib.cm as cm
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.stats as stats
 
 # add to the path variable the path to the metrics module
 import sys
@@ -123,12 +124,33 @@ def plot_line_metric(suptitle:str="Circuit Width (Number of Qubits)", metric_nam
     if cumulative_flag:
         x_data = cumulative_sum(x_data)
 
+    # calculate the return parameters here
+
+    # calculate the exec time per iteration
+    if x_val == 'cumulative_exec_time':
+        exec_time_per_iteration = x_data[-1]/len(x_data)
+    else:
+        exec_time_per_iteration = 0
+
+    # final solution quality after all iterations
+    if metric_name == 'solution_quality':
+        final_solution_quality = y_data[-1]
+    else:
+        final_solution_quality = 0
+
+    # final accuracy ratio after all iterations
+    if metric_name == 'accuracy_ratio':
+        final_accuracy_ratio = y_data[-1]
+    else:
+        final_accuracy_ratio = 0
+
+
     # plot the data as a line with the color of line depending on the y value
     #ax.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=12)
 
     # plot the data as a scatter plot with the color of the point depending on the y value, the scatter points are connected with a line
     # plot if the metric is solution quality invert the color map
-    if metric_name == 'solution_quality':
+    if metric_name == 'solution_quality' or 'accuracy_ratio':
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm_r)
     else:
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm)
@@ -154,6 +176,15 @@ def plot_line_metric(suptitle:str="Circuit Width (Number of Qubits)", metric_nam
     # add a horizontal line at y=1 for solution quality
     elif metric_name == 'solution_quality':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
+
+        # start the y-ticks of solution quality at 0 and end at 1
+        ax.set_ylim([0, 1.1])
+
+    # add a horizontal line at y=0 for accuracy ratio
+    elif metric_name == 'accuracy_ratio':
+        ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
+
+
     # add a horizontal line at y=0 for accuracy volume
     elif metric_name == 'accuracy_volume':
         ax.axhline(y=0, color='r', linestyle='--', label='Ideal Solution')
@@ -172,11 +203,101 @@ def plot_line_metric(suptitle:str="Circuit Width (Number of Qubits)", metric_nam
                                             + str(instance) + '-'
                                             + str(metric_name) + '-'
                                             + str(x_metric_name) + '-'), backend_id)
+        
+    return exec_time_per_iteration, final_solution_quality, final_accuracy_ratio
 
+
+# method to plot cumulative execution time vs. number of qubits
+def plot_cumulative_metrics(x_data1:list=None, y_data1:list=None, y_err1:list=None, x_data2:list=None, y_data2:list=None, y_err2:list=None):
+    '''
+    Function to plot cumulative metrics (accuracy ratio, execution time per iteration) over different number of qubits
+
+    parameters:
+    ----------
+    x_data1: list
+        list of x data for plot 1
+
+    y_data1: list
+        list of y data for plot 1
+
+    y_err1: list
+        list of y error data for plot 1
+
+    x_data2: list
+        list of x data for plot 2
+
+    y_data2: list   
+        list of y data for plot 2
+
+    y_err2: list    
+        list of y error data for plot 2
+    '''
+
+    # get subtitle from metrics
+    subtitle = metrics.circuit_metrics['subtitle']
+
+    # get backend id from subtitle
+    backend_id = subtitle[9:]
+
+    # create two figures for two plots
+    fig1 = plt.figure()
+    fig2 = plt.figure()
+    # plot xdata1 vs ydata1 on fig1
+    ax1 = fig1.gca()
+    ax1.plot(x_data1, y_data1, linestyle='solid', linewidth=2, markersize=12, marker='x')
+    
+    # plot xdata2 vs ydata2 on fig2
+    ax2 = fig2.gca()
+    ax2.plot(x_data2, y_data2, linestyle='solid', linewidth=2, markersize=12, marker='x')
+
+
+    # set the title
+    ax1.set_title("Cumulative Execution Time per iteration vs. Number of Qubits")
+    ax1.set_xlabel("Number of Qubits")
+    ax1.set_ylabel("Cumulative Execution Time/ iteration (s)")
+
+    ax2.set_title("Accuracy Ratio Error vs. Number of Qubits")
+    ax2.set_xlabel("Number of Qubits")
+    ax2.set_ylabel("Error in Accuracy Ratio")
+
+    # also plot a bar plot on the same figure
+    ax1.bar(x_data1, y_data1, 0.75, alpha = 0.8, zorder = 3)
+    ax2.bar(x_data2, y_data2, 0.75, alpha = 0.8, zorder = 3)
+    ax1.grid(True, axis = 'y', color='silver', zorder = 0)
+    ax2.grid(True, axis = 'y', color='silver', zorder = 0)
+    
+
+    # error bars for the bar plot
+    ax1.errorbar(x_data1, y_data1, yerr=y_err1, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
+    ax2.errorbar(x_data2, y_data2, yerr=y_err2, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
+
+    # save the plot image
+    if save_plot_images:
+        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-cumulative-"
+                                            + "exec_time_per_iteration" + '-'
+                                            + "qubit_count" + '-'), backend_id)
+    # show the plot
+    plt.show(block=True)
 
 
 # function to plot all line metrics
 def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_volume"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True):
+    '''
+    Function to plot all line metrics (energy, solution quality, accuracy volume) vs different x values (iteration count, cumulative execution time)
+
+    parameters:
+    ----------
+    score_metrics: list
+        list of score metrics to plot
+
+    x_vals: list
+        list of x values to plot
+
+    subplot: bool
+        flag to plot all metrics on the same figure or on different figures
+    '''
+
+
     # if score_metrics and x_val are strings, convert to lists
     if type(score_metrics) is str:
         score_metrics = [score_metrics]
@@ -184,12 +305,24 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
         x_vals = [x_vals]
 
     global h_lattice_metrics
+
+    average_exec_time_per_iteration = []
+    average_exec_time_per_iteration_error = []
+    average_solution_quality = []
+    average_accuracy_ratio = []
+    average_solution_quality_error = []
+    average_accuracy_ratio_error = []
+    qubit_counts = []
     
     # iterate over number of qubits and score metrics and plot each
     for qubit_count in h_lattice_metrics:
 
         circuit_ids = [int(x) for x in (h_lattice_metrics[qubit_count])]
         total_instances = int(np.floor(circuit_ids[-1]/1000))
+
+        exec_time_array = []
+        sol_quality_array = []
+        acc_ratio_array = []
     
         for instance in range(1, total_instances + 1):
 
@@ -212,18 +345,40 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
                         plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name=score_metric, x_val=x_val, num_qubits=qubit_count, instance=instance, ax=fig.gca(), subplot=subplot)
             '''
             plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="energy", x_val="iteration_count", num_qubits=qubit_count, instance=instance, ax=axs[0, 0], subplot=subplot)
-            plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="energy", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[0, 1], subplot=subplot)
-            plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="solution_quality", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 0], subplot=subplot)
-            plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="accuracy_volume", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 1], subplot=subplot)
+            exec_time, _, __ = plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="energy", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[0, 1], subplot=subplot)
+            _, sol_quality, __ = plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="solution_quality", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 0], subplot=subplot)
+            #plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="accuracy_volume", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 1], subplot=subplot)
+            _, __, acc_ratio = plot_line_metric(suptitle="Hydrogen Lattice (Number of Qubits)", metric_name="accuracy_ratio", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 1], subplot=subplot)
 
-            # start the y-ticks of solution quality at 0 and end at 1
-            axs[1, 0].set_ylim([0, 1.1])
 
             if not subplot:
                 plt.show(block=True)
 
+            exec_time_array.append(exec_time)
+            sol_quality_array.append(1 - sol_quality)
+            acc_ratio_array.append(1 - acc_ratio)
+
+        average_et = np.average(exec_time_array)
+        error_et = stats.sem(exec_time_array)
+        average_ar = np.average(acc_ratio_array)
+        error_ar = stats.sem(acc_ratio_array)
+        average_sq = np.average(sol_quality_array)
+        error_sq = stats.sem(sol_quality_array)
+
+        average_exec_time_per_iteration.append(average_et)
+        average_exec_time_per_iteration_error.append(error_et)
+        average_accuracy_ratio.append(average_ar)
+        average_accuracy_ratio_error.append(error_ar)
+        average_solution_quality.append(average_sq)
+        average_solution_quality_error.append(error_sq)
+
+        qubit_counts.append(qubit_count)
+
         if subplot:
             plt.show(block=True)
+
+    # plot the cumulative execution time per iteration vs. number of qubits
+    plot_cumulative_metrics(x_data1=qubit_counts, y_data1=average_exec_time_per_iteration, y_err1=average_exec_time_per_iteration_error, x_data2=qubit_counts, y_data2=average_accuracy_ratio, y_err2=average_accuracy_ratio_error)
 
 # function to input a list of float and return a list of cumulative sums
 def cumulative_sum(input_list: list):
