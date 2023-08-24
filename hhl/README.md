@@ -41,18 +41,6 @@ The following circuit is the general quantum circuit for the HHL algorithm with 
 References [[2]](#references) and [[3]](#references) both have overviews of the mathematical details of the 
 algorithm, but the key points will be reproduced here.
 
-### Algorithmic Visualization
-
-<p align="center">
-<img align=center src="../_doc/images/bernstein-vazirani/bv_gif.gif"  width="700" />
-</p>
-
-*Fig 2. Visualization of quantum circuit executing for Bernstein-Vazirani Algorithm. The visualization
-demonstrates how each qubit and state evolves throughout the algorithm. Visualization created
-with IBM's Quantum Composer and can be analyzed
-[here](https://quantum-computing.ibm.com/composer/files/new?initial=N4IgdghgtgpiBcIBCA1ABAQQDYHMD2ATgJYAuAFlCADQgCOEAzpYgPIAKAogHICKGAygFk0AJgB0ABgDcAHTBEwAYywBXACYw0MujCxEARgEYxCxdtlg5tAjBxpaAbQBsAXQuKbdxc7dy5%2BiAJiGAJ7BwlfMACgohCww0jo4NDHEUTA5LCAZnSYuMcAFkiADzCAVkiyMIiLKscE2rC0xsccloci9oqLJNiU8NzM%2BsG%2BppH8hzb-DNHC8f7uuSI1asjl%2BMjFUtSXKkdF%2BRXHGqWjhwbTsfdtyd39%2BdWemYmLqOf%2B5um8-qm377DOl8hg4DnUBu1XmDPmAwb8wYCYeUSkiLLBGCobKs0ABaAB8aG8JzAaIYGM0wxx%2BO8rxJZLGlIJDmhtMxrRcDO8vxZ5I67LxjM61BAGgYHiIAAcSEQ8GAECAQABfIA).*
-
-[//]: # (For more information about reading these circuit diagrams, visit internal documentation or link to qiskit circuit composer. We likely need to include information about Bloch sphere reading to really make this a useful visualization.)
 
 ### Algorithm Steps
 
@@ -150,12 +138,12 @@ This rotation process can be implemented by setting the angle of rotation:
 
 Controlled Rotations can be implemented like this,
    <p align="center">
-   <img align=center src="../_doc/images/hhl/old_ry.png" width="200"/>
+   <img align=center src="../_doc/images/hhl/old_ry.png" width="600"/>
    </p>
 
 However, it can also be implemented using single CNOT and rotation gates by changing the angles as can be seen below
    <p align="center">
-   <img align=center src="../_doc/images/hhl/new_ry.png" width="200"/>
+   <img align=center src="../_doc/images/hhl/new_ry.png" width="600"/>
    </p>
 
 To do this, the user needs to apply the following matrix to the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\alpha"> angles. 
@@ -168,48 +156,88 @@ To do this, the user needs to apply the following matrix to the <img align=cente
    where <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}M_{ij}=2^{-k}(-1)^{{b_{j-1}}\cdot{g_{i-1}}}\end{align*}\">. <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}g_m\end{align*}\"> stands for the binary reflected gray code representation of the integer m. How the gray code works can be read here https://en.wikipedia.org/wiki/Gray_code.
 
    
-- **RY rotation**:
+- **e^{iAt}**:
 
+The controlled rotation that's implemented in this benchmark is influenced by the Quantum Walk circuit from the paper, "Exponential algorithmic speedup by quantum walk." In this paper, a Hamiltonian is implemented that calculates the connected vertex in a graph given an input vertex and a colored edge.
 
-
-
-
-## Circuit Methods
-This benchmark contains two methods for generating the Bernstein-Vazirani circuit.
-
-- **Method 1**: Generate the Bernstein-Vazirani circuit traditionally using the quantum circuit described in the [General Quantum Circuit](#general-quantum-circuit) section.
-This method benchmarks the following circuit:
 
    <p align="center">
-   <img align=center src="../_doc/images/bernstein-vazirani/bv1_qiskit_circ.png"  width="600" />
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}H=V_{c}TV_{c}\\T|a,b,0\rangle=|b,a,0\rangle\\T|a,b,1\rangle=0\\V_c|a,b,r\rangle=|a,b\otimes{v_c{a}},r\otimes{f_c(a)}\rangle\end{align*}\">
    </p>
 
-- **Method 2**: Generate the Bernstein-Vazirani circuit using only two qubits and mid-circuit measurements. This method
-mathematically is the same as method 1 but reduces the total number of qubits to two. This circuit is generated with the following 
-steps:
-  
-1. Initialize the two qubits to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle|-\rangle">
-2. Repeat the following subcircuit *n* times:
-   * Measure the first qubit 
-   * Reset the first qubit to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle">
-   * For a given bitstring *s*, if <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}s_n=1"> apply a hadamard to the first qubit, a CNOT gate where the first qubit is the control qubit, followed by another hadamard.
-  
-To learn more about this method, refer to 
-Qiskit's implementation blog post [[4]](#references). This is currently only implemented in Qiskit. The following
-is an example of the circuit benchmarked for this method: 
-  
-   <p align="center">
-   <img align=center src="../_doc/images/bernstein-vazirani/bv2_qiskit_circ.png"  width="800" />
-   </p>
-
-Note for this method, the following plots (which are generated with each benchmark)
-plots some metric versus the circuit width (number of qubits). For method 2, this circuit width is a virtual circuit width since the 
-physical circuit width is two. For example, for the virtual circuit width = 4, this represents the corresponding
-two qubit circuit used with mid circuit measurements to represent the quantum circuit with 4 qubits.
+T is written in the following way:
 
    <p align="center">
-   <img align=center src="../_doc/images/bernstein-vazirani/bv_fidelity_width.png"  width="500" />
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}T=(\bigotimes^{2n}_{l=1}S^{l,2n+1})\otimes|0\rangle\langle0|\\S|z_{1}z_{2}\rangle=|z_{2}z_{1}\rangle\end{align*}\">
    </p>
+   
+   One can note the eigenvalues of the swap operator as follows
+
+   <p align="center">
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}S\frac{1}{\sqrt{2}}(|01\rangle+|10\rangle)=(+1)\frac{1}{\sqrt{2}}(|01\rangle+|10\rangle)\\S\frac{1}{\sqrt{2}}(|01\rangle-|10\rangle)=(-1)\frac{1}{\sqrt{2}}(|01\rangle-|10\rangle)\end{align*}\">
+   </p>
+
+It can be seen that the swap gate can be diagonalized using the properties of the eigenvectors and eigenvalues of the S gate by using the W operator which operates as follows. It's also worth noting that W is unitary.
+
+   <p align="center">
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}W|00\rangle=|00\rangle\\W\frac{1}{\sqrt{2}}(|01\rangle+|10\rangle)=|01\rangle\\W\frac{1}{\sqrt{2}}(|01\rangle-|10\rangle)=|10\rangle\\W|11\rangle=|11\rangle\end{align*}\">
+   </p>
+
+As such, applying the W gate to the vectors allows one to use the diagonalized version of the SWAP gate for computations. The circuit <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}e^{-iTt}"> can be seen below.
+
+Now one can observe the action of the Hamiltonian operator:
+
+   <p align="center">
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}H|a,0,0\rangle=\sum_{c}V_{c}T|a,v_{c}(a),f_{c}(a)\rangle\\=\sum_{c}\delta_{0,f_{c}}(a)V_{c}|v_{c}(a),a,0\rangle\\=\sum_{c:v_{c}(a)\in{G}}|v_{c}(a),a\oplus{v_c(v_c(a))},f_c(v_c(a))\rangle\end{align*}\">
+   </p>
+
+   
+<img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}v_cv_c(a)=a"> because it returns to the same vertex on the graph along the edge and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}f_c(a)=0"> because a is a vertex on the graph. So
+
+
+   <p align="center">
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}H|a,0,0\rangle=\sum_{c:v_{c}(a)\in{G}}|v_c(a),0,0\rangle\end{align*}\">
+   </p>
+
+
+So far, the discussion has been about quantum graphs but now is the time to see how it relates to the HHL algorithm.
+We start of by defining the V gate, mainly the $v_c(a)$ function. The $v_c(i)$ returns the column index of the cth non-zero element on the ith column.
+
+
+For example in the below matrix:
+
+<p align="center">
+   <img align=center src="../_doc/images/hhl/sparse_matrix.png"  width="600" />
+</p>
+
+
+We want to be able to generate the eigenvectors of a from b. From this 2 sparse matrix, one can note the following 2 eigenvectors.
+
+   <p align="center">
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{align*}|{\lambda=\frac{1}{2}}\rangle=\begin{pmatrix}1\\0\\0\\0\\0\\1\\0\\0\end{pmatrix},\|{\lambda=1}\rangle=\begin{pmatrix}-1\\0\\0\\0\\0\\1\\0\\0\end{pmatrix}\end{align*}\">
+   </p>
+
+To get the first eigenvector all you have to do is apply the control phase gate before doing the rest of the Hamiltonian simulation with the following expression
+
+   <p align="center">
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{verbatim}qc.cp(-t*(diag\_el+sign*off\_diag\_el),control,anc)\end{verbatim}\">
+   </p>
+
+In this case, it will be 0.75+(-0.25) = 0.5
+
+And replacing the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}e^{-iZt}"> expression in the quantum walk algorithm,
+
+
+   <p align="center">
+   <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\begin{verbatim}qc.cp((sign*2*t*off\_diag\_el),control,anc)\end{verbatim}\">
+   </p>
+
+
+This will be subtracted from to the original value so, 0.5-(2*-0.25) = 1.0. 
+
+The sign is determined by if there are an even or odd amount of 1s are in the column index. For example index 5 has 2 1s. As such, the sign would be positive 1. This is to determine the sign of the eigenvalue that you would get from applying the Z gate.
+
+
 
 ## References
 
