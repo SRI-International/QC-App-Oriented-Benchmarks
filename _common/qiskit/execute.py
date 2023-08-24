@@ -140,6 +140,7 @@ class BenchmarkResult(object):
 class Job:
     local_job = True
     unique_job_id = 1001
+    executor_result = None
     
     def __init__(self):
         Job.unique_job_id = Job.unique_job_id + 1
@@ -150,6 +151,9 @@ class Job:
     
     def status(self):
         return JobStatus.DONE
+        
+    def result(self):
+        return self.executor_result
        
 #####################
 # DEFAULT NOISE MODEL 
@@ -488,7 +492,7 @@ def execute_circuit(circuit):
             job = Job()
             
             # store the result object on the job for processing in job_complete
-            job.result = result  
+            job.executor_result = result  
         
         ##############        
         # normal execution processing is performed here
@@ -634,6 +638,7 @@ def wait_on_job_result(job, active_circuit):
                          
         except Exception as e:
             print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
+            if verbose: print(traceback.format_exc())
             time.sleep(15)
             continue
     
@@ -658,6 +663,7 @@ def get_job_status(job, active_circuit):
                          
         except Exception as e:
             print(f'... error occurred during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
+            if verbose: print(traceback.format_exc())
             time.sleep(15)
             continue
     
@@ -888,7 +894,7 @@ def job_complete(job):
     if hasattr(job, 'local_job'):
     
         # get the result object directly from the pseudo-job object
-        result = job.result
+        result = job.result()
         
         if hasattr(result, 'exec_time'):
             exec_time = result.exec_time
