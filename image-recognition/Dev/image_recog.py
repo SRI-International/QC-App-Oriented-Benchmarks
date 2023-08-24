@@ -54,7 +54,7 @@ debug = False
 import expectation_calc
 
 # Number of qubits for the quantum circuit
-num_qubits = 4
+num_qubits = 8
 
 # Fetch the MNIST dataset from openml
 mnist = fetch_openml('mnist_784')
@@ -280,8 +280,6 @@ global num_iter_plot
 # function to calculate the loss function
 def loss_function(theta, is_draw_circ=False, is_print=True):
     # predicted_label = []
-    total_loss = 0
-    epsilon = 1e-15  # small value to avoid log(0) errors
     prediction_label = []
     i_draw = 0
     for data_point, label in zip(x_scaled_train, y_train):
@@ -332,6 +330,7 @@ def callback(theta):
 num_epochs = 1
 reps = 3
 
+
 # Number of shots to run the program (experiment)
 num_shots = 1000
 
@@ -344,7 +343,7 @@ print(len(weights))
 # Will increase the number of epochs once the code is fine tuned to get convergance 
 for epoch in range(num_epochs):
     # Minimize the loss using SPSA optimizer
-    theta = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, callback=callback, options={'maxiter': 100, 'disp': False} )
+    theta = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, callback=callback, options={'maxiter': 150, 'disp': False} )
     #theta=SPSA(maxiter=100).minimize(loss_function, x0=weights)
 
     loss = theta.fun

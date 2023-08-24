@@ -3,6 +3,7 @@
 
 import pandas as pd
 import numpy as np
+import sys
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
@@ -22,6 +23,22 @@ global expectation_calc_method
 
 # change the below variable to True if you want to use expectation_calc.py file for expectation value calculation
 expectation_calc_method = True
+
+from qiskit.primitives import Estimator
+
+estimator = Estimator()
+
+def exp_cal(state):
+    
+    # op = SparsePauliOp("IIIIZIII")
+    op = SparsePauliOp("IIZI")
+    # print("state" , state)
+    expectation_value = estimator.run(state, op).result().values
+
+# for shot-based simulation:
+    expectation_value = estimator.run(state, op, shots=100).result().values
+
+    return expectation_value
 
 # Dev Note :- Each image has Intensity from 0 to 255
 
@@ -57,7 +74,7 @@ expectation_calc_method = True
 global num_qubits
 
 # Number of qubits for the quantum circuit
-num_qubits = 8
+num_qubits = 4
 
 # Fetch the MNIST dataset from openml
 mnist = fetch_openml('mnist_784')
@@ -129,7 +146,8 @@ x_scaled_train = scaler.fit_transform(x_train_pca)
 # Define the convolutional circuits
 def conv_circ_1(thetas, first, second):
     # Your implementation for conv_circ_1 function here
-    conv_circ = QuantumCircuit(8)
+    # print(thetas)
+    conv_circ = QuantumCircuit(4)
     conv_circ.rx(thetas[0], first)
     conv_circ.rx(thetas[1], second)
     conv_circ.rz(thetas[2], first)
@@ -140,19 +158,20 @@ def conv_circ_1(thetas, first, second):
     conv_circ.rx(thetas[7], second)
     conv_circ.rz(thetas[8], first)
     conv_circ.rz(thetas[9], second)
+    # print(conv_circ)
     return conv_circ
 
 # Define the pooling circuits
 def pool_circ_1(thetas, first, second):
     # Your implementation for pool_circ_1 function here
-    pool_circ = QuantumCircuit(8)
+    pool_circ = QuantumCircuit(4)
     pool_circ.crz(thetas[0], first, second)
-    pool_circ.x(second)
+    # pool_circ.x(second)
     pool_circ.crx(thetas[1], first, second)
     return pool_circ
 
 def pool_circ_2(first, second):
-    pool_circ = QuantumCircuit(8)
+    pool_circ = QuantumCircuit(4)
     pool_circ.crz(first, second)
     return pool_circ
 
@@ -160,53 +179,49 @@ def pool_circ_2(first, second):
 def conv_layer_1(qc, thetas):
     qc = qc.compose(conv_circ_1(thetas, 0, 1))
     qc = qc.compose(conv_circ_1(thetas, 2, 3))
-    qc = qc.compose(conv_circ_1(thetas, 4, 5))
-    qc = qc.compose(conv_circ_1(thetas, 6, 7))
     return qc
 
 def conv_layer_2(qc, thetas):
     qc = qc.compose(conv_circ_1(thetas, 0, 2))
-    qc = qc.compose(conv_circ_1(thetas, 4, 6))
     return qc
 
-def conv_layer_3(qc, thetas):
-    qc = qc.compose(conv_circ_1(thetas, 0, 4))
-    return qc
+# def conv_layer_3(qc, thetas):
+#     qc = qc.compose(conv_circ_1(thetas, 0, 4))
+#     return qc
 
 # Quantum Circuits for Pooling layers
 def pooling_layer_1(qc, thetas):
     qc = qc.compose(pool_circ_1(thetas, 1, 0))
     qc = qc.compose(pool_circ_1(thetas, 3, 2))
-    qc = qc.compose(pool_circ_1(thetas, 5, 4))
-    qc = qc.compose(pool_circ_1(thetas, 7, 6))
     return qc
 
 def pooling_layer_2(qc, thetas):
     qc = qc.compose(pool_circ_1(thetas, 0, 2))
-    qc = qc.compose(pool_circ_1(thetas, 4, 6))
     return qc
 
-def pooling_layer_3(qc, thetas):
-    qc = qc.compose(pool_circ_1(thetas, 0, 4))
-    return qc
+# def pooling_layer_3(qc, thetas):
+#     qc = qc.compose(pool_circ_1(thetas, 0, 4))
+#     return qc
 
+debug = False
 # Variational circuit used in below model which has parameters optimized during training
 def qcnn_circ(num_qubits, thetas, layer_size = 10):
-    qc = QuantumCircuit(num_qubits,1)  # just to measure the 5 th qubit (4 indexed)
+    qc = QuantumCircuit(num_qubits,1)  # just to measure the 5 th qubit (4 indexed)\
+    if debug == True:
+        print(thetas)
     theta1 = thetas[0:layer_size]
     theta2 = thetas[layer_size: 2 * layer_size]
-    theta3 = thetas[2 * layer_size: 3 * layer_size]
-    theta4 = thetas[3 * layer_size: 3 * layer_size + 2]
-    theta5 = thetas[3 * layer_size + 2: 3 * layer_size + 4]
-    theta6 = thetas[3 * layer_size + 4: 3 * layer_size + 6]
+    # theta3 = thetas[2 * layer_size: 3 * layer_size]
+    theta4 = thetas[2 * layer_size: 2 * layer_size + 2]
+    theta5 = thetas[2 * layer_size + 2: 2 * layer_size + 4]
+    # theta6 = thetas[3 * layer_size + 4: 3 * layer_size + 6]
 
     # Pooling Ansatz1 is used by default
     qc = conv_layer_1(qc, theta1)
     qc = pooling_layer_1(qc, theta4)
     qc = conv_layer_2(qc, theta2)
     qc = pooling_layer_2(qc, theta5)
-    qc = conv_layer_3(qc, theta3)
-    qc = pooling_layer_3(qc, theta6)
+    # qc = conv_layer_3(qc, theta3)
 
     return qc
 
@@ -226,6 +241,13 @@ def qcnn_model(theta, x, num_qubits, reps):
     qc.compose(qcnn_circ_temp, inplace=True)
     return qc
 
+def square_loss(labels, predictions):
+    loss = 0
+    for l, p in zip(labels, predictions):
+        loss = loss + (l - p) ** 2
+    loss = loss / len(labels)
+    return loss
+
 
 # Define the quantum instance to be used for training
 backend = Aer.get_backend('qasm_simulator')
@@ -243,43 +265,47 @@ train_accuracy_history = []
 global num_iter_plot 
 
 
-# function to calculate the loss function
-def loss_function(theta, is_draw_circ=True, is_print=True):
 
+# function to calculate the loss function
+def loss_function(theta, x_batch, y_batch, is_draw_circ=False, is_print=False):
+    # predicted_label = []
+    total_loss = 0
+    epsilon = 1e-15  # small value to avoid log(0) errors
     prediction_label = []
     i_draw = 0
-    for data_point, label in zip(x_scaled_train, y_train):
+    for data_point, label in zip(x_batch, y_batch):
         # Create the quantum circuit for the data point
         qc = qcnn_model(theta, data_point, num_qubits, reps)
 
         if i_draw==0 and is_draw_circ:
             print(qc)
             i_draw += 1
-
         # Simulate the quantum circuit and get the result
         if expectation_calc_method == True:
-            val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits)  
-            print(val)  
+            # val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits) 
+            val = exp_cal(qc) 
             val=(val+1)*0.5
-        prediction_label.append(val)
-        
-    loss = log_loss(y_train, prediction_label)
+        prediction_label.append(float(val[0]))
+        # prediction_label.append(val)
+    
+    # print(prediction_label)
+    # loss = log_loss(y_train, prediction_label)
+    loss = log_loss(y_batch, prediction_label)
 
     if is_print:
         predictions = []
-        for i in range(len(y_train)):
+        for i in range(len(y_batch)):
             if prediction_label[i] > 0.5:
                 predictions.append(1)
             else:
                 predictions.append(0)
         # print(predictions)
-        accuracy = accuracy_score(y_train, predictions)
+        accuracy = accuracy_score(y_batch, predictions)
         print("Accuracy:", accuracy, "loss:", loss)
         train_loss_history.append(loss)
         train_accuracy_history.append(accuracy)
     
     return loss
-
 # print(len(train_loss_history))
 
 def callback(theta):
@@ -294,20 +320,45 @@ reps = 3
 num_shots = 1000
 
 # Initialize the weights for the QNN model
-np.random.seed(0)
+np.random.seed(1)
 # weights = np.random.rand(num_qubits * reps *2 )
-weights = np.random.rand(36)
+weights = np.random.rand(24)
 #weights = np.zeros(num_qubits * reps)
 print(len(weights))
 
-# Will increase the number of epochs once the code is fine tuned to get convergance 
+# Mini Batch taining batch size 
+batch_size = 35
+
+# training samples data size 
+data_size  = len(x_scaled_train)
+
+# Number of batches 
+batch_count =  (data_size + batch_size - 1) // batch_size
+
 for epoch in range(num_epochs):
+    
+    #  Looping batch count
+    for batch in range(batch_count):
+      
+      # start and end indeces for current_batch( Here batch is index of above batch)
+        start_index = batch * batch_size   # batch will be 0 for first index
+        end_index   = min((batch + 1 ) * batch_size, data_size)
+      
+      # batch extraction 
+        x_batch = x_scaled_train[start_index:end_index]
+        y_batch = y_train[start_index:end_index]
+      
+      
+        print(f"Current batch is {batch}")
     # Minimize the loss using SPSA optimizer
-    theta = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, callback=callback, options={'maxiter': 100, 'disp': False} )
+        is_draw,is_print = False,True
+        theta = minimize(loss_function, x0 = weights, args=(x_batch,y_batch,is_draw,is_print), method="COBYLA", tol=0.001, 
+                                callback=callback, options={'maxiter': 100, 'disp': False} )
     #theta=SPSA(maxiter=100).minimize(loss_function, x0=weights)
 
     loss = theta.fun
     print(f"Epoch {epoch+1}/{num_epochs}, loss = {loss:.4f}")
+
 
 print("theta function", theta)
     # print(type(theta.x))
@@ -325,7 +376,8 @@ for data_point in x_scaled_test:
     qc = qcnn_model(theta.x, data_point, num_qubits, reps)
         # Simulate the quantum circuit and get the result
     if expectation_calc_method == True:
-        val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits)   
+        # val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits)   
+        val = exp_cal(qc)   
         val=(val+1)*0.5
         if val > 0.5:
             predicted_label = 1
