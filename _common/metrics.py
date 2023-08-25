@@ -2552,6 +2552,7 @@ cmap_custom_spectral = None
 
 # the default colormap is the spectral map
 cmap = cmap_spectral
+cmap_orig = cmap_spectral
 
 # create a copy of cmap 
 cmap_orig = cmap
@@ -2660,11 +2661,10 @@ def create_custom_spectral_cmap(
     
     return cmap_custom_spectral
 
-cmap_custom_spectral = create_custom_spectral_cmap()
+# Make the custom spectral color map the default on module init
+set_custom_cmap_style()
 
-
-############### Helper functions
-
+# Return the color associated with the spcific value, using color map norm
 def get_color(value):
     
     # if there is a normalize function installed, scale the data
@@ -2679,8 +2679,10 @@ def get_color(value):
         value = 0.0 + value*0.95
         
     return cmap(value)
-    
-    
+
+
+############### Helper functions
+ 
 # return the base index for a circuit depth value
 # take the log in the depth base, and add 1
 def depth_index(d, depth_base):
