@@ -2559,7 +2559,7 @@ def set_custom_cmap_style(
             fade_low_fidelity_level=default_fade_low_fidelity_level,
             fade_rate=default_fade_rate):
             
-    #print("... set custom map style")
+    print("... set custom map style")
     global cmap, cmap_custom_spectral, cmap_orig
     cmap_custom_spectral = create_custom_spectral_cmap(
                 fade_low_fidelity_level=fade_low_fidelity_level, fade_rate=fade_rate)
