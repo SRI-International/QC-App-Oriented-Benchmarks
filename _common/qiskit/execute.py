@@ -93,10 +93,15 @@ cached_circuits = {}
 # user-supplied result handler
 result_handler = None
 
+# Option to compute normalized depth during execution (can disable to reduce overhead in large circuits)
+use_normalized_depth = True
+
 # Option to perform explicit transpile to collect depth metrics
+# (disabled after first circuit in iterative algorithms)
 do_transpile_metrics = True
 
-# Option to perform transpilation prior to execution (disable to execute unmodified circuit)
+# Option to perform transpilation prior to execution
+# (disabled after first circuit in iterative algorithms)
 do_transpile_for_execute = True
 
 # Intercept function to post-process results
@@ -431,8 +436,11 @@ def execute_circuit(circuit):
     
     try:    
         # transpile the circuit to obtain size metrics using normalized basis
-        if do_transpile_metrics:
+        if do_transpile_metrics and use_normalized_depth:
             qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q = transpile_for_metrics(qc)
+            
+            # we want to ignore elapsed time contribution of transpile for metrics (normalized depth)
+            active_circuit["launch_time"] = time.time()
             
         # use noise model from execution options if given for simulator
         this_noise = noise
@@ -749,7 +757,7 @@ def transpile_for_metrics(qc):
 
            
 # Return a transpiled and bound circuit
-# Cache the transpiled, and use it if do_transpile_for_execute not set
+# Cache the transpiled circuit, and use it if do_transpile_for_execute not set
 # DEVNOTE: this approach does not permit passing of untranspiled circuit through
 # DEVNOTE: currently this only caches a single circuit
 def transpile_and_bind_circuit(circuit, params, backend,
