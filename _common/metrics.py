@@ -1551,8 +1551,7 @@ known_x_labels = {
     'cumulative_elapsed_time' : 'Cumulative Elapsed Quantum Execution Time (s)',
     'cumulative_exec_time' : 'Cumulative Quantum Execution Time (s)',
     'cumulative_opt_exec_time' : 'Cumulative Classical Optimization Time (s)',
-    'cumulative_depth' : 'Cumulative Circuit Depth',
-    'iteration_count' : 'Iterations'
+    'cumulative_depth' : 'Cumulative Circuit Depth'
 }
 
 x_label_save_str = {
@@ -1578,12 +1577,7 @@ known_score_labels = {
     'bestcut_ratio' : 'Best Measurement Ratio',
     'fidelity' : 'Result Fidelity',
     'max_fidelity' : 'Max. Result Fidelity',
-    'hf_fidelity' : 'Hellinger Fidelity',
-    'solution_quality' : 'Solution Quality',
-    'accuracy_volume' : 'Accuracy Volume',
-    'accuracy_ratio' : 'Accuracy Ratio',
-    'energy' : 'Energy (Hartree)'
-    
+    'hf_fidelity' : 'Hellinger Fidelity'
 }
 
 # string that will go into the name of the figure when saved
@@ -1593,10 +1587,7 @@ score_label_save_str = {
     'bestcut_ratio' : 'bestCut',
     'gibbs_ratio' : 'gibbs',
     'fidelity' : 'fidelity',
-    'hf_fidelity' : 'hf',
-    'solution_quality' : 'solution_quality', 
-    'accuracy_volume' : 'accuracy_volume', 
-    'accuracy_ratio' : 'accuracy_ratio'
+    'hf_fidelity' : 'hf'
 }
 
  

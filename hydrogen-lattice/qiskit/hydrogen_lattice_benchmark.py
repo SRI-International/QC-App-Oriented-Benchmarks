@@ -838,10 +838,25 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     if y_size == None:
         y_size = 1.5
         
-
-    
     # Initialize metrics module
     metrics.init_metrics()
+    
+    # Add custom metrics to metrics module
+    metrics.known_x_labels.update({
+        'iteration_count' : 'Iterations'
+    })
+    metrics.known_score_labels.update({
+        'solution_quality' : 'Solution Quality',
+        'accuracy_volume' : 'Accuracy Volume',
+        'accuracy_ratio' : 'Accuracy Ratio',
+        'energy' : 'Energy (Hartree)'  
+    })
+    metrics.score_label_save_str.update({
+        'solution_quality' : 'solution_quality', 
+        'accuracy_volume' : 'accuracy_volume', 
+        'accuracy_ratio' : 'accuracy_ratio',
+        'energy' : 'energy'
+    })
     
     # Define custom result handler
     def execution_handler (qc, result, num_qubits, s_int, num_shots):  
