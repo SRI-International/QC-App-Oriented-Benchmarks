@@ -2554,9 +2554,6 @@ cmap_custom_spectral = None
 cmap = cmap_spectral
 cmap_orig = cmap_spectral
 
-# create a copy of cmap 
-cmap_orig = cmap
-
 # current cmap normalization function (default None)
 cmap_norm = None
 
@@ -2580,7 +2577,7 @@ def set_custom_cmap_style(
             fade_low_fidelity_level=default_fade_low_fidelity_level,
             fade_rate=default_fade_rate):
             
-    print("... set custom map style")
+    #print("... set custom map style")
     global cmap, cmap_custom_spectral, cmap_orig
     cmap_custom_spectral = create_custom_spectral_cmap(
                 fade_low_fidelity_level=fade_low_fidelity_level, fade_rate=fade_rate)
@@ -3115,7 +3112,7 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
     # if score label is accuracy volume, get the cmap colors and invert them
     if score_label == 'Accuracy Volume':
         global cmap
-        cmap_colors = [cmap_spectral(v/1000) for v in range(1000)]
+        cmap_colors = [cmap_orig(v/1000) for v in range(1000)]
         cmap_colors.reverse()
         cmap = ListedColormap(cmap_colors)
 
