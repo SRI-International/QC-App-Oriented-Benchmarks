@@ -888,12 +888,16 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_executes:
-        if max(group_metrics["avg_exec_times"]) < 0.1:
-            axs[axi].set_ylim([0, 0.1])
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
         
         if show_elapsed_times:    # a global setting
             axs[axi].bar(group_metrics["groups"], group_metrics["avg_elapsed_times"], 0.75, color='skyblue', alpha = 0.8, zorder = 3)
+            
+            if max(group_metrics["avg_elapsed_times"]) < 0.1 and max(group_metrics["avg_exec_times"]) < 0.1:
+                axs[axi].set_ylim([0, 0.1])
+        else:
+            if max(group_metrics["avg_exec_times"]) < 0.1:
+                axs[axi].set_ylim([0, 0.1])
             
         axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
