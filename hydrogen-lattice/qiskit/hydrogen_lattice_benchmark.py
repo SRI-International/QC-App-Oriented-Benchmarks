@@ -1225,7 +1225,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
             plot_results_from_data(**dict_of_inputs)
 
 def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circuits = 1,
-             method=2,
+            method=2,
             score_metric='solution_quality', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
             num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
             offset_flag=False,      # default is False for QAOA
@@ -1238,8 +1238,6 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
             score_metric = [score_metric]
     suffix = []
     options = []
-
-    
 
     for sm in score_metric:
         if sm not in metrics.score_label_save_str:
@@ -1258,8 +1256,12 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
             short_obj_func_str = metrics.score_label_save_str[sm]
             suffix.append(f'of-{short_obj_func_str}') #of=objective function
 
-        obj_str = (metrics.known_score_labels[sm])
+        # for hydrogen lattice, objective function is always 'Energy'
+        #obj_str = (metrics.known_score_labels[sm])
+        obj_str = "Energy"
+        
         options.append({'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits, '\nObjective Function' : obj_str})
+        
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
 
     # plots all line metrics, including solution quality, accuracy volume, and accuracy ratio vs iteration count and cumulative execution time
@@ -1273,8 +1275,6 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
                 offset_flag=offset_flag,
                 options=options, suffix=suffix, which_metric='solution_quality', save_metric_label_flag=True)
     
-
-
 
 def calculate_quality_metric(energy=None, fci_energy=0, random_energy=0, precision = 4, num_electrons = 2):
     """
