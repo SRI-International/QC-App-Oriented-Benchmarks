@@ -2534,6 +2534,7 @@ cmap_custom_spectral = None
 
 # the default colormap is the spectral map
 cmap = cmap_spectral
+cmap_orig = cmap_spectral
 
 # current cmap normalization function (default None)
 cmap_norm = None
@@ -2559,10 +2560,11 @@ def set_custom_cmap_style(
             fade_rate=default_fade_rate):
             
     #print("... set custom map style")
-    global cmap, cmap_custom_spectral
+    global cmap, cmap_custom_spectral, cmap_orig
     cmap_custom_spectral = create_custom_spectral_cmap(
                 fade_low_fidelity_level=fade_low_fidelity_level, fade_rate=fade_rate)
     cmap = cmap_custom_spectral
+    cmap_orig = cmap_custom_spectral
        
 # Create the custom spectral colormap from the base spectral
 def create_custom_spectral_cmap(
