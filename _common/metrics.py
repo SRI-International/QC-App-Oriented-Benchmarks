@@ -2558,7 +2558,7 @@ def set_custom_cmap_style(
             fade_low_fidelity_level=default_fade_low_fidelity_level,
             fade_rate=default_fade_rate):
             
-    print("... set custom map style")
+    #print("... set custom map style")
     global cmap, cmap_custom_spectral
     cmap_custom_spectral = create_custom_spectral_cmap(
                 fade_low_fidelity_level=fade_low_fidelity_level, fade_rate=fade_rate)
@@ -2638,11 +2638,10 @@ def create_custom_spectral_cmap(
     
     return cmap_custom_spectral
 
-cmap_custom_spectral = create_custom_spectral_cmap()
+# Make the custom spectral color map the default on module init
+set_custom_cmap_style()
 
-
-############### Helper functions
-
+# Return the color associated with the spcific value, using color map norm
 def get_color(value):
     
     # if there is a normalize function installed, scale the data
@@ -2657,8 +2656,10 @@ def get_color(value):
         value = 0.0 + value*0.95
         
     return cmap(value)
-    
-    
+
+
+############### Helper functions
+ 
 # return the base index for a circuit depth value
 # take the log in the depth base, and add 1
 def depth_index(d, depth_base):
