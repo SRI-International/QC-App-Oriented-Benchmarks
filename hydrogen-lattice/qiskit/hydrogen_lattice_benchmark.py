@@ -966,8 +966,6 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
             if operator == None:
                 print(f"  ... problem not found.")
                 break
-                
-
 
             if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
@@ -1246,9 +1244,7 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
     
     # for hydrogen lattice, objective function is always 'Energy'
     obj_str = "Energy"
-    
-    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits,
-                '\nObjective Function' : obj_str}
+ 
     suffix = ''
 
     if detailed_save_names:
@@ -1260,9 +1256,13 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
 
     # plots all line metrics, including solution quality, accuracy volume, and accuracy ratio vs iteration count and cumulative execution time
-    h_metrics.plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_ratio"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True)
+    backend_id = metrics.get_backend_id()
+    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits}
+    h_metrics.plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_ratio"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True, backend_id=backend_id, options=options)
     
     # plots all area metrics
+    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits,
+                '\nObjective Function' : obj_str}
     metrics.plot_all_area_metrics(suptitle,
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
                 fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
