@@ -96,20 +96,28 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
     
     # Create title for all plots
     method = 2
-    suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
+    toptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit" + \
+                f"\nDevice={backend_id}  {metrics.get_timestr()}"
     
     # append the circuit metrics subtitle to the title
-    subtitle = f"Device={backend_id}  {metrics.get_timestr()}"
+    #subtitle = f"Device={backend_id}  {metrics.get_timestr()}"
+    subtitle = ""
+    
+    '''
     if options != None:
         options_str = ''
         for key, value in options.items():
             if len(options_str) > 0: options_str += ', '
             options_str += f"{key}={value}"
         subtitle += f"\n{options_str}"
-                
+    '''
+    shots = options['shots']
+    
     # iterate over number of qubits and score metrics and plot each
     for qubit_count in h_lattice_metrics:
 
+        num_qubits = qubit_count
+        
         circuit_ids = [int(x) for x in (h_lattice_metrics[qubit_count])]
         total_instances = int(np.floor(circuit_ids[-1]/1000))
 
@@ -119,13 +127,24 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
     
         for instance in range(1, total_instances + 1):
 
+            current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = find_last_metrics_for_group(qubit_count, instance)
+            
+            energy_text = f'Num Qubits: {num_qubits} \u00B7 Radius: {current_radius}  \u00B7\u00B7  DOCI Energy: {doci_energy:.3f} \u00B7 FCI Energy: {fci_energy:.3f} \u00B7 Energy: {energy:.3f} '
+            
+            energy_text = f'DOCI Energy={doci_energy:.3f}, FCI Energy={fci_energy:.3f}, Energy={energy:.3f}, , Accuracy={accuracy_ratio:.3f}'
+            
+            suptitle = toptitle + \
+                    f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}" + \
+                    "\n" + energy_text
+            
+            # if all subplots drawn together, share common heading
             if subplot:
                 # create subplots equal to the number of score metrics times the number of x_vals, figsize proportional to the number of subplots
                 # fig, axs = plt.subplots(len(score_metrics), len(x_vals), figsize=(len(x_vals)*5, len(score_metrics)*3))
-                fig, axs = plt.subplots(2, 2, figsize=(14, 8.0))
-                fig.tight_layout(pad=5.0, w_pad=6.0)
-                fig.subplots_adjust(top=0.88, hspace=0.50)
-                fig.suptitle(f"--- {qubit_count} qubit group ---", fontsize=14)
+                fig, axs = plt.subplots(2, 2, figsize=(12, 9))
+                
+                #fig.suptitle(f"--- {qubit_count} qubit group ---" + "\n" + energy_text, fontsize=14)
+                fig.suptitle(suptitle, fontsize=13, backgroundcolor='aliceblue')
                     
             plot_line_metric(suptitle=suptitle, subtitle=subtitle,
                 metric_name="energy", x_val="iteration_count", num_qubits=qubit_count, instance=instance, ax=axs[0, 0], subplot=subplot)
@@ -140,14 +159,28 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             
             _, __, acc_ratio = plot_line_metric(suptitle=suptitle, subtitle=subtitle,
                 metric_name="accuracy_ratio", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 1], subplot=subplot)
-                
+            
+            # this appears to be unneeded
+            #plt.subplots_adjust(top=0.88, hspace=0.10)
+      
+            # add padding below suptitle, and between plots, due to multi-line titles
+            fig.tight_layout(pad=1.5, h_pad=2.0, w_pad=3.0)
+            
+            group = qubit_count
+            
+            image_name = (f"Hydrogen-Lattice-(2)-line-{group}-{instance}") + \
+                            ("-all" if subplot else f"-{metric_name}-{x_metric_name}")  
+            
+            if save_plot_images:
+                metrics.save_plot_image(plt, image_name, backend_id)
+                                            
             if not subplot:
                 plt.show(block=True)
-
+            
             exec_time_array.append(exec_time)
             sol_quality_array.append(1 - sol_quality)
             acc_ratio_array.append(1 - acc_ratio)
-
+            
         average_et = np.average(exec_time_array)
         error_et = np.std(exec_time_array)/np.sqrt(len(exec_time_array))
         average_ar = np.average(acc_ratio_array)
@@ -168,6 +201,7 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             plt.show(block=True)
 
     # plot the cumulative execution time per iteration vs. number of qubits
+    
     plot_cumulative_metrics(suptitle=suptitle, subtitle=subtitle,
             x_data1=qubit_counts,
             y_data1=average_exec_time_per_iteration,
@@ -175,6 +209,7 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             x_data2=qubit_counts,
             y_data2=average_accuracy_ratio,
             y_err2=average_accuracy_ratio_error)
+    
 
 
 # function to take input the title of plot, the x and y axis labels, and the data to plot as a line plot
@@ -272,7 +307,7 @@ def plot_line_metric(suptitle:str="Title", subtitle:str="",
     ax.plot(x_data, y_data, linestyle='-.', linewidth=2, markersize=12)
 
     # set the title   
-    ax.set_title(suptitle + "\n" + subtitle + f", qubits={num_qubits}", fontsize=12)
+    #ax.set_title(suptitle + "\n" + subtitle + f", qubits={num_qubits}", fontsize=12)
     
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
@@ -285,6 +320,7 @@ def plot_line_metric(suptitle:str="Title", subtitle:str="",
     if metric_name == 'energy':
         ax.axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
         ax.axhline(y=fci_energy, color='g', linestyle='-.', label='FCI Energy for given Hamiltonian')
+        
     # add a horizontal line at y=1 for solution quality
     elif metric_name == 'solution_quality':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
@@ -299,21 +335,23 @@ def plot_line_metric(suptitle:str="Title", subtitle:str="",
     # add a horizontal line at y=0 for accuracy volume
     elif metric_name == 'accuracy_volume':
         ax.axhline(y=0, color='r', linestyle='--', label='Ideal Solution')
-    energy_text = f'DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
-    ax.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
+        
+    #energy_text = f'DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
+    #ax.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
     
     ax.grid(True)
 
     ax.legend()
-    
+    '''
     if save_plot_images:
         metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)-line-"
                                             + str(group) + '-'
                                             + str(instance) + '-'
                                             + str(metric_name) + '-'
                                             + str(x_metric_name)), backend_id)
-        
+    '''   
     return exec_time_per_iteration, final_solution_quality, final_accuracy_ratio
+        #, doci_energy, fci_energy, current_radius 
 
 # function to input a list of float and return a list of cumulative sums
 def cumulative_sum(input_list: list):
@@ -323,8 +361,32 @@ def cumulative_sum(input_list: list):
         sum += item
         output_list.append(sum)
     return output_list
- 
- 
+
+# Find the last energy and radius associated with specific group of circuits
+def find_last_metrics_for_group(num_qubits, instance):
+
+    group = str(num_qubits)
+
+    current_radius = 0
+    doci_energy = 0
+    fci_energy = 0
+
+    # DEVNOTE: would it be easier to just get the last entry of array, rather than this loop?
+    for circuit_id in h_lattice_metrics[group]:
+        if np.floor(int(circuit_id)/1000) == instance:
+        
+            energy = h_lattice_metrics[group][circuit_id]['energy']
+            doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
+            fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
+            current_radius = h_lattice_metrics[group][circuit_id]['radius']
+            accuracy_ratio = h_lattice_metrics[group][circuit_id]['accuracy_ratio']
+            solution_quality = h_lattice_metrics[group][circuit_id]['solution_quality']
+
+        else:
+            continue
+            
+    return current_radius, doci_energy, fci_energy, energy, accuracy_ratio, solution_quality
+    
 #################################################
 
 # method to plot cumulative execution time vs. number of qubits

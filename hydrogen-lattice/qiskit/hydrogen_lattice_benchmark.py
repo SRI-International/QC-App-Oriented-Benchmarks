@@ -146,7 +146,6 @@ def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = Non
     thetas_array = np.repeat(thetas_array, len(excitation_pairs))
     # Hartree Fock initial state
 
-
     for idx, pair in enumerate(excitation_pairs):
         # parameter
         
@@ -173,7 +172,6 @@ def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = Non
     return circuit,parameter_vector,thetas_array
     
 
-
 # Create the benchmark program circuit
 # Accepts optional rounds and array of thetas (betas and gammas)
 def HydrogenLattice (num_qubits, operator, secret_int = 000000, thetas_array = None, parameterized = None):
@@ -182,7 +180,6 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000, thetas_array = N
     # here we are filling this th
     if thetas_array is None:
         thetas_array = [1.0]
-    
     
     #print(f"... actual thetas_array={thetas_array}")
     
@@ -202,7 +199,7 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000, thetas_array = N
         # gammas = ParameterVector("𝞬", p)
         # params = {betas: thetas_array[:p], gammas: thetas_array[p:]}   
 
-        _qc ,parameter_vector,thetas_array = VQE_ansatz(num_qubits=num_qubits, thetas_array=thetas_array, num_occ_pairs = None )
+        _qc,parameter_vector,thetas_array = VQE_ansatz(num_qubits=num_qubits, thetas_array=thetas_array, num_occ_pairs = None )
 
     _measurable_expression = StateFn(operator, is_measurement=True)
     _observables = PauliExpectation().convert(_measurable_expression)
@@ -523,12 +520,12 @@ def dump_to_json(parent_folder_save, num_qubits, radius, instance_num,
     if save_final_counts is True, then also store the distribution of cuts 
     """
     
-    print(f"... saving data for width {num_qubits} radius {radius} instance_num {instance_num}")
+    print(f"... saving data for width={num_qubits} radius={radius} instance={instance_num}")
     
     if not os.path.exists(parent_folder_save): os.makedirs(parent_folder_save)
     store_loc = os.path.join(parent_folder_save,'width_{}_instance_{}.json'.format(num_qubits, instance_num))
 
-    print(f"  ... to file {store_loc}")
+    #print(f"  ... to file {store_loc}")
     
     # Obtain dictionary with iterations data corresponding to given instance_num 
     all_restart_ids = list(metrics.circuit_metrics[str(num_qubits)].keys())
