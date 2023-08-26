@@ -99,7 +99,27 @@ if len(sys.argv) > 1:
 else:
     DEBUG = False
 
+# Add custom metric names to metrics module
+def add_custom_metric_names():
+    
+    metrics.known_x_labels.update({
+        'iteration_count' : 'Iterations'
+    })
+    metrics.known_score_labels.update({
+        'solution_quality' : 'Solution Quality',
+        'accuracy_volume' : 'Accuracy Volume',
+        'accuracy_ratio' : 'Accuracy Ratio',
+        'energy' : 'Energy (Hartree)'  
+    })
+    metrics.score_label_save_str.update({
+        'solution_quality' : 'solution_quality', 
+        'accuracy_volume' : 'accuracy_volume', 
+        'accuracy_ratio' : 'accuracy_ratio',
+        'energy' : 'energy'
+    })
 
+###################################
+    
 # Create the  ansatz quantum circuit for the VQE algorithm.
 def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = None, *args, **kwargs) -> QuantumCircuit:
     # Generate the ansatz circuit for the VQE algorithm.
@@ -827,8 +847,6 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
             max_qubits -= 1
             max_qubits = min(max_qubits, MAX_QUBITS)
         print(err.args[0] + "\n Running for for values min_qubits = {}, max_qubits = {}".format(min_qubits, max_qubits))
-        
-
     
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
@@ -838,25 +856,11 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     if y_size == None:
         y_size = 1.5
         
-    # Initialize metrics module
+    # Initialize metrics module with empty metrics arrays
     metrics.init_metrics()
-    
-    # Add custom metrics to metrics module
-    metrics.known_x_labels.update({
-        'iteration_count' : 'Iterations'
-    })
-    metrics.known_score_labels.update({
-        'solution_quality' : 'Solution Quality',
-        'accuracy_volume' : 'Accuracy Volume',
-        'accuracy_ratio' : 'Accuracy Ratio',
-        'energy' : 'Energy (Hartree)'  
-    })
-    metrics.score_label_save_str.update({
-        'solution_quality' : 'solution_quality', 
-        'accuracy_volume' : 'accuracy_volume', 
-        'accuracy_ratio' : 'accuracy_ratio',
-        'energy' : 'energy'
-    })
+
+    # Add custom metric names to metrics module
+    add_custom_metric_names()
     
     # Define custom result handler
     def execution_handler (qc, result, num_qubits, s_int, num_shots):  
@@ -1228,52 +1232,42 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
             method=2,
             score_metric='solution_quality', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
             num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
-            offset_flag=False,      # default is False for QAOA
             detailed_save_names=False, **kwargs):
     """
     Plot results
     """
 
+    # Add custom metric names to metrics module (in case this is run outside of run())
+    add_custom_metric_names()
+    
+    # handle single string form of score metrics
     if type(score_metric) == str:
             score_metric = [score_metric]
-    suffix = []
-    options = []
+    
+    # for hydrogen lattice, objective function is always 'Energy'
+    obj_str = "Energy"
+    
+    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits,
+                '\nObjective Function' : obj_str}
+    suffix = ''
 
-    for sm in score_metric:
-        if sm not in metrics.score_label_save_str:
-            raise Exception(f"score_metric {sm} not found in metrics.score_label_save_str")
-        
-        if detailed_save_names:
-            # If detailed names are desired for saving plots, put date of creation, etc.
-            cur_time=datetime.datetime.now()
-            dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
-            #short_obj_func_str = metrics.score_label_save_str["compute_energy"]
-            short_obj_func_str = (metrics.score_label_save_str[sm])
-            suffix.append(f'-s{num_shots}_r{radius}_mi{max_iter}_of-{short_obj_func_str}_{dt}') #of=objective function
-
-        else:
-            #short_obj_func_str = metrics.score_label_save_str["compute_energy"]
-            short_obj_func_str = metrics.score_label_save_str[sm]
-            suffix.append(f'of-{short_obj_func_str}') #of=objective function
-
-        # for hydrogen lattice, objective function is always 'Energy'
-        #obj_str = (metrics.known_score_labels[sm])
-        obj_str = "Energy"
-        
-        options.append({'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits, '\nObjective Function' : obj_str})
-        
+    if detailed_save_names:
+        # If detailed names are desired for saving plots, put date of creation, etc.
+        cur_time=datetime.datetime.now()
+        dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
+        suffix = f's{num_shots}_r{radius}_mi{max_iter}_{dt}'
+    
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
 
     # plots all line metrics, including solution quality, accuracy volume, and accuracy ratio vs iteration count and cumulative execution time
     h_metrics.plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_ratio"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True)
     
     # plots all area metrics
-    metrics.plot_all_area_metrics(f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit",
+    metrics.plot_all_area_metrics(suptitle,
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
                 fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
                 x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
-                offset_flag=offset_flag,
-                options=options, suffix=suffix, which_metric='solution_quality', save_metric_label_flag=True)
+                options=options, suffix=suffix, which_metric='solution_quality')
     
 
 def calculate_quality_metric(energy=None, fci_energy=0, random_energy=0, precision = 4, num_electrons = 2):

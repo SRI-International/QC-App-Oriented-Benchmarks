@@ -191,18 +191,16 @@ def plot_line_metric(suptitle:str="Circuit Width (Number of Qubits)", metric_nam
     energy_text = f'DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
     ax.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
     
-    
     ax.grid(True)
 
     ax.legend()
     
-
     if save_plot_images:
-        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-line-"
+        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)-line-"
                                             + str(group) + '-'
                                             + str(instance) + '-'
                                             + str(metric_name) + '-'
-                                            + str(x_metric_name) + '-'), backend_id)
+                                            + str(x_metric_name)), backend_id)
         
     return exec_time_per_iteration, final_solution_quality, final_accuracy_ratio
 
@@ -258,14 +256,13 @@ def plot_cumulative_metrics(x_data1:list=None, y_data1:list=None, y_err1:list=No
 
     ax2.set_title("Accuracy Ratio Error vs. Number of Qubits")
     ax2.set_xlabel("Number of Qubits")
-    ax2.set_ylabel("Error in Accuracy Ratio")
+    ax2.set_ylabel("Error in Accuracy Ratio (%)")
 
     # also plot a bar plot on the same figure
     ax1.bar(x_data1, y_data1, 0.75, alpha = 0.8, zorder = 3)
     ax2.bar(x_data2, y_data2, 0.75, alpha = 0.8, zorder = 3)
     ax1.grid(True, axis = 'y', color='silver', zorder = 0)
-    ax2.grid(True, axis = 'y', color='silver', zorder = 0)
-    
+    ax2.grid(True, axis = 'y', color='silver', zorder = 0) 
 
     # error bars for the bar plot
     ax1.errorbar(x_data1, y_data1, yerr=y_err1, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
@@ -273,9 +270,14 @@ def plot_cumulative_metrics(x_data1:list=None, y_data1:list=None, y_err1:list=No
 
     # save the plot image
     if save_plot_images:
-        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-cumulative-"
-                                            + "exec_time_per_iteration" + '-'
-                                            + "qubit_count" + '-'), backend_id)
+        ''' DEVNOTE: only second one getting saved!
+        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)" +
+                                            "-" + "avg_exec_time_per_iteration"),
+                                            backend_id)
+        '''                                  
+        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)" +
+                                            "-" + "accuracy_ratio_error"),
+                                            backend_id)
     # show the plot
     plt.show(block=True)
 
@@ -367,10 +369,10 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
 
         average_exec_time_per_iteration.append(average_et)
         average_exec_time_per_iteration_error.append(error_et)
-        average_accuracy_ratio.append(average_ar)
-        average_accuracy_ratio_error.append(error_ar)
-        average_solution_quality.append(average_sq)
-        average_solution_quality_error.append(error_sq)
+        average_accuracy_ratio.append(average_ar * 100)
+        average_accuracy_ratio_error.append(error_ar * 100)
+        average_solution_quality.append(average_sq * 100)
+        average_solution_quality_error.append(error_sq * 100)
 
         qubit_counts.append(qubit_count)
 
