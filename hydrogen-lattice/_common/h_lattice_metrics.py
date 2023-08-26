@@ -361,17 +361,12 @@ def plot_cumulative_metrics(suptitle="", subtitle="",
     # get backend id from subtitle
     backend_id = m_subtitle[9:]
 
-    # create two figures for two plots
+    # create a figures for the plot
     fig1 = plt.figure()
-    fig2 = plt.figure()
     
     # plot xdata1 vs ydata1 on fig1
     ax1 = fig1.gca()
     ax1.plot(x_data1, y_data1, linestyle='solid', linewidth=2, markersize=12, marker='x')
-    
-    # plot xdata2 vs ydata2 on fig2
-    ax2 = fig2.gca()
-    ax2.plot(x_data2, y_data2, linestyle='solid', linewidth=2, markersize=12, marker='x')
 
     # set the title
     #ax1.set_title("Cumulative Execution Time per iteration vs. Number of Qubits")
@@ -379,30 +374,42 @@ def plot_cumulative_metrics(suptitle="", subtitle="",
     ax1.set_xlabel("Number of Qubits")
     ax1.set_ylabel("Cumulative Execution Time/ iteration (s)")
 
+    # also plot a bar plot on the same figure
+    ax1.bar(x_data1, y_data1, 0.75, alpha = 0.8, zorder = 3)
+    ax1.grid(True, axis = 'y', color='silver', zorder = 0)
+
+    # error bars for the bar plot
+    ax1.errorbar(x_data1, y_data1, yerr=y_err1, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
+
+    # save the plot image
+    if save_plot_images:
+        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)" +
+                                            "-" + "avg_exec_time_per_iteration"),
+                                            backend_id)                                         
+    # create a figures for the plot
+    fig2 = plt.figure()
+    
+    # plot xdata2 vs ydata2 on fig2
+    ax2 = fig2.gca()
+    ax2.plot(x_data2, y_data2, linestyle='solid', linewidth=2, markersize=12, marker='x')
+
     #ax2.set_title("Accuracy Ratio Error vs. Number of Qubits")
     ax2.set_title(suptitle + "\n" + subtitle, fontsize=12)
     ax2.set_xlabel("Number of Qubits")
     ax2.set_ylabel("Error in Accuracy Ratio (%)")
 
     # also plot a bar plot on the same figure
-    ax1.bar(x_data1, y_data1, 0.75, alpha = 0.8, zorder = 3)
     ax2.bar(x_data2, y_data2, 0.75, alpha = 0.8, zorder = 3)
-    ax1.grid(True, axis = 'y', color='silver', zorder = 0)
     ax2.grid(True, axis = 'y', color='silver', zorder = 0) 
 
     # error bars for the bar plot
-    ax1.errorbar(x_data1, y_data1, yerr=y_err1, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
     ax2.errorbar(x_data2, y_data2, yerr=y_err2, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
 
     # save the plot image
-    if save_plot_images:
-        ''' DEVNOTE: only second one getting saved!
-        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)" +
-                                            "-" + "avg_exec_time_per_iteration"),
-                                            backend_id)
-        '''                                  
+    if save_plot_images:                                
         metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)" +
                                             "-" + "accuracy_ratio_error"),
                                             backend_id)
-    # show the plot
+                                            
+    # show the plot(s)
     plt.show(block=True)
