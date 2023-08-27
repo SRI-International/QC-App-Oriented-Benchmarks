@@ -112,6 +112,7 @@ def cumulative_sum(input_list: list):
     for item in input_list:
         sum += item
         output_list.append(sum)
+        
     return output_list  
 
 
@@ -503,12 +504,13 @@ def plot_all_cumulative_metrics(suptitle=None,
             y_data=average_accuracy_ratio,
             y_err=average_accuracy_ratio_error,
             y_label="Error in Accuracy Ratio (%)",
+            y_lim_min=1.0,
             suffix="accuracy_ratio_error")
 
 # method to plot cumulative execution time vs. number of qubits
 def plot_cumulative_metrics(suptitle="",
             x_data:list=None, x_label:str="",
-            y_data:list=None, y_err:list=None, y_label:str="",
+            y_data:list=None, y_err:list=None, y_label:str="", y_lim_min=None,
             individual=True, suffix=None):
     '''
     Function to plot cumulative metrics (accuracy ratio, execution time per iteration) over different number of qubits
@@ -525,6 +527,8 @@ def plot_cumulative_metrics(suptitle="",
         list of y error data for plot
     y_label: str
         label for y axis
+    y_lim_min: float    
+        minimum value to autoscale y axis 
     '''
 
     # get subtitle from metrics
@@ -543,6 +547,10 @@ def plot_cumulative_metrics(suptitle="",
     #ax1 = fig1.gca()
     ax1.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=12, marker='x')
 
+    # autoscale y axis to user-specified min
+    if y_lim_min != None and max(y_data) < y_lim_min:
+        ax1.set_ylim(0.0, y_lim_min)
+    
     # set the title
     #ax1.set_title("Cumulative Execution Time per iteration vs. Number of Qubits")
     #ax1.set_title(suptitle + "\n" + subtitle, fontsize=12)

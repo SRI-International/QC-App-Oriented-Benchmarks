@@ -35,10 +35,6 @@ from qiskit.result import sampled_expectation_value
 sys.path[1:1] = [ "_common", "_common/qiskit", "hydrogen-lattice/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
 
-
-
-
-
 import common
 import execute as ex
 import metrics as metrics
@@ -46,7 +42,6 @@ from matplotlib import cm
 
 # import h-lattice_metrics from _common folder
 import h_lattice_metrics as h_metrics
-
 
 logger = logging.getLogger(__name__)
 fname, _, ext = os.path.basename(__file__).partition(".")
@@ -121,12 +116,16 @@ def add_custom_metric_names():
 ###################################
     
 # Create the  ansatz quantum circuit for the VQE algorithm.
-def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = None, *args, **kwargs) -> QuantumCircuit:
+def VQE_ansatz(num_qubits: int,
+            thetas_array,
+            parameterized,
+            num_occ_pairs: Optional[int] = None,
+            *args, **kwargs) -> QuantumCircuit:
     # Generate the ansatz circuit for the VQE algorithm.
     if num_occ_pairs is None:
         num_occ_pairs = (num_qubits // 2)  # e.g., half-filling, which is a reasonable chemical case
 
-        # do all possible excitations if not passed a list of excitations directly
+    # do all possible excitations if not passed a list of excitations directly
     excitation_pairs = []
     for i in range(num_occ_pairs):
         for a in range(num_occ_pairs, num_qubits):
@@ -141,15 +140,22 @@ def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = Non
     # if thetas_array is not None:
     #     parameter_vector = ParameterVector(thetas_array)
     # else:
-    parameter_vector = ParameterVector("t", length=len(excitation_pairs))
+    parameter_vector = None
+    if parameterized:
+        parameter_vector = ParameterVector("t", length=len(excitation_pairs))
+        #print(f"... t = {parameter_vector}")
     
     thetas_array = np.repeat(thetas_array, len(excitation_pairs))
+    #print(f"... thetas_array = {thetas_array}")
+    
     # Hartree Fock initial state
 
     for idx, pair in enumerate(excitation_pairs):
         # parameter
         
-        theta = parameter_vector[idx]            
+        # if parameterized, use ParamterVector, otherwise raw theta value
+        theta = parameter_vector[idx] if parameterized else thetas_array[idx]
+        
         # apply excitation
         i, a = pair[0], pair[1]
 
@@ -169,45 +175,46 @@ def VQE_ansatz(num_qubits: int, thetas_array, num_occ_pairs: Optional[int] = Non
         circuit.sdg(a)
         circuit.sdg(i)
 
-    return circuit,parameter_vector,thetas_array
+    return circuit, parameter_vector, thetas_array
     
 
 # Create the benchmark program circuit
 # Accepts optional rounds and array of thetas (betas and gammas)
-def HydrogenLattice (num_qubits, operator, secret_int = 000000, thetas_array = None, parameterized = None):
+def HydrogenLattice (num_qubits, operator, secret_int = 000000,
+            thetas_array = None, parameterized = None):
+    
     # if no thetas_array passed in, create defaults 
     
     # here we are filling this th
     if thetas_array is None:
         thetas_array = [1.0]
     
-    #print(f"... actual thetas_array={thetas_array}")
+    #print(f"... incoming thetas_array={thetas_array}")
     
     # create parameters in the form expected by the ansatz generator
     # this is an array of betas followed by array of gammas, each of length = rounds
     global _qc
     global theta
-    # global gammas
     
     # create the circuit the first time, add measurements
     if ex.do_transpile_for_execute:
         logger.info(f'*** Constructing parameterized circuit for {num_qubits = } {secret_int}')
-        # theta = ParameterVector("θ", 1)
-        
-        # Here we are doing the equivalent code inside VQE_ansatz
-        # betas = ParameterVector("𝞫", p)
-        # gammas = ParameterVector("𝞬", p)
-        # params = {betas: thetas_array[:p], gammas: thetas_array[p:]}   
+ 
+        _qc, parameter_vector, thetas_array = VQE_ansatz(num_qubits=num_qubits,
+                thetas_array=thetas_array, parameterized=parameterized,
+                num_occ_pairs = None )
 
-        _qc,parameter_vector,thetas_array = VQE_ansatz(num_qubits=num_qubits, thetas_array=thetas_array, num_occ_pairs = None )
-
+    #print(f"... returned parameter_vector={parameter_vector}")
+    #print(f"... returned thetas_array={thetas_array}")
+    
     _measurable_expression = StateFn(operator, is_measurement=True)
     _observables = PauliExpectation().convert(_measurable_expression)
     _qc_array, _formatted_observables = prepare_circuits(_qc, observables=_observables)
 
-    # Here Parametee
-    params = {parameter_vector: thetas_array}
-        
+    # create a binding of Parameter values
+    params = {parameter_vector: thetas_array} if parameterized else None
+    #print(params)
+    
     # if thetas_array is None and len(_qc.parameters) > 0:
     #     _qc.assign_parameters([np.random.choice([-1e-3, 1e-3]) for _ in range(len(_qc.parameters))],inplace=True)
     
@@ -531,6 +538,7 @@ def dump_to_json(parent_folder_save, num_qubits, radius, instance_num,
     all_restart_ids = list(metrics.circuit_metrics[str(num_qubits)].keys())
     ids_this_restart = [r_id for r_id in all_restart_ids if int(r_id) // 1000 == instance_num]
     iterations_dict_this_restart =  {r_id : metrics.circuit_metrics[str(num_qubits)][r_id] for r_id in ids_this_restart}
+    
     # Values to be stored in json file
     dict_to_store = {'iterations' : iterations_dict_this_restart}
     dict_to_store['general_properties'] = dict_of_inputs
@@ -743,7 +751,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     alpha : float, optional
         Value between 0 and 1. The default is 0.1.
     parameterized : bool, optional
-        Whether to use parametrized circuits or not. The default is False.
+        Whether to use parameter objects in circuits or not. The default is False.
     do_fidelities : bool, optional
         Compute circuit fidelity. The default is True.
     max_iter : int, optional
@@ -967,17 +975,20 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
             if method == 1:
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
-            # DEVNOTE:  Primary focus is on method 2
+            
                 thetas_array_0 = thetas_array
-                qc_array, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,operator = operator, thetas_array= thetas_array_0, parameterized= parameterized)
+                
+                qc_array, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,operator = operator, thetas_array= thetas_array_0, parameterized=parameterized)
+                
                 for qc in qc_array:
                     metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
-                    # collapse the sub-circuit levels used in this benchmark (for qiskit)
-                    qc.bind_parameters(params)
-                    qc2 = qc.decompose()
-
+                    
+                    # if using parameter objects, bind before execution
+                    if parameterized:
+                        qc.bind_parameters(params)
+                    
                     # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                    ex.submit_circuit(qc2, num_qubits, instance_num, shots=num_shots, params=params)
+                    ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
 
             if method == 2:
                 # a unique circuit index used inside the inner minimizer loop as identifier
@@ -1018,7 +1029,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                     ts = time.time()
 
                     # call the HydrogenLattice ansatz to generate a parameterized hamiltonian
-                    qc_array, frmt_obs, params = HydrogenLattice(num_qubits=num_qubits, secret_int=unique_id, thetas_array= thetas_array, parameterized= parameterized, operator=operator)
+                    qc_array, frmt_obs, params = HydrogenLattice(num_qubits=num_qubits, secret_int=unique_id, thetas_array=thetas_array, parameterized=parameterized, operator=operator)
                     
                     # store the time it took to create the circuit
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
@@ -1033,9 +1044,14 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                             print("DEBUG : \n method: compute_energy \n\t binding parameters: "+str(params))
 
                         # bind parameters
-                        qc.bind_parameters(params)
-
-                    
+                        '''
+                        print(f"... params during execution = {params}")
+                        if minimizer_loop_index < 3:
+                            print(qc)
+                        '''
+                        if parameterized:
+                            qc.bind_parameters(params)
+                 
                         # Circuit Creation and Decomposition end
                         #************************************************
                         
@@ -1048,17 +1064,22 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                         if DEBUG:
                             print("submit circuit id" + str(unique_id) )
     
-                        
                         # Must wait for circuit to complete
                         #ex.throttle_execution(metrics.finalize_group)
     
-                        # finalize execution of group of circuits
+                        # finalize execution of group of circuits (don't throttle, we can do these in parallel)
                         ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
                         
                         # after first execution and thereafter, no need for transpilation if parameterized
                         if parameterized:
-                            ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                            logger.info(f'**** First execution complete, disabling transpile')
+                        
+                            # DEVNOTE: since Hydro uses 3 circuits inside this loop, and execute.py can only
+                            # cache 1 at a time, we cannot yet implement caching.  Transpile every time.
+                            cached_circuits = False
+                            if cached_circuits:
+                                ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                                logger.info(f'**** First execution complete, disabling transpile')
+                                
                         #************************************************
                         
                         global saved_result
@@ -1229,7 +1250,7 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
             num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
             detailed_save_names=False, individual=False, **kwargs):
     """
-    Plot results
+    Plot results from the data contained in metrics tables.
     """
 
     # Add custom metric names to metrics module (in case this is run outside of run())
