@@ -97,18 +97,8 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
     # Create standard title for all plots
     method = 2
     toptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit" + \
-                f"\nDevice={backend_id}  {metrics.get_timestr()}"
-    
+                f"\nDevice={backend_id}  {metrics.get_timestr()}" 
     subtitle = ""
-    
-    '''
-    if options != None:
-        options_str = ''
-        for key, value in options.items():
-            if len(options_str) > 0: options_str += ', '
-            options_str += f"{key}={value}"
-        subtitle += f"\n{options_str}"
-    '''
     
     # iterate over number of qubits and score metrics and plot each
     for qubit_count in h_lattice_metrics:
@@ -129,37 +119,38 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             
             '''
             energy_text = f'Num Qubits: {num_qubits} \u00B7 Radius: {current_radius}  \u00B7\u00B7  DOCI Energy: {doci_energy:.3f} \u00B7 FCI Energy: {fci_energy:.3f} \u00B7 Energy: {energy:.3f} '
-            
-            energy_text = f'DOCI Energy={doci_energy:.3f}, FCI Energy={fci_energy:.3f}, Energy={energy:.3f}, , Accuracy={accuracy_ratio:.3f}'
             '''
             
             # create common title
             suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
             
-            # create a figure for all plots in this group
+            # create a figure for all plots in this group, larger if only one plot at a time
             
             if subplot:
                 fig, axs = plt.subplots(2, 2, figsize=(12, 9))
             else:
-                fig, axs1 = plt.subplots(1, 1, figsize=(12, 9))
+                fig, axs1 = plt.subplots(1, 1, figsize=(5.5, 3.5))
                 axs = [axs1]
                 
             #fig.suptitle(f"--- {qubit_count} qubit group ---" + "\n" + energy_text, fontsize=14)
             fig.suptitle(suptitle, fontsize=13, backgroundcolor='aliceblue')
                     
-            plot_line_metric(suptitle=suptitle, subtitle=subtitle,
-                metric_name="energy", x_val="iteration_count", num_qubits=qubit_count, instance=instance, ax=axs[0, 0], subplot=subplot)
+            plot_line_metric(ax=axs[0, 0], subtitle=subtitle,
+                metric_name="energy", x_val="iteration_count",
+                num_qubits=qubit_count, instance=instance)
             
-            exec_time, _, __ = plot_line_metric(suptitle=suptitle, subtitle=subtitle,
-                metric_name="energy", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[0, 1], subplot=subplot)
+            # this one also returns the exec time
+            cum_exec_time = plot_line_metric(ax=axs[0, 1], subtitle=subtitle,
+                metric_name="energy", x_val="cumulative_exec_time",
+                num_qubits=qubit_count, instance=instance)
             
-            _, sol_quality, __ = plot_line_metric(suptitle=suptitle, subtitle=subtitle,
-                metric_name="solution_quality", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 0], subplot=subplot)
+            plot_line_metric(ax=axs[1, 0], subtitle=subtitle,
+                metric_name="solution_quality", x_val="cumulative_exec_time",
+                num_qubits=qubit_count, instance=instance)
             
-            #plot_line_metric(suptitle=suptitle, subtitle=subtitle, metric_name="accuracy_volume", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 1], subplot=subplot)
-            
-            _, __, acc_ratio = plot_line_metric(suptitle=suptitle, subtitle=subtitle,
-                metric_name="accuracy_ratio", x_val="cumulative_exec_time", num_qubits=qubit_count, instance=instance, ax=axs[1, 1], subplot=subplot)
+            plot_line_metric(ax=axs[1, 1], subtitle=subtitle,
+                metric_name="accuracy_ratio", x_val="cumulative_exec_time",
+                num_qubits=qubit_count, instance=instance)
             
             # this appears to be unneeded
             #plt.subplots_adjust(top=0.88, hspace=0.10)
@@ -169,18 +160,18 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             
             group = qubit_count
             
-            image_name = (f"Hydrogen-Lattice-(2)-line-{group}-{instance}") + \
-                            ("-all" if subplot else f"-{metric_name}-{x_metric_name}")  
-            
             if save_plot_images:
+                image_name = (f"Hydrogen-Lattice-({method})-line-{group}-{instance}") + \
+                            ("-all" if subplot else f"-{metric_name}-{x_metric_name}")
+                            
                 metrics.save_plot_image(plt, image_name, backend_id)
                                             
             if not subplot:
                 plt.show(block=True)
             
-            exec_time_array.append(exec_time)
-            sol_quality_array.append(1 - sol_quality)
-            acc_ratio_array.append(1 - acc_ratio)
+            exec_time_array.append(cum_exec_time)
+            sol_quality_array.append(1 - solution_quality)
+            acc_ratio_array.append(1 - accuracy_ratio)
             
         average_et = np.average(exec_time_array)
         error_et = np.std(exec_time_array)/np.sqrt(len(exec_time_array))
@@ -212,22 +203,33 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             y_err2=average_accuracy_ratio_error)
 
 
-# function to take input the title of plot, the x and y axis labels, and the data to plot as a line plot
-def plot_line_metric(suptitle:str="Title", subtitle:str="",
+# function to create a single subplot
+def plot_line_metric(ax=None, subtitle:str="",
         metric_name:str="energy", x_val:str='cumulative_exec_time',
-        num_qubits:int=None, instance:str=None,
-        ax=None, subplot:bool=False):
+        num_qubits:int=None, instance:str=None):
+    '''
+    Function to create subplot for one line metrics (energy, solution quality, accuracy volume)
+    vs different x values (iteration count, cumulative execution time)
+
+    parameters:
+    ----------
+    ax: Axis Object
+        axis on which to draw the plot
+    subtitle: str   
+        title of the subplot (unused now)
+    metric_name: str
+        list of score metrics to plot
+    x_val: str
+        list of x values to plot
+    num_qubits: int
+        number of qubits, or the group identifier
+    instance: str
+        instance identifier
     
-    # get subtitle from metrics
-    m_subtitle = metrics.circuit_metrics['subtitle']
+    TODO: add error handling for invalid metric_name and x_val inputs
+    '''
 
-    # get backend id from metrics subtitle
-    backend_id = m_subtitle[9:]
-        
-    # set the full title
-    #fulltitle = f"{metrics.known_score_labels[metric_name]} vs. {metrics.known_x_labels[x_val]} "
-
-    # TODO: add error handling for invalid metric_name and x_val inputs
+    # Get the data required to plot this metric
 
     # check if x_val starts with cumulative and turn cumulatifve flag on
     if x_val.startswith('cumulative'):
@@ -295,20 +297,21 @@ def plot_line_metric(suptitle:str="Title", subtitle:str="",
     else:
         final_accuracy_ratio = 0
 
-    # plot the data as a line with the color of line depending on the y value
-    #ax.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=12)
-
-    # plot the data as a scatter plot with the color of the point depending on the y value, the scatter points are connected with a line
-    # plot if the metric is solution quality invert the color map
+    ###################
+    
+    # set the title --- not currently shown for these subplots
+    # fulltitle = f"{metrics.known_score_labels[metric_name]} vs. {metrics.known_x_labels[x_val]} "
+    # ax.set_title(fulltitle, fontsize=12)
+    
+    # plot the data as a scatter plot where the color of the point depends on the y value
+    # the scatter points are connected with a line
+    # plot if the metric is solution quality or accuracy ratio invert the color map
     if metric_name == 'solution_quality' or 'accuracy_ratio':
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm_r)
     else:
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm)
 
     ax.plot(x_data, y_data, color='darkblue', linestyle='-.', linewidth=2, markersize=12)
-
-    # set the title   
-    #ax.set_title(suptitle + "\n" + subtitle + f", qubits={num_qubits}", fontsize=12)
     
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
@@ -339,31 +342,20 @@ def plot_line_metric(suptitle:str="Title", subtitle:str="",
     # add a horizontal line at y=0 for accuracy volume
     elif metric_name == 'accuracy_volume':
         ax.axhline(y=0, color='r', linestyle='--', label='Ideal Solution')
-        metric_legend_label = f'Accuracy Volume = {final_accuracy_volume:.3f}'
-        
-    #energy_text = f'DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
-    #ax.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
+        metric_legend_label = f'Accuracy Volume = {final_accuracy_volume:.3f}' 
     
     ax.grid(True)
 
+    # add a copy of first legend item and change to blue with the metric value shown
     handles, labels = ax.get_legend_handles_labels()
-    '''
-    import copy
-    print(handles[0])
-    newhandle = copy.deepcopy(handles[0])
-    newhandle.set_color('blue')
-    handles.append(newhandle)
-    '''
-    import matplotlib
     newhandle = matplotlib.lines.Line2D([0,1],[0,1])
     newhandle.update_from(handles[0])
     newhandle.set_color('darkblue')
     handles.append(newhandle)
     labels.append(metric_legend_label)
-
     ax.legend(handles, labels)
   
-    return exec_time_per_iteration, final_solution_quality, final_accuracy_ratio
+    return exec_time_per_iteration
 
 
 # function to input a list of float and return a list of cumulative sums
