@@ -15,38 +15,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-##########################
-# H-Lattice Metrics Module
+#################################
+# Hydrogen-Lattice Metrics Module
 #
 # This module contains methods to initialize, store, aggregate and
-# plot metrics collected in the benchmark programs for the H-Lattice
+# plot metrics collected in the benchmark programs for the Hydrogen-Lattice
 #
-# Metrics are indexed by group id (e.g. circuit_id size), circuit_id id (e.g. secret string)
-# and metric name.
-# Multiple metrics with different names may be stored, each with a single metric_value.
-#
-# The 'aggregate' method accumulates all circuit_id-specific metrics for each group
-# and creates an average that may be reported and plotted across all groups
+# This module primatily provides custom plotting functions
 #
 
 import os
 import json
-import time
-from time import gmtime, strftime
-from datetime import datetime
 import traceback
-import matplotlib.cm as cm
-import copy
-import matplotlib, matplotlib.pyplot as plt
+import matplotlib, matplotlib.pyplot as plt, matplotlib.cm as cm
 import numpy as np
-import scipy.stats as stats
 
 # add to the path variable the path to the metrics module
 import sys
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "hydrogen-lattice/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
-
 
 # import the metrics module
 import metrics as metrics
@@ -57,6 +45,78 @@ h_lattice_metrics = metrics.circuit_metrics_detail
 save_plot_images = True
 
 #################################################
+# ADDITIONAL METRIC FUNCTIONS
+
+# Find the last energy and radius associated with specific group of circuits
+def find_last_metrics_for_group(group, instance):
+
+    current_radius = 0
+    doci_energy = 0
+    fci_energy = 0
+    energy = 0
+    accuracy_ratio = 0
+    solution_quality = 0
+    
+    # DEVNOTE: would it be easier to just get the last entry of array, rather than this loop?
+    for circuit_id in h_lattice_metrics[group]:
+        if np.floor(int(circuit_id)/1000) == instance:
+        
+            energy = h_lattice_metrics[group][circuit_id]['energy']
+            doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
+            fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
+            current_radius = h_lattice_metrics[group][circuit_id]['radius']
+            accuracy_ratio = h_lattice_metrics[group][circuit_id]['accuracy_ratio']
+            solution_quality = h_lattice_metrics[group][circuit_id]['solution_quality']
+
+        else:
+            continue
+            
+    return current_radius, doci_energy, fci_energy, energy, accuracy_ratio, solution_quality
+
+# Find the array of metrics associated with specific group of circuits
+def find_metrics_array_for_group(group, instance, metric_name, x_val, x_metric_name):   
+
+    y_data = []
+    x_data = []
+    x_label = ''
+    y_label = ''
+
+    for circuit_id in h_lattice_metrics[group]:
+        if np.floor(int(circuit_id)/1000) == instance:
+        
+            # get the metric value
+            metric_value = h_lattice_metrics[group][circuit_id][metric_name]
+            # set the y label 
+            y_label = metrics.known_score_labels[metric_name]
+
+            # append the metric value to the y_data list
+            y_data.append(metric_value)
+
+            # get the x metric value
+            x_metric_value = h_lattice_metrics[group][circuit_id][x_metric_name]
+            # set the x label
+            x_label = metrics.known_x_labels[x_val]
+
+            # append the x metric value to the x_data list
+            x_data.append(x_metric_value)
+
+        else:
+            continue
+    
+    return x_data, x_label, y_data, y_label
+
+# function to input a list of float and return a list of cumulative sums
+def cumulative_sum(input_list: list):
+    output_list = []
+    sum = 0
+    for item in input_list:
+        sum += item
+        output_list.append(sum)
+    return output_list  
+
+
+#################################################
+# PLOT LINE METRICS
 
 # function to plot all line metrics
 def plot_all_line_metrics(suptitle=None,
@@ -65,18 +125,22 @@ def plot_all_line_metrics(suptitle=None,
         individual=False,
         backend_id="UNKNOWN", options=None):
     '''
-    Function to plot all line metrics (energy, solution quality, accuracy volume) vs different x values (iteration count, cumulative execution time)
+    Function to plot all line metrics (energy, solution quality) vs different x values (iteration count, cumulative execution time)
 
     parameters:
     ----------
+    suptitle: str   
+        first line of the title of the figure
     score_metrics: list
         list of score metrics to plot
-
     x_vals: list
         list of x values to plot
-
-    subplot: bool
-        flag to plot all metrics on the same figure or on different figures
+    individual: bool
+        draw each subplot in its own figure if set to True
+    backend_id: str 
+        identifier for the backend system used for execution
+    options: dict
+        dictionary of options used for execution
     '''
 
     # if score_metrics and x_val are strings, convert to lists
@@ -85,16 +149,6 @@ def plot_all_line_metrics(suptitle=None,
     if type(x_vals) is str:
         x_vals = [x_vals]
 
-    global h_lattice_metrics
-
-    average_exec_time_per_iteration = []
-    average_exec_time_per_iteration_error = []
-    average_solution_quality = []
-    average_accuracy_ratio = []
-    average_solution_quality_error = []
-    average_accuracy_ratio_error = []
-    qubit_counts = []
-    
     # Create standard title for all plots
     method = 2
     toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
@@ -104,28 +158,22 @@ def plot_all_line_metrics(suptitle=None,
     for qubit_count in h_lattice_metrics:
 
         num_qubits = qubit_count
+        group = str(num_qubits)
         
         circuit_ids = [int(x) for x in (h_lattice_metrics[qubit_count])]
         total_instances = int(np.floor(circuit_ids[-1]/1000))
 
-        exec_time_array = []
-        sol_quality_array = []
-        acc_ratio_array = []
-    
+        # components of all the plots
+        metric_names = ["energy", "energy", "solution_quality", "accuracy_ratio"]
+        x_vals =["iteration_count", "cumulative_exec_time", "cumulative_exec_time", "cumulative_exec_time"]
+        
+        # generate a set of plots for each instance (radius) in data set
         for instance in range(1, total_instances + 1):
 
             # search metrics store for final metrics for this group
-            current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = find_last_metrics_for_group(qubit_count, instance)
-            
-            '''
-            energy_text = f'Num Qubits: {num_qubits} \u00B7 Radius: {current_radius}  \u00B7\u00B7  DOCI Energy: {doci_energy:.3f} \u00B7 FCI Energy: {fci_energy:.3f} \u00B7 Energy: {energy:.3f} '
-            '''
-            
-            # components of all the plots
-            
-            metric_names = ["energy", "energy", "solution_quality", "accuracy_ratio"]
-            x_vals =["iteration_count", "cumulative_exec_time", "cumulative_exec_time", "cumulative_exec_time"]
-            
+            current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = \
+                    find_last_metrics_for_group(group, instance)
+
             # create common title
             suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
             
@@ -142,9 +190,7 @@ def plot_all_line_metrics(suptitle=None,
             # since all subplots share the same header, give user and indication of the grouping
             if individual:
                 print(f"----- Line Plots for the {qubit_count} qubit group -----")
-            
-            cum_exec_time = 0
-            
+
             subplot_index = 0
             
             for jj in range(plot_count):
@@ -170,14 +216,10 @@ def plot_all_line_metrics(suptitle=None,
                     x_val=x_vals[subplot_index]
                     
                     # draw a single subplot
-                    et = plot_line_metric(ax=axes[subplot_index], subtitle=subtitle,
+                    plot_line_metric(ax=axes[subplot_index], subtitle=subtitle,
                         metric_name=metric_name, x_val=x_val,
                         num_qubits=qubit_count, instance=instance)
                     
-                    # klunky want to get exec time
-                    if metric_names[subplot_index] == "energy" and x_vals[subplot_index] == "cumulative_exec_time":
-                        cum_exec_time = et
-                        
                     subplot_index += 1
                         
                 # this appears to be unneeded
@@ -185,8 +227,6 @@ def plot_all_line_metrics(suptitle=None,
           
                 # add padding below suptitle, and between plots, due to multi-line titles
                 fig.tight_layout(pad=padding, h_pad=2.0, w_pad=3.0)
-                
-                group = qubit_count
                 
                 if save_plot_images:
                     image_name = (f"Hydrogen-Lattice-({method})-line-{group}-{instance}") + \
@@ -196,40 +236,9 @@ def plot_all_line_metrics(suptitle=None,
                                                 
                 if individual:
                     plt.show(block=True)
-                
-                exec_time_array.append(cum_exec_time)
-                sol_quality_array.append(1 - solution_quality)
-                acc_ratio_array.append(1 - accuracy_ratio)
-                       
-        average_et = np.average(exec_time_array)
-        error_et = np.std(exec_time_array)/np.sqrt(len(exec_time_array))
-        average_ar = np.average(acc_ratio_array)
-        error_ar = np.std(acc_ratio_array)/np.sqrt(len(acc_ratio_array))
-        average_sq = np.average(sol_quality_array)
-        error_sq = np.std(sol_quality_array)/np.sqrt(len(sol_quality_array))
-
-        average_exec_time_per_iteration.append(average_et)
-        average_exec_time_per_iteration_error.append(error_et)
-        average_accuracy_ratio.append(average_ar * 100)
-        average_accuracy_ratio_error.append(error_ar * 100)
-        average_solution_quality.append(average_sq * 100)
-        average_solution_quality_error.append(error_sq * 100)
-
-        qubit_counts.append(qubit_count)
 
         if not individual:
             plt.show(block=True)
-
-    # plot the cumulative execution time per iteration vs. number of qubits
-    
-    plot_cumulative_metrics(suptitle=suptitle, subtitle=subtitle,
-            x_data1=qubit_counts,
-            y_data1=average_exec_time_per_iteration,
-            y_err1=average_exec_time_per_iteration_error,
-            x_data2=qubit_counts,
-            y_data2=average_accuracy_ratio,
-            y_err2=average_accuracy_ratio_error)
-
 
 # function to create a single subplot
 def plot_line_metric(ax=None, subtitle:str="",
@@ -267,40 +276,16 @@ def plot_line_metric(ax=None, subtitle:str="",
     else:
         x_metric_name = x_val
         cumulative_flag = False
-    
+  
     group = str(num_qubits)
+ 
+    # find the metrics_array for this group and instance, along with the final matrics             
+    x_data, x_label, y_data, y_label = \
+            find_metrics_array_for_group(group, instance, metric_name, x_val, x_metric_name)
 
-    y_data = []
-    x_data = []
-
-    current_radius = 0
-
-    for circuit_id in h_lattice_metrics[group]:
-        if np.floor(int(circuit_id)/1000) == instance:
-            # get the metric value
-            metric_value = h_lattice_metrics[group][circuit_id][metric_name]
-            # set the y label 
-            y_label = metrics.known_score_labels[metric_name]
-
-            # append the metric value to the y_data list
-            y_data.append(metric_value)
-
-            # get the x metric value
-            x_metric_value = h_lattice_metrics[group][circuit_id][x_metric_name]
-            # set the x label
-            x_label = metrics.known_x_labels[x_val]
-
-            # append the x metric value to the x_data list
-            x_data.append(x_metric_value)
-
-            doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
-            fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
-            current_radius = h_lattice_metrics[group][circuit_id]['radius']
-            energy = h_lattice_metrics[group][circuit_id]['energy']
-
-        else:
-            continue
-         
+    current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = \
+            find_last_metrics_for_group(group, instance)
+            
     # make the x_data cumulative if the cumulative flag is on
     if cumulative_flag:
         x_data = cumulative_sum(x_data)
@@ -396,68 +381,150 @@ def plot_line_metric(ax=None, subtitle:str="",
     return exec_time_per_iteration
 
 
-# function to input a list of float and return a list of cumulative sums
-def cumulative_sum(input_list: list):
-    output_list = []
-    sum = 0
-    for item in input_list:
-        sum += item
-        output_list.append(sum)
-    return output_list
-
-# Find the last energy and radius associated with specific group of circuits
-def find_last_metrics_for_group(num_qubits, instance):
-
-    group = str(num_qubits)
-
-    current_radius = 0
-    doci_energy = 0
-    fci_energy = 0
-
-    # DEVNOTE: would it be easier to just get the last entry of array, rather than this loop?
-    for circuit_id in h_lattice_metrics[group]:
-        if np.floor(int(circuit_id)/1000) == instance:
-        
-            energy = h_lattice_metrics[group][circuit_id]['energy']
-            doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
-            fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
-            current_radius = h_lattice_metrics[group][circuit_id]['radius']
-            accuracy_ratio = h_lattice_metrics[group][circuit_id]['accuracy_ratio']
-            solution_quality = h_lattice_metrics[group][circuit_id]['solution_quality']
-
-        else:
-            continue
-            
-    return current_radius, doci_energy, fci_energy, energy, accuracy_ratio, solution_quality
-    
 #################################################
+# PLOT CUMULATIVE METRICS
+
+# function to plot all cumulative/final metrics
+def plot_all_cumulative_metrics(suptitle=None,
+        score_metrics=["energy", "solution_quality", "accuracy_volume"],
+        x_vals=["iteration_count", "cumulative_exec_time"],
+        individual=False,
+        backend_id="UNKNOWN", options=None):
+    '''
+    Function to plot all cumulative metrics (average_iteration_time, final_accuracy_ratio)
+
+    parameters:
+    ----------
+    suptitle: str   
+        first line of the title of the figure
+    score_metrics: list
+        list of score metrics to plot
+    x_vals: list
+        list of x values to plot
+    individual: bool
+        draw each subplot in its own figure if set to True
+    backend_id: str 
+        identifier for the backend system used for execution
+    options: dict
+        dictionary of options used for execution
+    '''
+
+    # if score_metrics and x_val are strings, convert to lists
+    '''
+    '''
+    if type(score_metrics) is str:
+        score_metrics = [score_metrics]
+    if type(x_vals) is str:
+        x_vals = [x_vals]
+    
+    average_exec_time_per_iteration = []
+    average_exec_time_per_iteration_error = []
+    average_solution_quality = []
+    average_accuracy_ratio = []
+    average_solution_quality_error = []
+    average_accuracy_ratio_error = []
+    qubit_counts = []
+    
+    # iterate over number of qubits and instances to compute averages
+    for num_qubits in h_lattice_metrics:
+        group = str(num_qubits)
+        
+        circuit_ids = [int(x) for x in (h_lattice_metrics[group])]
+        total_instances = int(np.floor(circuit_ids[-1]/1000))
+
+        exec_time_array = []
+        sol_quality_array = []
+        acc_ratio_array = []
+        
+        # generate a set of plots for each instance (radius) in data set
+        for instance in range(1, total_instances + 1):
+
+            # search metrics store for final metrics for this group
+            current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = \
+                    find_last_metrics_for_group(group, instance)
+            
+            # find the execution time array for "energy" metric         
+            x_data, x_label, y_data, y_label = \
+                find_metrics_array_for_group(group, instance, "energy", "cumulative_exec_time", "exec_time")
+                
+            # make the x_data cumulative if the cumulative flag is on
+            x_data = cumulative_sum(x_data)
+            
+            # and compute average execution time
+            exec_time_per_iteration = x_data[-1]/len(x_data)
+
+            exec_time_array.append(exec_time_per_iteration)
+            sol_quality_array.append(1 - solution_quality)
+            acc_ratio_array.append(1 - accuracy_ratio)
+                   
+        average_et = np.average(exec_time_array)
+        error_et = np.std(exec_time_array)/np.sqrt(len(exec_time_array))
+        average_ar = np.average(acc_ratio_array)
+        error_ar = np.std(acc_ratio_array)/np.sqrt(len(acc_ratio_array))
+        average_sq = np.average(sol_quality_array)
+        error_sq = np.std(sol_quality_array)/np.sqrt(len(sol_quality_array))
+
+        average_exec_time_per_iteration.append(average_et)
+        average_exec_time_per_iteration_error.append(error_et)
+        average_accuracy_ratio.append(average_ar * 100)
+        average_accuracy_ratio_error.append(error_ar * 100)
+        average_solution_quality.append(average_sq * 100)
+        average_solution_quality_error.append(error_sq * 100)
+
+        qubit_counts.append(num_qubits)
+ 
+    ##########################
+    
+    individual=True
+    
+    # Create standard title for all plots
+    method = 2
+    toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
+    subtitle = ""
+    
+    # create common title
+    suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
+    
+    # since all subplots share the same header, give user and indication of the grouping
+    if individual:
+        print(f"----- Cumulative Plots for all qubit groups -----")
+                
+    plot_cumulative_metrics(suptitle=suptitle,
+            x_data=qubit_counts,
+            x_label="Number of Qubits",
+            y_data=average_exec_time_per_iteration,
+            y_err=average_exec_time_per_iteration_error,
+            y_label="Cumulative Execution Time/ iteration (s)",
+            suffix="avg_exec_time_per_iteration")
+            
+    plot_cumulative_metrics(suptitle=suptitle,
+            x_data=qubit_counts,
+            x_label="Number of Qubits",
+            y_data=average_accuracy_ratio,
+            y_err=average_accuracy_ratio_error,
+            y_label="Error in Accuracy Ratio (%)",
+            suffix="accuracy_ratio_error")
 
 # method to plot cumulative execution time vs. number of qubits
-def plot_cumulative_metrics(suptitle="", subtitle="",
-            x_data1:list=None, y_data1:list=None, y_err1:list=None, 
-            x_data2:list=None, y_data2:list=None, y_err2:list=None):
+def plot_cumulative_metrics(suptitle="",
+            x_data:list=None, x_label:str="",
+            y_data:list=None, y_err:list=None, y_label:str="",
+            individual=True, suffix=None):
     '''
     Function to plot cumulative metrics (accuracy ratio, execution time per iteration) over different number of qubits
 
     parameters:
     ----------
-    x_data1: list
-        list of x data for plot 1
-
-    y_data1: list
-        list of y data for plot 1
-
-    y_err1: list
-        list of y error data for plot 1
-
-    x_data2: list
-        list of x data for plot 2
-
-    y_data2: list   
-        list of y data for plot 2
-
-    y_err2: list    
-        list of y error data for plot 2
+    x_data: list
+        list of x data for plot
+    x_label: str
+        label for x axis
+    y_data: list
+        list of y data for plot
+    y_err: list
+        list of y error data for plot
+    y_label: str
+        label for y axis
     '''
 
     # get subtitle from metrics
@@ -466,55 +533,37 @@ def plot_cumulative_metrics(suptitle="", subtitle="",
     # get backend id from subtitle
     backend_id = m_subtitle[9:]
 
-    # create a figures for the plot
-    fig1 = plt.figure()
+    # create a figure for the plot
+    fig1, ax1 = plt.subplots(1, 1, figsize=(6, 4.2))
+    
+    # and add the title
+    fig1.suptitle(suptitle, fontsize=13, x=(0.54 if individual else 0.5))
     
     # plot xdata1 vs ydata1 on fig1
-    ax1 = fig1.gca()
-    ax1.plot(x_data1, y_data1, linestyle='solid', linewidth=2, markersize=12, marker='x')
+    #ax1 = fig1.gca()
+    ax1.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=12, marker='x')
 
     # set the title
     #ax1.set_title("Cumulative Execution Time per iteration vs. Number of Qubits")
-    ax1.set_title(suptitle + "\n" + subtitle, fontsize=12)
-    ax1.set_xlabel("Number of Qubits")
-    ax1.set_ylabel("Cumulative Execution Time/ iteration (s)")
+    #ax1.set_title(suptitle + "\n" + subtitle, fontsize=12)
+    ax1.set_xlabel(x_label)
+    ax1.set_ylabel(y_label)
 
     # also plot a bar plot on the same figure
-    ax1.bar(x_data1, y_data1, 0.75, alpha = 0.8, zorder = 3)
+    ax1.bar(x_data, y_data, 0.75, alpha = 0.8, zorder = 3)
     ax1.grid(True, axis = 'y', color='silver', zorder = 0)
 
     # error bars for the bar plot
-    ax1.errorbar(x_data1, y_data1, yerr=y_err1, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
+    ax1.errorbar(x_data, y_data, yerr=y_err, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
 
+    # add padding below suptitle, and between plots, due to multi-line titles
+    padding=0.8
+    fig1.tight_layout(pad=padding, h_pad=2.0, w_pad=3.0)
+                
     # save the plot image
     if save_plot_images:
         metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)" +
-                                            "-" + "avg_exec_time_per_iteration"),
-                                            backend_id)                                         
-    # create a figures for the plot
-    fig2 = plt.figure()
-    
-    # plot xdata2 vs ydata2 on fig2
-    ax2 = fig2.gca()
-    ax2.plot(x_data2, y_data2, linestyle='solid', linewidth=2, markersize=12, marker='x')
-
-    #ax2.set_title("Accuracy Ratio Error vs. Number of Qubits")
-    ax2.set_title(suptitle + "\n" + subtitle, fontsize=12)
-    ax2.set_xlabel("Number of Qubits")
-    ax2.set_ylabel("Error in Accuracy Ratio (%)")
-
-    # also plot a bar plot on the same figure
-    ax2.bar(x_data2, y_data2, 0.75, alpha = 0.8, zorder = 3)
-    ax2.grid(True, axis = 'y', color='silver', zorder = 0) 
-
-    # error bars for the bar plot
-    ax2.errorbar(x_data2, y_data2, yerr=y_err2, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
-
-    # save the plot image
-    if save_plot_images:                                
-        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)" +
-                                            "-" + "accuracy_ratio_error"),
+                                            "-" + suffix),
                                             backend_id)
-                                            
     # show the plot(s)
     plt.show(block=True)

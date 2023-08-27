@@ -1251,11 +1251,11 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
         suffix = f's{num_shots}_r{radius}_mi{max_iter}_{dt}'
     
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
-
-    # plots all line metrics, including solution quality and accuracy ratio 
-    # vs iteration count and cumulative execution time
     backend_id = metrics.get_backend_id()
     options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits}
+    
+    # plots all line metrics, including solution quality and accuracy ratio 
+    # vs iteration count and cumulative execution time
     h_metrics.plot_all_line_metrics(suptitle,
                 score_metrics=["energy", "solution_quality", "accuracy_ratio"],
                 x_vals=["iteration_count", "cumulative_exec_time"],
@@ -1263,9 +1263,20 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
                 backend_id=backend_id,
                 options=options)
     
+    # plots all cumulative metrics, including average_iteration_time and accuracy ratio 
+    # over number of qubits
+    backend_id = metrics.get_backend_id()
+    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits}
+    h_metrics.plot_all_cumulative_metrics(suptitle,
+                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
+                x_vals=["iteration_count", "cumulative_exec_time"],
+                individual=individual,
+                backend_id=backend_id,
+                options=options)
+                
     # plots all area metrics
-    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits,
-                '\nObjective Function' : obj_str}
+    #options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits,
+    #            '\nObjective Function' : obj_str}
     metrics.plot_all_area_metrics(suptitle,
                 score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
                 fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
