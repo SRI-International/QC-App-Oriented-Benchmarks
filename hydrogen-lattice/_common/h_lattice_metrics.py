@@ -37,7 +37,7 @@ from datetime import datetime
 import traceback
 import matplotlib.cm as cm
 import copy
-import matplotlib.pyplot as plt
+import matplotlib, matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
 
@@ -94,13 +94,11 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
     average_accuracy_ratio_error = []
     qubit_counts = []
     
-    # Create title for all plots
+    # Create standard title for all plots
     method = 2
     toptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit" + \
                 f"\nDevice={backend_id}  {metrics.get_timestr()}"
     
-    # append the circuit metrics subtitle to the title
-    #subtitle = f"Device={backend_id}  {metrics.get_timestr()}"
     subtitle = ""
     
     '''
@@ -111,7 +109,6 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             options_str += f"{key}={value}"
         subtitle += f"\n{options_str}"
     '''
-    shots = options['shots']
     
     # iterate over number of qubits and score metrics and plot each
     for qubit_count in h_lattice_metrics:
@@ -127,24 +124,28 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
     
         for instance in range(1, total_instances + 1):
 
+            # search metrics store for final metrics for this group
             current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = find_last_metrics_for_group(qubit_count, instance)
             
+            '''
             energy_text = f'Num Qubits: {num_qubits} \u00B7 Radius: {current_radius}  \u00B7\u00B7  DOCI Energy: {doci_energy:.3f} \u00B7 FCI Energy: {fci_energy:.3f} \u00B7 Energy: {energy:.3f} '
             
             energy_text = f'DOCI Energy={doci_energy:.3f}, FCI Energy={fci_energy:.3f}, Energy={energy:.3f}, , Accuracy={accuracy_ratio:.3f}'
+            '''
             
-            suptitle = toptitle + \
-                    f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}" + \
-                    "\n" + energy_text
+            # create common title
+            suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
             
-            # if all subplots drawn together, share common heading
+            # create a figure for all plots in this group
+            
             if subplot:
-                # create subplots equal to the number of score metrics times the number of x_vals, figsize proportional to the number of subplots
-                # fig, axs = plt.subplots(len(score_metrics), len(x_vals), figsize=(len(x_vals)*5, len(score_metrics)*3))
                 fig, axs = plt.subplots(2, 2, figsize=(12, 9))
+            else:
+                fig, axs1 = plt.subplots(1, 1, figsize=(12, 9))
+                axs = [axs1]
                 
-                #fig.suptitle(f"--- {qubit_count} qubit group ---" + "\n" + energy_text, fontsize=14)
-                fig.suptitle(suptitle, fontsize=13, backgroundcolor='aliceblue')
+            #fig.suptitle(f"--- {qubit_count} qubit group ---" + "\n" + energy_text, fontsize=14)
+            fig.suptitle(suptitle, fontsize=13, backgroundcolor='aliceblue')
                     
             plot_line_metric(suptitle=suptitle, subtitle=subtitle,
                 metric_name="energy", x_val="iteration_count", num_qubits=qubit_count, instance=instance, ax=axs[0, 0], subplot=subplot)
@@ -209,7 +210,6 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             x_data2=qubit_counts,
             y_data2=average_accuracy_ratio,
             y_err2=average_accuracy_ratio_error)
-    
 
 
 # function to take input the title of plot, the x and y axis labels, and the data to plot as a line plot
@@ -266,6 +266,7 @@ def plot_line_metric(suptitle:str="Title", subtitle:str="",
             doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
             fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
             current_radius = h_lattice_metrics[group][circuit_id]['radius']
+            energy = h_lattice_metrics[group][circuit_id]['energy']
 
         else:
             continue
@@ -304,7 +305,7 @@ def plot_line_metric(suptitle:str="Title", subtitle:str="",
     else:
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm)
 
-    ax.plot(x_data, y_data, linestyle='-.', linewidth=2, markersize=12)
+    ax.plot(x_data, y_data, color='darkblue', linestyle='-.', linewidth=2, markersize=12)
 
     # set the title   
     #ax.set_title(suptitle + "\n" + subtitle + f", qubits={num_qubits}", fontsize=12)
@@ -315,43 +316,55 @@ def plot_line_metric(suptitle:str="Title", subtitle:str="",
     # if the x metric is iteration count, set x ticks to be integers
     if x_metric_name == 'iteration_count':
         ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
-
+    
     # if the score metric is energy or solution quality, plot the FCI and DOCI energy lines
     if metric_name == 'energy':
-        ax.axhline(y=doci_energy, color='r', linestyle='--', label='DOCI Energy for given Hamiltonian')
-        ax.axhline(y=fci_energy, color='g', linestyle='-.', label='FCI Energy for given Hamiltonian')
+        ax.axhline(y=doci_energy, color='r', linestyle='--', label=f'DOCI Energy = {doci_energy:.3f}')
+        ax.axhline(y=fci_energy, color='g', linestyle='-.', label=f'FCI Energy    = {fci_energy:.3f}')
+        metric_legend_label = f'Solution Energy = {energy:.3f}'
         
     # add a horizontal line at y=1 for solution quality
     elif metric_name == 'solution_quality':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
-
+        metric_legend_label = f'Solution Quality = {final_solution_quality:.3f}'
+        
         # start the y-ticks of solution quality at 0 and end at 1
         ax.set_ylim([0, 1.1])
 
     # add a horizontal line at y=0 for accuracy ratio
     elif metric_name == 'accuracy_ratio':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
+        metric_legend_label = f'Accuracy Ratio = {final_accuracy_ratio:.3f}'
 
     # add a horizontal line at y=0 for accuracy volume
     elif metric_name == 'accuracy_volume':
         ax.axhline(y=0, color='r', linestyle='--', label='Ideal Solution')
+        metric_legend_label = f'Accuracy Volume = {final_accuracy_volume:.3f}'
         
     #energy_text = f'DOCI Energy: {doci_energy:.2f} | FCI Energy: {fci_energy:.2f} | Num of Qubits: {num_qubits} | Radius: {current_radius}'
     #ax.annotate(energy_text, xy=(0.5, 0.97), xycoords='figure fraction', ha='center', va='top')
     
     ax.grid(True)
 
-    ax.legend()
+    handles, labels = ax.get_legend_handles_labels()
     '''
-    if save_plot_images:
-        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)-line-"
-                                            + str(group) + '-'
-                                            + str(instance) + '-'
-                                            + str(metric_name) + '-'
-                                            + str(x_metric_name)), backend_id)
-    '''   
+    import copy
+    print(handles[0])
+    newhandle = copy.deepcopy(handles[0])
+    newhandle.set_color('blue')
+    handles.append(newhandle)
+    '''
+    import matplotlib
+    newhandle = matplotlib.lines.Line2D([0,1],[0,1])
+    newhandle.update_from(handles[0])
+    newhandle.set_color('darkblue')
+    handles.append(newhandle)
+    labels.append(metric_legend_label)
+
+    ax.legend(handles, labels)
+  
     return exec_time_per_iteration, final_solution_quality, final_accuracy_ratio
-        #, doci_energy, fci_energy, current_radius 
+
 
 # function to input a list of float and return a list of cumulative sums
 def cumulative_sum(input_list: list):
