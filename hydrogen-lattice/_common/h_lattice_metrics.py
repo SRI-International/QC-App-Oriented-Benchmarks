@@ -59,9 +59,10 @@ save_plot_images = True
 #################################################
 
 # function to plot all line metrics
-def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_volume"],
+def plot_all_line_metrics(suptitle=None,
+        score_metrics=["energy", "solution_quality", "accuracy_volume"],
         x_vals=["iteration_count", "cumulative_exec_time"],
-        subplot=True,
+        individual=False,
         backend_id="UNKNOWN", options=None):
     '''
     Function to plot all line metrics (energy, solution quality, accuracy volume) vs different x values (iteration count, cumulative execution time)
@@ -96,8 +97,7 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
     
     # Create standard title for all plots
     method = 2
-    toptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit" + \
-                f"\nDevice={backend_id}  {metrics.get_timestr()}" 
+    toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
     subtitle = ""
     
     # iterate over number of qubits and score metrics and plot each
@@ -121,58 +121,86 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
             energy_text = f'Num Qubits: {num_qubits} \u00B7 Radius: {current_radius}  \u00B7\u00B7  DOCI Energy: {doci_energy:.3f} \u00B7 FCI Energy: {fci_energy:.3f} \u00B7 Energy: {energy:.3f} '
             '''
             
+            # components of all the plots
+            
+            metric_names = ["energy", "energy", "solution_quality", "accuracy_ratio"]
+            x_vals =["iteration_count", "cumulative_exec_time", "cumulative_exec_time", "cumulative_exec_time"]
+            
             # create common title
             suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
             
-            # create a figure for all plots in this group, larger if only one plot at a time
-            
-            if subplot:
-                fig, axs = plt.subplots(2, 2, figsize=(12, 9))
-            else:
-                fig, axs1 = plt.subplots(1, 1, figsize=(5.5, 3.5))
-                axs = [axs1]
+            # draw a single plot
+            if not individual:
+                plot_count = 1
+                subplot_count = 4
                 
-            #fig.suptitle(f"--- {qubit_count} qubit group ---" + "\n" + energy_text, fontsize=14)
-            fig.suptitle(suptitle, fontsize=13, backgroundcolor='aliceblue')
+            # or multiple individual plots
+            else:
+                plot_count = 4
+                subplot_count = 1
+
+            # since all subplots share the same header, give user and indication of the grouping
+            if individual:
+                print(f"----- Line Plots for the {qubit_count} qubit group -----")
+            
+            cum_exec_time = 0
+            
+            subplot_index = 0
+            
+            for jj in range(plot_count):
+                
+                # create a figure for all plots in this group, smaller if only one plot at a time
+                if individual:
+                    fig, axs1 = plt.subplots(1, 1, figsize=(6, 4.2))
+                    axs = [axs1]
+                    axes = [ axs1, axs1, axs1, axs1]
+                    padding = 0.8 
+                else:
+                    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+                    axes = [ axs[0, 0], axs[0, 1], axs[1, 0], axs[1, 1] ]
+                    padding = 1.4
                     
-            plot_line_metric(ax=axs[0, 0], subtitle=subtitle,
-                metric_name="energy", x_val="iteration_count",
-                num_qubits=qubit_count, instance=instance)
-            
-            # this one also returns the exec time
-            cum_exec_time = plot_line_metric(ax=axs[0, 1], subtitle=subtitle,
-                metric_name="energy", x_val="cumulative_exec_time",
-                num_qubits=qubit_count, instance=instance)
-            
-            plot_line_metric(ax=axs[1, 0], subtitle=subtitle,
-                metric_name="solution_quality", x_val="cumulative_exec_time",
-                num_qubits=qubit_count, instance=instance)
-            
-            plot_line_metric(ax=axs[1, 1], subtitle=subtitle,
-                metric_name="accuracy_ratio", x_val="cumulative_exec_time",
-                num_qubits=qubit_count, instance=instance)
-            
-            # this appears to be unneeded
-            #plt.subplots_adjust(top=0.88, hspace=0.10)
-      
-            # add padding below suptitle, and between plots, due to multi-line titles
-            fig.tight_layout(pad=1.5, h_pad=2.0, w_pad=3.0)
-            
-            group = qubit_count
-            
-            if save_plot_images:
-                image_name = (f"Hydrogen-Lattice-({method})-line-{group}-{instance}") + \
-                            ("-all" if subplot else f"-{metric_name}-{x_metric_name}")
-                            
-                metrics.save_plot_image(plt, image_name, backend_id)
-                                            
-            if not subplot:
-                plt.show(block=True)
-            
-            exec_time_array.append(cum_exec_time)
-            sol_quality_array.append(1 - solution_quality)
-            acc_ratio_array.append(1 - accuracy_ratio)
-            
+                #fig.suptitle(suptitle, fontsize=13, backgroundcolor='whitesmoke')
+                fig.suptitle(suptitle, fontsize=13, x=(0.54 if individual else 0.5))
+                   
+                #### Generate a subplot for all each metric combination   
+                for kk in range(subplot_count):
+                    
+                    metric_name=metric_names[subplot_index]
+                    x_val=x_vals[subplot_index]
+                    
+                    # draw a single subplot
+                    et = plot_line_metric(ax=axes[subplot_index], subtitle=subtitle,
+                        metric_name=metric_name, x_val=x_val,
+                        num_qubits=qubit_count, instance=instance)
+                    
+                    # klunky want to get exec time
+                    if metric_names[subplot_index] == "energy" and x_vals[subplot_index] == "cumulative_exec_time":
+                        cum_exec_time = et
+                        
+                    subplot_index += 1
+                        
+                # this appears to be unneeded
+                #plt.subplots_adjust(top=0.88, hspace=0.10)
+          
+                # add padding below suptitle, and between plots, due to multi-line titles
+                fig.tight_layout(pad=padding, h_pad=2.0, w_pad=3.0)
+                
+                group = qubit_count
+                
+                if save_plot_images:
+                    image_name = (f"Hydrogen-Lattice-({method})-line-{group}-{instance}") + \
+                                ("-all" if not individual else f"-{metric_name}-{x_val}")
+                                
+                    metrics.save_plot_image(plt, image_name, backend_id)
+                                                
+                if individual:
+                    plt.show(block=True)
+                
+                exec_time_array.append(cum_exec_time)
+                sol_quality_array.append(1 - solution_quality)
+                acc_ratio_array.append(1 - accuracy_ratio)
+                       
         average_et = np.average(exec_time_array)
         error_et = np.std(exec_time_array)/np.sqrt(len(exec_time_array))
         average_ar = np.average(acc_ratio_array)
@@ -189,7 +217,7 @@ def plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy
 
         qubit_counts.append(qubit_count)
 
-        if subplot:
+        if not individual:
             plt.show(block=True)
 
     # plot the cumulative execution time per iteration vs. number of qubits
@@ -276,6 +304,10 @@ def plot_line_metric(ax=None, subtitle:str="",
     # make the x_data cumulative if the cumulative flag is on
     if cumulative_flag:
         x_data = cumulative_sum(x_data)
+        
+    # calc range of the y data
+    y_min = min(y_data); y_max = max(y_data)
+    y_range = y_max - y_min
 
     # calculate the return parameters here
 
@@ -326,18 +358,24 @@ def plot_line_metric(ax=None, subtitle:str="",
         ax.axhline(y=fci_energy, color='g', linestyle='-.', label=f'FCI Energy    = {fci_energy:.3f}')
         metric_legend_label = f'Solution Energy = {energy:.3f}'
         
+        # start the y-ticks at 0 and end at y max
+        ax.set_ylim([fci_energy-0.08*y_range, y_max+0.08*y_range])
+        
     # add a horizontal line at y=1 for solution quality
     elif metric_name == 'solution_quality':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
         metric_legend_label = f'Solution Quality = {final_solution_quality:.3f}'
         
-        # start the y-ticks of solution quality at 0 and end at 1
-        ax.set_ylim([0, 1.1])
+        # start the y-ticks at 0 and end at 1.1
+        ax.set_ylim([0, 1.08])
 
     # add a horizontal line at y=0 for accuracy ratio
     elif metric_name == 'accuracy_ratio':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
         metric_legend_label = f'Accuracy Ratio = {final_accuracy_ratio:.3f}'
+        
+        # start the y-ticks at just below min and just above 1.0
+        ax.set_ylim([y_min-0.08*y_range, 1.0+0.08*y_range])
 
     # add a horizontal line at y=0 for accuracy volume
     elif metric_name == 'accuracy_volume':

@@ -586,7 +586,7 @@ def load_all_metrics(folder, backend_id=None):
     metrics.init_metrics()
     
     list_of_files = os.listdir(folder)
-    print(list_of_files)
+    #print(list_of_files)
     
     width_restart_file_tuples = [(*get_width_restart_tuple_from_filename(fileName), fileName)
                                  for (ind, fileName) in enumerate(list_of_files) if fileName.startswith("width")]  # list with elements that are tuples->(width,restartInd,filename)
@@ -1227,7 +1227,7 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
             method=2,
             score_metric='solution_quality', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
             num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
-            detailed_save_names=False, **kwargs):
+            detailed_save_names=False, individual=False, **kwargs):
     """
     Plot results
     """
@@ -1252,10 +1252,16 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
     
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
 
-    # plots all line metrics, including solution quality, accuracy volume, and accuracy ratio vs iteration count and cumulative execution time
+    # plots all line metrics, including solution quality and accuracy ratio 
+    # vs iteration count and cumulative execution time
     backend_id = metrics.get_backend_id()
     options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits}
-    h_metrics.plot_all_line_metrics(score_metrics=["energy", "solution_quality", "accuracy_ratio"], x_vals=["iteration_count", "cumulative_exec_time"], subplot=True, backend_id=backend_id, options=options)
+    h_metrics.plot_all_line_metrics(suptitle,
+                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
+                x_vals=["iteration_count", "cumulative_exec_time"],
+                individual=individual,
+                backend_id=backend_id,
+                options=options)
     
     # plots all area metrics
     options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits,
