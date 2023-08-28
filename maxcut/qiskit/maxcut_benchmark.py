@@ -25,9 +25,10 @@ import common
 import execute as ex
 import metrics as metrics
 
+# DEVNOTE: this logging feature should be moved to common level
 logger = logging.getLogger(__name__)
 fname, _, ext = os.path.basename(__file__).partition(".")
-log_to_file = True
+log_to_file = False
 
 try:
     if log_to_file:
@@ -41,7 +42,7 @@ try:
         )
     else:
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.WARNING,
             format='%(asctime)s %(name)s - %(levelname)s:%(message)s')
         
 except Exception as e:
