@@ -3093,9 +3093,22 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
 
     if ylabels != None:
         plt.yticks(ybasis, ylabels)
-    
-    # add colorbar to right of plot (scale if normalize function installed)
-    plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+      
+    # if score label is accuracy volume, get the cmap colors and invert them
+    if score_label == 'Accuracy Volume':
+        global cmap
+        cmap_colors = [cmap_orig(v/1000) for v in range(1000)]
+        cmap_colors.reverse()
+        cmap = ListedColormap(cmap_colors)
+
+    else:
+        cmap = cmap_orig
+
+
+    # add colorbar to right of plot (scale if normalize function installed)    
+    cbar = plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+    if score_label == 'Accuracy Volume':
+        cbar.ax.invert_yaxis()
         
     return ax
 
