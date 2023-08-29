@@ -207,12 +207,11 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
     #print(qc)
     
     # pre-compute and save an array of expected measurements
-    #Imp Note This is different to  compute_expectation in simulator.py and it is renamed as calculate_expectation
-    # This is not important as of now
+    '''
     if do_compute_expectation:
         logger.info('Computing expectation')
         compute_expectation(qc, num_qubits, secret_int, params=params)
-   
+    '''
     # save small circuit example for display
     global QC_
     if QC_ == None or num_qubits <= 6:
@@ -220,12 +219,9 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
 
     # return a handle on the circuit
     return _qc_array, _formatted_observables, params
-
-
-# ############### Circuit Definition - Parameterized version   
+   
     
-    
-# ############### Expectation Tables
+############### Expectation Tables
 
 # DEVNOTE: We are building these tables on-demand for now, but for larger circuits
 # this will need to be pre-computed ahead of time and stored in a data file to avoid run-time delays.
@@ -238,35 +234,51 @@ expectations = {}
 # Use statevector_simulator to obtain exact expectation
 def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simulator', params=None):
     
-    pass  # For now
-    # #ts = time.time()
-    # if params != None:
-    #     qc = qc.bind_parameters(params)
+    #ts = time.time()
+    if params != None:
+        qc = qc.bind_parameters(params)
     
-    # #execute statevector simulation
-    # sv_backend = Aer.get_backend(backend_id)
-    # sv_result = execute(qc, sv_backend).result()
+    #execute statevector simulation
+    sv_backend = Aer.get_backend(backend_id)
+    sv_result = execute(qc, sv_backend).result()
 
-    # # get the probability distribution
-    # counts = sv_result.get_counts()
+    # get the probability distribution
+    counts = sv_result.get_counts()
 
-    # #print(f"... statevector expectation = {counts}")
+    #print(f"... statevector expectation = {counts}")
     
-    # # store in table until circuit execution is complete
-    # id = f"_{num_qubits}_{secret_int}"
-    # expectations[id] = counts
-
+    # store in table until circuit execution is complete
+    id = f"_{num_qubits}_{secret_int}"
+    expectations[id] = counts
+    
     #print(f"  ... time to execute statevector simulator: {time.time() - ts}")
+    
 # Return expected measurement array scaled to number of shots executed
-def get_expectation(num_qubits,  num_shots):
-    pass
+def get_expectation(num_qubits, secret_int, num_shots):
+
+    # find expectation counts for the given circuit 
+    id = f"_{num_qubits}_{secret_int}"
+    
+    if id in expectations:
+        counts = expectations[id]
+        
+        # scale to number of shots
+        for k, v in counts.items():
+            counts[k] = round(v * num_shots)
+        
+        # delete from the dictionary
+        del expectations[id]
+        
+        return counts
+        
+    else:
+        return None
+    
     
 # ############### Result Data Analysis
 
-# expected_dist = {}
+expected_dist = {}
 
-
-# Note :- Not related to initial execution
 # Compare the measurement results obtained with the expected measurements to determine fidelity
 def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     global expected_dist
@@ -275,7 +287,7 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     counts = result.get_counts(qc)
     
     # retrieve pre-computed expectation values for the circuit that just completed
-    expected_dist = get_expectation(num_qubits,  num_shots)
+    expected_dist = get_expectation(num_qubits, secret_int, num_shots)
     
     # if the expectation is not being calculated (only need if we want to compute fidelity)
     # assume that the expectation is the same as measured counts, yielding fidelity = 1
@@ -285,14 +297,12 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     if verbose: print(f"For width {num_qubits}   measured: {counts}\n  expected: {expected_dist}")
     # if verbose: print(f"For width {num_qubits} problem {secret_int}\n  measured: {counts}\n  expected: {expected_dist}")
 
-
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, expected_dist)
-
+    
     # if verbose: print(f"For secret int {secret_int} fidelity: {fidelity}")    
     
     return counts, fidelity
-
 
 
 # For initial development
@@ -363,6 +373,8 @@ def normalize_counts(counts, num_qubits=None):
     assert abs(sum(probabilities.values()) - 1) < 1e-9
     return probabilities
 
+no_measures = False
+
 def prepare_circuits(base_circuit, observables):
     """
     Prepare the qubit-wise commuting circuits for a given operator.
@@ -374,7 +386,10 @@ def prepare_circuits(base_circuit, observables):
     for obs in observables:
         circuit = base_circuit.copy()
         circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
-        circuit.measure_all()
+        
+        if not no_measures:
+            circuit.measure_all()
+            
         circuits.append(circuit)
     return circuits, observables
 
@@ -459,7 +474,6 @@ def create_data_folder(save_res_to_file, detailed_save_names, backend_id):
     if save_res_to_file and not os.path.exists(parent_folder_save):
         os.makedirs(os.path.join(parent_folder_save))
         
-
 # Function to save final iteration data to file
 def store_final_iter_to_metrics_json(backend_id,
                             num_qubits,
@@ -468,42 +482,21 @@ def store_final_iter_to_metrics_json(backend_id,
                             num_shots,
                             converged_thetas_list,
                             energy,
-                            #iter_size_dist,
-                            #iter_dist,
                             detailed_save_names,
                             dict_of_inputs,
                             save_final_counts,
                             save_res_to_file,
                             _instances=None):
     """
-    For a given graph (specified by num_qubits and degree),
+    For a given problem (specified by num_qubits and instance),
     1. For a given restart, store properties of the final minimizer iteration to metrics.circuit_metrics_final_iter, and
     2. Store various properties for all minimizer iterations for each restart to a json file.
-    Parameters
-    ----------
-        num_qubits, degree, restarts, num_shots : ints
-        parent_folder_save : string (location where json file will be stored)
-        dict_of_inputs : dictionary of inputs that were given to run()
-        save_final_counts: bool. If true, save counts, cuts and sizes for last iteration to json file.
-        save_res_to_file: bool. If False, do not save data to json file.
-        iter_size_dist : dictionary containing distribution of cut sizes.  Keys are 'unique_sizes', 'unique_counts' and         'cumul_counts'
-        opt (int) : Max Cut value
     """
     # In order to compare with uniform random sampling, get some samples
-    '''
-    unif_cuts, unif_counts, unif_sizes, unique_counts_unif, unique_sizes_unif, cumul_counts_unif = uniform_cut_sampling(
-        num_qubits, degree, num_shots, _instances)
-    unif_dict = {'unique_counts_unif': unique_counts_unif,
-                 'unique_sizes_unif': unique_sizes_unif,
-                 'cumul_counts_unif': cumul_counts_unif}  # store only the distribution of cut sizes, and not the cuts themselves
-    '''
-    # Store properties such as (cuts, counts, sizes) of the final iteration, the converged theta values, as well as the known optimal value for the current problem, in metrics.circuit_metrics_final_iter. Also store uniform cut sampling results
+
+    # Store properties of the final iteration, the converged theta values, as well as the known optimal value for the current problem, in metrics.circuit_metrics_final_iter. 
     metrics.store_props_final_iter(num_qubits, instance_num, 'energy', energy)
-    #metrics.store_props_final_iter(num_qubits, instance_num, None, iter_size_dist)
     metrics.store_props_final_iter(num_qubits, instance_num, 'converged_thetas_list', converged_thetas_list)
-    #metrics.store_props_final_iter(num_qubits, instance_num, None, unif_dict)
-    # metrics.store_props_final_iter(num_qubits, instance_num, None, iter_dist) # do not store iter_dist, since it takes a lot of memory for larger widths, instead, store just iter_size_dist
-    #global radius
     
     # Save final iteration data to metrics.circuit_metrics_final_iter
     # This data includes final counts, cuts, etc.
@@ -511,35 +504,27 @@ def store_final_iter_to_metrics_json(backend_id,
     
         # Save data to a json file
         dump_to_json(parent_folder_save,
-                    num_qubits, radius, instance_num, 
-                    #iter_size_dist, 
-                    #iter_dist, 
+                    num_qubits, radius, instance_num,  
                     dict_of_inputs, 
                     converged_thetas_list, 
                     energy,
-                    #unif_dict,
                     save_final_counts=save_final_counts)
 
 def dump_to_json(parent_folder_save, num_qubits, radius, instance_num, 
-                #iter_size_dist, iter_dist,
                 dict_of_inputs, 
                 converged_thetas_list,
                 energy,
-                #unif_dict,
                 save_final_counts=False):
     """
-    For a given problem (specified by number of qubits and graph degree) and instance_numex, 
+    For a given problem (specified by number of qubits and instance_number), 
     save the evolution of various properties in a json file.
-    Items stored in the json file: Data from all iterations (iterations), inputs to run program ('general properties'), converged theta values ('converged_thetas_list'), max cut size for the graph (optimal_value), distribution of cut sizes for random uniform sampling (unif_dict), and distribution of cut sizes for the final iteration (final_size_dist)
-    if save_final_counts is True, then also store the distribution of cuts 
+    Items stored in the json file: Data from all iterations (iterations), inputs to run program ('general properties'), converged theta values ('converged_thetas_list'), computes results.
+    if save_final_counts is True, then also store the distribution counts 
     """
     
     #print(f"... saving data for width={num_qubits} radius={radius} instance={instance_num}")
-    print(parent_folder_save)
     if not os.path.exists(parent_folder_save): os.makedirs(parent_folder_save)
     store_loc = os.path.join(parent_folder_save,'width_{}_instance_{}.json'.format(num_qubits, instance_num))
-
-    print(f"  ... to file {store_loc}")
     
     # Obtain dictionary with iterations data corresponding to given instance_num 
     all_restart_ids = list(metrics.circuit_metrics[str(num_qubits)].keys())
@@ -552,13 +537,15 @@ def dump_to_json(parent_folder_save, num_qubits, radius, instance_num,
     dict_to_store['converged_thetas_list'] = converged_thetas_list
     dict_to_store['energy'] = energy
     #dict_to_store['unif_dict'] = unif_dict
-    #dict_to_store['final_size_dist'] = iter_size_dist
+    
     # Also store the value of counts obtained for the final counts
     '''
     if save_final_counts:
         dict_to_store['final_counts'] = iter_dist
-    '''                                   #iter_dist.get_counts()
-    # Now save the output
+        #iter_dist.get_counts()
+    ''' 
+    
+    # Now write the data fo;e
     with open(store_loc, 'w') as outfile:
         json.dump(dict_to_store, outfile)
 
@@ -606,10 +593,12 @@ def load_all_metrics(folder, backend_id=None):
     list_of_files = os.listdir(folder)
     #print(list_of_files)
     
+    # list with elements that are tuples->(width,restartInd,filename)
     width_restart_file_tuples = [(*get_width_restart_tuple_from_filename(fileName), fileName)
-                                 for (ind, fileName) in enumerate(list_of_files) if fileName.startswith("width")]  # list with elements that are tuples->(width,restartInd,filename)
+                                 for (ind, fileName) in enumerate(list_of_files) if fileName.startswith("width")]  
     
-    width_restart_file_tuples = sorted(width_restart_file_tuples, key=lambda x:(x[0], x[1])) #sort first by width, and then by restartInd
+    #sort first by width, and then by restartInd
+    width_restart_file_tuples = sorted(width_restart_file_tuples, key=lambda x:(x[0], x[1])) 
     distinct_widths = list(set(it[0] for it in width_restart_file_tuples)) 
     list_of_files = [
         [tup[2] for tup in width_restart_file_tuples if tup[0] == width] for width in distinct_widths
@@ -639,7 +628,7 @@ def load_all_metrics(folder, backend_id=None):
     return gen_prop
 
 
-# # ----------------need to revise the below code------------------
+# # load data from a specific file
 
 def load_from_width_restart_file(folder, fileName):
     """
@@ -666,12 +655,10 @@ def load_from_width_restart_file(folder, fileName):
         data = json.load(json_file)
         gen_prop = data['general_properties']
         converged_thetas_list = data['converged_thetas_list']
-        #unif_dict = data['unif_dict']
         energy = data['energy']
         if gen_prop['save_final_counts']:
             # Distribution of measured cuts
             final_counts = data['final_counts']
-        #final_size_dist = data['final_size_dist']
         
         backend_id = gen_prop.get('backend_id')
         metrics.set_plot_subtitle(f"Device = {backend_id}")
@@ -685,15 +672,12 @@ def load_from_width_restart_file(folder, fileName):
         method = gen_prop['method']
         if method == 2:
             metrics.store_props_final_iter(num_qubits, restart_ind, 'energy', energy)
-            #metrics.store_props_final_iter(num_qubits, restart_ind, None, final_size_dist)
             metrics.store_props_final_iter(num_qubits, restart_ind, 'converged_thetas_list', converged_thetas_list)
-            #metrics.store_props_final_iter(num_qubits, restart_ind, None, unif_dict)
             if gen_prop['save_final_counts']:
                 metrics.store_props_final_iter(num_qubits, restart_ind, None, final_counts)
 
     return gen_prop
     
-
 def get_width_restart_tuple_from_filename(fileName):
     """
     Given a filename, extract the corresponding width and degree it corresponds to
@@ -970,20 +954,43 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
             ###############
             if method == 1:
             
-                # create the circuit for given qubit size and secret string, store time metric
+                # create the circuit(s) for given qubit size and secret string, store time metric
                 ts = time.time()
             
                 thetas_array_0 = thetas_array
                 
-                qc_array, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,operator = operator, thetas_array= thetas_array_0, parameterized=parameterized)
+                # DEVNOTE: this is a klunky way to obtain the circuits without measure gates 
+                # so they can be run on state vector simulator.  Improve this by simply removing 
+                # measures at end of circuit before simulating.
+                global no_measures
+                no_measures = True
+                qc_array_00, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,
+                            secret_int=instance_num,
+                            operator = operator,
+                            thetas_array= thetas_array_0,
+                            parameterized=parameterized)
+                no_measures = False
+                
+                # create the circuits to be tested
+                qc_array, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,
+                            secret_int=instance_num,
+                            operator = operator,
+                            thetas_array= thetas_array_0,
+                            parameterized=parameterized)
                 
                 for qc in qc_array:
-                    metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
-                    
+                
                     # if using parameter objects, bind before execution
                     if parameterized:
                         qc.bind_parameters(params)
+                        
+                    metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
                     
+                    # pre-compute and save an array of expected measurements
+                    if do_compute_expectation:
+                        logger.info('Computing expectation')
+                        compute_expectation(qc_array_00[0], num_qubits, instance_num, params=params)
+        
                     # submit circuit for execution on target (simulator, cloud simulator, or hardware)
                     ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
                     
