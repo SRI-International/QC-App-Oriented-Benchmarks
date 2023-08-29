@@ -436,21 +436,45 @@ def compute_energy(result_array, formatted_observables, num_qubits):
     
     return energy    
 
-# TODO : Discuss the need of this function, possibly remove this
+#################################################
+# DATA SAVE FUNCTIONS
+
+# Create a folder where the results will be saved. 
+# For every circuit width, metrics will be stored the moment the results are obtained
+# In addition to the metrics, the parameter values obtained by the optimizer, as well as the counts
+# measured for the final circuit will be stored.
+def create_data_folder(save_res_to_file, detailed_save_names, backend_id):
+    global parent_folder_save
+    
+    # if detailed filenames requested, use directory name with timestamp
+    if detailed_save_names:
+        start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        parent_folder_save = os.path.join('__data', f'{backend_id}', f'run_start_{start_time_str}')
+        
+    # otherwise, just put all json files under __data/backend_id
+    else:
+        parent_folder_save = os.path.join('__data', f'{backend_id}')
+    
+    # create the folder if it doesn't exist already
+    if save_res_to_file and not os.path.exists(parent_folder_save):
+        os.makedirs(os.path.join(parent_folder_save))
+        
+
 # Function to save final iteration data to file
-def store_final_iter_to_metrics_json(num_qubits,
-                                     radius,
-                                     instance_num,
-                                     num_shots,
-                                     converged_thetas_list,
-                                     energy,
-                                     #iter_size_dist,
-                                     #iter_dist,
-                                     parent_folder_save,
-                                     dict_of_inputs,
-                                     save_final_counts,
-                                     save_res_to_file,
-                                     _instances=None):
+def store_final_iter_to_metrics_json(backend_id,
+                            num_qubits,
+                            radius,
+                            instance_num,
+                            num_shots,
+                            converged_thetas_list,
+                            energy,
+                            #iter_size_dist,
+                            #iter_dist,
+                            detailed_save_names,
+                            dict_of_inputs,
+                            save_final_counts,
+                            save_res_to_file,
+                            _instances=None):
     """
     For a given graph (specified by num_qubits and degree),
     1. For a given restart, store properties of the final minimizer iteration to metrics.circuit_metrics_final_iter, and
@@ -480,24 +504,29 @@ def store_final_iter_to_metrics_json(num_qubits,
     #metrics.store_props_final_iter(num_qubits, instance_num, None, unif_dict)
     # metrics.store_props_final_iter(num_qubits, instance_num, None, iter_dist) # do not store iter_dist, since it takes a lot of memory for larger widths, instead, store just iter_size_dist
     #global radius
+    
+    # Save final iteration data to metrics.circuit_metrics_final_iter
+    # This data includes final counts, cuts, etc.
     if save_res_to_file:
+    
         # Save data to a json file
-        dump_to_json(parent_folder_save, num_qubits,
-                     radius, instance_num, 
-                     #iter_size_dist, 
-                     #iter_dist, 
-                     dict_of_inputs, 
-                     converged_thetas_list, 
-                     energy,
-                     #unif_dict,
-                     save_final_counts=save_final_counts)
+        dump_to_json(parent_folder_save,
+                    num_qubits, radius, instance_num, 
+                    #iter_size_dist, 
+                    #iter_dist, 
+                    dict_of_inputs, 
+                    converged_thetas_list, 
+                    energy,
+                    #unif_dict,
+                    save_final_counts=save_final_counts)
 
 def dump_to_json(parent_folder_save, num_qubits, radius, instance_num, 
-                 #iter_size_dist, iter_dist,
-                 dict_of_inputs, 
-                 converged_thetas_list, energy,
-                 #unif_dict,
-                 save_final_counts=False):
+                #iter_size_dist, iter_dist,
+                dict_of_inputs, 
+                converged_thetas_list,
+                energy,
+                #unif_dict,
+                save_final_counts=False):
     """
     For a given problem (specified by number of qubits and graph degree) and instance_numex, 
     save the evolution of various properties in a json file.
@@ -506,11 +535,11 @@ def dump_to_json(parent_folder_save, num_qubits, radius, instance_num,
     """
     
     #print(f"... saving data for width={num_qubits} radius={radius} instance={instance_num}")
-    
+    print(parent_folder_save)
     if not os.path.exists(parent_folder_save): os.makedirs(parent_folder_save)
     store_loc = os.path.join(parent_folder_save,'width_{}_instance_{}.json'.format(num_qubits, instance_num))
 
-    #print(f"  ... to file {store_loc}")
+    print(f"  ... to file {store_loc}")
     
     # Obtain dictionary with iterations data corresponding to given instance_num 
     all_restart_ids = list(metrics.circuit_metrics[str(num_qubits)].keys())
@@ -532,7 +561,10 @@ def dump_to_json(parent_folder_save, num_qubits, radius, instance_num,
     # Now save the output
     with open(store_loc, 'w') as outfile:
         json.dump(dict_to_store, outfile)
-        
+
+#################################################
+# DATA LOAD FUNCTIONS
+       
 # %% Loading saved data (from json files)
 
 def load_data_and_plot(folder, backend_id=None, **kwargs):
@@ -689,27 +721,21 @@ def get_width_restart_tuple_from_filename(fileName):
     degree = int(match.groups()[1])
     return (num_qubits,degree)
 
-# # ----------------need to revise the above code------------------
 
-
-################ Run Method
+################################################
+################################################
+# RUN METHOD
 
 MAX_QUBITS = 16
-# # iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
-# # iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 
-# saved_result = {  }
-
-# instance_filename = None
-
-#radius = None
-
-def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
+def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
         method=2, radius=None, thetas_array=None, parameterized= False, do_fidelities=True,
-        max_iter=30, score_metric=['solution_quality', 'accuracy_ratio'], x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
+        max_iter=30, comfort=False,
+        score_metric=['solution_quality', 'accuracy_ratio'],
+        x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, plot_results = True,
-        save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
-        backend_id='qasm_simulator', provider_backend=None, eta=0.5,
+        save_res_to_file = False, save_final_counts = False, detailed_save_names = False, 
+        backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None, _instances=None) :
     """
     Parameters
@@ -784,7 +810,7 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     # Update the dictionary of inputs
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
     
-    # Delete some entries from the dictionary
+    # Delete some entries from the dictionary; they may contain secrets or function pointers
     for key in ["hub", "group", "project", "provider_backend", "exec_options"]:
         dict_of_inputs.pop(key)
     
@@ -799,19 +825,6 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     print("Hydrogen Lattice Benchmark Program - Qiskit")
 
     QC_ = None
-    
-    # Create a folder where the results will be saved. Folder name=time of start of computation
-    # In particular, for every circuit width, the metrics will be stored the moment the results are obtained
-    # In addition to the metrics, the (beta,gamma) values obtained by the optimizer, as well as the counts
-    # measured for the final circuit will be stored.
-    # Use the following parent folder, for a more detailed 
-    if detailed_save_names:
-        start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        parent_folder_save = os.path.join('__results', f'{backend_id}', f'run_start_{start_time_str}')
-    else:
-        parent_folder_save = os.path.join('__results', f'{backend_id}')
-    
-    if save_res_to_file and not os.path.exists(parent_folder_save): os.makedirs(os.path.join(parent_folder_save))
     
     # validate parameters
     max_qubits = max(2, max_qubits)
@@ -872,8 +885,8 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options)
 
-    # for noiseless simulation, set noise model to be None
-    #ex.set_noise_model(None)
+    # create a data folder for the results
+    create_data_folder(save_res_to_file, detailed_save_names, backend_id)
     
 # -------------classical Pauli sum operator from list of Pauli operators and coefficients----
     # Below function is to reduce some dependency on qiskit ( String data type issue)-------------
@@ -1171,21 +1184,18 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                 # pLotting each instance of qubit count given 
                 cumlative_iter_time = cumlative_iter_time[1:]                
 
-                # Save final iteration data to metrics.circuit_metrics_final_iter
-                # This data includes final counts, cuts, etc.
-                parent_folder_save = os.path.join('__data', f'{backend_id}')
-            
-                # sve the data for this qubit width, and instance number
-                store_final_iter_to_metrics_json(num_qubits=num_qubits, 
-                              radius = radius,
-                              instance_num=instance_num,
-                              num_shots=num_shots, 
-                              converged_thetas_list=thetas_array.x.tolist(),
-                              energy = lowest_energy_values[-1],
-                              # iter_size_dist=iter_size_dist, iter_dist=iter_dist,
-                              parent_folder_save=parent_folder_save,
-                              dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
-                              save_res_to_file=save_res_to_file, _instances=_instances)
+                # save the data for this qubit width, and instance number
+                store_final_iter_to_metrics_json(backend_id=backend_id,
+                                num_qubits=num_qubits, 
+                                radius = radius,
+                                instance_num=instance_num,
+                                num_shots=num_shots, 
+                                converged_thetas_list=thetas_array.x.tolist(),
+                                energy = lowest_energy_values[-1],
+                                # iter_size_dist=iter_size_dist, iter_dist=iter_dist,
+                                detailed_save_names=detailed_save_names,
+                                dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
+                                save_res_to_file=save_res_to_file, _instances=_instances)
 
             ###### End of instance processing
             
