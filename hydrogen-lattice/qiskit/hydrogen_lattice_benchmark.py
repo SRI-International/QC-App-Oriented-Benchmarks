@@ -990,6 +990,10 @@ def run (min_qubits=2, max_qubits=4, max_circuits=3, num_shots=100,
                     
                     # submit circuit for execution on target (simulator, cloud simulator, or hardware)
                     ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
+                    
+                    # Break out of this loop, so we only execute the first of the ansatz circuits
+                    # DEVNOTE: maybe we should do all three, and aggregate, just as in method2
+                    break
 
             if method == 2:
                 # a unique circuit index used inside the inner minimizer loop as identifier
