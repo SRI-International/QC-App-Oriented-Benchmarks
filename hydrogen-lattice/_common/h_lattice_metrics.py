@@ -155,8 +155,12 @@ def plot_all_line_metrics(suptitle=None,
     toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
     subtitle = ""
     
+    # get group keys, sorted by qubit number
+    igroup_keys = sorted([int(key) for key in h_lattice_metrics.keys()])
+    group_keys = [str(key) for key in igroup_keys]
+    
     # iterate over number of qubits and score metrics and plot each
-    for qubit_count in h_lattice_metrics:
+    for qubit_count in group_keys:
 
         num_qubits = qubit_count
         group = str(num_qubits)
@@ -297,18 +301,12 @@ def plot_line_metric(ax=None, subtitle:str="",
 
     # calculate the return parameters here
 
-    # calculate the exec time per iteration
-    if x_val == 'cumulative_exec_time':
-        exec_time_per_iteration = x_data[-1]/len(x_data)
-    else:
-        exec_time_per_iteration = 0
-
     # final solution quality after all iterations
     if metric_name == 'solution_quality':
         final_solution_quality = y_data[-1]
     else:
-        final_solution_quality = 0
-
+        final_solution_quality = 0   
+    
     # final accuracy ratio after all iterations
     if metric_name == 'accuracy_ratio':
         final_accuracy_ratio = y_data[-1]
@@ -379,8 +377,8 @@ def plot_line_metric(ax=None, subtitle:str="",
     labels.append(metric_legend_label)
     ax.legend(handles, labels)
   
-    return exec_time_per_iteration
-
+    return
+    
 
 #################################################
 # PLOT CUMULATIVE METRICS
@@ -420,6 +418,8 @@ def plot_all_cumulative_metrics(suptitle=None,
     
     average_exec_time_per_iteration = []
     average_exec_time_per_iteration_error = []
+    average_elapsed_time_per_iteration = []
+    average_elapsed_time_per_iteration_error = []
     average_solution_quality = []
     average_accuracy_ratio = []
     average_solution_quality_error = []
@@ -434,6 +434,7 @@ def plot_all_cumulative_metrics(suptitle=None,
         total_instances = int(np.floor(circuit_ids[-1]/1000))
 
         exec_time_array = []
+        elapsed_time_array = []
         sol_quality_array = []
         acc_ratio_array = []
         
@@ -444,7 +445,7 @@ def plot_all_cumulative_metrics(suptitle=None,
             current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = \
                     find_last_metrics_for_group(group, instance)
             
-            # find the execution time array for "energy" metric         
+            ###### find the execution time array for "energy" metric         
             x_data, x_label, y_data, y_label = \
                 find_metrics_array_for_group(group, instance, "energy", "cumulative_exec_time", "exec_time")
                 
@@ -454,12 +455,25 @@ def plot_all_cumulative_metrics(suptitle=None,
             # and compute average execution time
             exec_time_per_iteration = x_data[-1]/len(x_data)
 
+            ###### find the elapsed execution time array for "energy" metric         
+            x_data, x_label, y_data, y_label = \
+                find_metrics_array_for_group(group, instance, "energy", "cumulative_elapsed_time", "elapsed_time")
+                
+            # make the x_data cumulative if the cumulative flag is on
+            x_data = cumulative_sum(x_data)
+            
+            # and compute average elapsed execution time
+            elapsed_time_per_iteration = x_data[-1]/len(x_data)
+            
             exec_time_array.append(exec_time_per_iteration)
+            elapsed_time_array.append(elapsed_time_per_iteration)
             sol_quality_array.append(1 - solution_quality)
             acc_ratio_array.append(1 - accuracy_ratio)
                    
         average_et = np.average(exec_time_array)
         error_et = np.std(exec_time_array)/np.sqrt(len(exec_time_array))
+        average_elt = np.average(elapsed_time_array)
+        error_elt = np.std(elapsed_time_array)/np.sqrt(len(elapsed_time_array))
         average_ar = np.average(acc_ratio_array)
         error_ar = np.std(acc_ratio_array)/np.sqrt(len(acc_ratio_array))
         average_sq = np.average(sol_quality_array)
@@ -467,6 +481,8 @@ def plot_all_cumulative_metrics(suptitle=None,
 
         average_exec_time_per_iteration.append(average_et)
         average_exec_time_per_iteration_error.append(error_et)
+        average_elapsed_time_per_iteration.append(average_elt)
+        average_elapsed_time_per_iteration_error.append(error_elt)
         average_accuracy_ratio.append(average_ar * 100)
         average_accuracy_ratio_error.append(error_ar * 100)
         average_solution_quality.append(average_sq * 100)
@@ -489,7 +505,15 @@ def plot_all_cumulative_metrics(suptitle=None,
     # since all subplots share the same header, give user and indication of the grouping
     if individual:
         print(f"----- Cumulative Plots for all qubit groups -----")
-                
+    
+    plot_cumulative_metrics(suptitle=suptitle,
+            x_data=qubit_counts,
+            x_label="Number of Qubits",
+            y_data=average_elapsed_time_per_iteration,
+            y_err=average_elapsed_time_per_iteration_error,
+            y_label="Cumulative Elapsed Execution Time/ iteration (s)",
+            suffix="avg_elapsed_time_per_iteration")
+            
     plot_cumulative_metrics(suptitle=suptitle,
             x_data=qubit_counts,
             x_label="Number of Qubits",
@@ -543,6 +567,25 @@ def plot_cumulative_metrics(suptitle="",
     # and add the title
     fig1.suptitle(suptitle, fontsize=13, x=(0.54 if individual else 0.5))
     
+    ###### DEVNOTE: these arrays should be converted to float (and sorted?) at higher level
+    
+    # sort the arrays, in case they come out of order
+    x_data = [float(x) for x in x_data]
+    y_data = [float(y) for y in y_data]
+    z = sorted(zip(x_data, y_data))
+    x_data = [x for x, y in z]
+    y_data = [y for x, y in z]
+    
+    ######
+    
+    # check if we have sparse or non-linear axis data and linearize if so
+    # (convert irregular x-axis data to linear if any non-linear gaps in the data)
+    if metrics.needs_linearize(x_data, gap=2):
+        x_data, x_labels = metrics.linearize_axis(x_data, gap=1, outer=0, fill=False) 
+        ax1.set_xticks(x_data)
+        if x_labels != None:
+            plt.xticks(x_data, x_labels)
+
     # plot xdata1 vs ydata1 on fig1
     #ax1 = fig1.gca()
     ax1.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=12, marker='x')

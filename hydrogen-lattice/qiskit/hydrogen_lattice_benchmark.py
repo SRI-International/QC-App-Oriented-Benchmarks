@@ -528,7 +528,7 @@ def dump_to_json(parent_folder_save, num_qubits, radius, instance_num,
     if save_final_counts is True, then also store the distribution of cuts 
     """
     
-    print(f"... saving data for width={num_qubits} radius={radius} instance={instance_num}")
+    #print(f"... saving data for width={num_qubits} radius={radius} instance={instance_num}")
     
     if not os.path.exists(parent_folder_save): os.makedirs(parent_folder_save)
     store_loc = os.path.join(parent_folder_save,'width_{}_instance_{}.json'.format(num_qubits, instance_num))
