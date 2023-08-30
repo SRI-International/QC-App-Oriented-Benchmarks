@@ -21,7 +21,7 @@ import glob
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, normalize
 from sklearn.metrics import accuracy_score,log_loss
 import numpy as np
 from scipy.optimize import minimize
@@ -35,6 +35,9 @@ from qiskit.exceptions import QiskitError
 from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
 from qiskit.quantum_info import Statevector,Pauli
 from qiskit.result import sampled_expectation_value
+from sklearn.metrics import accuracy_score,log_loss, mean_squared_error
+from noisyopt import minimizeSPSA
+
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "image-recognition/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../image-recognition/_common/" ]
@@ -97,10 +100,10 @@ train_accuracy_history = []
 # DEBUG prints
 # give argument to the python script as "debug" or "true" or "1" to enable debug prints
 
-def fetch_data(train_size = 200):
+def fetch_data(train_size = 200, test_size=50):
     
     # Fetch the MNIST dataset from openml
-    mnist = fetch_openml('mnist_784')
+    mnist = fetch_openml('mnist_784', parser='auto', version=1, as_frame=False)
 
     # Access the data and target
     # x has all the pixel values of image and has Data shape of (70000, 784)  here 784 is 28*28
@@ -116,21 +119,28 @@ def fetch_data(train_size = 200):
     y = y.astype(int)
 
     # Filtering only values with 7 or 9 as we are doing binary classification for now and we will extend it to multi-class classification
-    binary_filter = (y == 0) | (y == 1)
+    binary_filter = (y == 7) | (y == 9)
 
     # Filtering the x and y data with the binary filter
     x = x[binary_filter]
     y = y[binary_filter]
 
     # create a new y data with 0 and 1 values with 7 as 0 and 9 as 1 so that we can use it for binary classification
-    # y = (y == 9).astype(int)
+    y = (y == 9).astype(int)
 
 
     ''' Here X_train is training features , y_train is training labels, X_test is testing features , 
                                                                   y_test is testing labels ,'''
 
-    test_size = int(abs(train_size * 0.25 ))    # Testing size is 25 perc of training size
+    if test_size is None:
+        test_size = int(abs(train_size * 0.25 ))    # Testing size is 25 perc of training size
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = test_size, train_size = train_size, random_state=42)
+
+
+    # Normalize images between 0 to 1
+    x = normalize(x, norm='max', axis=1)
+    x_test =  normalize(x_test, norm='max', axis=1)
+    x_train = normalize(x_train, norm='max', axis=1)
     
     return x, x_train,x_test,y_train,y_test
 
@@ -142,7 +152,7 @@ def preprocess_data(num_qubits, x, x_train, x_test):
     x_test_pca = pca.transform(x_test)
 
     # Step 2: Apply MinMax scaling to the PCA-transformed data
-    scaler = MinMaxScaler(feature_range=(0, 2 * np.pi)).fit(x_pca)
+    scaler = MinMaxScaler(feature_range=(0, np.pi)).fit(x_pca)
     x_final_train =  scaler.transform(x_train_pca)
     x_final_test  =  scaler.transform(x_test_pca)
 
@@ -247,6 +257,147 @@ def classification_ansatz(x, num_qubits: int,  model_type, theta,*args, **kwargs
         operator = PauliSumOp(SparsePauliOp("Z" * num_qubits))
 
     return qc,operator
+
+#########################################################################################
+# ANSATZ RELATED FUNCTIONS
+#########################################################################################
+
+# Variational circuit ansatzes
+def parametrized_block(thetas, num_qubits, reps):
+    
+    # reps is Number of times ry and cx gates are repeated
+    qc = QuantumCircuit(num_qubits)    
+    # print("parameter_vector",parameter_vector)
+    counter = 0
+    for rep in range(reps):
+        for i in range(num_qubits):
+            theta = thetas[counter]
+            qc.ry(theta, i)
+            counter += 1
+        
+        for i in range(num_qubits):
+            theta = thetas[counter]
+            qc.rx(theta, i)
+            counter += 1
+    
+        for j in range(0, num_qubits - 1, 1):
+            if rep<reps-1:
+                qc.cx(j, j + 1)
+    # print("counter",counter)
+    return qc
+
+# Ansatz from paper https://arxiv.org/pdf/2108.00661.pdf
+def parameterized_2q_gate_1(thetas, num_reps=1):
+    # Your implementation for conv_circ_1 function here
+    # print(thetas)
+    conv_circ = QuantumCircuit(2)
+
+    for i in range(num_reps):
+        conv_circ.rx(thetas[12*i+0], 0)
+        conv_circ.rx(thetas[12*i+1], 1)
+        conv_circ.rz(thetas[12*i+2], 0)
+        conv_circ.rz(thetas[12*i+3], 1)
+
+
+        conv_circ.crx(thetas[12*i+4], 0, 1)  
+        conv_circ.crx(thetas[12*i+5], 1, 0)
+
+        conv_circ.rx(thetas[12*i+6], 0)
+        conv_circ.rx(thetas[12*i+7], 1)
+        conv_circ.rz(thetas[12*i+8], 0)
+        conv_circ.rz(thetas[12*i+9], 1)
+
+        conv_circ.crz(thetas[12*i+10], 1, 0)  
+        conv_circ.x(1)
+        conv_circ.crx(thetas[12*i+11], 1, 0)
+        conv_circ.x(1)
+
+    #conv_circ = QuantumCircuit(2)
+    #conv_circ.crx(thetas[0], 0, 1)
+
+    # print(conv_circ)
+    return conv_circ
+
+#Most general two qubit gate ansatz
+def parameterized_2q_gate_2(thetas, num_reps=1):
+
+    conv_circ = QuantumCircuit(2)
+
+    for i in range(num_reps):
+        conv_circ.rx(thetas[15*i+0], 0)
+        conv_circ.rz(thetas[15*i+1], 0)
+        conv_circ.rx(thetas[15*i+2], 0)
+    
+        conv_circ.rx(thetas[15*i+3], 1)
+        conv_circ.rz(thetas[15*i+4], 1)
+        conv_circ.rx(thetas[15*i+5], 1)
+    
+        conv_circ.cx(1, 0)
+        conv_circ.rz(thetas[15*i+6], 0)
+        conv_circ.ry(thetas[15*i+7], 1)
+        conv_circ.cx(0, 1)
+        conv_circ.ry(thetas[15*i+8], 1)
+        conv_circ.cx(1, 0)
+    
+        conv_circ.rx(thetas[15*i+9], 0)
+        conv_circ.rz(thetas[15*i+10], 0)
+        conv_circ.rx(thetas[15*i+11], 0)
+    
+        conv_circ.rx(thetas[15*i+12], 1)
+        conv_circ.rz(thetas[15*i+13], 1)
+        conv_circ.rx(thetas[15*i+14], 1)
+
+    return conv_circ
+
+
+# new ansatz circuit
+def ansatz(ansatz_type,num_qubits, num_reps=1):
+
+    qc = QuantumCircuit(num_qubits) 
+
+    if ansatz_type == "block":
+        parameter_vector = ParameterVector("t", length=num_qubits*num_reps*2)
+        qc=qc.compose(parametrized_block(parameter_vector,num_qubits, num_reps), qubits=range(num_qubits))
+    elif ansatz_type == "qcnn uniform":
+        num_layers = int(np.ceil(np.log2(num_qubits)))
+        num_parameters_per_layer = 15 * num_reps
+        num_parameters=num_layers*num_parameters_per_layer
+        parameter_vector = ParameterVector("t", length=num_parameters)  
+        qc = QuantumCircuit(num_qubits)  
+        for i_layer in range(num_layers):
+            for i_sub_layer in [0 , 2**i_layer]:            
+                for i_q1 in range(i_sub_layer, num_qubits, 2**(i_layer+1)):
+                    i_q2=2**i_layer+i_q1
+                    if i_q2<num_qubits:
+                        qc=qc.compose(parameterized_2q_gate_2(parameter_vector[num_parameters_per_layer*i_layer:num_parameters_per_layer*(i_layer+1)], num_reps=num_reps), qubits=(i_q1,i_q2))  
+                        #print("i_q1",i_q1,"i_q2",i_q2)
+    elif ansatz_type == "qcnn unique":
+        num_layers = int(np.ceil(np.log2(num_qubits)))
+        num_parameters_per_conv = 15 * num_reps
+        parameter_vector = ParameterVector("t", length=0)  
+        qc = QuantumCircuit(num_qubits)  
+        i_conv=0
+        for i_layer in range(num_layers):
+            for i_sub_layer in [0 , 2**i_layer]:            
+                for i_q1 in range(i_sub_layer, num_qubits, 2**(i_layer+1)):
+                    i_q2=2**i_layer+i_q1
+                    if i_q2<num_qubits:
+                        parameter_vector.resize((i_conv+1)*num_parameters_per_conv)
+                        qc=qc.compose(parameterized_2q_gate_2(parameter_vector[num_parameters_per_conv*i_conv:num_parameters_per_conv*(i_conv+1)], num_reps=num_reps), qubits=(i_q1,i_q2)) 
+                        i_conv+=1
+    else:
+        print("ansatz_type not recognized")
+    
+    #print(qc)
+    
+    return qc
+
+
+
+
+
+###################################################
+
     
 def qcnn_circ(qc,num_qubits,theta, layer_size = 10):
 
@@ -395,15 +546,22 @@ def ansatz_qcnn(num_qubits,theta):
 
 # Create the benchmark program circuit
 # Accepts optional rounds and array of thetas (betas and gammas)
-def ImageRecognition (x, num_qubits, model_type, secret_int = 000000, thetas_array = None, parameterized = None):
+def ImageRecognition (x, num_qubits, model_type = 'qcnn uniform', secret_int = 000000, thetas_array = None, parameterized = None, reps = 3):
     # if no thetas_array passed in, create defaults 
     
-    # here we are filling this th
-    if thetas_array is None:
-        thetas_array = np.random.rand(parameter_size)
+    # # here we are filling this th
+    # if thetas_array is None:
+    #     thetas_array = np.random.rand(parameter_size)
 
     global _qc
     global theta
+
+    # createa circuit with num_qubits
+    qc = QuantumCircuit(num_qubits)
+
+    # add feature maps
+    for j in range(num_qubits):
+        qc.ry(x[j], j )
    
    
     # create the circuit the first time, add measurements
@@ -414,28 +572,35 @@ def ImageRecognition (x, num_qubits, model_type, secret_int = 000000, thetas_arr
     
         theta =  ParameterVector("t", parameter_size)
         
-        _qc, operator = classification_ansatz(x = x, num_qubits = num_qubits, model_type = model_type, theta = theta)  #thetas_array = thetas_array) 
+        #_qc, operator = classification_ansatz(x = x, num_qubits = num_qubits, model_type = model_type, theta = theta)  #thetas_array = thetas_array) 
 
-    # if model_type == 'QCNN':
-    #     _qc ,parameter_vector,thetas_array = qcnn_circ(num_qubits=num_qubits, thetas_array=thetas_array)
-    # elif model_type == 'QV'
-    # betas = ParameterVector("𝞫", )
+        _qc = ansatz(ansatz_type= model_type, num_qubits = num_qubits, num_reps = reps) # TODO set the number of reps?
+
     
+    z_operator = PauliSumOp(SparsePauliOp(("I" * (num_qubits-1))+"Z"))
+    #x_operator = PauliSumOp(SparsePauliOp("X" * num_qubits))
+    total_operator=z_operator
+
+
          
     if debug:
         print("first check of parameters",_qc)
-    _measurable_expression = StateFn(operator, is_measurement=True)
+    _measurable_expression = StateFn(total_operator, is_measurement=True)
     _observables = PauliExpectation().convert(_measurable_expression)
-    _qc_array, _formatted_observables = prepare_circuits(_qc, num_qubits, observables=_observables, model_type = model_type)
+    qc_prepared, formatted_observables = prepare_circuits(_qc, observables=_observables)
     
-    params = {theta: thetas_array} 
+    #params = {theta: thetas_array} 
     # Here Parameter
     # params = thetas
-        
+    params = None
+
     logger.info(f"Create binding parameters for {thetas_array}")
     
-    qc = _qc
-    #print(qc)
+    # bind parameters
+    qc_prepared.assign_parameters(thetas_array, inplace=True)
+
+    # compose the ansatz with the image data circuit
+    qc.compose(qc_prepared, inplace=True)
     
     # pre-compute and save an array of expected measurements
     #Imp Note This is different to  compute_expectation in simulator.py and it is renamed as calculate_expectation
@@ -444,13 +609,9 @@ def ImageRecognition (x, num_qubits, model_type, secret_int = 000000, thetas_arr
         logger.info('Computing expectation')
         compute_expectation(qc, num_qubits, secret_int, params=params)
    
-    # save small circuit example for display
-    global QC_
-    if QC_ == None or num_qubits <= 6:
-        if num_qubits < 9: QC_ = qc
 
     # return a handle on the circuit
-    return _qc_array, _formatted_observables, params
+    return qc, formatted_observables, params
 
 
 # ############### Expectation Tables
@@ -558,30 +719,26 @@ def normalize_counts(counts, num_qubits=None):
     return probabilities
 
     
-def prepare_circuits(base_circuit, num_qubits, observables, model_type):
+def prepare_circuits(base_circuit, observables):
     """
     Prepare the qubit-wise commuting circuits for a given operator.
     """
-    # circuits = list()
 
     if isinstance(observables, ComposedOp):
         observables = SummedOp([observables])
     # for obs in observables:
-    circuit = base_circuit.copy()
     if debug:
         print(observables)
     print(observables)
-    # circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
-    circuit.append(observables[1], qargs=list(range(base_circuit.num_qubits)))
-    if model_type != 'QCNN':
+
+    circuits = list()
+
+    for obs in observables:
+        circuit = base_circuit.copy()
+        circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
         circuit.measure_all()
-    else:
-        if num_qubits == 8:
-            circuit.measure(4,0)
-        elif num_qubits == 4:
-            circuit.measure(2,0)
-    # circuits.append(circuit)
-    # return circuits, observables
+        circuits.append(circuit)
+
     return circuit, observables
 
 
@@ -603,17 +760,23 @@ def calculate_expectation_values(probabilities, observables):
 # ------------------Main objective Function to calculate expectation value------------------
 # objective Function to compute the energy of a circuit with given parameters and operator
 # # Initialize an empty list to store the lowest energy values
-lowest_energy_values = []
 
 def compute_exp_sum(result_array, formatted_observables, num_qubits): 
     
-    
+    # if result is not a list make it a list
+    if not isinstance(result_array, list):
+        result_array = [result_array]
+
+    # if formatted_observables is not a list make it a list
+    if not isinstance(formatted_observables, list):
+        formatted_observables = [formatted_observables]
+
     # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
 
     _probabilities = list()
 
-    for _res in result_array:
-        _counts = _res.get_counts()
+    for res in result_array:
+        _counts = res.get_counts()
         _probs = normalize_counts(_counts, num_qubits=num_qubits)
         _probabilities.append(_probs)
 
@@ -622,8 +785,6 @@ def compute_exp_sum(result_array, formatted_observables, num_qubits):
 
     result = sum(_expectation_values)
 
-    # Append the energy value to the list
-    lowest_energy_values.append(result)
 
     
     return result   
@@ -944,7 +1105,7 @@ MAX_QUBITS = 8
 
 debug = False 
 
-def run (min_qubits= 4 , max_qubits = 8, model_type = 'QCNN',  train_size = 200,  max_circuits=3, num_shots=1000,
+def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_size = 200,  max_circuits=3, num_shots=1000,
         method=2, loss_type = 'cross_entropy', print_status = True, batch_size = 35, epochs = 1, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, plot_results = True,
@@ -1160,10 +1321,14 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'QCNN',  train_size = 200,
             logger.info(f'===============  Begin method 2 loop, enabling transpile')
             
             instance_num = 1
+
+            loss_history = []
+            test_accuracy_history = []
+            train_accuracy_history = []
      
                             
             # function to calculate the loss function
-            def loss_function(theta, x_batch, y_batch, is_draw_circ=False, is_print=False ,final_run = False):
+            def loss_function(theta, is_draw_circ=False, is_print=False ,final_run = False):
                 # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                 if debug:
                     print('theta', theta , 'x_batch' , x_batch , 'y_batch' , y_batch)
@@ -1179,41 +1344,30 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'QCNN',  train_size = 200,
                 ts = time.time()
                 for data_point, label in zip(x_batch, y_batch):
                 # Create the quantum circuit for the data point
+                    # Circuit Creation and Decomposition end
+                    #************************************************
                     qc, frmt_obs, params = ImageRecognition(x = data_point , model_type= model_type, num_qubits=num_qubits,
-                                        secret_int=unique_id, thetas_array= thetas_array, parameterized= parameterized)
+                                        secret_int=unique_id, thetas_array= theta, parameterized= parameterized)
                     
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     if debug:
                         print("create time:" + str(time.time() -ts))
-                    #print("store metrics" +str(metrics.circuit_metrics[str(method)]['1000']))
                     
-                    # loop over each of the circuits that are generated with basis measurements and execute
-        # ************* for qc in qc_array:
                     print("initial circuit",qc) 
-                    # qc_upd = qc.bind_parameters(params)
-                    # qc2 = qc_upd.decompose()
-                    # qc2 = qc_upd
                     
-                        # Circuit Creation and Decomposition end
-                        #************************************************
                         
                         #************************************************
                         #*** Quantum Part: Execution of Circuits ***
                         # submit circuit for execution on target with the current parameters
-                    # print("final circuit",qc2)
-                    ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
-                    # debug = True
-                    # if debug:
-                    print("abc")
+                    ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=None)
                     print("submit circuit id" + str(unique_id) )
 
                         
-                        # Must wait for circuit to complete
-                        #ex.throttle_execution(metrics.finalize_group)
+                    # Must wait for circuit to complete
+                    #ex.throttle_execution(metrics.finalize_group)
 
-                        # finalize execution of group of circuits
+                    # finalize execution of group of circuits
                     ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
-                    print("ABC")
                     # after first execution and thereafter, no need for transpilation if parameterized
                     if parameterized:
                         ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
@@ -1221,30 +1375,15 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'QCNN',  train_size = 200,
                     #************************************************
                     
                     global saved_result
-                    res.append(saved_result)
-                    print("Result" , res)
-                    if debug:
-                        print("saved result: "+ str(saved_result))
 
-                        # tapping into circuit metric exect time:
-                    if debug:
-                        print("circuit metrics method: " + str(num_qubits) + " id: " + str(unique_id) )
-                    quantum_execution_time = quantum_execution_time + metrics.circuit_metrics[str(num_qubits)][str(unique_id)]['exec_time']
-                    quantum_elapsed_time = quantum_elapsed_time + metrics.circuit_metrics[str(num_qubits)][str(unique_id)]['elapsed_time']
+
                     
-                        # Fidelity Calculation and Storage
-                        # _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, unique_id, num_shots) 
-                        
-                        #************************************************
-                        #*** Classical Processing of Results - essential to optimizer ***
+                    #************************************************
+                    #*** Classical Processing of Results - essential to optimizer ***
                     global opt_ts
                     if debug:
                         print("iteration time :" +str(quantum_execution_time))
                     global cumulative_iter_time
-        # ************* cumlative_iter_time.append(cumlative_iter_time[-1] + quantum_execution_time)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'exec_time', quantum_execution_time)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'elapsed_time', quantum_elapsed_time)
-                    dict_of_vals = dict()
                     # Start counting classical optimizer time here again
                     tc1 = time.time()
 
@@ -1255,24 +1394,15 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'QCNN',  train_size = 200,
                         if minimizer_loop_index == 1: print("")
                         print(".", end ="")
 
-                    expectation_value = compute_exp_sum(result_array = res, formatted_observables = frmt_obs, num_qubits=num_qubits)
+                    expectation_value = compute_exp_sum(result = saved_result, formatted_observables = frmt_obs, num_qubits=num_qubits)
+                    prediction = (expectation_value + 1)*0.5
 
-                    prediction_label.append(expectation_value)
+                    prediction_label.append(prediction)
                     
-                if loss_type == 'square_loss':
-                    loss = square_loss(y_batch, prediction_label)
-                elif loss_type == 'cross_entropy':
-                    loss = log_loss(y_batch, prediction_label)
-                    # calculate the solution quality
-                    # solution_quality, accuracy_volume = calculate_quality_metric(energy, fci_energy, precision=0.5, num_electrons=num_qubits)
-                    # metrics.store_metric(str(num_qubits), str(unique_id), 'energy', energy)
-                    # metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
-                    # metrics.store_metric(str(num_qubits), str(unique_id), 'solution_quality', solution_quality)
-                    # metrics.store_metric(str(num_qubits), str(unique_id), 'accuracy_volume', accuracy_volume)
-                    # metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
-                    # metrics.store_metric(str(num_qubits), str(unique_id), 'doci_energy', doci_energy)
-                    # metrics.store_metric(str(num_qubits), str(unique_id), 'radius', current_radius)
-                    # metrics.store_metric(str(num_qubits), str(unique_id), 'iteration_count', minimizer_loop_index)
+                loss =  mean_squared_error(y_batch, prediction_label)
+
+
+
                 if print_status:
                     predictions = []
                     for i in range(len(y_batch)):
@@ -1304,36 +1434,122 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'QCNN',  train_size = 200,
             
             weights = np.random.rand(24)
 
-            def callback():
-                pass
-            
-            for epoch in range(epochs):
-                for batch in range(batch_count):
-                    
-                    # indices = np.random.choice(len(x_final_train), size=batch_size, replace=False)
-                    # x_batch = x_final_train[indices]
-                    # y_batch = y_train[indices]
 
-                # start and end indeces for current_batch( Here batch is index of above batch)
-                    start_index = batch * batch_size   # batch will be 0 for first index
-                    end_index   = min((batch + 1 ) * batch_size, data_size)
+            # callback function called after each iteration of optimizer, responsible for recursive call of optimizer
+            def callback(theta):
                 
-                # batch extraction 
-                    x_batch = x_final_train[start_index:end_index]
-                    y_batch = y_train[start_index:end_index]
+                #Create a batch from random indices
+
+                #print("theta:", theta)
+                loss=loss_function(theta, is_draw_circ=False, is_print=True)
+                loss_history.append(loss)
+
+                # #Calculate the accuracy on test data
+                # test_predictions=calculate_predictions(x_scaled_test, theta, num_qubits, num_shots, reps=reps)
+                # test_accuracy=calculate_accuracy(y_test, test_predictions)
+                # test_accuracy_history.append(test_accuracy)
+                #print(mean_squared_error(test_predictions, y_test))
+
+                global batch_index
+
+                global x_batch, y_batch
+                indices = np.random.choice(len(x_final_train), size=batch_size, replace=False)
+                x_batch = x_final_train[indices]
+                y_batch = y_train[indices]
+
+                # Get modulus of batch_index with number of batches
+                #global x_batch, y_batch, batch_index
+                #i_batch = batch_index % num_batches
+                #x_batch = x_final_train[i_batch * batch_size : (i_batch + 1) * batch_size]
+                #y_batch = y_train[i_batch * batch_size : (i_batch + 1) * batch_size]
+            
+            # for epoch in range(epochs):
+            #     for batch in range(batch_count):
+                    
+            #         # indices = np.random.choice(len(x_final_train), size=batch_size, replace=False)
+            #         # x_batch = x_final_train[indices]
+            #         # y_batch = y_train[indices]
+
+            #     # start and end indeces for current_batch( Here batch is index of above batch)
+            #         start_index = batch * batch_size   # batch will be 0 for first index
+            #         end_index   = min((batch + 1 ) * batch_size, data_size)
+                
+            #     # batch extraction 
+            #         x_batch = x_final_train[start_index:end_index]
+            #         y_batch = y_train[start_index:end_index]
             
             
-                    print(f"Current batch is {batch}")
-                # Minimize the loss using SPSA optimizer
-                    is_draw,is_print = False,True
-                    theta = minimize(loss_function, x0 = weights, args=(x_batch,y_batch,is_draw,is_print), method="COBYLA", tol=0.001, 
-                                            callback=callback, options={'maxiter': 150, 'disp': False} )
-            #theta=SPSA(maxiter=100).minimize(loss_function, x0=weights)
-                    weights = theta.x
-                    print(weights)
-                    print(len(weights))
-                loss = theta.fun
-                print(f"Epoch {epoch+1}/{epochs}, loss = {loss:.4f}")
+            #         print(f"Current batch is {batch}")
+            #     # Minimize the loss using SPSA optimizer
+            #         is_draw,is_print = False,True
+            #         theta = minimize(loss_function, x0 = weights, args=(x_batch,y_batch,is_draw,is_print), method="COBYLA", tol=0.001, 
+            #                                 callback=callback, options={'maxiter': 150, 'disp': False} )
+            # #theta=SPSA(maxiter=100).minimize(loss_function, x0=weights)
+            #         weights = theta.x
+            #         print(weights)
+            #         print(len(weights))
+            #     loss = theta.fun
+            #     print(f"Epoch {epoch+1}/{epochs}, loss = {loss:.4f}")
+
+            # Initialize  epochs
+            num_epochs = 300
+
+            # Batch size for the optimizer
+            batch_size = 50
+            num_batches = int(np.ceil(len(x_final_train) / batch_size))
+
+            # Learning rate
+            init_step_size = 1
+
+            # Number of shots to run the program (experiment)
+            num_shots = 1000
+            reps = 1
+
+            # Choose the variational circuit
+            ansatz_type = 'qcnn uniform' # 'block' or 'qcnn  uniform' or 'qcnn unique'
+
+            # Initialize the weights for the QNN model
+            if ansatz_type == 'block':
+                num_parameters= num_qubits * reps * 2
+            elif ansatz_type == 'qcnn uniform':
+                num_parameters_per_layer=15*reps
+                num_layers = int(np.ceil(np.log2(num_qubits)))
+                num_parameters = num_parameters_per_layer*num_layers
+            elif ansatz_type == 'qcnn unique':
+                num_parameters_per_conv=15*reps
+                num_parameters = num_parameters_per_conv*(2*num_qubits-2-int(np.ceil(np.log2(num_qubits))))
+            else:
+                print("Invalid ansatz_type")
+
+            weights = -np.pi+2*np.pi*np.random.rand(num_parameters)
+            #weights = np.zeros(num_parameters)
+            print("Number of parameters:", len(weights))
+
+            global x_batch, y_batch
+            indices = np.random.choice(len(x_final_train), size=batch_size, replace=False)
+            x_batch = x_final_train[indices]
+            y_batch = y_train[indices]
+
+            #global x_batch, y_batch
+            #i_batch = batch_index % num_batches
+            #x_batch = x_final_train[i_batch * batch_size : (i_batch + 1) * batch_size]
+            #y_batch = y_train[i_batch * batch_size : (i_batch + 1) * batch_size]
+
+            #for k in range(5):
+            #    indices = np.random.choice(len(x_final_train), size=batch_size, replace=False)
+            #    x_batch = x_final_train[indices]
+            #    y_batch = y_train[indices]
+            #    predictions=calculate_predictions(x_batch, weights, num_qubits, reps, num_shots)
+            #
+            #    #Form and print a 2 column vector from indices and predictions
+            #    indices = indices.reshape(-1, 1)
+            #    predictions = np.array(predictions).reshape(-1, 1)
+            #    data = np.hstack((indices, predictions))
+            #    print(data)
+
+
+            #res = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, callback=callback, options={'disp': False, 'rhobeg': init_step_size} )
+            res= minimizeSPSA(loss_function, x0=weights, a=0.3, c=0.3, niter=300, callback=callback, paired=False)
 
             theta = loss_function(weights,x_final_test,y_test,print_status = False,final_run=True)
             # test_accuracy_history = []
