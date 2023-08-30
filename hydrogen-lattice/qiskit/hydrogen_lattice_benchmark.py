@@ -203,21 +203,17 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
     
     logger.info(f"Create binding parameters for {thetas_array}")
     
-    qc = _qc
+    # save the first circuit in the array returned from prepare_circuits (with appendage)
+    # to be used an example for display purposes
+    qc = _qc_array[0]
     #print(qc)
     
-    # pre-compute and save an array of expected measurements
-    '''
-    if do_compute_expectation:
-        logger.info('Computing expectation')
-        compute_expectation(qc, num_qubits, secret_int, params=params)
-    '''
     # save small circuit example for display
     global QC_
-    if QC_ == None or num_qubits <= 6:
-        if num_qubits < 9: QC_ = qc
+    if QC_ == None or num_qubits <= 4:
+        if num_qubits <= 7: QC_ = qc
 
-    # return a handle on the circuit
+    # return a handle on the circuit, the observables, and parameters
     return _qc_array, _formatted_observables, params
    
     
@@ -235,6 +231,10 @@ expectations = {}
 def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simulator', params=None):
     
     #ts = time.time()
+    
+    # to execute on Aer state vector simulator, need to remove measurements
+    qc = qc.remove_final_measurements(inplace=False)
+    
     if params != None:
         qc = qc.bind_parameters(params)
     
@@ -373,8 +373,6 @@ def normalize_counts(counts, num_qubits=None):
     assert abs(sum(probabilities.values()) - 1) < 1e-9
     return probabilities
 
-no_measures = False
-
 def prepare_circuits(base_circuit, observables):
     """
     Prepare the qubit-wise commuting circuits for a given operator.
@@ -386,10 +384,7 @@ def prepare_circuits(base_circuit, observables):
     for obs in observables:
         circuit = base_circuit.copy()
         circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
-        
-        if not no_measures:
-            circuit.measure_all()
-            
+        circuit.measure_all()
         circuits.append(circuit)
     return circuits, observables
 
@@ -959,18 +954,6 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
             
                 thetas_array_0 = thetas_array
                 
-                # DEVNOTE: this is a klunky way to obtain the circuits without measure gates 
-                # so they can be run on state vector simulator.  Improve this by simply removing 
-                # measures at end of circuit before simulating.
-                global no_measures
-                no_measures = True
-                qc_array_00, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,
-                            secret_int=instance_num,
-                            operator = operator,
-                            thetas_array= thetas_array_0,
-                            parameterized=parameterized)
-                no_measures = False
-                
                 # create the circuits to be tested
                 qc_array, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,
                             secret_int=instance_num,
@@ -978,6 +961,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                             thetas_array= thetas_array_0,
                             parameterized=parameterized)
                 
+                # loop over the array of circuits generated
                 for qc in qc_array:
                 
                     # if using parameter objects, bind before execution
@@ -987,11 +971,15 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                     metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
                     
                     # pre-compute and save an array of expected measurements
+                    # for comparison in the analysis method
+                    # (do not count as part of creation time, as this is a benchmark function)
                     if do_compute_expectation:
                         logger.info('Computing expectation')
-                        compute_expectation(qc_array_00[0], num_qubits, instance_num, params=params)
-        
-                    # submit circuit for execution on target (simulator, cloud simulator, or hardware)
+                        
+                        # pass None for parameters as they have already been bound
+                        compute_expectation(qc, num_qubits, instance_num, params=None)
+                
+                    # submit circuit for execution on target 
                     ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
                     
                     # Break out of this loop, so we only execute the first of the ansatz circuits
@@ -1220,12 +1208,11 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)       
-             
-#     global print_sample_circuit
-#     if print_sample_circuit:
-#         # print a sample circuit
-#         print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-#     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
+    
+    # print a sample circuit
+    if print_sample_circuit:
+        if method == 1: 
+            print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
     if method == 1:
