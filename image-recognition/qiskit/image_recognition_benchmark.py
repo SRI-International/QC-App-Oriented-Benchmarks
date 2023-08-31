@@ -37,6 +37,7 @@ from qiskit.quantum_info import Statevector,Pauli
 from qiskit.result import sampled_expectation_value
 from sklearn.metrics import accuracy_score,log_loss, mean_squared_error
 from noisyopt import minimizeSPSA
+import warnings
 
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "image-recognition/_common" ]
@@ -570,7 +571,7 @@ def ImageRecognition (x, num_qubits, model_type = 'qcnn uniform', secret_int = 0
         logger.info(f'*** Constructing parameterized circuit for {num_qubits = } {secret_int}') 
        
     
-        theta =  ParameterVector("t", parameter_size)
+        theta =  ParameterVector("t")
         
         #_qc, operator = classification_ansatz(x = x, num_qubits = num_qubits, model_type = model_type, theta = theta)  #thetas_array = thetas_array) 
 
@@ -598,6 +599,7 @@ def ImageRecognition (x, num_qubits, model_type = 'qcnn uniform', secret_int = 0
     
     # bind parameters
     qc_prepared.assign_parameters(thetas_array, inplace=True)
+
 
     # compose the ansatz with the image data circuit
     qc.compose(qc_prepared, inplace=True)
@@ -729,7 +731,6 @@ def prepare_circuits(base_circuit, observables):
     # for obs in observables:
     if debug:
         print(observables)
-    print(observables)
 
     circuits = list()
 
@@ -747,10 +748,10 @@ def calculate_expectation_values(probabilities, observables):
     Return the expectation values for an operator given the probabilities.
     """
     expectation_values = list()
-    print("observables", observables)
-    print("probabilities", probabilities)
+    # print("observables", observables)
+    # print("probabilities", probabilities)
     for idx, op in enumerate(observables):
-        expectation_value = sampled_expectation_value(probabilities[idx], op.primitive)
+        expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
         expectation_values.append(expectation_value)
 
     return expectation_values
@@ -768,8 +769,8 @@ def compute_exp_sum(result_array, formatted_observables, num_qubits):
         result_array = [result_array]
 
     # if formatted_observables is not a list make it a list
-    if not isinstance(formatted_observables, list):
-        formatted_observables = [formatted_observables]
+    #if not isinstance(formatted_observables, list):
+    #    formatted_observables = [formatted_observables]
 
     # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
 
@@ -1200,6 +1201,8 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
     global minimizer_loop_index
     global opt_ts
     global predictions,test_accuracy_history
+
+    predictions = list()
     
     print("Image Recognition Benchmark Program - Qiskit")
 
@@ -1232,6 +1235,9 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
         
     # Initialize metrics module
     metrics.init_metrics()
+
+    # disable deprecated warnings
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
     
     # Define custom result handler
     def execution_handler (qc, result, num_qubits, s_int, num_shots):  
@@ -1328,7 +1334,7 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
      
                             
             # function to calculate the loss function
-            def loss_function(theta, is_draw_circ=False, is_print=False ,final_run = False):
+            def loss_function(theta, is_draw_circ=False, is_print=False ,final_run = False, reps = 1):
                 # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                 if debug:
                     print('theta', theta , 'x_batch' , x_batch , 'y_batch' , y_batch)
@@ -1347,20 +1353,19 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
                     # Circuit Creation and Decomposition end
                     #************************************************
                     qc, frmt_obs, params = ImageRecognition(x = data_point , model_type= model_type, num_qubits=num_qubits,
-                                        secret_int=unique_id, thetas_array= theta, parameterized= parameterized)
+                                        secret_int=unique_id, thetas_array= theta, parameterized= parameterized, reps = reps)
                     
                     metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
                     if debug:
                         print("create time:" + str(time.time() -ts))
                     
-                    print("initial circuit",qc) 
+                    
                     
                         
                         #************************************************
                         #*** Quantum Part: Execution of Circuits ***
                         # submit circuit for execution on target with the current parameters
                     ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=None)
-                    print("submit circuit id" + str(unique_id) )
 
                         
                     # Must wait for circuit to complete
@@ -1394,7 +1399,7 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
                         if minimizer_loop_index == 1: print("")
                         print(".", end ="")
 
-                    expectation_value = compute_exp_sum(result = saved_result, formatted_observables = frmt_obs, num_qubits=num_qubits)
+                    expectation_value = compute_exp_sum(result_array = saved_result, formatted_observables = frmt_obs, num_qubits=num_qubits)
                     prediction = (expectation_value + 1)*0.5
 
                     prediction_label.append(prediction)
@@ -1551,7 +1556,9 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
             #res = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, callback=callback, options={'disp': False, 'rhobeg': init_step_size} )
             res= minimizeSPSA(loss_function, x0=weights, a=0.3, c=0.3, niter=300, callback=callback, paired=False)
 
-            theta = loss_function(weights,x_final_test,y_test,print_status = False,final_run=True)
+            x_batch = x_final_test
+            y_batch = y_test
+            theta = loss_function(res.x, is_print= False, final_run=True)
             # test_accuracy_history = []
             # for data_point in x_final_test:
             #     qc = qcnn_model(data_point, num_qubits)
@@ -1574,13 +1581,13 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
             #     # Store the test accuracy in the history list after each data point
             #     test_accuracy_history.append(test_accuracy)
 
-
+        '''
         # Evaluate the QCNN accuracy on the test set once the model is trained and tested
         accuracy = accuracy_score(y_test, predictions)
         print("Accuracy:", accuracy)
         print(f"This is for {num_qubits} qubits")
         print("predictions",predictions)
-
+        '''
 
         # training loss after each iteration
         # plt.plot(range(1, num_epochs * 100 + 1), train_loss_history)
@@ -1825,7 +1832,7 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
 #     return _solution_quality, _accuracy_volume
 
 # # # if main, execute method
-if __name__ == '__main__': run( )
+if __name__ == '__main__': run( min_qubits=4, max_qubits=4 )
 
 # # # %%
 
