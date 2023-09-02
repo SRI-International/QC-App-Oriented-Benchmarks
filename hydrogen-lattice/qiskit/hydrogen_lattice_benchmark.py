@@ -960,31 +960,37 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                             operator = operator,
                             thetas_array= thetas_array_0,
                             parameterized=parameterized)
-                
+                '''
                 # loop over the array of circuits generated
                 for qc in qc_array:
+                '''
+                # Instead, we only do one of the circuits, the last one. which is in the 
+                # z-basis.  This is the one that is most illustrative of a device's fidelity
+                qc = qc_array[2]
                 
-                    # if using parameter objects, bind before execution
-                    if parameterized:
-                        qc.bind_parameters(params)
-                        
-                    metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
+                # if using parameter objects, bind before execution
+                if parameterized:
+                    qc.bind_parameters(params)
                     
-                    # pre-compute and save an array of expected measurements
-                    # for comparison in the analysis method
-                    # (do not count as part of creation time, as this is a benchmark function)
-                    if do_compute_expectation:
-                        logger.info('Computing expectation')
-                        
-                        # pass None for parameters as they have already been bound
-                        compute_expectation(qc, num_qubits, instance_num, params=None)
+                metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
                 
-                    # submit circuit for execution on target 
-                    ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
+                # pre-compute and save an array of expected measurements
+                # for comparison in the analysis method
+                # (do not count as part of creation time, as this is a benchmark function)
+                if do_compute_expectation:
+                    logger.info('Computing expectation')
                     
+                    # pass None for parameters as they have already been bound
+                    compute_expectation(qc, num_qubits, instance_num, params=None)
+            
+                # submit circuit for execution on target 
+                ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
+                
+                ''' (see comment above about looping)
                     # Break out of this loop, so we only execute the first of the ansatz circuits
                     # DEVNOTE: maybe we should do all three, and aggregate, just as in method2
-                    break
+                    #break
+                ''' 
 
             ###############
             if method == 2:
@@ -1161,7 +1167,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                         tol=1e-3,
                         options={'maxiter': max_iter, 'disp': False},
                         callback=callback_thetas_array) 
-
+                
                 #if verbose:
                 #print(f"\nEnergies for problem file {os.path.basename(instance_filepath)} for {num_qubits} qubits and radius {current_radius} of paired hamiltionians")
                 #print(f"  PUCCD calculated energy : {ideal_energy}")
