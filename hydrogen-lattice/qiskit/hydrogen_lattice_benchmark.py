@@ -351,7 +351,9 @@ def normalize_counts(counts, num_qubits=None):
     assert abs(sum(probabilities.values()) - 1) < 1e-9
     return probabilities
 
-   
+#################################################
+# EXPECTED RESULT TABLES (METHOD 1)
+  
 ############### Expectation Tables Created using State Vector Simulator
 
 # DEVNOTE: We are building these tables on-demand for now, but for larger circuits
@@ -409,7 +411,9 @@ def get_expectation(num_qubits, secret_int, num_shots):
     else:
         return None
       
-# ############### Result Data Analysis
+
+#################################################
+# RESULT DATA ANALYSIS (METHOD 1)
 
 expected_dist = {}
 
@@ -438,78 +442,48 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     return counts, fidelity
 
-''' 
-#-------------- start of simulator expectation value code ---------------------------
+##### METHOD 2 function to compute application-specific figures of merit
 
-# For initial development
-statevector_backend = Aer.get_backend("statevector_simulator")
-qasm_backend = Aer.get_backend("qasm_simulator")
-
-def get_measured_qubits(circuit: QuantumCircuit) -> List[int]:
+def calculate_quality_metric(energy=None,
+            fci_energy=0,
+            random_energy=0, 
+            precision = 4,
+            num_electrons = 2):
     """
-    Get a list of indices of the qubits being measured in a given quantum circuit.
+    Returns the quality metrics, namely solution quality, accuracy volume, and accuracy ratio. 
+    Solution quality is a value between zero and one. The other two metrics can take any value.
+
+    Parameters
+    ----------
+    energy : list
+        list of energies calculated for each iteration.
+
+    fci_energy : float
+        FCI energy for the problem.
+
+    random_energy : float
+        Random energy for the problem, precomputed and stored and read from json file   
+
+    precision : float
+        precision factor used in solution quality calculation
+        changes the behavior of the monotonic arctan function
+
+    num_electrons : int
+        number of electrons in the problem
     """
-    measured_qubits = []
+    _relative_energy = np.absolute(np.divide(np.subtract( np.array(energy), fci_energy), fci_energy))
+    
+    #scale the solution quality to 0 to 1 using arctan 
+    _solution_quality = np.subtract(1, np.divide(np.arctan(np.multiply(precision,_relative_energy)), np.pi/2))
 
-    for gate, qubits, clbits in circuit.data:
-        if gate.name == "measure":
-            measured_qubits.extend([qubit.index for qubit in qubits])
+    # define accuracy volume as the absolute energy difference between the FCI energy and the energy of the solution normalized per electron
+    _accuracy_volume = np.divide(np.absolute(np.subtract( np.array(energy), fci_energy)), num_electrons)
 
-    measured_qubits = sorted(list(set(measured_qubits)))
+    # define accuracy ratio as the difference between calculated energy and random energy divided by difference in random energy and FCI energy
+    _accuracy_ratio = np.divide(np.subtract( np.array(energy), random_energy), np.subtract(fci_energy, random_energy))
 
-    return measured_qubits
+    return _solution_quality, _accuracy_volume, _accuracy_ratio
 
-def expectation_run(circuit: QuantumCircuit, shots: Optional[int] = None) -> Dict[str, float]:
-        """Run a quantum circuit on the noise-free simulator and return the probabilities."""
-
-        # Refactored error check
-        # if circuit.num_parameters != 0:
-            # raise QiskitError(ErrorMessages.UNDEFINED_PARAMS.value)
-        if len(get_measured_qubits(circuit)) == 0:
-            circuit.measure_all()
-
-        if shots is None:
-            measured_qubits = get_measured_qubits(circuit)
-            statevector = (
-                execute(
-                    circuit.remove_final_measurements(inplace=False),
-                    backend= statevector_backend,
-                )
-                .result()
-                .get_statevector()
-            )
-            probs = Statevector(statevector).probabilities_dict(qargs=measured_qubits)
-        elif isinstance(shots, int):
-            counts = (execute(circuit, backend= qasm_backend, shots=shots).result().get_counts())
-            if DEBUG:
-                print("DEBUG : \n method: expectation_run \n\t counts: "+str(counts) + "\n\t circuit: "+str(circuit))
-            probs = normalize_counts(counts, num_qubits=circuit.num_qubits)
-        # else:
-        #     raise TypeError(ErrorMessages.UNRECOGNIZED_SHOTS.value.format(shots=shots))
-
-        return probs
-'''
-
-'''
-def compute_probabilities(circuits, parameters=None, shots=None):
-    """
-    Compute the probabilities for a list of circuits with given parameters.
-    """
-    probabilities = list()
-    for my_circuit in circuits:
-        if parameters is not None:
-            circuit = my_circuit.assign_parameters(parameters, inplace=False)
-        else:
-            circuit = my_circuit.copy()
-        result = expectation_run(circuit, shots)
-        if DEBUG:
-            print("DEBUG : \n method: compute_probabilities \n\t result_probabilities: "+str(result))
-        probabilities.append(result)
-
-    return probabilities
-
-# ------------------ end of simulator expectation value code ------------------------  
-'''
 
 #################################################
 # DATA SAVE FUNCTIONS
@@ -765,6 +739,66 @@ def get_width_restart_tuple_from_filename(fileName):
     degree = int(match.groups()[1])
     return (num_qubits,degree)
 
+
+################################################
+# PLOT METHODS
+
+def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circuits = 1,
+            method=2,
+            score_metric='solution_quality', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
+            num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
+            detailed_save_names=False, individual=False, **kwargs):
+    """
+    Plot results from the data contained in metrics tables.
+    """
+
+    # Add custom metric names to metrics module (in case this is run outside of run())
+    add_custom_metric_names()
+    
+    # handle single string form of score metrics
+    if type(score_metric) == str:
+            score_metric = [score_metric]
+    
+    # for hydrogen lattice, objective function is always 'Energy'
+    obj_str = "Energy"
+ 
+    suffix = ''
+
+    # If detailed names are desired for saving plots, put date of creation, etc.
+    if detailed_save_names:
+        cur_time=datetime.datetime.now()
+        dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
+        suffix = f's{num_shots}_r{radius}_mi{max_iter}_{dt}'
+    
+    suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
+    backend_id = metrics.get_backend_id()
+    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits}
+    
+    # plot all line metrics, including solution quality and accuracy ratio 
+    # vs iteration count and cumulative execution time
+    h_metrics.plot_all_line_metrics(suptitle,
+                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
+                x_vals=["iteration_count", "cumulative_exec_time"],
+                individual=individual,
+                backend_id=backend_id,
+                options=options)
+    
+    # plot all cumulative metrics, including average_iteration_time and accuracy ratio 
+    # over number of qubits
+    h_metrics.plot_all_cumulative_metrics(suptitle,
+                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
+                x_vals=["iteration_count", "cumulative_exec_time"],
+                individual=individual,
+                backend_id=backend_id,
+                options=options)
+                
+    # plot all area metrics
+    metrics.plot_all_area_metrics(suptitle,
+                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
+                fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
+                x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
+                options=options, suffix=suffix, which_metric='solution_quality')
+    
 
 ################################################
 ################################################
@@ -1302,99 +1336,8 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
-
-def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circuits = 1,
-            method=2,
-            score_metric='solution_quality', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
-            num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
-            detailed_save_names=False, individual=False, **kwargs):
-    """
-    Plot results from the data contained in metrics tables.
-    """
-
-    # Add custom metric names to metrics module (in case this is run outside of run())
-    add_custom_metric_names()
-    
-    # handle single string form of score metrics
-    if type(score_metric) == str:
-            score_metric = [score_metric]
-    
-    # for hydrogen lattice, objective function is always 'Energy'
-    obj_str = "Energy"
- 
-    suffix = ''
-
-    # If detailed names are desired for saving plots, put date of creation, etc.
-    if detailed_save_names:
-        cur_time=datetime.datetime.now()
-        dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
-        suffix = f's{num_shots}_r{radius}_mi{max_iter}_{dt}'
-    
-    suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
-    backend_id = metrics.get_backend_id()
-    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits}
-    
-    # plot all line metrics, including solution quality and accuracy ratio 
-    # vs iteration count and cumulative execution time
-    h_metrics.plot_all_line_metrics(suptitle,
-                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
-                x_vals=["iteration_count", "cumulative_exec_time"],
-                individual=individual,
-                backend_id=backend_id,
-                options=options)
-    
-    # plot all cumulative metrics, including average_iteration_time and accuracy ratio 
-    # over number of qubits
-    h_metrics.plot_all_cumulative_metrics(suptitle,
-                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
-                x_vals=["iteration_count", "cumulative_exec_time"],
-                individual=individual,
-                backend_id=backend_id,
-                options=options)
-                
-    # plot all area metrics
-    metrics.plot_all_area_metrics(suptitle,
-                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
-                fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
-                x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
-                options=options, suffix=suffix, which_metric='solution_quality')
-    
-
-def calculate_quality_metric(energy=None, fci_energy=0, random_energy=0, precision = 4, num_electrons = 2):
-    """
-    Returns the quality metrics, namely solution quality, accuracy volume, and accuracy ratio. 
-    Solution quality is a value between zero and one. The other two metrics can take any value.
-
-    Parameters
-    ----------
-    energy : list
-        list of energies calculated for each iteration.
-
-    fci_energy : float
-        FCI energy for the problem.
-
-    random_energy : float
-        Random energy for the problem, precomputed and stored and read from json file   
-
-    precision : float
-        precision factor used in solution quality calculation
-        changes the behavior of the monotonic arctan function
-
-    num_electrons : int
-        number of electrons in the problem
-    """
-    _relative_energy = np.absolute(np.divide(np.subtract( np.array(energy), fci_energy), fci_energy))
-    
-    #scale the solution quality to 0 to 1 using arctan 
-    _solution_quality = np.subtract(1, np.divide(np.arctan(np.multiply(precision,_relative_energy)), np.pi/2))
-
-    # define accuracy volume as the absolute energy difference between the FCI energy and the energy of the solution normalized per electron
-    _accuracy_volume = np.divide(np.absolute(np.subtract( np.array(energy), fci_energy)), num_electrons)
-
-    # define accuracy ratio as the difference between calculated energy and random energy divided by difference in random energy and FCI energy
-    _accuracy_ratio = np.divide(np.subtract( np.array(energy), random_energy), np.subtract(fci_energy, random_energy))
-
-    return _solution_quality, _accuracy_volume, _accuracy_ratio
+#################################
+# MAIN
 
 # # if main, execute method
 if __name__ == '__main__': run()
