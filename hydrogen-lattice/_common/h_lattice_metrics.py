@@ -65,8 +65,14 @@ def find_last_metrics_for_group(group, instance):
             doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
             fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
             current_radius = h_lattice_metrics[group][circuit_id]['radius']
-            accuracy_ratio = h_lattice_metrics[group][circuit_id]['accuracy_ratio']
             solution_quality = h_lattice_metrics[group][circuit_id]['solution_quality']
+            
+            # DEVNOTE: temporary backwards compatibility, remove later
+            # (this is so we can display older runs that do not have accuracy ratio)
+            if 'accuracy_ratio' in h_lattice_metrics[group][circuit_id]:
+                accuracy_ratio = h_lattice_metrics[group][circuit_id]['accuracy_ratio']
+            else:
+                accuracy_ratio = solution_quality  
 
         else:
             continue
@@ -81,6 +87,10 @@ def find_metrics_array_for_group(group, instance, metric_name, x_val, x_metric_n
     x_label = ''
     y_label = ''
 
+    # DEVNOTE: temporary backwards compatibility, remove later
+    # (this is so we can display older runs that do not have accuracy ratio)
+    if metric_name == 'accuracy_ratio': metric_name = 'solution_quality'
+    
     for circuit_id in h_lattice_metrics[group]:
         if np.floor(int(circuit_id)/1000) == instance:
         

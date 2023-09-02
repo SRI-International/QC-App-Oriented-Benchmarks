@@ -73,6 +73,7 @@ np.random.seed(0)
 hl_inputs = dict() #inputs to the run method
 verbose = False
 print_sample_circuit = True
+
 # Indicates whether to perform the (expensive) pre compute of expectations
 do_compute_expectation = True
 
@@ -111,14 +112,71 @@ def add_custom_metric_names():
 
 ###################################
 # HYDROGEN LATTICE CIRCUIT
+
+# parameter mode to control length of initial thetas_array (global during dev phase)
+# 1 - length 1
+# 2 - length N, where N is number of excitation pairs
+saved_parameter_mode = 1  
+
+def get_initial_parameters(num_qubits: int, thetas_array):
+    '''
+    Generate an initial set of parameters given the number of qubits and user-provided thetas_array.
+    If thetas_array is None, generate random array of parameters based on the parameter_mode
+    If thetas_array is of length 1, repeat to the required length based on parameter_mode
+    Otherwise, use the provided thetas_array.
     
+    Parameters
+    ----------
+    num_qubits : int
+        number of qubits in circuit 
+    thetas_array : array of floats
+        user-supplied array of initial values
+
+    Returns
+    -------
+    initial_parameters : array
+        array of parameter values required
+    '''
+    
+    # compute required size of array based on number of occupation pairs
+    size = 1
+    if saved_parameter_mode > 1:
+        num_occ_pairs = (num_qubits // 2)
+        size = num_occ_pairs**2
+    
+    # if None passed in, create array of random values
+    if thetas_array == None:
+        initial_parameters = np.random.random(size=size)
+    
+    # if single value passed in, extend to required size
+    elif size > 1 and len(thetas_array) == 1:
+        initial_parameters = np.repeat(thetas_array, size)
+    
+    # otherwise, use what user provided
+    else:
+        if len(thetas_array) != size:
+            print(f"WARNING: length of thetas_array {len(thetas_array)} does not equal required length {size}")
+            print("         Generating random values instead.")
+            initial_parameters = get_initial_parameters(num_qubits, None)
+        else:  
+            initial_parameters = np.array(thetas_array)
+        
+    if verbose:
+        print(f"... get_initial_parameters(num_qubits={num_qubits}, mode={saved_parameter_mode})")
+        print(f"    --> initial_parameter[{size}]={initial_parameters}")
+        
+    return initial_parameters
+                
 # Create the  ansatz quantum circuit for the VQE algorithm.
 def VQE_ansatz(num_qubits: int,
             thetas_array,
             parameterized,
             num_occ_pairs: Optional[int] = None,
             *args, **kwargs) -> QuantumCircuit:
-            
+    
+    if verbose:    
+        print(f"  ... VQE_ansatz(num_qubits={num_qubits}, thetas_array={thetas_array}")  
+    
     # Generate the ansatz circuit for the VQE algorithm.
     if num_occ_pairs is None:
         num_occ_pairs = (num_qubits // 2)  # e.g., half-filling, which is a reasonable chemical case
@@ -128,26 +186,25 @@ def VQE_ansatz(num_qubits: int,
     for i in range(num_occ_pairs):
         for a in range(num_occ_pairs, num_qubits):
             excitation_pairs.append([i, a])
-
+    
+    # create circuit of num_qubits
     circuit = QuantumCircuit(num_qubits)
     
     # Hartree Fock initial state
     for occ in range(num_occ_pairs):
         circuit.x(occ)
     
-    # if thetas_array is not None:
-    #     parameter_vector = ParameterVector(thetas_array)
-    # else:
+    # if parameterized flag set, create a ParameterVector
     parameter_vector = None
     if parameterized:
         parameter_vector = ParameterVector("t", length=len(excitation_pairs))
     
-    thetas_array = np.repeat(thetas_array, len(excitation_pairs))
+    # for parameter mode 1, make all thetas the same as the first
+    if saved_parameter_mode == 1:
+        thetas_array = np.repeat(thetas_array, len(excitation_pairs))
     
-    # Hartree Fock initial state
-
+    # create a Hartree Fock initial state
     for idx, pair in enumerate(excitation_pairs):
-        # parameter
         
         # if parameterized, use ParamterVector, otherwise raw theta value
         theta = parameter_vector[idx] if parameterized else thetas_array[idx]
@@ -171,12 +228,20 @@ def VQE_ansatz(num_qubits: int,
         circuit.sdg(a)
         circuit.sdg(i)
 
+    ''' TMI ...
+    if verbose:
+        print(f"      --> thetas_array={thetas_array}")
+        print(f"      --> parameter_vector={str(parameter_vector)}") 
+    '''
     return circuit, parameter_vector, thetas_array
     
 # Create the benchmark program circuit array, for the given operator
 def HydrogenLattice (num_qubits, operator, secret_int = 000000,
             thetas_array = None, parameterized = None):
     
+    if verbose:    
+        print(f"... HydrogenLattice(num_qubits={num_qubits}, thetas_array={thetas_array}") 
+        
     # if no thetas_array passed in, create defaults 
     if thetas_array is None:
         thetas_array = [1.0]
@@ -201,7 +266,10 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
     # create a binding of Parameter values
     params = {parameter_vector: thetas_array} if parameterized else None
     
-    logger.info(f"Create binding parameters for {thetas_array}")
+    if verbose:
+        print(f"    --> params={params}")
+        
+    logger.info(f"Create binding parameters for {thetas_array} {params}")
     
     # save the first circuit in the array returned from prepare_circuits (with appendage)
     # to be used an example for display purposes
@@ -216,8 +284,77 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
     # return a handle on the circuit, the observables, and parameters
     return _qc_array, _formatted_observables, params
    
+############### Prepare Circuits from Observables
+
+def prepare_circuits(base_circuit, observables):
+    """
+    Prepare the qubit-wise commuting circuits for a given operator.
+    """
+    circuits = list()
+
+    if isinstance(observables, ComposedOp):
+        observables = SummedOp([observables])
+        
+    for obs in observables:
+        circuit = base_circuit.copy()
+        circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
+        circuit.measure_all()
+        circuits.append(circuit)
+        
+    return circuits, observables
+
+def compute_energy(result_array, formatted_observables, num_qubits): 
+    """
+    Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
+    """
     
-############### Expectation Tables
+    _probabilities = list()
+
+    for _res in result_array:
+        _counts = _res.get_counts()
+        _probs = normalize_counts(_counts, num_qubits=num_qubits)
+        _probabilities.append(_probs)
+
+    _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
+
+    energy = sum(_expectation_values)
+
+    return energy    
+
+def calculate_expectation_values(probabilities, observables):
+    """
+    Return the expectation values for an operator given the probabilities.
+    """
+    expectation_values = list()
+    for idx, op in enumerate(observables):
+        expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
+        expectation_values.append(expectation_value)
+
+    return expectation_values
+
+def normalize_counts(counts, num_qubits=None):
+    """
+    Normalize the counts to get probabilities and convert to bitstrings.
+    """
+    
+    normalizer = sum(counts.values())
+
+    try:
+        dict({str(int(key, 2)): value for key, value in counts.items()})
+        if num_qubits is None:
+            num_qubits = max(len(key) for key in counts)
+        bitstrings = {key.zfill(num_qubits): value for key, value in counts.items()}
+    except ValueError:
+        bitstrings = counts
+
+    probabilities = dict({key: value / normalizer for key, value in bitstrings.items()})
+    assert abs(sum(probabilities.values()) - 1) < 1e-9
+    return probabilities
+
+#################################################
+# EXPECTED RESULT TABLES (METHOD 1)
+  
+############### Expectation Tables Created using State Vector Simulator
 
 # DEVNOTE: We are building these tables on-demand for now, but for larger circuits
 # this will need to be pre-computed ahead of time and stored in a data file to avoid run-time delays.
@@ -240,7 +377,7 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simu
     
     #execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
-    sv_result = execute(qc, sv_backend).result()
+    sv_result = execute(qc, sv_backend, params=params).result()
 
     # get the probability distribution
     counts = sv_result.get_counts()
@@ -262,7 +399,7 @@ def get_expectation(num_qubits, secret_int, num_shots):
     if id in expectations:
         counts = expectations[id]
         
-        # scale to number of shots
+        # scale probabilities to number of shots to obtain counts
         for k, v in counts.items():
             counts[k] = round(v * num_shots)
         
@@ -273,9 +410,10 @@ def get_expectation(num_qubits, secret_int, num_shots):
         
     else:
         return None
-    
-    
-# ############### Result Data Analysis
+      
+
+#################################################
+# RESULT DATA ANALYSIS (METHOD 1)
 
 expected_dist = {}
 
@@ -304,147 +442,48 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     return counts, fidelity
 
+##### METHOD 2 function to compute application-specific figures of merit
 
-# For initial development
-statevector_backend = Aer.get_backend("statevector_simulator")
-qasm_backend = Aer.get_backend("qasm_simulator")
-
-#----------------- start of simulator expectation value code-----------------------------------
-
-def get_measured_qubits(circuit: QuantumCircuit) -> List[int]:
+def calculate_quality_metric(energy=None,
+            fci_energy=0,
+            random_energy=0, 
+            precision = 4,
+            num_electrons = 2):
     """
-    Get a list of indices of the qubits being measured in a given quantum circuit.
+    Returns the quality metrics, namely solution quality, accuracy volume, and accuracy ratio. 
+    Solution quality is a value between zero and one. The other two metrics can take any value.
+
+    Parameters
+    ----------
+    energy : list
+        list of energies calculated for each iteration.
+
+    fci_energy : float
+        FCI energy for the problem.
+
+    random_energy : float
+        Random energy for the problem, precomputed and stored and read from json file   
+
+    precision : float
+        precision factor used in solution quality calculation
+        changes the behavior of the monotonic arctan function
+
+    num_electrons : int
+        number of electrons in the problem
     """
-    measured_qubits = []
-
-    for gate, qubits, clbits in circuit.data:
-        if gate.name == "measure":
-            measured_qubits.extend([qubit.index for qubit in qubits])
-
-    measured_qubits = sorted(list(set(measured_qubits)))
-
-    return measured_qubits
-
-def expectation_run(circuit: QuantumCircuit, shots: Optional[int] = None) -> Dict[str, float]:
-        """Run a quantum circuit on the noise-free simulator and return the probabilities."""
-
-        # Refactored error check
-        # if circuit.num_parameters != 0:
-            # raise QiskitError(ErrorMessages.UNDEFINED_PARAMS.value)
-        if len(get_measured_qubits(circuit)) == 0:
-            circuit.measure_all()
-
-        if shots is None:
-            measured_qubits = get_measured_qubits(circuit)
-            statevector = (
-                execute(
-                    circuit.remove_final_measurements(inplace=False),
-                    backend= statevector_backend,
-                )
-                .result()
-                .get_statevector()
-            )
-            probs = Statevector(statevector).probabilities_dict(qargs=measured_qubits)
-        elif isinstance(shots, int):
-            counts = (execute(circuit, backend= qasm_backend, shots=shots).result().get_counts())
-            if DEBUG:
-                print("DEBUG : \n method: expectation_run \n\t counts: "+str(counts) + "\n\t circuit: "+str(circuit))
-            probs = normalize_counts(counts, num_qubits=circuit.num_qubits)
-        # else:
-        #     raise TypeError(ErrorMessages.UNRECOGNIZED_SHOTS.value.format(shots=shots))
-
-        return probs
-
-def normalize_counts(counts, num_qubits=None):
-    """
-    Normalize the counts to get probabilities and convert to bitstrings.
-    """
-    normalizer = sum(counts.values())
-
-    try:
-        dict({str(int(key, 2)): value for key, value in counts.items()})
-        if num_qubits is None:
-            num_qubits = max(len(key) for key in counts)
-        bitstrings = {key.zfill(num_qubits): value for key, value in counts.items()}
-    except ValueError:
-        bitstrings = counts
-
-    probabilities = dict({key: value / normalizer for key, value in bitstrings.items()})
-    assert abs(sum(probabilities.values()) - 1) < 1e-9
-    return probabilities
-
-def prepare_circuits(base_circuit, observables):
-    """
-    Prepare the qubit-wise commuting circuits for a given operator.
-    """
-    circuits = list()
-
-    if isinstance(observables, ComposedOp):
-        observables = SummedOp([observables])
-    for obs in observables:
-        circuit = base_circuit.copy()
-        circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
-        circuit.measure_all()
-        circuits.append(circuit)
-    return circuits, observables
-
-def compute_probabilities(circuits, parameters=None, shots=None):
-    """
-    Compute the probabilities for a list of circuits with given parameters.
-    """
-    probabilities = list()
-    for my_circuit in circuits:
-        if parameters is not None:
-            circuit = my_circuit.assign_parameters(parameters, inplace=False)
-        else:
-            circuit = my_circuit.copy()
-        result = expectation_run(circuit, shots)
-        if DEBUG:
-            print("DEBUG : \n method: compute_probabilities \n\t result_probabilities: "+str(result))
-        probabilities.append(result)
-
-    return probabilities
-
-def calculate_expectation_values(probabilities, observables):
-    """
-    Return the expectation values for an operator given the probabilities.
-    """
-    expectation_values = list()
-    for idx, op in enumerate(observables):
-        expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
-        expectation_values.append(expectation_value)
-
-    return expectation_values
-
-# -------------------------------------end of simulator expectation value code-----------------------------------
-
-# ------------------Main objective Function to calculate expectation value------------------
-# objective Function to compute the energy of a circuit with given parameters and operator
-# # Initialize an empty list to store the lowest energy values
-lowest_energy_values = []
-
-def compute_energy(result_array, formatted_observables, num_qubits): 
+    _relative_energy = np.absolute(np.divide(np.subtract( np.array(energy), fci_energy), fci_energy))
     
-    
-    # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
+    #scale the solution quality to 0 to 1 using arctan 
+    _solution_quality = np.subtract(1, np.divide(np.arctan(np.multiply(precision,_relative_energy)), np.pi/2))
 
-    _probabilities = list()
+    # define accuracy volume as the absolute energy difference between the FCI energy and the energy of the solution normalized per electron
+    _accuracy_volume = np.divide(np.absolute(np.subtract( np.array(energy), fci_energy)), num_electrons)
 
-    for _res in result_array:
-        _counts = _res.get_counts()
-        _probs = normalize_counts(_counts, num_qubits=num_qubits)
-        _probabilities.append(_probs)
+    # define accuracy ratio as the difference between calculated energy and random energy divided by difference in random energy and FCI energy
+    _accuracy_ratio = np.divide(np.subtract( np.array(energy), random_energy), np.subtract(fci_energy, random_energy))
 
+    return _solution_quality, _accuracy_volume, _accuracy_ratio
 
-    _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
-
-    energy = sum(_expectation_values)
-
-    # Append the energy value to the list
-    lowest_energy_values.append(energy)
-
-    
-    return energy    
 
 #################################################
 # DATA SAVE FUNCTIONS
@@ -702,13 +741,74 @@ def get_width_restart_tuple_from_filename(fileName):
 
 
 ################################################
+# PLOT METHODS
+
+def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circuits = 1,
+            method=2,
+            score_metric='solution_quality', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
+            num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
+            detailed_save_names=False, individual=False, **kwargs):
+    """
+    Plot results from the data contained in metrics tables.
+    """
+
+    # Add custom metric names to metrics module (in case this is run outside of run())
+    add_custom_metric_names()
+    
+    # handle single string form of score metrics
+    if type(score_metric) == str:
+            score_metric = [score_metric]
+    
+    # for hydrogen lattice, objective function is always 'Energy'
+    obj_str = "Energy"
+ 
+    suffix = ''
+
+    # If detailed names are desired for saving plots, put date of creation, etc.
+    if detailed_save_names:
+        cur_time=datetime.datetime.now()
+        dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
+        suffix = f's{num_shots}_r{radius}_mi{max_iter}_{dt}'
+    
+    suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
+    backend_id = metrics.get_backend_id()
+    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits}
+    
+    # plot all line metrics, including solution quality and accuracy ratio 
+    # vs iteration count and cumulative execution time
+    h_metrics.plot_all_line_metrics(suptitle,
+                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
+                x_vals=["iteration_count", "cumulative_exec_time"],
+                individual=individual,
+                backend_id=backend_id,
+                options=options)
+    
+    # plot all cumulative metrics, including average_iteration_time and accuracy ratio 
+    # over number of qubits
+    h_metrics.plot_all_cumulative_metrics(suptitle,
+                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
+                x_vals=["iteration_count", "cumulative_exec_time"],
+                individual=individual,
+                backend_id=backend_id,
+                options=options)
+                
+    # plot all area metrics
+    metrics.plot_all_area_metrics(suptitle,
+                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
+                fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
+                x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
+                options=options, suffix=suffix, which_metric='solution_quality')
+    
+
+################################################
 ################################################
 # RUN METHOD
 
 MAX_QUBITS = 16
 
 def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
-        method=2, radius=None, thetas_array=None, parameterized= False, do_fidelities=True,
+        method=2, radius=None,
+        thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
         max_iter=30, comfort=False,
         score_metric=['solution_quality', 'accuracy_ratio'],
         x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
@@ -737,6 +837,8 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         Value between 0 and 1. The default is 0.1.
     parameterized : bool, optional
         Whether to use parameter objects in circuits or not. The default is False.
+    parameter_mode : bool, optional 
+        If 1, use thetas_array of length 1, otherwise (num_qubits//2)**2, to match excitation pairs
     do_fidelities : bool, optional
         Compute circuit fidelity. The default is True.
     max_iter : int, optional
@@ -828,7 +930,11 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
     do_compute_expectation = do_fidelities
-        
+    
+    # save the desired parameter mode globally (for now, during dev)
+    global saved_parameter_mode
+    saved_parameter_mode = parameter_mode
+    
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
         y_size = 1.5
@@ -941,24 +1047,25 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
             method_names, values = common.read_puccd_solution(sol_file_name)
             solution = list(zip(method_names, values))   
             
-                    # if the file does not exist, we are done with this number of qubits
+            # if the file does not exist, we are done with this number of qubits
             if operator == None:
                 print(f"  ... problem not found.")
                 break
-
+            
+            # create an intial thetas_array, given the circuit width and user input
+            thetas_array_0 = get_initial_parameters(num_qubits, thetas_array)
+            
             ###############
             if method == 1:
             
                 # create the circuit(s) for given qubit size and secret string, store time metric
                 ts = time.time()
-            
-                thetas_array_0 = thetas_array
                 
                 # create the circuits to be tested
-                qc_array, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,
+                qc_array, frmt_obs, params = HydrogenLattice(num_qubits=num_qubits,
                             secret_int=instance_num,
-                            operator = operator,
-                            thetas_array= thetas_array_0,
+                            operator=operator,
+                            thetas_array=thetas_array_0,
                             parameterized=parameterized)
                 '''
                 # loop over the array of circuits generated
@@ -968,10 +1075,13 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 # z-basis.  This is the one that is most illustrative of a device's fidelity
                 qc = qc_array[2]
                 
-                # if using parameter objects, bind before execution
-                if parameterized:
-                    qc.bind_parameters(params)
-                    
+                ''' TMI ...
+                # for testing and debugging ...
+                #if using parameter objects, bind before printing
+                if verbose:
+                    print(qc.bind_parameters(params) if parameterized else qc)
+                ''' 
+                
                 metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
                 
                 # pre-compute and save an array of expected measurements
@@ -980,10 +1090,10 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 if do_compute_expectation:
                     logger.info('Computing expectation')
                     
-                    # pass None for parameters as they have already been bound
-                    compute_expectation(qc, num_qubits, instance_num, params=None)
+                    # pass parameters as they are used during execution
+                    compute_expectation(qc, num_qubits, instance_num, params=params)
             
-                # submit circuit for execution on target 
+                # submit circuit for execution on target, with parameters
                 ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
                 
                 ''' (see comment above about looping)
@@ -1053,7 +1163,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                     # loop over each of the circuits that are generated with basis measurements and execute
                     
                     if verbose:
-                        print(f"... ** compute_energy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params}, thetas_array={thetas_array}")
+                        print(f"... ** compute energy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params}, thetas_array={thetas_array}")
                     
                     # loop over each circuit and execute
                     for qc in qc_array:      
@@ -1084,7 +1194,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                         global saved_result
                         result_array.append(saved_result)
 
-                        # Aggregate xecution and elapsed time for running all three circuits 
+                        # Aggregate execution and elapsed time for running all three circuits 
                         # corresponding to different measurements along the different Pauli bases
                         quantum_execution_time = quantum_execution_time + \
                                 metrics.circuit_metrics[str(num_qubits)][str(unique_id)]['exec_time']
@@ -1121,6 +1231,9 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                     energy = compute_energy(result_array = result_array,
                             formatted_observables = frmt_obs, num_qubits=num_qubits)
 
+                    # append the most recent energy value to the list
+                    lowest_energy_values.append(energy)
+    
                     # calculate the solution quality, accuracy volume and accuracy ratio
                     global solution_quality, accuracy_volume, accuracy_ratio
                     solution_quality, accuracy_volume, accuracy_ratio = calculate_quality_metric(
@@ -1151,18 +1264,16 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 # End of Objective Function
                 
                 # if in verbose mode, comfort dots need a newline before optimizer gets going
-                if comfort and verbose:
-                    print("")
-                
-                # generate random arry of length 1 (it is extended during ansatz creation)
-                initial_parameters = np.random.random(size=1)            
-                if verbose:
-                    print(f"... initial parameters = {initial_parameters}")
+                #if comfort and verbose:
+                    #print("")
+
+                # Initialize an empty list to store the energy values from each iteration
+                lowest_energy_values = []
 
                 # execute classical optimizer to minimize the objective function
                 # objective function is called repeatedly with varying parameters until lowest energy found
-                thetas_array = minimize(objective_function,
-                        x0=initial_parameters.ravel(),  # note: revel not really needed for this ansatz
+                ret = minimize(objective_function,
+                        x0=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
                         method='COBYLA',
                         tol=1e-3,
                         options={'maxiter': max_iter, 'disp': False},
@@ -1179,7 +1290,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 print(f"  Random Solution calculated energy : {random_energy}")
                 
                 print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
-                print(f"  Lowest Energy : {energy}")
+                print(f"  Lowest Energy : {lowest_energy_values[-1]}")
                 print(f"  Solution Quality : {solution_quality}, Accuracy Ratio : {accuracy_ratio}")
                 
                 # pLotting each instance of qubit count given 
@@ -1191,7 +1302,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                                 radius = radius,
                                 instance_num=instance_num,
                                 num_shots=num_shots, 
-                                converged_thetas_list=thetas_array.x.tolist(),
+                                converged_thetas_list=ret.x.tolist(),
                                 energy = lowest_energy_values[-1],
                                 # iter_size_dist=iter_size_dist, iter_dist=iter_dist,
                                 detailed_save_names=detailed_save_names,
@@ -1199,9 +1310,6 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                                 save_res_to_file=save_res_to_file, _instances=_instances)
 
             ###### End of instance processing
-            
-            # clear the table of lowest energy values for this problem instance
-            lowest_energy_values.clear()
 
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
@@ -1228,99 +1336,8 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
-
-def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circuits = 1,
-            method=2,
-            score_metric='solution_quality', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
-            num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
-            detailed_save_names=False, individual=False, **kwargs):
-    """
-    Plot results from the data contained in metrics tables.
-    """
-
-    # Add custom metric names to metrics module (in case this is run outside of run())
-    add_custom_metric_names()
-    
-    # handle single string form of score metrics
-    if type(score_metric) == str:
-            score_metric = [score_metric]
-    
-    # for hydrogen lattice, objective function is always 'Energy'
-    obj_str = "Energy"
- 
-    suffix = ''
-
-    # If detailed names are desired for saving plots, put date of creation, etc.
-    if detailed_save_names:
-        cur_time=datetime.datetime.now()
-        dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
-        suffix = f's{num_shots}_r{radius}_mi{max_iter}_{dt}'
-    
-    suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
-    backend_id = metrics.get_backend_id()
-    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits}
-    
-    # plot all line metrics, including solution quality and accuracy ratio 
-    # vs iteration count and cumulative execution time
-    h_metrics.plot_all_line_metrics(suptitle,
-                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
-                x_vals=["iteration_count", "cumulative_exec_time"],
-                individual=individual,
-                backend_id=backend_id,
-                options=options)
-    
-    # plot all cumulative metrics, including average_iteration_time and accuracy ratio 
-    # over number of qubits
-    h_metrics.plot_all_cumulative_metrics(suptitle,
-                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
-                x_vals=["iteration_count", "cumulative_exec_time"],
-                individual=individual,
-                backend_id=backend_id,
-                options=options)
-                
-    # plot all area metrics
-    metrics.plot_all_area_metrics(suptitle,
-                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
-                fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
-                x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
-                options=options, suffix=suffix, which_metric='solution_quality')
-    
-
-def calculate_quality_metric(energy=None, fci_energy=0, random_energy=0, precision = 4, num_electrons = 2):
-    """
-    Returns the quality metrics, namely solution quality, accuracy volume, and accuracy ratio. 
-    Solution quality is a value between zero and one. The other two metrics can take any value.
-
-    Parameters
-    ----------
-    energy : list
-        list of energies calculated for each iteration.
-
-    fci_energy : float
-        FCI energy for the problem.
-
-    random_energy : float
-        Random energy for the problem, precomputed and stored and read from json file   
-
-    precision : float
-        precision factor used in solution quality calculation
-        changes the behavior of the monotonic arctan function
-
-    num_electrons : int
-        number of electrons in the problem
-    """
-    _relative_energy = np.absolute(np.divide(np.subtract( np.array(energy), fci_energy), fci_energy))
-    
-    #scale the solution quality to 0 to 1 using arctan 
-    _solution_quality = np.subtract(1, np.divide(np.arctan(np.multiply(precision,_relative_energy)), np.pi/2))
-
-    # define accuracy volume as the absolute energy difference between the FCI energy and the energy of the solution normalized per electron
-    _accuracy_volume = np.divide(np.absolute(np.subtract( np.array(energy), fci_energy)), num_electrons)
-
-    # define accuracy ratio as the difference between calculated energy and random energy divided by difference in random energy and FCI energy
-    _accuracy_ratio = np.divide(np.subtract( np.array(energy), random_energy), np.subtract(fci_energy, random_energy))
-
-    return _solution_quality, _accuracy_volume, _accuracy_ratio
+#################################
+# MAIN
 
 # # if main, execute method
 if __name__ == '__main__': run()

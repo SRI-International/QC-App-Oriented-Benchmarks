@@ -905,6 +905,11 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
+        
+        if show_elapsed_times:
+            axs[axi].legend(['Elapsed', 'Quantum'], loc='upper left')
+        #else:
+            #axs[axi].legend(['Quantum'], loc='upper left')
             
         # none of these methods of sharing the x axis gives proper effect; makes extra white space
         #axs[axi].sharex(axs[2])
