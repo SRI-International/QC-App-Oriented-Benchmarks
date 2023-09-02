@@ -301,6 +301,21 @@ def set_execution_target(backend_id='qasm_simulator',
                     options.resilience_level = exec_options.get("resilience_level", 1)
                     options.optimization_level = exec_options.get("optimization_level", 3)
                     
+                    # special handling for ibmq_qasm_simulator to set noise model
+                    if backend_id == "ibmq_qasm_simulator":
+                        this_noise = noise
+                        # get noise model from options; used only in simulator for now
+                        if "noise_model" in exec_options:
+                            this_noise = exec_options.get("noise_model", None)
+                            if verbose:
+                                print(f"... using custom noise model: {this_noise}")
+                        # attach to backend if not None
+                        if this_noise != None:
+                            options.simulator = {"noise_model": this_noise}
+                            metrics.QV = this_noise.QV
+                            if verbose:
+                                print(f"... setting noise model, QV={this_noise.QV} on {backend_id}")
+                        
                     if verbose:
                         print(f"... execute using Sampler on backend_id {backend_id} with options = {options}")
                     
