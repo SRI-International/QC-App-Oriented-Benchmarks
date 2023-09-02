@@ -284,8 +284,75 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
     # return a handle on the circuit, the observables, and parameters
     return _qc_array, _formatted_observables, params
    
+############### Prepare Circuits from Observables
+
+def prepare_circuits(base_circuit, observables):
+    """
+    Prepare the qubit-wise commuting circuits for a given operator.
+    """
+    circuits = list()
+
+    if isinstance(observables, ComposedOp):
+        observables = SummedOp([observables])
+        
+    for obs in observables:
+        circuit = base_circuit.copy()
+        circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
+        circuit.measure_all()
+        circuits.append(circuit)
+        
+    return circuits, observables
+
+def compute_energy(result_array, formatted_observables, num_qubits): 
+    """
+    Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
+    """
     
-############### Expectation Tables
+    _probabilities = list()
+
+    for _res in result_array:
+        _counts = _res.get_counts()
+        _probs = normalize_counts(_counts, num_qubits=num_qubits)
+        _probabilities.append(_probs)
+
+    _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
+
+    energy = sum(_expectation_values)
+
+    return energy    
+
+def calculate_expectation_values(probabilities, observables):
+    """
+    Return the expectation values for an operator given the probabilities.
+    """
+    expectation_values = list()
+    for idx, op in enumerate(observables):
+        expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
+        expectation_values.append(expectation_value)
+
+    return expectation_values
+
+def normalize_counts(counts, num_qubits=None):
+    """
+    Normalize the counts to get probabilities and convert to bitstrings.
+    """
+    
+    normalizer = sum(counts.values())
+
+    try:
+        dict({str(int(key, 2)): value for key, value in counts.items()})
+        if num_qubits is None:
+            num_qubits = max(len(key) for key in counts)
+        bitstrings = {key.zfill(num_qubits): value for key, value in counts.items()}
+    except ValueError:
+        bitstrings = counts
+
+    probabilities = dict({key: value / normalizer for key, value in bitstrings.items()})
+    assert abs(sum(probabilities.values()) - 1) < 1e-9
+    return probabilities
+
+   
+############### Expectation Tables Created using State Vector Simulator
 
 # DEVNOTE: We are building these tables on-demand for now, but for larger circuits
 # this will need to be pre-computed ahead of time and stored in a data file to avoid run-time delays.
@@ -330,7 +397,7 @@ def get_expectation(num_qubits, secret_int, num_shots):
     if id in expectations:
         counts = expectations[id]
         
-        # scale to number of shots
+        # scale probabilities to number of shots to obtain counts
         for k, v in counts.items():
             counts[k] = round(v * num_shots)
         
@@ -341,8 +408,7 @@ def get_expectation(num_qubits, secret_int, num_shots):
         
     else:
         return None
-    
-    
+      
 # ############### Result Data Analysis
 
 expected_dist = {}
@@ -372,12 +438,12 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     return counts, fidelity
 
+''' 
+#-------------- start of simulator expectation value code ---------------------------
 
 # For initial development
 statevector_backend = Aer.get_backend("statevector_simulator")
 qasm_backend = Aer.get_backend("qasm_simulator")
-
-#----------------- start of simulator expectation value code-----------------------------------
 
 def get_measured_qubits(circuit: QuantumCircuit) -> List[int]:
     """
@@ -422,40 +488,9 @@ def expectation_run(circuit: QuantumCircuit, shots: Optional[int] = None) -> Dic
         #     raise TypeError(ErrorMessages.UNRECOGNIZED_SHOTS.value.format(shots=shots))
 
         return probs
+'''
 
-def normalize_counts(counts, num_qubits=None):
-    """
-    Normalize the counts to get probabilities and convert to bitstrings.
-    """
-    normalizer = sum(counts.values())
-
-    try:
-        dict({str(int(key, 2)): value for key, value in counts.items()})
-        if num_qubits is None:
-            num_qubits = max(len(key) for key in counts)
-        bitstrings = {key.zfill(num_qubits): value for key, value in counts.items()}
-    except ValueError:
-        bitstrings = counts
-
-    probabilities = dict({key: value / normalizer for key, value in bitstrings.items()})
-    assert abs(sum(probabilities.values()) - 1) < 1e-9
-    return probabilities
-
-def prepare_circuits(base_circuit, observables):
-    """
-    Prepare the qubit-wise commuting circuits for a given operator.
-    """
-    circuits = list()
-
-    if isinstance(observables, ComposedOp):
-        observables = SummedOp([observables])
-    for obs in observables:
-        circuit = base_circuit.copy()
-        circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
-        circuit.measure_all()
-        circuits.append(circuit)
-    return circuits, observables
-
+'''
 def compute_probabilities(circuits, parameters=None, shots=None):
     """
     Compute the probabilities for a list of circuits with given parameters.
@@ -473,46 +508,8 @@ def compute_probabilities(circuits, parameters=None, shots=None):
 
     return probabilities
 
-def calculate_expectation_values(probabilities, observables):
-    """
-    Return the expectation values for an operator given the probabilities.
-    """
-    expectation_values = list()
-    for idx, op in enumerate(observables):
-        expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
-        expectation_values.append(expectation_value)
-
-    return expectation_values
-
-# -------------------------------------end of simulator expectation value code-----------------------------------
-
-# ------------------Main objective Function to calculate expectation value------------------
-# objective Function to compute the energy of a circuit with given parameters and operator
-# # Initialize an empty list to store the lowest energy values
-lowest_energy_values = []
-
-def compute_energy(result_array, formatted_observables, num_qubits): 
-    
-    
-    # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
-
-    _probabilities = list()
-
-    for _res in result_array:
-        _counts = _res.get_counts()
-        _probs = normalize_counts(_counts, num_qubits=num_qubits)
-        _probabilities.append(_probs)
-
-
-    _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
-
-    energy = sum(_expectation_values)
-
-    # Append the energy value to the list
-    lowest_energy_values.append(energy)
-
-    
-    return energy    
+# ------------------ end of simulator expectation value code ------------------------  
+'''
 
 #################################################
 # DATA SAVE FUNCTIONS
@@ -1132,7 +1129,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                     # loop over each of the circuits that are generated with basis measurements and execute
                     
                     if verbose:
-                        print(f"... ** compute_energy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params}, thetas_array={thetas_array}")
+                        print(f"... ** compute energy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params}, thetas_array={thetas_array}")
                     
                     # loop over each circuit and execute
                     for qc in qc_array:      
@@ -1200,6 +1197,9 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                     energy = compute_energy(result_array = result_array,
                             formatted_observables = frmt_obs, num_qubits=num_qubits)
 
+                    # append the most recent energy value to the list
+                    lowest_energy_values.append(energy)
+    
                     # calculate the solution quality, accuracy volume and accuracy ratio
                     global solution_quality, accuracy_volume, accuracy_ratio
                     solution_quality, accuracy_volume, accuracy_ratio = calculate_quality_metric(
@@ -1233,6 +1233,9 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 #if comfort and verbose:
                     #print("")
 
+                # Initialize an empty list to store the energy values from each iteration
+                lowest_energy_values = []
+
                 # execute classical optimizer to minimize the objective function
                 # objective function is called repeatedly with varying parameters until lowest energy found
                 ret = minimize(objective_function,
@@ -1253,7 +1256,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 print(f"  Random Solution calculated energy : {random_energy}")
                 
                 print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
-                print(f"  Lowest Energy : {energy}")
+                print(f"  Lowest Energy : {lowest_energy_values[-1]}")
                 print(f"  Solution Quality : {solution_quality}, Accuracy Ratio : {accuracy_ratio}")
                 
                 # pLotting each instance of qubit count given 
@@ -1273,9 +1276,6 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                                 save_res_to_file=save_res_to_file, _instances=_instances)
 
             ###### End of instance processing
-            
-            # clear the table of lowest energy values for this problem instance
-            lowest_energy_values.clear()
 
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
