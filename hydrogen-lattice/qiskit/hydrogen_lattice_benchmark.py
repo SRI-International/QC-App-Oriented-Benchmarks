@@ -73,6 +73,7 @@ np.random.seed(0)
 hl_inputs = dict() #inputs to the run method
 verbose = False
 print_sample_circuit = True
+
 # Indicates whether to perform the (expensive) pre compute of expectations
 do_compute_expectation = True
 
@@ -111,14 +112,71 @@ def add_custom_metric_names():
 
 ###################################
 # HYDROGEN LATTICE CIRCUIT
+
+# parameter mode to control length of initial thetas_array (global during dev phase)
+# 1 - length 1
+# 2 - length N, where N is number of excitation pairs
+saved_parameter_mode = 1  
+
+def get_initial_parameters(num_qubits: int, thetas_array):
+    '''
+    Generate an initial set of parameters given the number of qubits and user-provided thetas_array.
+    If thetas_array is None, generate random array of parameters based on the parameter_mode
+    If thetas_array is of length 1, repeat to the required length based on parameter_mode
+    Otherwise, use the provided thetas_array.
     
+    Parameters
+    ----------
+    num_qubits : int
+        number of qubits in circuit 
+    thetas_array : array of floats
+        user-supplied array of initial values
+
+    Returns
+    -------
+    initial_parameters : array
+        array of parameter values required
+    '''
+    
+    # compute required size of array based on number of occupation pairs
+    size = 1
+    if saved_parameter_mode > 1:
+        num_occ_pairs = (num_qubits // 2)
+        size = num_occ_pairs**2
+    
+    # if None passed in, create array of random values
+    if thetas_array == None:
+        initial_parameters = np.random.random(size=size)
+    
+    # if single value passed in, extend to required size
+    elif size > 1 and len(thetas_array) == 1:
+        initial_parameters = np.repeat(thetas_array, size)
+    
+    # otherwise, use what user provided
+    else:
+        if len(thetas_array) != size:
+            print(f"WARNING: length of thetas_array {len(thetas_array)} does not equal required length {size}")
+            print("         Generating random values instead.")
+            initial_parameters = get_initial_parameters(num_qubits, None)
+        else:  
+            initial_parameters = np.array(thetas_array)
+        
+    if verbose:
+        print(f"... get_initial_parameters(num_qubits={num_qubits}, mode={saved_parameter_mode})")
+        print(f"    --> initial_parameter[{size}]={initial_parameters}")
+        
+    return initial_parameters
+                
 # Create the  ansatz quantum circuit for the VQE algorithm.
 def VQE_ansatz(num_qubits: int,
             thetas_array,
             parameterized,
             num_occ_pairs: Optional[int] = None,
             *args, **kwargs) -> QuantumCircuit:
-            
+    
+    if verbose:    
+        print(f"  ... VQE_ansatz(num_qubits={num_qubits}, thetas_array={thetas_array}")  
+    
     # Generate the ansatz circuit for the VQE algorithm.
     if num_occ_pairs is None:
         num_occ_pairs = (num_qubits // 2)  # e.g., half-filling, which is a reasonable chemical case
@@ -128,26 +186,25 @@ def VQE_ansatz(num_qubits: int,
     for i in range(num_occ_pairs):
         for a in range(num_occ_pairs, num_qubits):
             excitation_pairs.append([i, a])
-
+    
+    # create circuit of num_qubits
     circuit = QuantumCircuit(num_qubits)
     
     # Hartree Fock initial state
     for occ in range(num_occ_pairs):
         circuit.x(occ)
     
-    # if thetas_array is not None:
-    #     parameter_vector = ParameterVector(thetas_array)
-    # else:
+    # if parameterized flag set, create a ParameterVector
     parameter_vector = None
     if parameterized:
         parameter_vector = ParameterVector("t", length=len(excitation_pairs))
     
-    thetas_array = np.repeat(thetas_array, len(excitation_pairs))
+    # for parameter mode 1, make all thetas the same as the first
+    if saved_parameter_mode == 1:
+        thetas_array = np.repeat(thetas_array, len(excitation_pairs))
     
-    # Hartree Fock initial state
-
+    # create a Hartree Fock initial state
     for idx, pair in enumerate(excitation_pairs):
-        # parameter
         
         # if parameterized, use ParamterVector, otherwise raw theta value
         theta = parameter_vector[idx] if parameterized else thetas_array[idx]
@@ -171,12 +228,20 @@ def VQE_ansatz(num_qubits: int,
         circuit.sdg(a)
         circuit.sdg(i)
 
+    ''' TMI ...
+    if verbose:
+        print(f"      --> thetas_array={thetas_array}")
+        print(f"      --> parameter_vector={str(parameter_vector)}") 
+    '''
     return circuit, parameter_vector, thetas_array
     
 # Create the benchmark program circuit array, for the given operator
 def HydrogenLattice (num_qubits, operator, secret_int = 000000,
             thetas_array = None, parameterized = None):
     
+    if verbose:    
+        print(f"... HydrogenLattice(num_qubits={num_qubits}, thetas_array={thetas_array}") 
+        
     # if no thetas_array passed in, create defaults 
     if thetas_array is None:
         thetas_array = [1.0]
@@ -201,7 +266,10 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
     # create a binding of Parameter values
     params = {parameter_vector: thetas_array} if parameterized else None
     
-    logger.info(f"Create binding parameters for {thetas_array}")
+    if verbose:
+        print(f"    --> params={params}")
+        
+    logger.info(f"Create binding parameters for {thetas_array} {params}")
     
     # save the first circuit in the array returned from prepare_circuits (with appendage)
     # to be used an example for display purposes
@@ -240,7 +308,7 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simu
     
     #execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
-    sv_result = execute(qc, sv_backend).result()
+    sv_result = execute(qc, sv_backend, params=params).result()
 
     # get the probability distribution
     counts = sv_result.get_counts()
@@ -708,7 +776,8 @@ def get_width_restart_tuple_from_filename(fileName):
 MAX_QUBITS = 16
 
 def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
-        method=2, radius=None, thetas_array=None, parameterized= False, do_fidelities=True,
+        method=2, radius=None,
+        thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
         max_iter=30, comfort=False,
         score_metric=['solution_quality', 'accuracy_ratio'],
         x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
@@ -737,6 +806,8 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         Value between 0 and 1. The default is 0.1.
     parameterized : bool, optional
         Whether to use parameter objects in circuits or not. The default is False.
+    parameter_mode : bool, optional 
+        If 1, use thetas_array of length 1, otherwise (num_qubits//2)**2, to match excitation pairs
     do_fidelities : bool, optional
         Compute circuit fidelity. The default is True.
     max_iter : int, optional
@@ -828,7 +899,11 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
     do_compute_expectation = do_fidelities
-        
+    
+    # save the desired parameter mode globally (for now, during dev)
+    global saved_parameter_mode
+    saved_parameter_mode = parameter_mode
+    
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size == None:
         y_size = 1.5
@@ -941,24 +1016,25 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
             method_names, values = common.read_puccd_solution(sol_file_name)
             solution = list(zip(method_names, values))   
             
-                    # if the file does not exist, we are done with this number of qubits
+            # if the file does not exist, we are done with this number of qubits
             if operator == None:
                 print(f"  ... problem not found.")
                 break
-
+            
+            # create an intial thetas_array, given the circuit width and user input
+            thetas_array_0 = get_initial_parameters(num_qubits, thetas_array)
+            
             ###############
             if method == 1:
             
                 # create the circuit(s) for given qubit size and secret string, store time metric
                 ts = time.time()
-            
-                thetas_array_0 = thetas_array
                 
                 # create the circuits to be tested
-                qc_array, frmt_obs, params = HydrogenLattice(num_qubits = num_qubits,
+                qc_array, frmt_obs, params = HydrogenLattice(num_qubits=num_qubits,
                             secret_int=instance_num,
-                            operator = operator,
-                            thetas_array= thetas_array_0,
+                            operator=operator,
+                            thetas_array=thetas_array_0,
                             parameterized=parameterized)
                 '''
                 # loop over the array of circuits generated
@@ -968,10 +1044,13 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 # z-basis.  This is the one that is most illustrative of a device's fidelity
                 qc = qc_array[2]
                 
-                # if using parameter objects, bind before execution
-                if parameterized:
-                    qc.bind_parameters(params)
-                    
+                ''' TMI ...
+                # for testing and debugging ...
+                #if using parameter objects, bind before printing
+                if verbose:
+                    print(qc.bind_parameters(params) if parameterized else qc)
+                ''' 
+                
                 metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
                 
                 # pre-compute and save an array of expected measurements
@@ -980,10 +1059,10 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 if do_compute_expectation:
                     logger.info('Computing expectation')
                     
-                    # pass None for parameters as they have already been bound
-                    compute_expectation(qc, num_qubits, instance_num, params=None)
+                    # pass parameters as they are used during execution
+                    compute_expectation(qc, num_qubits, instance_num, params=params)
             
-                # submit circuit for execution on target 
+                # submit circuit for execution on target, with parameters
                 ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
                 
                 ''' (see comment above about looping)
@@ -1084,7 +1163,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                         global saved_result
                         result_array.append(saved_result)
 
-                        # Aggregate xecution and elapsed time for running all three circuits 
+                        # Aggregate execution and elapsed time for running all three circuits 
                         # corresponding to different measurements along the different Pauli bases
                         quantum_execution_time = quantum_execution_time + \
                                 metrics.circuit_metrics[str(num_qubits)][str(unique_id)]['exec_time']
@@ -1151,18 +1230,13 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 # End of Objective Function
                 
                 # if in verbose mode, comfort dots need a newline before optimizer gets going
-                if comfort and verbose:
-                    print("")
-                
-                # generate random arry of length 1 (it is extended during ansatz creation)
-                initial_parameters = np.random.random(size=1)            
-                if verbose:
-                    print(f"... initial parameters = {initial_parameters}")
+                #if comfort and verbose:
+                    #print("")
 
                 # execute classical optimizer to minimize the objective function
                 # objective function is called repeatedly with varying parameters until lowest energy found
-                thetas_array = minimize(objective_function,
-                        x0=initial_parameters.ravel(),  # note: revel not really needed for this ansatz
+                ret = minimize(objective_function,
+                        x0=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
                         method='COBYLA',
                         tol=1e-3,
                         options={'maxiter': max_iter, 'disp': False},
@@ -1191,7 +1265,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                                 radius = radius,
                                 instance_num=instance_num,
                                 num_shots=num_shots, 
-                                converged_thetas_list=thetas_array.x.tolist(),
+                                converged_thetas_list=ret.x.tolist(),
                                 energy = lowest_energy_values[-1],
                                 # iter_size_dist=iter_size_dist, iter_dist=iter_dist,
                                 detailed_save_names=detailed_save_names,
