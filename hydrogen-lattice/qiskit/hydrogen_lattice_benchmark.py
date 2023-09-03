@@ -809,7 +809,7 @@ MAX_QUBITS = 16
 def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
         method=2, radius=None,
         thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
-        max_iter=30, comfort=False,
+        minimizer_function=None, minimizer_tolerance=1e-3, max_iter=30, comfort=False,
         score_metric=['solution_quality', 'accuracy_ratio'],
         x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, plot_results = True,
@@ -841,6 +841,10 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         If 1, use thetas_array of length 1, otherwise (num_qubits//2)**2, to match excitation pairs
     do_fidelities : bool, optional
         Compute circuit fidelity. The default is True.
+    minimizer_function : function
+        custom function used for minimizer
+    minimizer_tolerance : float
+        tolerance for minimizer, default is 1e-3,
     max_iter : int, optional
         Number of iterations for the minimizer routine. The default is 30.
     score_metric : list or string, optional
@@ -892,7 +896,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
     
     # Delete some entries from the dictionary; they may contain secrets or function pointers
-    for key in ["hub", "group", "project", "provider_backend", "exec_options"]:
+    for key in ["hub", "group", "project", "provider_backend", "exec_options", "minimizer_function"]:
         dict_of_inputs.pop(key)
     
     global hydrogen_lattice_inputs
@@ -1270,15 +1274,24 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 # Initialize an empty list to store the energy values from each iteration
                 lowest_energy_values = []
 
-                # execute classical optimizer to minimize the objective function
-                # objective function is called repeatedly with varying parameters until lowest energy found
-                ret = minimize(objective_function,
-                        x0=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
-                        method='COBYLA',
-                        tol=1e-3,
-                        options={'maxiter': max_iter, 'disp': False},
-                        callback=callback_thetas_array) 
-                
+                # execute COPYLA classical optimizer to minimize the objective function
+                # objective function is called repeatedly with varying parameters
+                # until the lowest energy found
+                if minimizer_function == None:
+                    ret = minimize(objective_function,
+                            x0=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
+                            method='COBYLA',
+                            tol=minimizer_tolerance,
+                            options={'maxiter': max_iter, 'disp': False},
+                            callback=callback_thetas_array) 
+                            
+                # or, execute a custom minimizer
+                else:
+                    ret = minimizer_function(objective_function=objective_function,
+                            initial_parameters=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
+                            callback=callback_thetas_array
+                            )
+                            
                 #if verbose:
                 #print(f"\nEnergies for problem file {os.path.basename(instance_filepath)} for {num_qubits} qubits and radius {current_radius} of paired hamiltionians")
                 #print(f"  PUCCD calculated energy : {ideal_energy}")
