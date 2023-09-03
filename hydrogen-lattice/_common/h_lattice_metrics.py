@@ -66,14 +66,15 @@ def find_last_metrics_for_group(group, instance):
             fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
             current_radius = h_lattice_metrics[group][circuit_id]['radius']
             solution_quality = h_lattice_metrics[group][circuit_id]['solution_quality']
-            
+            accuracy_ratio = h_lattice_metrics[group][circuit_id]['accuracy_ratio']
+            '''
             # DEVNOTE: temporary backwards compatibility, remove later
             # (this is so we can display older runs that do not have accuracy ratio)
             if 'accuracy_ratio' in h_lattice_metrics[group][circuit_id]:
                 accuracy_ratio = h_lattice_metrics[group][circuit_id]['accuracy_ratio']
             else:
                 accuracy_ratio = solution_quality  
-
+            '''
         else:
             continue
             
@@ -87,9 +88,11 @@ def find_metrics_array_for_group(group, instance, metric_name, x_val, x_metric_n
     x_label = ''
     y_label = ''
 
+    '''
     # DEVNOTE: temporary backwards compatibility, remove later
     # (this is so we can display older runs that do not have accuracy ratio)
     if metric_name == 'accuracy_ratio': metric_name = 'solution_quality'
+    '''
     
     for circuit_id in h_lattice_metrics[group]:
         if np.floor(int(circuit_id)/1000) == instance:
@@ -361,8 +364,11 @@ def plot_line_metric(ax=None, subtitle:str="",
         metric_legend_label = f'Solution Quality = {final_solution_quality:.3f}'
         
         # start the y-ticks at 0 and end at 1.1
-        ax.set_ylim([0, 1.08])
-
+        ax.set_ylim([0.0, 1.08])
+        '''
+        ax.set_ylim([y_min - 0.2*y_range, 1.0 + 0.1*y_range])
+        ax.set_yscale('log')
+        '''
     # add a horizontal line at y=0 for accuracy ratio
     elif metric_name == 'accuracy_ratio':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
