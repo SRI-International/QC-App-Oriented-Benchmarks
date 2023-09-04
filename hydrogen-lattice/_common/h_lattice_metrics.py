@@ -394,7 +394,7 @@ def plot_line_metric(ax=None, subtitle:str="",
         chacc = -math.atan((CHEM_ACC_HARTREE/fci_energy) * precision) / (math.pi/2)
         
         # define the lowest y value a fraction below the chemical accuracy line
-        y_base = chacc/5
+        y_base = chacc/3
         
         # draw a shaded rectangle from bottom of plot to chem accuracy level
         rect = Rectangle((0.0, y_base), x_data[-1], chacc-y_base, color='lightgrey')
@@ -421,7 +421,7 @@ def plot_line_metric(ax=None, subtitle:str="",
         chacc = -math.atan((CHEM_ACC_HARTREE/fci_energy) * precision) / (math.pi/2)
         
         # define the lowest y value a fraction below the chemical accuracy line
-        y_base = chacc/5
+        y_base = chacc/3
         
         # draw a shaded rectangle from bottom of plot to chem accuracy level
         rect = Rectangle((0.0, y_base), x_data[-1], chacc-y_base, color='lightgrey')
