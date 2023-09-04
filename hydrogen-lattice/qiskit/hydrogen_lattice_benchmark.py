@@ -745,13 +745,18 @@ def get_width_restart_tuple_from_filename(fileName):
 
 def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circuits = 1,
             method=2,
-            score_metric='solution_quality', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
+            score_metric=['solution_quality', 'accuracy_ratio'],
+            x_metric=['cumulative_elapsed_time', 'cumulative_exec_time'],
+            y_metric=['num_qubits'],
+            line_x_metrics=['iteration_count', 'cumulative_exec_time', 'cumulative_exec_time', 'cumulative_exec_time'],
+            line_y_metrics=['energy', 'solution_quality_error', 'solution_quality', 'accuracy_ratio_error'],
+            fixed_metrics={},
             num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
             detailed_save_names=False, individual=False, **kwargs):
     """
     Plot results from the data contained in metrics tables.
     """
-
+    
     # Add custom metric names to metrics module (in case this is run outside of run())
     add_custom_metric_names()
     
@@ -777,8 +782,8 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
     # plot all line metrics, including solution quality and accuracy ratio 
     # vs iteration count and cumulative execution time
     h_metrics.plot_all_line_metrics(suptitle,
-                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
-                x_vals=["iteration_count", "cumulative_exec_time"],
+                line_x_metrics=line_x_metrics,
+                line_y_metrics=line_y_metrics,
                 individual=individual,
                 backend_id=backend_id,
                 options=options)
@@ -812,6 +817,8 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         minimizer_function=None, minimizer_tolerance=1e-3, max_iter=30, comfort=False,
         score_metric=['solution_quality', 'accuracy_ratio'],
         x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
+        line_x_metrics=['iteration_count', 'cumulative_exec_time', 'cumulative_exec_time', 'cumulative_exec_time'],
+        line_y_metrics=['energy', 'solution_quality_error', 'solution_quality', 'accuracy_ratio_error'],
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, 
         backend_id='qasm_simulator', provider_backend=None,
@@ -847,6 +854,10 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         tolerance for minimizer, default is 1e-3,
     max_iter : int, optional
         Number of iterations for the minimizer routine. The default is 30.
+    line_x_metrics : list or string, optional
+        Which metrics are to be plotted on x-axis in line metrics plots. 
+    line_y_metrics : list or string, optional
+        Which metrics are to be plotted on y-axis in line metrics plots.
     score_metric : list or string, optional
         Which metrics are to be plotted in area metrics plots. The default is 'fidelity'.
     x_metric : list or string, optional
@@ -1345,6 +1356,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     if method == 1:
         metrics.plot_metrics(f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit",
                 options=dict(shots=num_shots))
+                
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
