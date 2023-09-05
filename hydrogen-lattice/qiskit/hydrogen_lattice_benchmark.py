@@ -748,7 +748,7 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
             
             line_x_metrics=['iteration_count', 'cumulative_exec_time'],
             line_y_metrics=['energy', 'solution_quality_error'],
-            individual=False,
+            plot_layout_style = "grid",
             
             score_metric=['solution_quality', 'accuracy_ratio'],
             y_metric=['num_qubits'],
@@ -787,7 +787,7 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
     h_metrics.plot_all_line_metrics(suptitle,
                 line_x_metrics=line_x_metrics,
                 line_y_metrics=line_y_metrics,
-                individual=individual,
+                plot_layout_style=plot_layout_style,
                 backend_id=backend_id,
                 options=options)
     
@@ -796,7 +796,7 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
     h_metrics.plot_all_cumulative_metrics(suptitle,
                 score_metrics=["energy", "solution_quality", "accuracy_ratio"],
                 x_vals=["iteration_count", "cumulative_exec_time"],
-                individual=individual,
+                plot_layout_style=plot_layout_style,
                 backend_id=backend_id,
                 options=options)
                 
@@ -821,7 +821,6 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         
         line_x_metrics=['iteration_count', 'cumulative_exec_time'],
         line_y_metrics=['energy', 'solution_quality_error'],
-        individual=False,
         
         score_metric=['solution_quality', 'accuracy_ratio'],
         y_metric='num_qubits',
@@ -829,6 +828,8 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         
         plot_results = True,
+        plot_layout_style = "grid", 
+        
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, 
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None, _instances=None) :
@@ -863,6 +864,8 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         tolerance for minimizer, default is 1e-3,
     max_iter : int, optional
         Number of iterations for the minimizer routine. The default is 30.
+    plot_layout_style : str, optional
+        Style of plot layout, 'grid', 'stacked', or 'individual', default = 'grid'
     line_x_metrics : list or string, optional
         Which metrics are to be plotted on x-axis in line metrics plots. 
     line_y_metrics : list or string, optional
