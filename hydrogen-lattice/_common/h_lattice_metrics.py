@@ -142,7 +142,7 @@ def cumulative_sum(input_list: list):
 def plot_all_line_metrics(suptitle=None,
         line_x_metrics=['iteration_count', 'cumulative_exec_time'],
         line_y_metrics=['energy', 'solution_quality_error'],
-        individual=False,
+        plot_layout_style='grid',
         backend_id="UNKNOWN", options=None):
     '''
     Function to plot all line metrics (energy, solution quality) vs different x values (iteration count, cumulative execution time)
@@ -151,12 +151,12 @@ def plot_all_line_metrics(suptitle=None,
     ----------
     suptitle: str   
         first line of the title of the figure
+    plot_layout_style : str, optional
+        Style of plot layout, 'grid', 'stacked', or 'individual', default = 'grid'
     line_y_metrics: list
         list of y metrics to plot
     line_x_metrics: list
         list of x values to plot
-    individual: bool
-        draw each subplot in its own figure if set to True
     backend_id: str 
         identifier for the backend system used for execution
     options: dict
@@ -196,7 +196,7 @@ def plot_all_line_metrics(suptitle=None,
 
             # create common title
             suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
-            
+            '''
             # draw a single plot
             if not individual:
                 plot_count = 1
@@ -206,21 +206,39 @@ def plot_all_line_metrics(suptitle=None,
             else:
                 plot_count = min(4, len(line_y_metrics))
                 subplot_count = 1
-
-            # since all subplots share the same header, give user and indication of the grouping
-            if individual:
+            '''
+            # if drawing plots individually, get plot count from metrics length
+            if plot_layout_style == 'individual':
+                plot_count = min(4, len(line_y_metrics))
+                subplot_count = 1
+                
+            # otherwise is it just one plot to draw with multiple subplots
+            else:
+                plot_count = 1
+                subplot_count = min(4, len(line_y_metrics))
+             
+            # individual and stacked plots need an indication of the grouping
+            if plot_layout_style != 'grid':
                 print(f"----- Line Plots for the {qubit_count} qubit group -----")
 
             subplot_index = 0
             
             for jj in range(plot_count):
                 
-                # create a figure for all plots in this group, smaller if only one plot at a time
-                if individual:
+                # create individual figure for each plot, smaller if only one plot at a time
+                if plot_layout_style == 'individual':
                     fig, axs1 = plt.subplots(1, 1, figsize=(6, 4.2))
                     axs = [axs1]
                     axes = [ axs1, axs1, axs1, axs1]
                     padding = 0.8 
+                
+                # create figure for stacked layout, all in one column
+                elif plot_layout_style == 'stacked':
+                    fig, axs = plt.subplots(subplot_count, 1, figsize=(6, subplot_count * 3.8 + 0.4))
+                    axes = axs
+                    padding = 0.8 
+                    
+                # create figure for grid layout, add rows as needed
                 else:
                     if min(4, len(line_y_metrics)) <= 2:
                         fig, axs = plt.subplots(1, 2, figsize=(12, 4.2))
@@ -232,7 +250,7 @@ def plot_all_line_metrics(suptitle=None,
                         padding = 1.4
                     
                 #fig.suptitle(suptitle, fontsize=13, backgroundcolor='whitesmoke')
-                fig.suptitle(suptitle, fontsize=13, x=(0.54 if individual else 0.5))
+                fig.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
                    
                 #### Generate a subplot for all each metric combination   
                 for kk in range(subplot_count):
@@ -255,14 +273,14 @@ def plot_all_line_metrics(suptitle=None,
                 
                 if save_plot_images:
                     image_name = (f"Hydrogen-Lattice-({method})-line-{group}-{instance}") + \
-                                ("-all" if not individual else f"-{metric_name}-{x_val}")
+                        ("-all" if plot_layout_style != 'individual' else f"-{metric_name}-{x_val}")
                                 
                     metrics.save_plot_image(plt, image_name, backend_id)
                                                 
-                if individual:
+                if plot_layout_style == 'individual':
                     plt.show(block=True)
 
-        if not individual:
+        if plot_layout_style != 'individual':
             plt.show(block=True)
 
 # function to create a single subplot
@@ -470,7 +488,7 @@ def plot_line_metric(ax=None, subtitle:str="",
 def plot_all_cumulative_metrics(suptitle=None,
         score_metrics=["energy", "solution_quality", "accuracy_volume"],
         x_vals=["iteration_count", "cumulative_exec_time"],
-        individual=False,
+        plot_layout_style='grid',
         backend_id="UNKNOWN", options=None):
     '''
     Function to plot all cumulative metrics (average_iteration_time, final_accuracy_ratio)
@@ -483,8 +501,8 @@ def plot_all_cumulative_metrics(suptitle=None,
         list of score metrics to plot
     x_vals: list
         list of x values to plot
-    individual: bool
-        draw each subplot in its own figure if set to True
+    plot_layout_style : str, optional
+        Style of plot layout, 'grid', 'stacked', or 'individual', default = 'grid'
     backend_id: str 
         identifier for the backend system used for execution
     options: dict
@@ -618,7 +636,7 @@ def plot_all_cumulative_metrics(suptitle=None,
 def plot_cumulative_metrics(suptitle="",
             x_data:list=None, x_label:str="",
             y_data:list=None, y_err:list=None, y_label:str="", y_lim_min=None,
-            individual=True, suffix=None):
+            plot_layout_style='grid', suffix=None):
     '''
     Function to plot cumulative metrics (accuracy ratio, execution time per iteration) over different number of qubits
 
@@ -647,8 +665,8 @@ def plot_cumulative_metrics(suptitle="",
     # create a figure for the plot
     fig1, ax1 = plt.subplots(1, 1, figsize=(6, 4.2))
     
-    # and add the title
-    fig1.suptitle(suptitle, fontsize=13, x=(0.54 if individual else 0.5))
+    # and add the title (shifted to the right a bit if single column plot)
+    fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
     
     ###### DEVNOTE: these arrays should be converted to float (and sorted?) at higher level
     
