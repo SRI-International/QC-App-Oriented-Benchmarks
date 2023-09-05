@@ -745,13 +745,21 @@ def get_width_restart_tuple_from_filename(fileName):
 
 def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circuits = 1,
             method=2,
-            score_metric='solution_quality', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
-            num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
-            detailed_save_names=False, individual=False, **kwargs):
+            
+            line_x_metrics=['iteration_count', 'cumulative_exec_time'],
+            line_y_metrics=['energy', 'solution_quality_error'],
+            individual=False,
+            
+            score_metric=['solution_quality', 'accuracy_ratio'],
+            y_metric=['num_qubits'],
+            x_metric=['cumulative_exec_time', 'cumulative_elapsed_time'],
+            fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
+            
+            detailed_save_names=False, **kwargs):
     """
     Plot results from the data contained in metrics tables.
     """
-
+    
     # Add custom metric names to metrics module (in case this is run outside of run())
     add_custom_metric_names()
     
@@ -777,8 +785,8 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
     # plot all line metrics, including solution quality and accuracy ratio 
     # vs iteration count and cumulative execution time
     h_metrics.plot_all_line_metrics(suptitle,
-                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
-                x_vals=["iteration_count", "cumulative_exec_time"],
+                line_x_metrics=line_x_metrics,
+                line_y_metrics=line_y_metrics,
                 individual=individual,
                 backend_id=backend_id,
                 options=options)
@@ -809,10 +817,18 @@ MAX_QUBITS = 16
 def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
         method=2, radius=None,
         thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
-        max_iter=30, comfort=False,
+        minimizer_function=None, minimizer_tolerance=1e-3, max_iter=30, comfort=False,
+        
+        line_x_metrics=['iteration_count', 'cumulative_exec_time'],
+        line_y_metrics=['energy', 'solution_quality_error'],
+        individual=False,
+        
         score_metric=['solution_quality', 'accuracy_ratio'],
-        x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
-        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, plot_results = True,
+        y_metric='num_qubits',
+        x_metric=['cumulative_exec_time','cumulative_elapsed_time'], 
+        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
+        
+        plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, 
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None, _instances=None) :
@@ -841,8 +857,16 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         If 1, use thetas_array of length 1, otherwise (num_qubits//2)**2, to match excitation pairs
     do_fidelities : bool, optional
         Compute circuit fidelity. The default is True.
+    minimizer_function : function
+        custom function used for minimizer
+    minimizer_tolerance : float
+        tolerance for minimizer, default is 1e-3,
     max_iter : int, optional
         Number of iterations for the minimizer routine. The default is 30.
+    line_x_metrics : list or string, optional
+        Which metrics are to be plotted on x-axis in line metrics plots. 
+    line_y_metrics : list or string, optional
+        Which metrics are to be plotted on y-axis in line metrics plots.
     score_metric : list or string, optional
         Which metrics are to be plotted in area metrics plots. The default is 'fidelity'.
     x_metric : list or string, optional
@@ -892,7 +916,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
     
     # Delete some entries from the dictionary; they may contain secrets or function pointers
-    for key in ["hub", "group", "project", "provider_backend", "exec_options"]:
+    for key in ["hub", "group", "project", "provider_backend", "exec_options", "minimizer_function"]:
         dict_of_inputs.pop(key)
     
     global hydrogen_lattice_inputs
@@ -1270,15 +1294,24 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 # Initialize an empty list to store the energy values from each iteration
                 lowest_energy_values = []
 
-                # execute classical optimizer to minimize the objective function
-                # objective function is called repeatedly with varying parameters until lowest energy found
-                ret = minimize(objective_function,
-                        x0=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
-                        method='COBYLA',
-                        tol=1e-3,
-                        options={'maxiter': max_iter, 'disp': False},
-                        callback=callback_thetas_array) 
-                
+                # execute COPYLA classical optimizer to minimize the objective function
+                # objective function is called repeatedly with varying parameters
+                # until the lowest energy found
+                if minimizer_function == None:
+                    ret = minimize(objective_function,
+                            x0=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
+                            method='COBYLA',
+                            tol=minimizer_tolerance,
+                            options={'maxiter': max_iter, 'disp': False},
+                            callback=callback_thetas_array) 
+                            
+                # or, execute a custom minimizer
+                else:
+                    ret = minimizer_function(objective_function=objective_function,
+                            initial_parameters=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
+                            callback=callback_thetas_array
+                            )
+                            
                 #if verbose:
                 #print(f"\nEnergies for problem file {os.path.basename(instance_filepath)} for {num_qubits} qubits and radius {current_radius} of paired hamiltionians")
                 #print(f"  PUCCD calculated energy : {ideal_energy}")
@@ -1332,6 +1365,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     if method == 1:
         metrics.plot_metrics(f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit",
                 options=dict(shots=num_shots))
+                
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)

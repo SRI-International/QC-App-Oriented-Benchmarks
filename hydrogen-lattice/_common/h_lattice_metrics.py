@@ -28,7 +28,10 @@ import os
 import json
 import traceback
 import matplotlib, matplotlib.pyplot as plt, matplotlib.cm as cm
+from matplotlib.patches import Rectangle
+
 import numpy as np
+import math
 
 # add to the path variable the path to the metrics module
 import sys
@@ -44,6 +47,9 @@ h_lattice_metrics = metrics.circuit_metrics_detail
 # save plot images flag
 save_plot_images = True
 
+# chemical accuracy in Hartrees
+CHEM_ACC_HARTREE = 0.0016
+        
 #################################################
 # ADDITIONAL METRIC FUNCTIONS
 
@@ -134,8 +140,8 @@ def cumulative_sum(input_list: list):
 
 # function to plot all line metrics
 def plot_all_line_metrics(suptitle=None,
-        score_metrics=["energy", "solution_quality", "accuracy_volume"],
-        x_vals=["iteration_count", "cumulative_exec_time"],
+        line_x_metrics=['iteration_count', 'cumulative_exec_time'],
+        line_y_metrics=['energy', 'solution_quality_error'],
         individual=False,
         backend_id="UNKNOWN", options=None):
     '''
@@ -145,9 +151,9 @@ def plot_all_line_metrics(suptitle=None,
     ----------
     suptitle: str   
         first line of the title of the figure
-    score_metrics: list
-        list of score metrics to plot
-    x_vals: list
+    line_y_metrics: list
+        list of y metrics to plot
+    line_x_metrics: list
         list of x values to plot
     individual: bool
         draw each subplot in its own figure if set to True
@@ -158,11 +164,11 @@ def plot_all_line_metrics(suptitle=None,
     '''
 
     # if score_metrics and x_val are strings, convert to lists
-    if type(score_metrics) is str:
-        score_metrics = [score_metrics]
-    if type(x_vals) is str:
-        x_vals = [x_vals]
-
+    if type(line_x_metrics) is str:
+        line_x_metrics = [line_x_metrics]
+    if type(line_y_metrics) is str:
+        line_y_metrics = [line_y_metrics]
+    
     # Create standard title for all plots
     method = 2
     toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
@@ -180,10 +186,6 @@ def plot_all_line_metrics(suptitle=None,
         
         circuit_ids = [int(x) for x in (h_lattice_metrics[qubit_count])]
         total_instances = int(np.floor(circuit_ids[-1]/1000))
-
-        # components of all the plots
-        metric_names = ["energy", "energy", "solution_quality", "accuracy_ratio"]
-        x_vals =["iteration_count", "cumulative_exec_time", "cumulative_exec_time", "cumulative_exec_time"]
         
         # generate a set of plots for each instance (radius) in data set
         for instance in range(1, total_instances + 1):
@@ -198,11 +200,11 @@ def plot_all_line_metrics(suptitle=None,
             # draw a single plot
             if not individual:
                 plot_count = 1
-                subplot_count = 4
+                subplot_count = min(4, len(line_y_metrics))
                 
             # or multiple individual plots
             else:
-                plot_count = 4
+                plot_count = min(4, len(line_y_metrics))
                 subplot_count = 1
 
             # since all subplots share the same header, give user and indication of the grouping
@@ -220,9 +222,14 @@ def plot_all_line_metrics(suptitle=None,
                     axes = [ axs1, axs1, axs1, axs1]
                     padding = 0.8 
                 else:
-                    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-                    axes = [ axs[0, 0], axs[0, 1], axs[1, 0], axs[1, 1] ]
-                    padding = 1.4
+                    if min(4, len(line_y_metrics)) <= 2:
+                        fig, axs = plt.subplots(1, 2, figsize=(12, 4.2))
+                        axes = axs
+                        padding = 0.6
+                    else:
+                        fig, axs = plt.subplots(2, 2, figsize=(12, 8.0))
+                        axes = [ axs[0, 0], axs[0, 1], axs[1, 0], axs[1, 1] ]
+                        padding = 1.4
                     
                 #fig.suptitle(suptitle, fontsize=13, backgroundcolor='whitesmoke')
                 fig.suptitle(suptitle, fontsize=13, x=(0.54 if individual else 0.5))
@@ -230,8 +237,8 @@ def plot_all_line_metrics(suptitle=None,
                 #### Generate a subplot for all each metric combination   
                 for kk in range(subplot_count):
                     
-                    metric_name=metric_names[subplot_index]
-                    x_val=x_vals[subplot_index]
+                    metric_name=line_y_metrics[subplot_index]
+                    x_val=line_x_metrics[subplot_index]
                     
                     # draw a single subplot
                     plot_line_metric(ax=axes[subplot_index], subtitle=subtitle,
@@ -297,9 +304,12 @@ def plot_line_metric(ax=None, subtitle:str="",
   
     group = str(num_qubits)
  
-    # find the metrics_array for this group and instance, along with the final matrics             
+    # find the metrics_array for this group and instance, along with the final metrics 
+    # if metric name ends with "_error", get value for base name
     x_data, x_label, y_data, y_label = \
-            find_metrics_array_for_group(group, instance, metric_name, x_val, x_metric_name)
+            find_metrics_array_for_group(group, instance,
+                    metric_name if not metric_name.endswith("_error") else metric_name[0:-6],
+                    x_val, x_metric_name)
 
     current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = \
             find_last_metrics_for_group(group, instance)
@@ -326,6 +336,11 @@ def plot_line_metric(ax=None, subtitle:str="",
     else:
         final_accuracy_ratio = 0
 
+    # if this is an 'error' metric, subtract all values from optimal (1.0)
+    # DEVNOTE: may want to add 'energy_error' later, where optimal is not 1
+    if metric_name == 'solution_quality_error' or metric_name == 'accuracy_ratio_error':
+        y_data = [1 - y for y in y_data]
+        
     ###################
     
     # set the title --- not currently shown for these subplots
@@ -333,13 +348,13 @@ def plot_line_metric(ax=None, subtitle:str="",
     # ax.set_title(fulltitle, fontsize=12)
     
     # plot the data as a scatter plot where the color of the point depends on the y value
-    # the scatter points are connected with a line
-    # plot if the metric is solution quality or accuracy ratio invert the color map
-    if metric_name == 'solution_quality' or 'accuracy_ratio':
+    # if the metric is solution quality or accuracy ratio invert the color map   
+    if metric_name == 'solution_quality' or metric_name == 'accuracy_ratio':
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm_r)
     else:
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm)
-
+    
+    # the scatter points are connected with a line plot
     ax.plot(x_data, y_data, color='darkblue', linestyle='-.', linewidth=2, markersize=12)
     
     ax.set_xlabel(x_label)
@@ -357,25 +372,77 @@ def plot_line_metric(ax=None, subtitle:str="",
         
         # start the y-ticks at 0 and end at y max
         ax.set_ylim([fci_energy-0.08*y_range, y_max+0.08*y_range])
-        
-    # add a horizontal line at y=1 for solution quality
+
+    # solution quality
     elif metric_name == 'solution_quality':
-        ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
-        metric_legend_label = f'Solution Quality = {final_solution_quality:.3f}'
+        ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution = 1.0000')
+        metric_legend_label = f'Solution Quality = {final_solution_quality:.4f}'
         
         # start the y-ticks at 0 and end at 1.1
         ax.set_ylim([0.0, 1.08])
-        '''
-        ax.set_ylim([y_min - 0.2*y_range, 1.0 + 0.1*y_range])
-        ax.set_yscale('log')
-        '''
-    # add a horizontal line at y=0 for accuracy ratio
+        
+    # accuracy ratio
     elif metric_name == 'accuracy_ratio':
-        ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution')
-        metric_legend_label = f'Accuracy Ratio = {final_accuracy_ratio:.3f}'
+        ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution = 1.0000')
+        metric_legend_label = f'Accuracy Ratio = {final_accuracy_ratio:.4f}'
         
         # start the y-ticks at just below min and just above 1.0
         ax.set_ylim([y_min-0.08*y_range, 1.0+0.08*y_range])
+
+    # solution quality error
+    elif metric_name == 'solution_quality_error':
+        ax.set_ylabel("Solution Quality Error")
+        
+        # compute chemical accuracy relative to exact ennergy (FCI)
+        # and using solution quality formula
+        precision = 0.5
+        chacc = -math.atan((CHEM_ACC_HARTREE/fci_energy) * precision) / (math.pi/2)
+        
+        # define the lowest y value a fraction below the chemical accuracy line
+        y_base = chacc/3
+        
+        # draw a shaded rectangle from bottom of plot to chem accuracy level
+        rect = Rectangle((0.0, y_base), x_data[-1], chacc-y_base, color='lightgrey')
+        ax.add_patch(rect)
+        
+        # draw horiz line representing level of error that would be chemical accuracy
+        ax.axhline(y=chacc, color='r', linestyle='--', label=f'Chem. Accuracy = {1 - chacc:.4f}')
+        
+        # add legend item for solution quality
+        final_solution_quality = 1.0 - y_data[-1]
+        metric_legend_label = f'Solution Quality = {final_solution_quality:.4f}'
+        
+        # make this a log axis from base to 1.0
+        ax.set_ylim(y_base, 1.0)
+        ax.set_yscale('log') 
+
+    # accuracy ratio error
+    elif metric_name == 'accuracy_ratio_error':
+        ax.set_ylabel("Accuracy Ratio Error")
+        
+        # compute chemical accuracy relative to exact ennergy (FCI)
+        # and using solution quality formula
+        precision = 0.5
+        chacc = -math.atan((CHEM_ACC_HARTREE/fci_energy) * precision) / (math.pi/2)
+        
+        # define the lowest y value a fraction below the chemical accuracy line
+        y_base = chacc/3
+        
+        # draw a shaded rectangle from bottom of plot to chem accuracy level
+        rect = Rectangle((0.0, y_base), x_data[-1], chacc-y_base, color='lightgrey')
+        ax.add_patch(rect)
+        
+        # draw horiz line representing level of error that would be chemical accuracy
+        ax.axhline(y=chacc, color='r', linestyle='--', label=f'Chem. Accuracy = {1 - chacc:.4f}')
+        
+        # add legend item for solution quality
+        final_solution_quality = 1.0 - y_data[-1]
+        metric_legend_label = f'Accuracy Ratio = {final_solution_quality:.4f}'
+        
+        # make this a log axis from base to 1.0
+        ax.set_ylim(y_base, 1.0)
+        ax.set_yscale('log') 
+        
 
     # add a horizontal line at y=0 for accuracy volume
     elif metric_name == 'accuracy_volume':
