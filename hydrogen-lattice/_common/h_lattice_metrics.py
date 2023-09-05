@@ -222,9 +222,14 @@ def plot_all_line_metrics(suptitle=None,
                     axes = [ axs1, axs1, axs1, axs1]
                     padding = 0.8 
                 else:
-                    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-                    axes = [ axs[0, 0], axs[0, 1], axs[1, 0], axs[1, 1] ]
-                    padding = 1.4
+                    if min(4, len(line_y_metrics)) <= 2:
+                        fig, axs = plt.subplots(1, 2, figsize=(12, 4.2))
+                        axes = axs
+                        padding = 0.6
+                    else:
+                        fig, axs = plt.subplots(2, 2, figsize=(12, 8.0))
+                        axes = [ axs[0, 0], axs[0, 1], axs[1, 0], axs[1, 1] ]
+                        padding = 1.4
                     
                 #fig.suptitle(suptitle, fontsize=13, backgroundcolor='whitesmoke')
                 fig.suptitle(suptitle, fontsize=13, x=(0.54 if individual else 0.5))

@@ -745,14 +745,17 @@ def get_width_restart_tuple_from_filename(fileName):
 
 def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circuits = 1,
             method=2,
+            
+            line_x_metrics=['iteration_count', 'cumulative_exec_time'],
+            line_y_metrics=['energy', 'solution_quality_error'],
+            individual=False,
+            
             score_metric=['solution_quality', 'accuracy_ratio'],
-            x_metric=['cumulative_elapsed_time', 'cumulative_exec_time'],
             y_metric=['num_qubits'],
-            line_x_metrics=['iteration_count', 'cumulative_exec_time', 'cumulative_exec_time', 'cumulative_exec_time'],
-            line_y_metrics=['energy', 'solution_quality_error', 'solution_quality', 'accuracy_ratio_error'],
-            fixed_metrics={},
-            num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
-            detailed_save_names=False, individual=False, **kwargs):
+            x_metric=['cumulative_exec_time', 'cumulative_elapsed_time'],
+            fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
+            
+            detailed_save_names=False, **kwargs):
     """
     Plot results from the data contained in metrics tables.
     """
@@ -815,11 +818,17 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         method=2, radius=None,
         thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
         minimizer_function=None, minimizer_tolerance=1e-3, max_iter=30, comfort=False,
+        
+        line_x_metrics=['iteration_count', 'cumulative_exec_time'],
+        line_y_metrics=['energy', 'solution_quality_error'],
+        individual=False,
+        
         score_metric=['solution_quality', 'accuracy_ratio'],
-        x_metric=['cumulative_exec_time','cumulative_elapsed_time'], y_metric='num_qubits',
-        line_x_metrics=['iteration_count', 'cumulative_exec_time', 'cumulative_exec_time', 'cumulative_exec_time'],
-        line_y_metrics=['energy', 'solution_quality_error', 'solution_quality', 'accuracy_ratio_error'],
-        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, plot_results = True,
+        y_metric='num_qubits',
+        x_metric=['cumulative_exec_time','cumulative_elapsed_time'], 
+        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
+        
+        plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, 
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None, _instances=None) :
