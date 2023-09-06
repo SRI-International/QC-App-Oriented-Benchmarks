@@ -830,7 +830,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         plot_results = True,
         plot_layout_style = "grid", 
         
-        save_res_to_file = False, save_final_counts = False, detailed_save_names = False, 
+        save_res_to_file = True, save_final_counts = False, detailed_save_names = False, 
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None, _instances=None) :
     """
@@ -1272,7 +1272,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
 
                     # store the metrics for the current iteration
                     metrics.store_metric(str(num_qubits), str(unique_id), 'energy', energy)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), 'random_energy', random_energy)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'solution_quality', solution_quality)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'accuracy_volume', accuracy_volume)
                     metrics.store_metric(str(num_qubits), str(unique_id), 'accuracy_ratio', accuracy_ratio)

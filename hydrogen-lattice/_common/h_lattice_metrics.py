@@ -67,24 +67,22 @@ def find_last_metrics_for_group(group, instance):
     for circuit_id in h_lattice_metrics[group]:
         if np.floor(int(circuit_id)/1000) == instance:
         
-            energy = h_lattice_metrics[group][circuit_id]['energy']
-            doci_energy = h_lattice_metrics[group][circuit_id]['doci_energy']
-            fci_energy = h_lattice_metrics[group][circuit_id]['fci_energy']
-            current_radius = h_lattice_metrics[group][circuit_id]['radius']
-            solution_quality = h_lattice_metrics[group][circuit_id]['solution_quality']
-            accuracy_ratio = h_lattice_metrics[group][circuit_id]['accuracy_ratio']
-            '''
-            # DEVNOTE: temporary backwards compatibility, remove later
-            # (this is so we can display older runs that do not have accuracy ratio)
-            if 'accuracy_ratio' in h_lattice_metrics[group][circuit_id]:
-                accuracy_ratio = h_lattice_metrics[group][circuit_id]['accuracy_ratio']
-            else:
-                accuracy_ratio = solution_quality  
-            '''
+            metrics_for_circuit = h_lattice_metrics[group][circuit_id]
+            
+            energy = metrics_for_circuit['energy']
+            doci_energy = metrics_for_circuit['doci_energy']
+            fci_energy = metrics_for_circuit['fci_energy']
+            current_radius = metrics_for_circuit['radius']
+            solution_quality = metrics_for_circuit['solution_quality']
+            
+            # recent additions (backwards compat)
+            accuracy_ratio = metrics_for_circuit['accuracy_ratio'] if 'accuracy_ratio' in metrics_for_circuit else solution_quality
+            random_energy = metrics_for_circuit['random_energy'] if 'random_energy' in metrics_for_circuit else 0
+
         else:
             continue
             
-    return current_radius, doci_energy, fci_energy, energy, accuracy_ratio, solution_quality
+    return current_radius, doci_energy, fci_energy, random_energy, energy, accuracy_ratio, solution_quality
 
 # Find the array of metrics associated with specific group of circuits
 def find_metrics_array_for_group(group, instance, metric_name, x_val, x_metric_name):   
@@ -191,8 +189,9 @@ def plot_all_line_metrics(suptitle=None,
         for instance in range(1, total_instances + 1):
 
             # search metrics store for final metrics for this group
-            current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = \
-                    find_last_metrics_for_group(group, instance)
+            current_radius, doci_energy, fci_energy, random_energy, \
+                    energy, solution_quality, accuracy_ratio = \
+                            find_last_metrics_for_group(group, instance)
 
             # create common title
             suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
@@ -329,8 +328,9 @@ def plot_line_metric(ax=None, subtitle:str="",
                     metric_name if not metric_name.endswith("_error") else metric_name[0:-6],
                     x_val, x_metric_name)
 
-    current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = \
-            find_last_metrics_for_group(group, instance)
+    current_radius, doci_energy, fci_energy, random_energy, \
+            energy, solution_quality, accuracy_ratio = \
+                    find_last_metrics_for_group(group, instance)
             
     # make the x_data cumulative if the cumulative flag is on
     if cumulative_flag:
@@ -384,9 +384,11 @@ def plot_line_metric(ax=None, subtitle:str="",
     
     # if the score metric is energy or solution quality, plot the FCI and DOCI energy lines
     if metric_name == 'energy':
-        ax.axhline(y=doci_energy, color='r', linestyle='--', label=f'DOCI Energy = {doci_energy:.3f}')
-        ax.axhline(y=fci_energy, color='g', linestyle='-.', label=f'FCI Energy    = {fci_energy:.3f}')
-        metric_legend_label = f'Solution Energy = {energy:.3f}'
+        ax.axhline(y=doci_energy, color='r', linestyle='--', label=f'DOCI Energy = {doci_energy:.4f}')
+        ax.axhline(y=fci_energy, color='g', linestyle='-.', label=f'FCI Energy    = {fci_energy:.4f}')
+        if random_energy != 0:
+            ax.axhline(y=random_energy, color='y', linestyle='-.', label=f'Random Energy = {random_energy:.4f}')
+        metric_legend_label = f'Solution Energy = {energy:.4f}'
         
         # start the y-ticks at 0 and end at y max
         ax.set_ylim([fci_energy-0.08*y_range, y_max+0.08*y_range])
@@ -543,8 +545,9 @@ def plot_all_cumulative_metrics(suptitle=None,
         for instance in range(1, total_instances + 1):
 
             # search metrics store for final metrics for this group
-            current_radius, doci_energy, fci_energy, energy, solution_quality, accuracy_ratio = \
-                    find_last_metrics_for_group(group, instance)
+            current_radius, doci_energy, fci_energy, random_energy, \
+                    energy, solution_quality, accuracy_ratio = \
+                        find_last_metrics_for_group(group, instance)
             
             ###### find the execution time array for "energy" metric         
             x_data, x_label, y_data, y_label = \
