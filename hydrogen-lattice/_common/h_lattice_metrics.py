@@ -378,10 +378,13 @@ def plot_line_metric(ax=None, subtitle:str="",
     
     # plot the data as a scatter plot where the color of the point depends on the y value
     # if the metric is solution quality or accuracy ratio invert the color map   
+    '''
     if metric_name == 'solution_quality' or metric_name == 'accuracy_ratio':
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm_r)
     else:
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm)
+    '''
+    ax.scatter(x_data, y_data, c='darkblue')
     
     # the scatter points are connected with a line plot
     ax.plot(x_data, y_data, color='darkblue', linestyle='-.', linewidth=2, markersize=12)
@@ -395,8 +398,8 @@ def plot_line_metric(ax=None, subtitle:str="",
     
     # if the score metric is energy or solution quality, plot the FCI and DOCI energy lines
     if metric_name == 'energy':
-        ax.axhline(y=doci_energy, color='r', linestyle='--', label=f'DOCI Energy = {doci_energy:.4f}')
-        ax.axhline(y=fci_energy, color='g', linestyle='-.', label=f'FCI Energy    = {fci_energy:.4f}')
+        ax.axhline(y=doci_energy, color='g', linestyle='--', label=f'DOCI Energy = {doci_energy:.4f}')
+        ax.axhline(y=fci_energy, color='r', linestyle='-.', label=f'FCI Energy    = {fci_energy:.4f}')
         if random_energy != 0:
             ax.axhline(y=random_energy, color='lightseagreen', linestyle='-.', label=f'Random Energy = {random_energy:.4f}')
         metric_legend_label = f'Solution Energy = {energy:.4f}'

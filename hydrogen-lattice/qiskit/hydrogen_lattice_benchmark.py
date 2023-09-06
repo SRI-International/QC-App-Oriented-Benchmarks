@@ -559,17 +559,40 @@ def calculate_quality_metric(energy=None,
     num_electrons : int
         number of electrons in the problem
     """
-    _relative_energy = np.absolute(np.divide(np.subtract( np.array(energy), fci_energy), fci_energy))
+    
+    _delta_energy_fci = np.absolute(np.subtract( np.array(energy), fci_energy))
+    _delta_random_fci = np.absolute(np.subtract( np.array(random_energy), fci_energy))
+    
+    _relative_energy = np.absolute(
+                            np.divide(
+                                np.subtract( np.array(energy), fci_energy),
+                                fci_energy)
+                            )
+    
     
     #scale the solution quality to 0 to 1 using arctan 
-    _solution_quality = np.subtract(1, np.divide(np.arctan(np.multiply(precision,_relative_energy)), np.pi/2))
+    _solution_quality = np.subtract(
+                            1,
+                            np.divide(
+                                np.arctan(
+                                    np.multiply(precision,_relative_energy)
+                                    ),
+                                np.pi/2)
+                            )
 
     # define accuracy volume as the absolute energy difference between the FCI energy and the energy of the solution normalized per electron
-    _accuracy_volume = np.divide(np.absolute(np.subtract( np.array(energy), fci_energy)), num_electrons)
+    _accuracy_volume = np.divide(
+                            np.absolute(
+                                np.subtract( np.array(energy), fci_energy)
+                            ),
+                            num_electrons
+                            )
 
-    # define accuracy ratio as the difference between calculated energy and random energy divided by difference in random energy and FCI energy
-    _accuracy_ratio = np.divide(np.subtract( np.array(energy), random_energy), np.subtract(fci_energy, random_energy))
+    # define accuracy ratio as 1.0 minus the error in energy over the error in random energy:
+    #       accuracy_ratio = 1.0 - abs(energy - FCI) ) / abs(random - FCI)
 
+    _accuracy_ratio = np.subtract(1.0, np.divide(_delta_energy_fci,_delta_random_fci))
+    
     return _solution_quality, _accuracy_volume, _accuracy_ratio
 
 
