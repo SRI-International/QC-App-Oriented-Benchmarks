@@ -95,6 +95,9 @@ classifier_parameter = namedtuple('classifier_param','theta')
 # Qiskit uses the little-Endian convention. 
 reverseStep = -1
 
+# batch_index
+batch_index = 0
+
 global train_loss_history,train_accuracy_history
 train_loss_history = []
 train_accuracy_history = []
@@ -1417,7 +1420,7 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
                                 predictions.append(0)
                         # print(predictions)
                     accuracy = accuracy_score(y_batch, predictions)
-                    print("Accuracy:", accuracy, "loss:", loss)
+                    print("Batch: ", batch_index, "Loss: ", loss, "Accuracy: ", accuracy)
                     train_loss_history.append(loss)
                     train_accuracy_history.append(accuracy)
                 
@@ -1467,6 +1470,9 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
                 #i_batch = batch_index % num_batches
                 #x_batch = x_final_train[i_batch * batch_size : (i_batch + 1) * batch_size]
                 #y_batch = y_train[i_batch * batch_size : (i_batch + 1) * batch_size]
+
+                # increment batch_index
+                batch_index += 1
             
             # for epoch in range(epochs):
             #     for batch in range(batch_count):
@@ -1581,6 +1587,273 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
             #     # Store the test accuracy in the history list after each data point
             #     test_accuracy_history.append(test_accuracy)
 
+        if method == 3:
+            # A unique circuit index used inside the inner minimizer loop as identifier
+            minimizer_loop_index = 0 # Value of 0 corresponds to the 0th iteration of the minimizer
+            start_iters_t = time.time()
+
+            # Always start by enabling transpile ...
+            ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+                
+            logger.info(f'===============  Begin method 2 loop, enabling transpile')
+            
+            instance_num = 1
+
+            loss_history = []
+            test_accuracy_history = []
+            train_accuracy_history = []
+     
+                            
+            # function to calculate the loss function
+            def loss_function(theta, is_draw_circ=False, is_print=False ,final_run = False, reps = 1):
+                # Every circuit needs a unique id; add unique_circuit_index instead of s_int
+                if debug:
+                    print('theta', theta , 'x_batch' , x_batch , 'y_batch' , y_batch)
+                global minimizer_loop_index
+                instance_num , minimizer_loop_index = 1,1
+                unique_id = instance_num * 1000 + minimizer_loop_index
+                res = []
+                quantum_execution_time = 0.0
+                quantum_elapsed_time = 0.0
+                prediction_label = []
+                i_draw = 0
+                # create the ansatz from the ooperator, resulting in multiple circuits, one for each measured basis
+                ts = time.time()
+                for data_point, label in zip(x_batch, y_batch):
+                # Create the quantum circuit for the data point
+                    # Circuit Creation and Decomposition end
+                    #************************************************
+                    qc, frmt_obs, params = ImageRecognition(x = data_point , model_type= model_type, num_qubits=num_qubits,
+                                        secret_int=unique_id, thetas_array= theta, parameterized= parameterized, reps = reps)
+                    
+                    metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
+                    if debug:
+                        print("create time:" + str(time.time() -ts))
+                    
+                    
+                    
+                        
+                        #************************************************
+                        #*** Quantum Part: Execution of Circuits ***
+                        # submit circuit for execution on target with the current parameters
+                    ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=None)
+
+                        
+                    # Must wait for circuit to complete
+                    #ex.throttle_execution(metrics.finalize_group)
+
+                    # finalize execution of group of circuits
+                    ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
+                    # after first execution and thereafter, no need for transpilation if parameterized
+                    if parameterized:
+                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                        logger.info(f'**** First execution complete, disabling transpile')
+                    #************************************************
+                    
+                    global saved_result
+
+
+                    
+                    #************************************************
+                    #*** Classical Processing of Results - essential to optimizer ***
+                    global opt_ts
+                    if debug:
+                        print("iteration time :" +str(quantum_execution_time))
+                    global cumulative_iter_time
+                    # Start counting classical optimizer time here again
+                    tc1 = time.time()
+
+                    # increment the minimizer loop index, the index is increased by one for three circuits created ( three measurement basis circuits)
+                    minimizer_loop_index += 1
+                    
+                    if comfort:
+                        if minimizer_loop_index == 1: print("")
+                        print(".", end ="")
+
+                    expectation_value = compute_exp_sum(result_array = saved_result, formatted_observables = frmt_obs, num_qubits=num_qubits)
+                    prediction = (expectation_value + 1)*0.5
+
+                    prediction_label.append(prediction)
+                    
+                loss =  mean_squared_error(y_batch, prediction_label)
+
+
+
+                if print_status:
+                    predictions = []
+                    for i in range(len(y_batch)):
+                            if prediction_label[i] > 0.5:
+                                predictions.append(1)
+                            else:
+                                predictions.append(0)
+                        # print(predictions)
+                    accuracy = accuracy_score(y_batch, predictions)
+                    print("Accuracy:", accuracy, "loss:", loss)
+                    train_loss_history.append(loss)
+                    train_accuracy_history.append(accuracy)
+                
+                if final_run == True:
+                    accuracy = accuracy_score(y_batch, predictions)
+                    print(("Accuracy:", accuracy, "loss:", loss))
+                    # Calculate the test accuracy on the test set after each data point
+                    test_accuracy = accuracy_score(y_test[:len(predictions)], predictions)
+
+                    # Store the test accuracy in the history list after each data point
+                    test_accuracy_history.append(test_accuracy)
+                return loss
+                    
+                    # training samples data size 
+            data_size  = len(x_final_train)
+
+                # Number of batches 
+            batch_count =  (data_size + batch_size - 1) // batch_size   
+            
+            weights = np.random.rand(24)
+
+
+            # callback function called after each iteration of optimizer, responsible for recursive call of optimizer
+            def callback(theta):
+                
+                #Create a batch from random indices
+
+                #print("theta:", theta)
+                loss=loss_function(theta, is_draw_circ=False, is_print=True)
+                loss_history.append(loss)
+            
+                # calculate test accuracy after each batch
+                global x_batch, y_batch
+
+                x_batch = x_final_test
+                y_batch = y_test
+                test_loss = loss_function(res.x, is_print= False, final_run=True)
+
+                # #Calculate the accuracy on test data
+                # test_predictions=calculate_predictions(x_scaled_test, theta, num_qubits, num_shots, reps=reps)
+                # test_accuracy=calculate_accuracy(y_test, test_predictions)
+                # test_accuracy_history.append(test_accuracy)
+                #print(mean_squared_error(test_predictions, y_test))
+
+                global batch_index
+
+                indices = np.random.choice(len(x_final_train), size=batch_size, replace=False)
+                x_batch = x_final_train[indices]
+                y_batch = y_train[indices]
+
+                # Get modulus of batch_index with number of batches
+                #global x_batch, y_batch, batch_index
+                #i_batch = batch_index % num_batches
+                #x_batch = x_final_train[i_batch * batch_size : (i_batch + 1) * batch_size]
+                #y_batch = y_train[i_batch * batch_size : (i_batch + 1) * batch_size]
+            
+            # for epoch in range(epochs):
+            #     for batch in range(batch_count):
+                    
+            #         # indices = np.random.choice(len(x_final_train), size=batch_size, replace=False)
+            #         # x_batch = x_final_train[indices]
+            #         # y_batch = y_train[indices]
+
+            #     # start and end indeces for current_batch( Here batch is index of above batch)
+            #         start_index = batch * batch_size   # batch will be 0 for first index
+            #         end_index   = min((batch + 1 ) * batch_size, data_size)
+                
+            #     # batch extraction 
+            #         x_batch = x_final_train[start_index:end_index]
+            #         y_batch = y_train[start_index:end_index]
+            
+            
+            #         print(f"Current batch is {batch}")
+            #     # Minimize the loss using SPSA optimizer
+            #         is_draw,is_print = False,True
+            #         theta = minimize(loss_function, x0 = weights, args=(x_batch,y_batch,is_draw,is_print), method="COBYLA", tol=0.001, 
+            #                                 callback=callback, options={'maxiter': 150, 'disp': False} )
+            # #theta=SPSA(maxiter=100).minimize(loss_function, x0=weights)
+            #         weights = theta.x
+            #         print(weights)
+            #         print(len(weights))
+            #     loss = theta.fun
+            #     print(f"Epoch {epoch+1}/{epochs}, loss = {loss:.4f}")
+
+            # Initialize  epochs
+            num_epochs = 300
+
+            # Batch size for the optimizer
+            batch_size = 50
+            num_batches = int(np.ceil(len(x_final_train) / batch_size))
+
+            # Learning rate
+            init_step_size = 1
+
+            # Number of shots to run the program (experiment)
+            num_shots = 1000
+            reps = 1
+
+            # Choose the variational circuit
+            ansatz_type = 'qcnn uniform' # 'block' or 'qcnn  uniform' or 'qcnn unique'
+
+            # Initialize the weights for the QNN model
+            if ansatz_type == 'block':
+                num_parameters= num_qubits * reps * 2
+            elif ansatz_type == 'qcnn uniform':
+                num_parameters_per_layer=15*reps
+                num_layers = int(np.ceil(np.log2(num_qubits)))
+                num_parameters = num_parameters_per_layer*num_layers
+            elif ansatz_type == 'qcnn unique':
+                num_parameters_per_conv=15*reps
+                num_parameters = num_parameters_per_conv*(2*num_qubits-2-int(np.ceil(np.log2(num_qubits))))
+            else:
+                print("Invalid ansatz_type")
+
+            weights = -np.pi+2*np.pi*np.random.rand(num_parameters)
+            #weights = np.zeros(num_parameters)
+            print("Number of parameters:", len(weights))
+
+            indices = np.random.choice(len(x_final_train), size=batch_size, replace=False)
+            x_batch = x_final_train[indices]
+            y_batch = y_train[indices]
+
+            #global x_batch, y_batch
+            #i_batch = batch_index % num_batches
+            #x_batch = x_final_train[i_batch * batch_size : (i_batch + 1) * batch_size]
+            #y_batch = y_train[i_batch * batch_size : (i_batch + 1) * batch_size]
+
+            #for k in range(5):
+            #    indices = np.random.choice(len(x_final_train), size=batch_size, replace=False)
+            #    x_batch = x_final_train[indices]
+            #    y_batch = y_train[indices]
+            #    predictions=calculate_predictions(x_batch, weights, num_qubits, reps, num_shots)
+            #
+            #    #Form and print a 2 column vector from indices and predictions
+            #    indices = indices.reshape(-1, 1)
+            #    predictions = np.array(predictions).reshape(-1, 1)
+            #    data = np.hstack((indices, predictions))
+            #    print(data)
+
+
+            #res = minimize(loss_function, x0 = weights, method="COBYLA", tol=0.001, callback=callback, options={'disp': False, 'rhobeg': init_step_size} )
+            res= minimizeSPSA(loss_function, x0=weights, a=0.3, c=0.3, niter=300, callback=callback, paired=False)
+
+            # test_accuracy_history = []
+            # for data_point in x_final_test:
+            #     qc = qcnn_model(data_point, num_qubits)
+            #     qc_upd = qc.bind_parameters(theta.x)
+            #         # Simulate the quantum circuit and get the result
+            #     if expectation_calc_method == True:
+            #         # val = expectation_calc_qcnn.calculate_expectation(qc,shots=num_shots,num_qubits=num_qubits)   
+            #         val = exp_cal(qc_upd)   
+            #         val=(val+1)*0.5
+            #         if val > 0.5:
+            #             predicted_label = 1
+            #         else:
+            #             predicted_label = 0
+            #     print("predicted_label",predicted_label)
+            #     predictions.append(predicted_label)
+                
+            #     # Calculate the test accuracy on the test set after each data point
+            #     test_accuracy = accuracy_score(y_test[:len(predictions)], predictions)
+
+            #     # Store the test accuracy in the history list after each data point
+            #     test_accuracy_history.append(test_accuracy)
+
         '''
         # Evaluate the QCNN accuracy on the test set once the model is trained and tested
         accuracy = accuracy_score(y_test, predictions)
@@ -1589,28 +1862,42 @@ def run (min_qubits= 4 , max_qubits = 8, model_type = 'qcnn uniform',  train_siz
         print("predictions",predictions)
         '''
 
+        # two subplots for training loss and accuracy
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+
         # training loss after each iteration
         # plt.plot(range(1, num_epochs * 100 + 1), train_loss_history)
-        plt.plot(range(1, len(train_loss_history)+1), train_loss_history)
-        plt.xlabel('Iteration')
-        plt.ylabel('Training Loss')
-        plt.title(f'Training Loss History for {num_qubits} qubits')
-        plt.show()
+        ax1.plot(range(1, len(train_loss_history)+1), train_loss_history)
+        ax1.set_xlabel('Iteration')
+        ax1.set_ylabel('Training Loss')
+        ax1.set_title(f'Training Loss History for {num_qubits} qubits')
+        ax1.grid(True)
 
         # training accuracy after each iteration
-        plt.plot(range(1, len(train_accuracy_history)+1), train_accuracy_history)
-        plt.xlabel('Iteration')
-        plt.ylabel('Training Accuracy')
-        plt.title(f'Training Accuracy History for {num_qubits} qubits')
-        plt.show()
+        ax2.plot(range(1, len(train_accuracy_history)+1), train_accuracy_history)
+        ax2.set_xlabel('Iteration')
+        ax2.set_ylabel('Training Accuracy')
+        ax2.set_title(f'Training Accuracy History for {num_qubits} qubits')
+        ax2.grid(True)
+
+        fig.show()
+
+        if debug:
+            # save the training loss and accuracy history in a file
+            import pickle
+            with open(f"train_loss_history_{num_qubits}_qubits.txt", "wb") as fp:   #Pickling
+                pickle.dump(train_loss_history, fp)
+            with open(f"train_accuracy_history_{num_qubits}_qubits.txt", "wb") as fp:   #Pickling
+                pickle.dump(train_accuracy_history, fp)
 
 
-        # testing accuracy after each data point
-        plt.plot(range(1, len(x_final_test) + 1), test_accuracy_history)
-        plt.xlabel('Data Point')
-        plt.ylabel('Test Accuracy')
-        plt.title('Test Accuracy after Each Data Point')
-        plt.show()
+        # testing accuracy after each data point for method 3
+        if method == 3:
+            plt.plot(test_accuracy_history)
+            plt.xlabel('Data Point')
+            plt.ylabel('Test Accuracy')
+            plt.title('Test Accuracy after Each Data Point')
+            plt.show()
         
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
