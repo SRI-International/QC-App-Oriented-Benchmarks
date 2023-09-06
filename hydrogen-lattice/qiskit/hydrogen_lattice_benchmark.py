@@ -12,34 +12,33 @@ import re
 import sys
 import time
 from collections import namedtuple
-from typing import Any, List, Optional
+from typing import Dict, Any, List, Optional
 from pathlib import Path
-from qiskit.opflow.primitive_ops import PauliSumOp
-import matplotlib.pyplot as plt
 import glob
-
+import matplotlib.pyplot as plt
+from matplotlib import cm
 import numpy as np
 from scipy.optimize import minimize
 
-from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
-                    QuantumCircuit, QuantumRegister, execute, transpile)
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+from qiskit import Aer, execute, transpile
 from qiskit.circuit import ParameterVector
-from typing import Dict, List, Optional
-from qiskit import Aer, execute
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit.exceptions import QiskitError
-from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
 from qiskit.quantum_info import Statevector,Pauli
 from qiskit.result import sampled_expectation_value
+
+# DEVNOTE: opflow dependency
+from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
+from qiskit.opflow.primitive_ops import PauliSumOp
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "hydrogen-lattice/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
 
+# benchmark-specific imports
 import common
 import execute as ex
 import metrics as metrics
-from matplotlib import cm
-
 # import h-lattice_metrics from _common folder
 import h_lattice_metrics as h_metrics
 
@@ -286,6 +285,15 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
    
 ############### Prepare Circuits from Observables
 
+# ---- classical Pauli sum operator from list of Pauli operators and coefficients ----
+    # Below function is to reduce some dependency on qiskit ( String data type issue) ----
+    # def pauli_sum_op(ops, coefs):
+    #     if len(ops) != len(coefs):
+    #         raise ValueError("The number of Pauli operators and coefficients must be equal.")
+    #     pauli_sum_op_list = [(op, coef) for op, coef in zip(ops, coefs)]
+    #     return pauli_sum_op_list
+#---- classical Pauli sum operator from list of Pauli operators and coefficients ----
+
 def prepare_circuits(base_circuit, observables):
     """
     Prepare the qubit-wise commuting circuits for a given operator.
@@ -351,6 +359,86 @@ def normalize_counts(counts, num_qubits=None):
     assert abs(sum(probabilities.values()) - 1) < 1e-9
     return probabilities
 
+############### Prepare Circuits for Execution
+
+def get_operator_for_problem(instance_filepath):
+    """
+    Return an operator object for the problem.
+    
+    Argument:
+    instance_filepath : problem defined by instance_filepath (but should be num_qubits + radius)
+    
+    Returns:
+    operator : an object encapsulating the Hamiltoian for the problem
+    """        
+    # operator is paired hamiltonian  for each instance in the loop  
+    ops,coefs = common.read_paired_instance(instance_filepath)
+    operator = PauliSumOp.from_list(list(zip(ops, coefs)))
+    return operator
+
+# A dictionary of random energy filename, obtained once
+random_energies_dict = None
+ 
+def get_random_energy(instance_filepath):
+    """
+    Get the 'random_energy' associated with the problem
+    """
+    
+    # read precomputed energies file from the random energies path
+    global random_energies_dict
+    
+    # get the list of random energy filenames once
+    # (DEVNOTE: probably don't want an exception here, should just return 0)
+    if not random_energies_dict:
+        try:
+            random_energies_dict = common.get_random_energies_dict()
+        except ValueError as err:
+            logger.error(err)
+            print("Error reading precomputed random energies json file. Please create the file by running the script 'compute_random_energies.py' in the _common/random_sampler directory")
+            raise
+  
+    # get the filename from the instance_filepath and get the random energy from the dictionary
+    filename = os.path.basename(instance_filepath)
+    filename = filename.split('.')[0]
+    random_energy = random_energies_dict[filename]
+
+    return random_energy
+    
+def get_classical_solutions(instance_filepath):
+    """
+    Get a list of the classical solutions for this problem
+    """           
+    # solution has list of classical solutions for each instance in the loop
+    sol_file_name = instance_filepath[:-5] + ".sol"
+    method_names, values = common.read_puccd_solution(sol_file_name)
+    solution = list(zip(method_names, values)) 
+    return solution
+
+# Return the file identifier (path) for the problem at this width, radius, and instance
+def get_problem_identifier(num_qubits, radius, instance_num):
+    
+    # if radius is given we should do same radius for max_circuits times
+    if radius is not None:
+        try:
+            instance_filepath = common.get_instance_filepaths(num_qubits, radius)
+        except ValueError as err:
+            logger.error(err)
+            instance_filepath = None
+
+    # if radius is not given we should do all the radius for max_circuits times
+    else:
+        instance_filepath_list = common.get_instance_filepaths(num_qubits)
+        try:
+            if len(instance_filepath_list) >= instance_num :
+                instance_filepath = instance_filepath_list[instance_num-1]
+            else:
+                instance_filepath = None
+        except ValueError as err:
+            logger.error(err)
+            instance_filepath = None
+                      
+    return instance_filepath
+    
 #################################################
 # EXPECTED RESULT TABLES (METHOD 1)
   
@@ -913,7 +1001,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     # It will also be used for sending parameters to the plotting function
     dict_of_inputs = locals()
     
-    thetas = []   #Need to change
+    thetas = []   # a default empty list of thetas 
     
     # Update the dictionary of inputs
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
@@ -924,6 +1012,9 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     
     global hydrogen_lattice_inputs
     hydrogen_lattice_inputs = dict_of_inputs
+    
+    ###########################
+    # Benchmark Initializeation
     
     global QC_
     global circuits_done
@@ -994,34 +1085,19 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     else:
         ex.init_execution(execution_handler)
     
+    # initialize the execution module with target information
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options)
 
     # create a data folder for the results
     create_data_folder(save_res_to_file, detailed_save_names, backend_id)
-    
-# -------------classical Pauli sum operator from list of Pauli operators and coefficients----
-    # Below function is to reduce some dependency on qiskit ( String data type issue)-------------
-    # def pauli_sum_op(ops, coefs):
-    #     if len(ops) != len(coefs):
-    #         raise ValueError("The number of Pauli operators and coefficients must be equal.")
-    #     pauli_sum_op_list = [(op, coef) for op, coef in zip(ops, coefs)]
-    #     return pauli_sum_op_list
-#-------------classical Pauli sum operator from list of Pauli operators and coefficients-----------------
 
+    ###########################
+    # Benchmark Execution Loop
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 for paired electron circuits
-    global instance_filepath 
-
-    # read precomputed energies file from the random energies path
-
-    try:
-        random_energies_dict = common.get_random_energies_dict()
-    except ValueError as err:
-        logger.error(err)
-        print("Error reading precomputed random energies json file. Please create the file by running the script 'compute_random_energies.py' in the _common/random_sampler directory")
-        raise
 
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
         
@@ -1034,50 +1110,42 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         # if radius < 0 :
         #     radius = max(3, (num_qubits + radius))
             
-        # looping all instance files according to max_circuits given        
+        # loop over all instance files according to max_circuits given 
+        # instance_num index starts from 1
         for instance_num in range(1, max_circuits + 1):
-            # Index should start from 1
+ 
+            # get the file identifier (path) for the problem at this width, radius, and instance
+            # DEVNOTE: this identifier should NOT be the filepath, use another method
+            instance_filepath = get_problem_identifier(num_qubits, radius, instance_num)
+            if instance_filepath == None:
+                print(f"WARNING: cannot find problem file for num_qubits={num_qubits}, radius={radius}, instance={instance_num}\n")
+                break
             
-            # if radius is given we should do same radius for max_circuits times
-            if radius is not None:
-                try:
-                    instance_filepath = common.get_instance_filepaths(num_qubits, radius)
-                except ValueError as err:
-                    logger.error(err)
-
-                    print(f"  ... problem not found. Running default radius")
-                    instance_filepath = common.get_instance_filepaths(num_qubits)[0]
-
-            # if radius is not given we should do all the radius for max_circuits times
+            # if radius given, each instance will use this same radius
+            if radius != None:  
+                current_radius = radius
+                
+            # else find current radius from the filename found for this num_qubits and instance_num
+            # DEVNOTE: klunky, improve later
             else:
-                instance_filepath_list = common.get_instance_filepaths(num_qubits)
-                try:
-                    if len(instance_filepath_list) >= instance_num :
-                        instance_filepath = instance_filepath_list[instance_num-1]
-                    else:
-                        raise ValueError("problem not found, please check the instances folder and generate the required problem and solution instances using provided scripts.")
-                except ValueError as err:
-                    logger.error(err)
-                    raise
+                current_radius = float(os.path.basename(instance_filepath).split('_')[2])
+                current_radius += float(os.path.basename(instance_filepath).split('_')[3][:2])*.01
             
-            # get the filename from the instance_filepath and get the random energy from the dictionary
-            filename = os.path.basename(instance_filepath)
-            filename = filename.split('.')[0]
-            random_energy = random_energies_dict[filename]
-
-            # operator is paired hamiltonian  for each instance in the loop  
-            ops,coefs = common.read_paired_instance(instance_filepath)
-            operator = PauliSumOp.from_list(list(zip(ops, coefs)))
+            if verbose:
+                print(f"... executing problem num_qubits={num_qubits}, radius={radius}, instance={instance_num}")
             
-            # solution has list of classical solutions for each instance in the loop
-            sol_file_name = instance_filepath[:-5] + ".sol"
-            method_names, values = common.read_puccd_solution(sol_file_name)
-            solution = list(zip(method_names, values))   
-            
-            # if the file does not exist, we are done with this number of qubits
+            # obtain the Hamiltonian operator object for the current problem
+            # if the problem is not pre-defined, we are done with this number of qubits
+            operator = get_operator_for_problem(instance_filepath) 
             if operator == None:
                 print(f"  ... problem not found.")
                 break
+            
+            # get a list of the classical solutions for this problem
+            solution = get_classical_solutions(instance_filepath)
+            
+            # get the 'random_energy' associated with the problem
+            random_energy = get_random_energy(instance_filepath)
             
             # create an intial thetas_array, given the circuit width and user input
             thetas_array_0 = get_initial_parameters(num_qubits, thetas_array)
@@ -1094,13 +1162,11 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                             operator=operator,
                             thetas_array=thetas_array_0,
                             parameterized=parameterized)
-                '''
-                # loop over the array of circuits generated
-                for qc in qc_array:
-                '''
-                # Instead, we only do one of the circuits, the last one. which is in the 
-                # z-basis.  This is the one that is most illustrative of a device's fidelity
-                qc = qc_array[2]
+                
+                # We only execute one of the circuits created, the last one. which is in the 
+                # z-basis.  This is the one that is most illustrative of a device's fidelity.
+                # DEVNOTE: maybe we should do all three, and aggregate, just as in method 2?
+                qc = qc_array[-1]
                 
                 ''' TMI ...
                 # for testing and debugging ...
@@ -1108,12 +1174,12 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 if verbose:
                     print(qc.bind_parameters(params) if parameterized else qc)
                 ''' 
-                
+                # store the creation time for these circuits  
                 metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
                 
-                # pre-compute and save an array of expected measurements
-                # for comparison in the analysis method
-                # (do not count as part of creation time, as this is a benchmark function)
+                # classically pre-compute and cache an array of expected measurement counts
+                # for comparison against actual measured counts for fidelity calc (in analysis)
+                
                 if do_compute_expectation:
                     logger.info('Computing expectation')
                     
@@ -1122,12 +1188,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
             
                 # submit circuit for execution on target, with parameters
                 ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
-                
-                ''' (see comment above about looping)
-                    # Break out of this loop, so we only execute the first of the ansatz circuits
-                    # DEVNOTE: maybe we should do all three, and aggregate, just as in method2
-                    #break
-                ''' 
+            
 
             ###############
             if method == 2:
@@ -1141,13 +1202,11 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 # Always start by enabling transpile ...
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
                     
-                # define the radius and energy variables
+                # get the classically computed expected energy variables from solution object
                 doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
                 fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
                 
-                current_radius = float(os.path.basename(instance_filepath).split('_')[2])
-                current_radius += float(os.path.basename(instance_filepath).split('_')[3][:2])*.01
-
+                # begin timer accumulation
                 cumlative_iter_time = [0]
                 start_iters_t = time.time()
                 
@@ -1316,11 +1375,11 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                             )
                             
                 #if verbose:
-                #print(f"\nEnergies for problem file {os.path.basename(instance_filepath)} for {num_qubits} qubits and radius {current_radius} of paired hamiltionians")
+                #print(f"\nEnergies for problem of {num_qubits} qubits and radius {current_radius} of paired hamiltionians")
                 #print(f"  PUCCD calculated energy : {ideal_energy}")
             
                 if comfort: print("")
-                print(f"Classically Computed Energies from solution file {os.path.basename(sol_file_name)} for {num_qubits} qubits and radius {current_radius}")
+                print(f"Classically Computed Energies from solution file for {num_qubits} qubits and radius {current_radius}")
                 print(f"  DOCI calculated energy : {doci_energy}")
                 print(f"  FCI calculated energy : {fci_energy}")
                 print(f"  Random Solution calculated energy : {random_energy}")

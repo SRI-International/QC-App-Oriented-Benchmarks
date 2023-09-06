@@ -159,20 +159,24 @@ def read_puccd_solution(file_path: str, _instances: dict = None) -> tuple:
     else:
         return None, None
 
-#get a list of instance file paths
+# get a list of instance file paths for num_qubits, or single file path if radius given
 def get_instance_filepaths(num_qubits=2, radius=None):
+
+    # return a single file path
+    if radius is not None:
+        sradius = f"{radius:06.2f}".replace(".","_")
+        instance_filepath = os.path.join(os.path.dirname(__file__), \
+            INSTANCE_DIR, f"h{num_qubits:03}_chain_{sradius}.json")
+        if not os.path.isfile(instance_filepath):  
+            instance_filepath = None
+        return instance_filepath
+    
+    # or list of multiple filepaths
     instance_filepath_list = [file \
         for file in glob.glob(os.path.join(os.path.dirname(__file__), \
         INSTANCE_DIR, f"h{num_qubits:03}_*_*_*.json"))]
-    
-    if radius is not None:
-        instance_filepath = os.path.join(os.path.dirname(__file__), \
-            INSTANCE_DIR, f"h{num_qubits:03}_chain_{radius:06.2f}.json")   
-        
-        return instance_filepath
-    
-    else:
-        return instance_filepath_list
+
+    return instance_filepath_list
     
 
 # return the random energies dictionary
