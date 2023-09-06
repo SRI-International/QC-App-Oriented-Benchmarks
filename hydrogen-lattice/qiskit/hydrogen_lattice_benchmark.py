@@ -12,34 +12,33 @@ import re
 import sys
 import time
 from collections import namedtuple
-from typing import Any, List, Optional
+from typing import Dict, Any, List, Optional
 from pathlib import Path
-from qiskit.opflow.primitive_ops import PauliSumOp
-import matplotlib.pyplot as plt
 import glob
-
+import matplotlib.pyplot as plt
+from matplotlib import cm
 import numpy as np
 from scipy.optimize import minimize
 
-from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
-                    QuantumCircuit, QuantumRegister, execute, transpile)
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+from qiskit import Aer, execute, transpile
 from qiskit.circuit import ParameterVector
-from typing import Dict, List, Optional
-from qiskit import Aer, execute
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit.exceptions import QiskitError
-from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
 from qiskit.quantum_info import Statevector,Pauli
 from qiskit.result import sampled_expectation_value
+
+# DEVNOTE: opflow dependency
+from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
+from qiskit.opflow.primitive_ops import PauliSumOp
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "hydrogen-lattice/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
 
+# benchmark-specific imports
 import common
 import execute as ex
 import metrics as metrics
-from matplotlib import cm
-
 # import h-lattice_metrics from _common folder
 import h_lattice_metrics as h_metrics
 
@@ -415,10 +414,8 @@ def get_classical_solutions(instance_filepath):
     solution = list(zip(method_names, values)) 
     return solution
 
-# get the file identifier (path) for the problem at this width, radius, and instance
+# Return the file identifier (path) for the problem at this width, radius, and instance
 def get_problem_identifier(num_qubits, radius, instance_num):
-    
-    #global instance_filepath 
     
     # if radius is given we should do same radius for max_circuits times
     if radius is not None:
@@ -426,9 +423,7 @@ def get_problem_identifier(num_qubits, radius, instance_num):
             instance_filepath = common.get_instance_filepaths(num_qubits, radius)
         except ValueError as err:
             logger.error(err)
-
-            print(f"  ... problem not found. Running default radius")
-            instance_filepath = common.get_instance_filepaths(num_qubits)[0]
+            instance_filepath = None
 
     # if radius is not given we should do all the radius for max_circuits times
     else:
@@ -437,11 +432,11 @@ def get_problem_identifier(num_qubits, radius, instance_num):
             if len(instance_filepath_list) >= instance_num :
                 instance_filepath = instance_filepath_list[instance_num-1]
             else:
-                raise ValueError("problem not found, please check the instances folder and generate the required problem and solution instances using provided scripts.")
+                instance_filepath = None
         except ValueError as err:
             logger.error(err)
-            raise   
-            
+            instance_filepath = None
+                      
     return instance_filepath
     
 #################################################
@@ -1006,7 +1001,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     # It will also be used for sending parameters to the plotting function
     dict_of_inputs = locals()
     
-    thetas = []   #Need to change
+    thetas = []   # a default empty list of thetas 
     
     # Update the dictionary of inputs
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
@@ -1017,6 +1012,9 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     
     global hydrogen_lattice_inputs
     hydrogen_lattice_inputs = dict_of_inputs
+    
+    ###########################
+    # Benchmark Initializeation
     
     global QC_
     global circuits_done
@@ -1087,12 +1085,16 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     else:
         ex.init_execution(execution_handler)
     
+    # initialize the execution module with target information
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options)
 
     # create a data folder for the results
     create_data_folder(save_res_to_file, detailed_save_names, backend_id)
 
+    ###########################
+    # Benchmark Execution Loop
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 for paired electron circuits
@@ -1113,7 +1115,24 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         for instance_num in range(1, max_circuits + 1):
  
             # get the file identifier (path) for the problem at this width, radius, and instance
+            # DEVNOTE: this identifier should NOT be the filepath, use another method
             instance_filepath = get_problem_identifier(num_qubits, radius, instance_num)
+            if instance_filepath == None:
+                print(f"WARNING: cannot find problem file for num_qubits={num_qubits}, radius={radius}, instance={instance_num}\n")
+                break
+            
+            # if radius given, each instance will use this same radius
+            if radius != None:  
+                current_radius = radius
+                
+            # else find current radius from the filename found for this num_qubits and instance_num
+            # DEVNOTE: klunky, improve later
+            else:
+                current_radius = float(os.path.basename(instance_filepath).split('_')[2])
+                current_radius += float(os.path.basename(instance_filepath).split('_')[3][:2])*.01
+            
+            if verbose:
+                print(f"... executing problem num_qubits={num_qubits}, radius={radius}, instance={instance_num}")
             
             # obtain the Hamiltonian operator object for the current problem
             # if the problem is not pre-defined, we are done with this number of qubits
@@ -1183,13 +1202,11 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 # Always start by enabling transpile ...
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
                     
-                # define the radius and energy variables
+                # get the classically computed expected energy variables from solution object
                 doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
                 fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
                 
-                current_radius = float(os.path.basename(instance_filepath).split('_')[2])
-                current_radius += float(os.path.basename(instance_filepath).split('_')[3][:2])*.01
-
+                # begin timer accumulation
                 cumlative_iter_time = [0]
                 start_iters_t = time.time()
                 
