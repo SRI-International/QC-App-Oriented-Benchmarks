@@ -331,7 +331,18 @@ def plot_line_metric(ax=None, subtitle:str="",
     current_radius, doci_energy, fci_energy, random_energy, \
             energy, solution_quality, accuracy_ratio = \
                     find_last_metrics_for_group(group, instance)
-            
+    
+    # special case for solution_quality and solution_quality_error
+    if metric_name.startswith("solution_quality"):
+        metric_name_2 = metric_name.replace("solution_quality", "accuracy_ratio")
+        
+        x_data_2, x_label_2, y_data_2, y_label_2 = \
+            find_metrics_array_for_group(group, instance,
+                    metric_name_2 if not metric_name_2.endswith("_error") else metric_name_2[0:-6],
+                    x_val, x_metric_name)
+        
+        y_data_2 = [1 - y for y in y_data_2]
+                    
     # make the x_data cumulative if the cumulative flag is on
     if cumulative_flag:
         x_data = cumulative_sum(x_data)
@@ -387,8 +398,9 @@ def plot_line_metric(ax=None, subtitle:str="",
         ax.axhline(y=doci_energy, color='r', linestyle='--', label=f'DOCI Energy = {doci_energy:.4f}')
         ax.axhline(y=fci_energy, color='g', linestyle='-.', label=f'FCI Energy    = {fci_energy:.4f}')
         if random_energy != 0:
-            ax.axhline(y=random_energy, color='y', linestyle='-.', label=f'Random Energy = {random_energy:.4f}')
+            ax.axhline(y=random_energy, color='lightseagreen', linestyle='-.', label=f'Random Energy = {random_energy:.4f}')
         metric_legend_label = f'Solution Energy = {energy:.4f}'
+        add_legend_item(ax, metric_legend_label, 'darkblue')
         
         # start the y-ticks at 0 and end at y max
         ax.set_ylim([fci_energy-0.08*y_range, y_max+0.08*y_range])
@@ -397,6 +409,7 @@ def plot_line_metric(ax=None, subtitle:str="",
     elif metric_name == 'solution_quality':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution = 1.0000')
         metric_legend_label = f'Solution Quality = {final_solution_quality:.4f}'
+        add_legend_item(ax, metric_legend_label, 'darkblue')
         
         # start the y-ticks at 0 and end at 1.1
         ax.set_ylim([0.0, 1.08])
@@ -405,6 +418,7 @@ def plot_line_metric(ax=None, subtitle:str="",
     elif metric_name == 'accuracy_ratio':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution = 1.0000')
         metric_legend_label = f'Accuracy Ratio = {final_accuracy_ratio:.4f}'
+        add_legend_item(ax, metric_legend_label, 'darkblue')
         
         # start the y-ticks at just below min and just above 1.0
         ax.set_ylim([y_min-0.08*y_range, 1.0+0.08*y_range])
@@ -431,11 +445,23 @@ def plot_line_metric(ax=None, subtitle:str="",
         # add legend item for solution quality
         final_solution_quality = 1.0 - y_data[-1]
         metric_legend_label = f'Solution Quality = {final_solution_quality:.4f}'
+        #add_legend_item(ax, metric_legend_label, 'darkblue')
         
         # make this a log axis from base to 1.0
         ax.set_ylim(y_base, 1.0)
         ax.set_yscale('log') 
+        
+        # draw the accuracy ratio plot also
+        ax.plot(x_data, y_data_2, color='lightseagreen', linestyle='-.', linewidth=2, markersize=12)
 
+        # add legend item for accuracy ratio
+        final_accuracy_ratio = 1.0 - y_data_2[-1]
+        metric_legend_label_2 = f'Accuracy Ratio = {final_accuracy_ratio:.4f}'
+        #add_legend_item(ax, metric_legend_label, 'lightseagreen')
+        
+        add_two_legend_items(ax, metric_legend_label_2, 'lightseagreen',
+                            metric_legend_label, 'darkblue')
+        
     # accuracy ratio error
     elif metric_name == 'accuracy_ratio_error':
         ax.set_ylabel("Accuracy Ratio Error")
@@ -458,6 +484,7 @@ def plot_line_metric(ax=None, subtitle:str="",
         # add legend item for solution quality
         final_solution_quality = 1.0 - y_data[-1]
         metric_legend_label = f'Accuracy Ratio = {final_solution_quality:.4f}'
+        add_legend_item(ax, metric_legend_label, 'darkblue')
         
         # make this a log axis from base to 1.0
         ax.set_ylim(y_base, 1.0)
@@ -471,18 +498,43 @@ def plot_line_metric(ax=None, subtitle:str="",
     
     ax.grid(True)
 
-    # add a copy of first legend item and change to blue with the metric value shown
-    handles, labels = ax.get_legend_handles_labels()
-    newhandle = matplotlib.lines.Line2D([0,1],[0,1])
-    newhandle.update_from(handles[0])
-    newhandle.set_color('darkblue')
-    handles.append(newhandle)
-    labels.append(metric_legend_label)
-    ax.legend(handles, labels)
-  
     return
     
+# add a new legend item
+# add a copy of first legend item and change to blue with the metric value shown
+def add_legend_item(ax, item_label, item_color):
 
+    handles, labels = ax.get_legend_handles_labels()
+    
+    newhandle = matplotlib.lines.Line2D([0,1],[0,1])
+    newhandle.update_from(handles[0])
+    newhandle.set_color(item_color)
+    handles.append(newhandle)
+    labels.append(item_label)
+    
+    ax.legend(handles, labels)
+  
+# add two new legend items (can only do this once, it seems)
+# should make this an array function later
+def add_two_legend_items(ax, item_label, item_color, item_label2, item_color2):
+
+    handles, labels = ax.get_legend_handles_labels()
+   
+    newhandle = matplotlib.lines.Line2D([0,1],[0,1])
+    newhandle.update_from(handles[0])
+    newhandle.set_color(item_color)
+    handles.append(newhandle)
+    labels.append(item_label)
+    
+    newhandle2 = matplotlib.lines.Line2D([0,1],[0,1])
+    newhandle2.update_from(handles[0])
+    newhandle2.set_color(item_color2)
+    handles.append(newhandle2)
+    labels.append(item_label2)
+    
+    ax.legend(handles, labels)
+    
+    
 #################################################
 # PLOT CUMULATIVE METRICS
 
