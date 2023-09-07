@@ -821,7 +821,7 @@ def load_all_metrics(folder, backend_id=None):
         if method == 2:
             num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
             metrics.process_circuit_metrics_2_level(num_qubits)
-            metrics.finalize_group(str(num_qubits))
+            metrics.finalize_group(num_qubits)
 
     # override device name with the backend_id if supplied by caller
     if backend_id is not None:
@@ -1394,11 +1394,11 @@ def run(
                         # corresponding to different measurements along the different Pauli bases
                         quantum_execution_time = (
                             quantum_execution_time
-                            + metrics.circuit_metrics[str(num_qubits)][str(unique_id)]["exec_time"]
+                            + metrics.get_metric(num_qubits, unique_id, "exec_time")
                         )
                         quantum_elapsed_time = (
                             quantum_elapsed_time
-                            + metrics.circuit_metrics[str(num_qubits)][str(unique_id)]["elapsed_time"]
+                            + metrics.get_metric(num_qubits, unique_id, "elapsed_time")
                         )
 
                     #####################
@@ -1410,8 +1410,8 @@ def run(
                     cumlative_iter_time.append(cumlative_iter_time[-1] + quantum_execution_time)
 
                     # store the new exec time and elapsed time back to metrics
-                    metrics.store_metric(str(num_qubits), str(unique_id), "exec_time", quantum_execution_time)
-                    metrics.store_metric(str(num_qubits), str(unique_id), "elapsed_time", quantum_elapsed_time)
+                    metrics.store_metric(num_qubits, unique_id, "exec_time", quantum_execution_time)
+                    metrics.store_metric(num_qubits, unique_id, "elapsed_time", quantum_elapsed_time)
 
                     # increment the minimizer loop index, the index is increased by one
                     # for the group of three circuits created ( three measurement basis circuits)
@@ -1448,15 +1448,15 @@ def run(
                     )
 
                     # store the metrics for the current iteration
-                    metrics.store_metric(str(num_qubits), str(unique_id), "energy", energy)
-                    metrics.store_metric(str(num_qubits), str(unique_id), "random_energy", random_energy)
-                    metrics.store_metric(str(num_qubits), str(unique_id), "solution_quality", solution_quality)
-                    metrics.store_metric(str(num_qubits), str(unique_id), "accuracy_volume", accuracy_volume)
-                    metrics.store_metric(str(num_qubits), str(unique_id), "accuracy_ratio", accuracy_ratio)
-                    metrics.store_metric(str(num_qubits), str(unique_id), "fci_energy", fci_energy)
-                    metrics.store_metric(str(num_qubits), str(unique_id), "doci_energy", doci_energy)
-                    metrics.store_metric(str(num_qubits), str(unique_id), "radius", current_radius)
-                    metrics.store_metric(str(num_qubits), str(unique_id), "iteration_count", minimizer_loop_index)
+                    metrics.store_metric(num_qubits, unique_id, "energy", energy)
+                    metrics.store_metric(num_qubits, unique_id, "random_energy", random_energy)
+                    metrics.store_metric(num_qubits, unique_id, "solution_quality", solution_quality)
+                    metrics.store_metric(num_qubits, unique_id, "accuracy_volume", accuracy_volume)
+                    metrics.store_metric(num_qubits, unique_id, "accuracy_ratio", accuracy_ratio)
+                    metrics.store_metric(num_qubits, unique_id, "fci_energy", fci_energy)
+                    metrics.store_metric(num_qubits, unique_id, "doci_energy", doci_energy)
+                    metrics.store_metric(num_qubits, unique_id, "radius", current_radius)
+                    metrics.store_metric(num_qubits, unique_id, "iteration_count", minimizer_loop_index)
 
                     return energy
 
@@ -1538,7 +1538,7 @@ def run(
         # Note that this assumes that all iterations of the circuit have completed by this point
         if method == 2:
             metrics.process_circuit_metrics_2_level(num_qubits)
-            metrics.finalize_group(str(num_qubits))
+            metrics.finalize_group(num_qubits)
 
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)

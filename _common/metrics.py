@@ -176,11 +176,15 @@ def end_metrics():
     print(f'... execution complete at {get_timestr()} in {total_run_time} secs')
     print("")
 
+##################################################
+# METRICS STORE AND GET FUNCTIONS
 
-# Store an individual metric associate with a group and circuit in the group
+# Store a single or multiple metric(s) associated with a group and circuit in the group
 def store_metric (group, circuit, metric, value):
     group = str(group)
     circuit = str(circuit)
+    
+    # ensure that a table for this group and circuit exists
     if group not in circuit_metrics:
         circuit_metrics[group] = { }
     if circuit not in circuit_metrics[group]:
@@ -195,21 +199,48 @@ def store_metric (group, circuit, metric, value):
             store_metric(group, circuit, key, value[key]) 
     else:
         circuit_metrics[group][circuit][metric] = value
-    #print(f'{group} {circuit} {metric} -> {value}')
+    #print(f'{group} {circuit} {metric} -> {value}')  
     
-    
-
+# Store "final iteration" metric(s) associated with a group and circuit in the group
 def store_props_final_iter(group, circuit, metric, value):
     group = str(group)
     circuit = str(circuit)
-    if group not in circuit_metrics_final_iter: circuit_metrics_final_iter[group] = {}
-    if circuit not in circuit_metrics_final_iter[group]: circuit_metrics_final_iter[group][circuit] = { }
+    
+    # ensure that a table for this group and circuit exists
+    if group not in circuit_metrics_final_iter:
+        circuit_metrics_final_iter[group] = {}
+    if circuit not in circuit_metrics_final_iter[group]:
+        circuit_metrics_final_iter[group][circuit] = { }
+        
+    # store value or values to the final iteration tables
     if type(value) is dict:
         for key in value:
             store_props_final_iter(group, circuit, key, value[key])
     else:
         circuit_metrics_final_iter[group][circuit][metric] = value
-    
+
+# Return the value for a single or multiple metric(s) in the given a group and circuit
+def get_metric (group, circuit, metric):
+    group = str(group)
+    circuit = str(circuit)
+
+    # if the metric is a dict, return an array of metric values
+    if type(metric) is dict:
+        values = []
+        for key in value:
+            values.append(get_metric(group, circuit, key)) 
+        return values
+
+    # otherwise return single value
+    if metric in circuit_metrics[group][circuit]:
+        return circuit_metrics[group][circuit][metric]
+    else:
+        return 0    # DEVNOTE: might want to raise exception?
+
+
+##################################################
+# METRICS AGGREGATION FUNCTIONS
+   
 # Aggregate metrics for a specific group, creating average across circuits in group
 def aggregate_metrics_for_group (group):
     group = str(group)
@@ -382,7 +413,8 @@ def report_metrics ():
        
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete
 def finalize_group(group, report=True):
-
+    group = str(group)
+    
     #print(f"... finalize group={group}")
 
     # loop over circuits in group to generate totals
