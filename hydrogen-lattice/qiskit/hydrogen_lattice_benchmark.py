@@ -320,6 +320,13 @@ def prepare_circuits(base_circuit, operator):
 
     # Loop over each group of commuting operators
     for comm_op in commuting_ops:
+        basis = ""
+        pauli_labels = np.array([list(pauli_label) for pauli_label in comm_op.paulis.to_labels()])
+        for qubit in range(pauli_labels.shape[1]):
+            # return the pauli operations on qubits that aren't identity so we can rotate them
+            qubit_ops = "".join(filter(lambda x: x != "I", pauli_labels[:, qubit]))
+            basis += qubit_ops[0] if qubit_ops else "Z"
+
         # Separate terms and coefficients
         term_coeff_list = comm_op.to_list()
         terms, coeffs = zip(*term_coeff_list)
@@ -339,9 +346,9 @@ def prepare_circuits(base_circuit, operator):
         formatted_obs.append(new_op)
 
         # Create single quantum circuit for each group of commuting operators
-        basis_circuit = QuantumCircuit(len(terms[0]))
+        basis_circuit = QuantumCircuit(len(basis))
         basis_circuit.barrier()
-        for idx, pauli in enumerate(reversed(terms[0])):
+        for idx, pauli in enumerate(reversed(basis)):
             for gate in basis_change_map[pauli]:
                 getattr(basis_circuit, gate)(idx)
         composed_qc = base_circuit.compose(basis_circuit)
@@ -364,7 +371,6 @@ def compute_energy(result_array, formatted_observables, num_qubits):
         _probabilities.append(_probs)
 
     _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
-
     energy = sum(_expectation_values)
 
     return energy
