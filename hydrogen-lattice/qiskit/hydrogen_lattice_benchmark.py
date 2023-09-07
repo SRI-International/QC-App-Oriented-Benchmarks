@@ -364,10 +364,17 @@ def compute_energy(result_array, formatted_observables, num_qubits):
         _probabilities.append(_probs)
 
     _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
-
     energy = sum(_expectation_values)
 
-    return energy
+    # now get <H^2>, assuming Cov[si,si'] = 0
+    formatted_observables_sq = [(obs @ obs).simplify(atol=0) for obs in formatted_observables]
+    _expectation_values_sq = calculate_expectation_values(_probabilities, formatted_observables_sq)
+
+    # now since Cov is assumed to be zero, we compute each term's variance and sum the result.
+    # see Eq 5, e.g. in https://arxiv.org/abs/2004.06252
+    variance = sum([exp_sq - exp**2 for exp_sq, exp in zip(_expectation_values_sq, _expectation_values)])
+
+    return energy, variance
 
 def calculate_expectation_values(probabilities, observables):
     """
@@ -1430,9 +1437,17 @@ def run(
 
                     # compute energy for this combination of observables and measurements
                     global energy
-                    energy = compute_energy(
+                    global variance
+                    global standard_error
+                    energy, variance = compute_energy(
                         result_array=result_array, formatted_observables=frmt_obs, num_qubits=num_qubits
                     )
+
+                    standard_error = np.sqrt(variance/num_shots)
+
+                    # TODO: remove debug prints
+                    print("ENERGY +/- STDERR")
+                    print(f"{energy:.5f} +/- {standard_error:.5f}")
 
                     # append the most recent energy value to the list
                     lowest_energy_values.append(energy)
@@ -1449,6 +1464,8 @@ def run(
 
                     # store the metrics for the current iteration
                     metrics.store_metric(num_qubits, unique_id, "energy", energy)
+                    metrics.store_metric(num_qubits, unique_id, "variance", variance)
+                    metrics.store_metric(num_qubits, unique_id, "standard_error", standard_error)
                     metrics.store_metric(num_qubits, unique_id, "random_energy", random_energy)
                     metrics.store_metric(num_qubits, unique_id, "solution_quality", solution_quality)
                     metrics.store_metric(num_qubits, unique_id, "accuracy_volume", accuracy_volume)
