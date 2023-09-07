@@ -1,4 +1,3 @@
-
 """
 Hydogen Lattice Benchmark Program - Qiskit
 """
@@ -6,34 +5,28 @@ Hydogen Lattice Benchmark Program - Qiskit
 import datetime
 import json
 import logging
-import math
 import os
 import re
 import sys
 import time
 from collections import namedtuple
-from typing import Dict, Any, List, Optional
-from pathlib import Path
-import glob
-import matplotlib.pyplot as plt
-from matplotlib import cm
+from typing import Optional
+
 import numpy as np
 from scipy.optimize import minimize
 
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
-from qiskit import Aer, execute, transpile
+from qiskit import Aer, QuantumCircuit, execute
 from qiskit.circuit import ParameterVector
-from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit.exceptions import QiskitError
-from qiskit.quantum_info import Statevector,Pauli
+from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
 
 # DEVNOTE: opflow dependency
 from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
 from qiskit.opflow.primitive_ops import PauliSumOp
 
-sys.path[1:1] = [ "_common", "_common/qiskit", "hydrogen-lattice/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
+sys.path[1:1] = ["_common", "_common/qiskit", "hydrogen-lattice/_common"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/"]
 
 # benchmark-specific imports
 import common
@@ -52,10 +45,10 @@ try:
         logging.basicConfig(
             # filename=f"{fname}_{datetime.datetime.now().strftime('%Y_%m_%d_%S')}.log",
             filename=f"{fname}.log",
-            filemode='w',
-            encoding='utf-8',
+            filemode="w",
+            encoding="utf-8",
             level=logging.INFO,
-            format='%(asctime)s %(name)s - %(levelname)s:%(message)s'
+            format="%(asctime)s %(name)s - %(levelname)s:%(message)s",
         )
     else:
         logging.basicConfig(
@@ -63,13 +56,13 @@ try:
             format='%(asctime)s %(name)s - %(levelname)s:%(message)s')
         
 except Exception as e:
-    print(f'Exception {e} occured while configuring logger: bypassing logger config to prevent data loss')
+    print(f"Exception {e} occured while configuring logger: bypassing logger config to prevent data loss")
     pass
 
 np.random.seed(0)
 
 # Hydrogen Lattice inputs  ( Here input is Hamiltonian matrix --- Need to change)
-hl_inputs = dict() #inputs to the run method
+hl_inputs = dict()  # inputs to the run method
 verbose = False
 print_sample_circuit = True
 
@@ -81,33 +74,38 @@ QC_ = None
 Uf_ = None
 
 # #theta parameters
-vqe_parameter = namedtuple('vqe_parameter','theta')
+vqe_parameter = namedtuple("vqe_parameter", "theta")
 
 # DEBUG prints
 # give argument to the python script as "debug" or "true" or "1" to enable debug prints
 if len(sys.argv) > 1:
-    DEBUG = (sys.argv[1].lower() in ['debug', 'true', '1'])
+    DEBUG = sys.argv[1].lower() in ["debug", "true", "1"]
 else:
     DEBUG = False
 
 # Add custom metric names to metrics module
 def add_custom_metric_names():
-    
-    metrics.known_x_labels.update({
-        'iteration_count' : 'Iterations'
-    })
-    metrics.known_score_labels.update({
-        'solution_quality' : 'Solution Quality',
-        'accuracy_volume' : 'Accuracy Volume',
-        'accuracy_ratio' : 'Accuracy Ratio',
-        'energy' : 'Energy (Hartree)'  
-    })
-    metrics.score_label_save_str.update({
-        'solution_quality' : 'solution_quality', 
-        'accuracy_volume' : 'accuracy_volume', 
-        'accuracy_ratio' : 'accuracy_ratio',
-        'energy' : 'energy'
-    })
+    metrics.known_x_labels.update(
+        {
+            "iteration_count": "Iterations"
+        }
+    )
+    metrics.known_score_labels.update(
+        {
+            "solution_quality": "Solution Quality",
+            "accuracy_volume": "Accuracy Volume",
+            "accuracy_ratio": "Accuracy Ratio",
+            "energy": "Energy (Hartree)",
+        }
+    )
+    metrics.score_label_save_str.update(
+        {
+            "solution_quality": "solution_quality",
+            "accuracy_volume": "accuracy_volume",
+            "accuracy_ratio": "accuracy_ratio",
+            "energy": "energy",
+        }
+    )
 
 ###################################
 # HYDROGEN LATTICE CIRCUIT
@@ -115,19 +113,19 @@ def add_custom_metric_names():
 # parameter mode to control length of initial thetas_array (global during dev phase)
 # 1 - length 1
 # 2 - length N, where N is number of excitation pairs
-saved_parameter_mode = 1  
+saved_parameter_mode = 1
 
 def get_initial_parameters(num_qubits: int, thetas_array):
-    '''
+    """
     Generate an initial set of parameters given the number of qubits and user-provided thetas_array.
     If thetas_array is None, generate random array of parameters based on the parameter_mode
     If thetas_array is of length 1, repeat to the required length based on parameter_mode
     Otherwise, use the provided thetas_array.
-    
+
     Parameters
     ----------
     num_qubits : int
-        number of qubits in circuit 
+        number of qubits in circuit
     thetas_array : array of floats
         user-supplied array of initial values
 
@@ -135,37 +133,37 @@ def get_initial_parameters(num_qubits: int, thetas_array):
     -------
     initial_parameters : array
         array of parameter values required
-    '''
-    
+    """
+
     # compute required size of array based on number of occupation pairs
     size = 1
     if saved_parameter_mode > 1:
         num_occ_pairs = (num_qubits // 2)
         size = num_occ_pairs**2
-    
+
     # if None passed in, create array of random values
-    if thetas_array == None:
+    if thetas_array is None:
         initial_parameters = np.random.random(size=size)
-    
+
     # if single value passed in, extend to required size
     elif size > 1 and len(thetas_array) == 1:
         initial_parameters = np.repeat(thetas_array, size)
-    
+
     # otherwise, use what user provided
     else:
         if len(thetas_array) != size:
             print(f"WARNING: length of thetas_array {len(thetas_array)} does not equal required length {size}")
             print("         Generating random values instead.")
             initial_parameters = get_initial_parameters(num_qubits, None)
-        else:  
+        else:
             initial_parameters = np.array(thetas_array)
-        
+
     if verbose:
         print(f"... get_initial_parameters(num_qubits={num_qubits}, mode={saved_parameter_mode})")
         print(f"    --> initial_parameter[{size}]={initial_parameters}")
-        
+
     return initial_parameters
-                
+
 # Create the  ansatz quantum circuit for the VQE algorithm.
 def VQE_ansatz(num_qubits: int,
             thetas_array,
@@ -185,29 +183,28 @@ def VQE_ansatz(num_qubits: int,
     for i in range(num_occ_pairs):
         for a in range(num_occ_pairs, num_qubits):
             excitation_pairs.append([i, a])
-    
+
     # create circuit of num_qubits
     circuit = QuantumCircuit(num_qubits)
-    
+
     # Hartree Fock initial state
     for occ in range(num_occ_pairs):
         circuit.x(occ)
-    
+
     # if parameterized flag set, create a ParameterVector
     parameter_vector = None
     if parameterized:
         parameter_vector = ParameterVector("t", length=len(excitation_pairs))
-    
+
     # for parameter mode 1, make all thetas the same as the first
     if saved_parameter_mode == 1:
         thetas_array = np.repeat(thetas_array, len(excitation_pairs))
-    
+
     # create a Hartree Fock initial state
     for idx, pair in enumerate(excitation_pairs):
-        
         # if parameterized, use ParamterVector, otherwise raw theta value
         theta = parameter_vector[idx] if parameterized else thetas_array[idx]
-        
+
         # apply excitation
         i, a = pair[0], pair[1]
 
@@ -227,11 +224,11 @@ def VQE_ansatz(num_qubits: int,
         circuit.sdg(a)
         circuit.sdg(i)
 
-    ''' TMI ...
+    """ TMI ...
     if verbose:
         print(f"      --> thetas_array={thetas_array}")
-        print(f"      --> parameter_vector={str(parameter_vector)}") 
-    '''
+        print(f"      --> parameter_vector={str(parameter_vector)}")
+    """
     return circuit, parameter_vector, thetas_array
     
 # Create the benchmark program circuit array, for the given operator
@@ -244,17 +241,18 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
     # if no thetas_array passed in, create defaults 
     if thetas_array is None:
         thetas_array = [1.0]
-        
+
     # create parameters in the form expected by the ansatz generator
     # this is an array of betas followed by array of gammas, each of length = rounds
     global _qc
     global theta
-    
+
     # create the circuit the first time, add measurements
     if ex.do_transpile_for_execute:
-        logger.info(f'*** Constructing parameterized circuit for {num_qubits = } {secret_int}')
- 
-        _qc, parameter_vector, thetas_array = VQE_ansatz(num_qubits=num_qubits,
+        logger.info(f"*** Constructing parameterized circuit for {num_qubits = } {secret_int}")
+
+        _qc, parameter_vector, thetas_array = VQE_ansatz(
+                num_qubits=num_qubits,
                 thetas_array=thetas_array, parameterized=parameterized,
                 num_occ_pairs = None )
     
@@ -264,21 +262,22 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
 
     # create a binding of Parameter values
     params = {parameter_vector: thetas_array} if parameterized else None
-    
+
     if verbose:
         print(f"    --> params={params}")
-        
+
     logger.info(f"Create binding parameters for {thetas_array} {params}")
-    
+
     # save the first circuit in the array returned from prepare_circuits (with appendage)
     # to be used an example for display purposes
     qc = _qc_array[0]
-    #print(qc)
-    
+    # print(qc)
+
     # save small circuit example for display
     global QC_
-    if QC_ == None or num_qubits <= 4:
-        if num_qubits <= 7: QC_ = qc
+    if QC_ is None or num_qubits <= 4:
+        if num_qubits <= 7:
+            QC_ = qc
 
     # return a handle on the circuit, the observables, and parameters
     return _qc_array, _formatted_observables, params
@@ -286,13 +285,13 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
 ############### Prepare Circuits from Observables
 
 # ---- classical Pauli sum operator from list of Pauli operators and coefficients ----
-    # Below function is to reduce some dependency on qiskit ( String data type issue) ----
-    # def pauli_sum_op(ops, coefs):
-    #     if len(ops) != len(coefs):
-    #         raise ValueError("The number of Pauli operators and coefficients must be equal.")
-    #     pauli_sum_op_list = [(op, coef) for op, coef in zip(ops, coefs)]
-    #     return pauli_sum_op_list
-#---- classical Pauli sum operator from list of Pauli operators and coefficients ----
+# Below function is to reduce some dependency on qiskit ( String data type issue) ----
+# def pauli_sum_op(ops, coefs):
+#     if len(ops) != len(coefs):
+#         raise ValueError("The number of Pauli operators and coefficients must be equal.")
+#     pauli_sum_op_list = [(op, coef) for op, coef in zip(ops, coefs)]
+#     return pauli_sum_op_list
+# ---- classical Pauli sum operator from list of Pauli operators and coefficients ----
 
 def prepare_circuits(base_circuit, observables):
     """
@@ -327,7 +326,7 @@ def compute_energy(result_array, formatted_observables, num_qubits):
 
     energy = sum(_expectation_values)
 
-    return energy    
+    return energy
 
 def calculate_expectation_values(probabilities, observables):
     """
@@ -344,7 +343,7 @@ def normalize_counts(counts, num_qubits=None):
     """
     Normalize the counts to get probabilities and convert to bitstrings.
     """
-    
+
     normalizer = sum(counts.values())
 
     try:
@@ -364,10 +363,10 @@ def normalize_counts(counts, num_qubits=None):
 def get_operator_for_problem(instance_filepath):
     """
     Return an operator object for the problem.
-    
+
     Argument:
     instance_filepath : problem defined by instance_filepath (but should be num_qubits + radius)
-    
+
     Returns:
     operator : an object encapsulating the Hamiltoian for the problem
     """        
@@ -383,10 +382,10 @@ def get_random_energy(instance_filepath):
     """
     Get the 'random_energy' associated with the problem
     """
-    
+
     # read precomputed energies file from the random energies path
     global random_energies_dict
-    
+
     # get the list of random energy filenames once
     # (DEVNOTE: probably don't want an exception here, should just return 0)
     if not random_energies_dict:
@@ -396,10 +395,10 @@ def get_random_energy(instance_filepath):
             logger.error(err)
             print("Error reading precomputed random energies json file. Please create the file by running the script 'compute_random_energies.py' in the _common/random_sampler directory")
             raise
-  
+
     # get the filename from the instance_filepath and get the random energy from the dictionary
     filename = os.path.basename(instance_filepath)
-    filename = filename.split('.')[0]
+    filename = filename.split(".")[0]
     random_energy = random_energies_dict[filename]
 
     return random_energy
@@ -407,11 +406,11 @@ def get_random_energy(instance_filepath):
 def get_classical_solutions(instance_filepath):
     """
     Get a list of the classical solutions for this problem
-    """           
+    """
     # solution has list of classical solutions for each instance in the loop
     sol_file_name = instance_filepath[:-5] + ".sol"
     method_names, values = common.read_puccd_solution(sol_file_name)
-    solution = list(zip(method_names, values)) 
+    solution = list(zip(method_names, values))
     return solution
 
 # Return the file identifier (path) for the problem at this width, radius, and instance
@@ -429,19 +428,20 @@ def get_problem_identifier(num_qubits, radius, instance_num):
     else:
         instance_filepath_list = common.get_instance_filepaths(num_qubits)
         try:
-            if len(instance_filepath_list) >= instance_num :
-                instance_filepath = instance_filepath_list[instance_num-1]
+            if len(instance_filepath_list) >= instance_num:
+                instance_filepath = instance_filepath_list[instance_num - 1]
             else:
                 instance_filepath = None
         except ValueError as err:
             logger.error(err)
             instance_filepath = None
-                      
+
     return instance_filepath
-    
+
+
 #################################################
 # EXPECTED RESULT TABLES (METHOD 1)
-  
+
 ############### Expectation Tables Created using State Vector Simulator
 
 # DEVNOTE: We are building these tables on-demand for now, but for larger circuits
@@ -451,27 +451,27 @@ def get_problem_identifier(num_qubits, radius, instance_num):
 # these are created at the time the circuit is created, then deleted when results are processed
 expectations = {}
 
+
 # Compute array of expectation values in range 0.0 to 1.0
 # Use statevector_simulator to obtain exact expectation
-def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simulator', params=None):
-    
-    #ts = time.time()
-    
+def compute_expectation(qc, num_qubits, secret_int, backend_id="statevector_simulator", params=None):
+    # ts = time.time()
+
     # to execute on Aer state vector simulator, need to remove measurements
     qc = qc.remove_final_measurements(inplace=False)
-    
-    if params != None:
+
+    if params is not None:
         qc = qc.bind_parameters(params)
-    
-    #execute statevector simulation
+
+    # execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
     sv_result = execute(qc, sv_backend, params=params).result()
 
     # get the probability distribution
     counts = sv_result.get_counts()
 
-    #print(f"... statevector expectation = {counts}")
-    
+    # print(f"... statevector expectation = {counts}")
+
     # store in table until circuit execution is complete
     id = f"_{num_qubits}_{secret_int}"
     expectations[id] = counts
@@ -483,51 +483,53 @@ def get_expectation(num_qubits, secret_int, num_shots):
 
     # find expectation counts for the given circuit 
     id = f"_{num_qubits}_{secret_int}"
-    
+
     if id in expectations:
         counts = expectations[id]
-        
+
         # scale probabilities to number of shots to obtain counts
         for k, v in counts.items():
             counts[k] = round(v * num_shots)
-        
+
         # delete from the dictionary
         del expectations[id]
-        
+
         return counts
-        
+
     else:
         return None
-      
+
 
 #################################################
 # RESULT DATA ANALYSIS (METHOD 1)
 
 expected_dist = {}
 
+
 # Compare the measurement results obtained with the expected measurements to determine fidelity
-def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
+def analyze_and_print_result(qc, result, num_qubits, secret_int, num_shots):
     global expected_dist
-    
+
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    
+
     # retrieve pre-computed expectation values for the circuit that just completed
     expected_dist = get_expectation(num_qubits, secret_int, num_shots)
-    
+
     # if the expectation is not being calculated (only need if we want to compute fidelity)
     # assume that the expectation is the same as measured counts, yielding fidelity = 1
-    if expected_dist == None:
+    if expected_dist is None:
         expected_dist = counts
-    
-    if verbose: print(f"For width {num_qubits}   measured: {counts}\n  expected: {expected_dist}")
+
+    if verbose:
+        print(f"For width {num_qubits}   measured: {counts}\n  expected: {expected_dist}")
     # if verbose: print(f"For width {num_qubits} problem {secret_int}\n  measured: {counts}\n  expected: {expected_dist}")
 
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, expected_dist)
-    
-    # if verbose: print(f"For secret int {secret_int} fidelity: {fidelity}")    
-    
+
+    # if verbose: print(f"For secret int {secret_int} fidelity: {fidelity}")
+
     return counts, fidelity
 
 ##### METHOD 2 function to compute application-specific figures of merit
@@ -538,7 +540,7 @@ def calculate_quality_metric(energy=None,
             precision = 4,
             num_electrons = 2):
     """
-    Returns the quality metrics, namely solution quality, accuracy volume, and accuracy ratio. 
+    Returns the quality metrics, namely solution quality, accuracy volume, and accuracy ratio.
     Solution quality is a value between zero and one. The other two metrics can take any value.
 
     Parameters
@@ -550,7 +552,7 @@ def calculate_quality_metric(energy=None,
         FCI energy for the problem.
 
     random_energy : float
-        Random energy for the problem, precomputed and stored and read from json file   
+        Random energy for the problem, precomputed and stored and read from json file
 
     precision : float
         precision factor used in solution quality calculation
@@ -599,39 +601,41 @@ def calculate_quality_metric(energy=None,
 #################################################
 # DATA SAVE FUNCTIONS
 
-# Create a folder where the results will be saved. 
+# Create a folder where the results will be saved.
 # For every circuit width, metrics will be stored the moment the results are obtained
 # In addition to the metrics, the parameter values obtained by the optimizer, as well as the counts
 # measured for the final circuit will be stored.
 def create_data_folder(save_res_to_file, detailed_save_names, backend_id):
     global parent_folder_save
-    
+
     # if detailed filenames requested, use directory name with timestamp
     if detailed_save_names:
         start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        parent_folder_save = os.path.join('__data', f'{backend_id}', f'run_start_{start_time_str}')
-        
+        parent_folder_save = os.path.join("__data", f"{backend_id}", f"run_start_{start_time_str}")
+
     # otherwise, just put all json files under __data/backend_id
     else:
-        parent_folder_save = os.path.join('__data', f'{backend_id}')
-    
+        parent_folder_save = os.path.join("__data", f"{backend_id}")
+
     # create the folder if it doesn't exist already
     if save_res_to_file and not os.path.exists(parent_folder_save):
         os.makedirs(os.path.join(parent_folder_save))
         
 # Function to save final iteration data to file
-def store_final_iter_to_metrics_json(backend_id,
-                            num_qubits,
-                            radius,
-                            instance_num,
-                            num_shots,
-                            converged_thetas_list,
-                            energy,
-                            detailed_save_names,
-                            dict_of_inputs,
-                            save_final_counts,
-                            save_res_to_file,
-                            _instances=None):
+def store_final_iter_to_metrics_json(
+    backend_id,
+    num_qubits,
+    radius,
+    instance_num,
+    num_shots,
+    converged_thetas_list,
+    energy,
+    detailed_save_names,
+    dict_of_inputs,
+    save_final_counts,
+    save_res_to_file,
+    _instances=None,
+):
     """
     For a given problem (specified by num_qubits and instance),
     1. For a given restart, store properties of the final minimizer iteration to metrics.circuit_metrics_final_iter, and
@@ -639,64 +643,76 @@ def store_final_iter_to_metrics_json(backend_id,
     """
     # In order to compare with uniform random sampling, get some samples
 
-    # Store properties of the final iteration, the converged theta values, as well as the known optimal value for the current problem, in metrics.circuit_metrics_final_iter. 
-    metrics.store_props_final_iter(num_qubits, instance_num, 'energy', energy)
-    metrics.store_props_final_iter(num_qubits, instance_num, 'converged_thetas_list', converged_thetas_list)
-    
+    # Store properties of the final iteration, the converged theta values,
+    # as well as the known optimal value for the current problem,
+    # in metrics.circuit_metrics_final_iter. 
+    metrics.store_props_final_iter(num_qubits, instance_num, "energy", energy)
+    metrics.store_props_final_iter(num_qubits, instance_num, "converged_thetas_list", converged_thetas_list)
+
     # Save final iteration data to metrics.circuit_metrics_final_iter
     # This data includes final counts, cuts, etc.
     if save_res_to_file:
     
         # Save data to a json file
-        dump_to_json(parent_folder_save,
-                    num_qubits, radius, instance_num,  
-                    dict_of_inputs, 
-                    converged_thetas_list, 
-                    energy,
-                    save_final_counts=save_final_counts)
+        dump_to_json(
+            parent_folder_save,
+            num_qubits,
+            radius,
+            instance_num,
+            dict_of_inputs,
+            converged_thetas_list,
+            energy,
+            save_final_counts=save_final_counts,
+        )
 
-def dump_to_json(parent_folder_save, num_qubits, radius, instance_num, 
-                dict_of_inputs, 
-                converged_thetas_list,
-                energy,
-                save_final_counts=False):
+def dump_to_json(
+    parent_folder_save,
+    num_qubits,
+    radius,
+    instance_num,
+    dict_of_inputs,
+    converged_thetas_list,
+    energy,
+    save_final_counts=False,
+):
     """
-    For a given problem (specified by number of qubits and instance_number), 
+    For a given problem (specified by number of qubits and instance_number),
     save the evolution of various properties in a json file.
     Items stored in the json file: Data from all iterations (iterations), inputs to run program ('general properties'), converged theta values ('converged_thetas_list'), computes results.
-    if save_final_counts is True, then also store the distribution counts 
+    if save_final_counts is True, then also store the distribution counts
     """
-    
-    #print(f"... saving data for width={num_qubits} radius={radius} instance={instance_num}")
-    if not os.path.exists(parent_folder_save): os.makedirs(parent_folder_save)
-    store_loc = os.path.join(parent_folder_save,'width_{}_instance_{}.json'.format(num_qubits, instance_num))
-    
-    # Obtain dictionary with iterations data corresponding to given instance_num 
+
+    # print(f"... saving data for width={num_qubits} radius={radius} instance={instance_num}")
+    if not os.path.exists(parent_folder_save):
+        os.makedirs(parent_folder_save)
+    store_loc = os.path.join(parent_folder_save, "width_{}_instance_{}.json".format(num_qubits, instance_num))
+
+    # Obtain dictionary with iterations data corresponding to given instance_num
     all_restart_ids = list(metrics.circuit_metrics[str(num_qubits)].keys())
     ids_this_restart = [r_id for r_id in all_restart_ids if int(r_id) // 1000 == instance_num]
-    iterations_dict_this_restart =  {r_id : metrics.circuit_metrics[str(num_qubits)][r_id] for r_id in ids_this_restart}
-    
+    iterations_dict_this_restart = {r_id: metrics.circuit_metrics[str(num_qubits)][r_id] for r_id in ids_this_restart}
+
     # Values to be stored in json file
-    dict_to_store = {'iterations' : iterations_dict_this_restart}
-    dict_to_store['general_properties'] = dict_of_inputs
-    dict_to_store['converged_thetas_list'] = converged_thetas_list
-    dict_to_store['energy'] = energy
-    #dict_to_store['unif_dict'] = unif_dict
-    
+    dict_to_store = {"iterations": iterations_dict_this_restart}
+    dict_to_store["general_properties"] = dict_of_inputs
+    dict_to_store["converged_thetas_list"] = converged_thetas_list
+    dict_to_store["energy"] = energy
+    # dict_to_store['unif_dict'] = unif_dict
+
     # Also store the value of counts obtained for the final counts
-    '''
+    """
     if save_final_counts:
         dict_to_store['final_counts'] = iter_dist
         #iter_dist.get_counts()
-    ''' 
-    
+    """
+
     # Now write the data fo;e
-    with open(store_loc, 'w') as outfile:
+    with open(store_loc, "w") as outfile:
         json.dump(dict_to_store, outfile)
 
 #################################################
 # DATA LOAD FUNCTIONS
-       
+
 # %% Loading saved data (from json files)
 
 def load_data_and_plot(folder, backend_id=None, **kwargs):
@@ -710,10 +726,9 @@ def load_data_and_plot(folder, backend_id=None, **kwargs):
         Directory where json files are saved.
     """
     _gen_prop = load_all_metrics(folder, backend_id=backend_id)
-    if _gen_prop != None:
+    if _gen_prop is not None:
         gen_prop = {**_gen_prop, **kwargs}
         plot_results_from_data(**gen_prop)
-
 
 def load_all_metrics(folder, backend_id=None):
     """
@@ -732,44 +747,45 @@ def load_all_metrics(folder, backend_id=None):
     """
     # Note: folder here should be the folder where only the width=... files are stored, and not a folder higher up in the directory
     assert os.path.isdir(folder), f"Specified folder ({folder}) does not exist."
-    
+
     metrics.init_metrics()
-    
+
     list_of_files = os.listdir(folder)
-    #print(list_of_files)
-    
+    # print(list_of_files)
+
     # list with elements that are tuples->(width,restartInd,filename)
-    width_restart_file_tuples = [(*get_width_restart_tuple_from_filename(fileName), fileName)
-                                 for (ind, fileName) in enumerate(list_of_files) if fileName.startswith("width")]  
-    
-    #sort first by width, and then by restartInd
-    width_restart_file_tuples = sorted(width_restart_file_tuples, key=lambda x:(x[0], x[1])) 
-    distinct_widths = list(set(it[0] for it in width_restart_file_tuples)) 
-    list_of_files = [
-        [tup[2] for tup in width_restart_file_tuples if tup[0] == width] for width in distinct_widths
-        ]
-    
+    width_restart_file_tuples = [
+        (*get_width_restart_tuple_from_filename(fileName), fileName)
+        for (ind, fileName) in enumerate(list_of_files)
+        if fileName.startswith("width")
+    ]
+
+    # sort first by width, and then by restartInd
+    width_restart_file_tuples = sorted(width_restart_file_tuples, key=lambda x: (x[0], x[1]))
+    distinct_widths = list(set(it[0] for it in width_restart_file_tuples))
+    list_of_files = [[tup[2] for tup in width_restart_file_tuples if tup[0] == width] for width in distinct_widths]
+
     # connot continue without at least one dataset
     if len(list_of_files) < 1:
         print("ERROR: No result files found")
         return None
-        
+
     for width_files in list_of_files:
         # For each width, first load all the restart files
         for fileName in width_files:
             gen_prop = load_from_width_restart_file(folder, fileName)
-      
+
         # next, do processing for the width
-        method = gen_prop['method']
+        method = gen_prop["method"]
         if method == 2:
             num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
-          
+
     # override device name with the backend_id if supplied by caller
-    if backend_id != None:
+    if backend_id is not None:
         metrics.set_plot_subtitle(f"Device = {backend_id}")
-          
+
     return gen_prop
 
 
@@ -792,33 +808,33 @@ def load_from_width_restart_file(folder, fileName):
     gen_prop : dict
         of inputs that were used in maxcut_benchmark.run method
     """
-    
+
     # Extract num_qubits and s from file name
     num_qubits, restart_ind = get_width_restart_tuple_from_filename(fileName)
     print(f"Loading from {fileName}, corresponding to {num_qubits} qubits and restart index {restart_ind}")
-    with open(os.path.join(folder, fileName), 'r') as json_file:
+    with open(os.path.join(folder, fileName), "r") as json_file:
         data = json.load(json_file)
-        gen_prop = data['general_properties']
-        converged_thetas_list = data['converged_thetas_list']
-        energy = data['energy']
-        if gen_prop['save_final_counts']:
+        gen_prop = data["general_properties"]
+        converged_thetas_list = data["converged_thetas_list"]
+        energy = data["energy"]
+        if gen_prop["save_final_counts"]:
             # Distribution of measured cuts
-            final_counts = data['final_counts']
-        
-        backend_id = gen_prop.get('backend_id')
+            final_counts = data["final_counts"]
+
+        backend_id = gen_prop.get("backend_id")
         metrics.set_plot_subtitle(f"Device = {backend_id}")
-        
+
         # Update circuit metrics
-        for circuit_id in data['iterations']:
+        for circuit_id in data["iterations"]:
             # circuit_id = restart_ind * 1000 + minimizer_loop_ind
-            for metric, value in data['iterations'][circuit_id].items():
+            for metric, value in data["iterations"][circuit_id].items():
                 metrics.store_metric(num_qubits, circuit_id, metric, value)
-                
-        method = gen_prop['method']
+
+        method = gen_prop["method"]
         if method == 2:
-            metrics.store_props_final_iter(num_qubits, restart_ind, 'energy', energy)
-            metrics.store_props_final_iter(num_qubits, restart_ind, 'converged_thetas_list', converged_thetas_list)
-            if gen_prop['save_final_counts']:
+            metrics.store_props_final_iter(num_qubits, restart_ind, "energy", energy)
+            metrics.store_props_final_iter(num_qubits, restart_ind, "converged_thetas_list", converged_thetas_list)
+            if gen_prop["save_final_counts"]:
                 metrics.store_props_final_iter(num_qubits, restart_ind, None, final_counts)
 
     return gen_prop
@@ -841,83 +857,105 @@ def get_width_restart_tuple_from_filename(fileName):
         graph degree.
 
     """
-    pattern = 'width_([0-9]+)_instance_([0-9]+).json'
+    pattern = "width_([0-9]+)_instance_([0-9]+).json"
     match = re.search(pattern, fileName)
-    #print(match)
+    # print(match)
 
     # assert match is not None, f"File {fileName} found inside folder. All files inside specified folder must be named in the format 'width_int_restartInd_int.json"
     num_qubits = int(match.groups()[0])
     degree = int(match.groups()[1])
-    return (num_qubits,degree)
+    return (num_qubits, degree)
 
 
 ################################################
 # PLOT METHODS
 
-def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circuits = 1,
-            method=2,
-            
-            line_x_metrics=['iteration_count', 'cumulative_exec_time'],
-            line_y_metrics=['energy', 'solution_quality_error'],
-            plot_layout_style = "grid",
-            
-            score_metric=['solution_quality', 'accuracy_ratio'],
-            y_metric=['num_qubits'],
-            x_metric=['cumulative_exec_time', 'cumulative_elapsed_time'],
-            fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
-            
-            detailed_save_names=False, **kwargs):
+def plot_results_from_data(
+    num_shots=100,
+    radius=0.75,
+    max_iter=30,
+    max_circuits=1,
+    method=2,
+    line_x_metrics=["iteration_count", "cumulative_exec_time"],
+    line_y_metrics=["energy", "solution_quality_error"],
+    plot_layout_style="grid",
+    score_metric=["solution_quality", "accuracy_ratio"],
+    y_metric=["num_qubits"],
+    x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
+    fixed_metrics={},
+    num_x_bins=15,
+    y_size=None,
+    x_size=None,
+    x_min=None,
+    x_max=None,
+    detailed_save_names=False,
+    **kwargs,
+):
     """
     Plot results from the data contained in metrics tables.
     """
-    
+
     # Add custom metric names to metrics module (in case this is run outside of run())
     add_custom_metric_names()
-    
+
     # handle single string form of score metrics
     if type(score_metric) == str:
-            score_metric = [score_metric]
-    
+        score_metric = [score_metric]
+
     # for hydrogen lattice, objective function is always 'Energy'
     obj_str = "Energy"
- 
-    suffix = ''
+
+    suffix = ""
 
     # If detailed names are desired for saving plots, put date of creation, etc.
     if detailed_save_names:
-        cur_time=datetime.datetime.now()
+        cur_time = datetime.datetime.now()
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
-        suffix = f's{num_shots}_r{radius}_mi{max_iter}_{dt}'
-    
+        suffix = f"s{num_shots}_r{radius}_mi{max_iter}_{dt}"
+
     suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
     backend_id = metrics.get_backend_id()
-    options = {'shots' : num_shots, 'radius' : radius, 'restarts' : max_circuits}
-    
-    # plot all line metrics, including solution quality and accuracy ratio 
+    options = {"shots": num_shots, "radius": radius, "restarts": max_circuits}
+
+    # plot all line metrics, including solution quality and accuracy ratio
     # vs iteration count and cumulative execution time
-    h_metrics.plot_all_line_metrics(suptitle,
-                line_x_metrics=line_x_metrics,
-                line_y_metrics=line_y_metrics,
-                plot_layout_style=plot_layout_style,
-                backend_id=backend_id,
-                options=options)
-    
-    # plot all cumulative metrics, including average_iteration_time and accuracy ratio 
+    h_metrics.plot_all_line_metrics(
+        suptitle,
+        line_x_metrics=line_x_metrics,
+        line_y_metrics=line_y_metrics,
+        plot_layout_style=plot_layout_style,
+        backend_id=backend_id,
+        options=options,
+    )
+
+    # plot all cumulative metrics, including average_iteration_time and accuracy ratio
     # over number of qubits
-    h_metrics.plot_all_cumulative_metrics(suptitle,
-                score_metrics=["energy", "solution_quality", "accuracy_ratio"],
-                x_vals=["iteration_count", "cumulative_exec_time"],
-                plot_layout_style=plot_layout_style,
-                backend_id=backend_id,
-                options=options)
-                
+    h_metrics.plot_all_cumulative_metrics(
+        suptitle,
+        score_metrics=["energy", "solution_quality", "accuracy_ratio"],
+        x_vals=["iteration_count", "cumulative_exec_time"],
+        plot_layout_style=plot_layout_style,
+        backend_id=backend_id,
+        options=options,
+    )
+
     # plot all area metrics
-    metrics.plot_all_area_metrics(suptitle,
-                score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
-                fixed_metrics=fixed_metrics, num_x_bins=num_x_bins,
-                x_size=x_size, y_size=y_size, x_min=x_min, x_max=x_max,
-                options=options, suffix=suffix, which_metric='solution_quality')
-    
+    metrics.plot_all_area_metrics(
+        suptitle,
+        score_metric=score_metric,
+        x_metric=x_metric,
+        y_metric=y_metric,
+        fixed_metrics=fixed_metrics,
+        num_x_bins=num_x_bins,
+        x_size=x_size,
+        y_size=y_size,
+        x_min=x_min,
+        x_max=x_max,
+        options=options,
+        suffix=suffix,
+        which_metric="solution_quality",
+    )
+
 
 ################################################
 ################################################
@@ -925,25 +963,29 @@ def plot_results_from_data(num_shots=100, radius = 0.75, max_iter=30, max_circui
 
 MAX_QUBITS = 16
 
-def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
-        method=2, radius=None,
-        thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
-        minimizer_function=None, minimizer_tolerance=1e-3, max_iter=30, comfort=False,
-        
-        line_x_metrics=['iteration_count', 'cumulative_exec_time'],
-        line_y_metrics=['energy', 'solution_quality_error'],
-        
-        score_metric=['solution_quality', 'accuracy_ratio'],
-        y_metric='num_qubits',
-        x_metric=['cumulative_exec_time','cumulative_elapsed_time'], 
-        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
-        
-        plot_results = True,
-        plot_layout_style = "grid", 
-        
-        save_res_to_file = True, save_final_counts = False, detailed_save_names = False, 
-        backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None, _instances=None) :
+def run(
+    min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
+    method=2,
+    radius=None, thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
+    minimizer_function=None,
+    minimizer_tolerance=1e-3, max_iter=30, comfort=False,
+    line_x_metrics=["iteration_count", "cumulative_exec_time"],
+    line_y_metrics=["energy", "solution_quality_error"],
+    score_metric=["solution_quality", "accuracy_ratio"],
+    y_metric="num_qubits",
+    x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
+    fixed_metrics={},
+    num_x_bins=15,
+    y_size=None,
+    x_size=None,
+    plot_results=True,
+    plot_layout_style="grid",
+    save_res_to_file=True, save_final_counts=False, detailed_save_names=False,
+    backend_id="qasm_simulator",
+    provider_backend=None, hub="ibm-q", group="open", project="main",
+    exec_options=None,
+    _instances=None,
+):
     """
     Parameters
     ----------
@@ -965,7 +1007,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         Value between 0 and 1. The default is 0.1.
     parameterized : bool, optional
         Whether to use parameter objects in circuits or not. The default is False.
-    parameter_mode : bool, optional 
+    parameter_mode : bool, optional
         If 1, use thetas_array of length 1, otherwise (num_qubits//2)**2, to match excitation pairs
     do_fidelities : bool, optional
         Compute circuit fidelity. The default is True.
@@ -978,7 +1020,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     plot_layout_style : str, optional
         Style of plot layout, 'grid', 'stacked', or 'individual', default = 'grid'
     line_x_metrics : list or string, optional
-        Which metrics are to be plotted on x-axis in line metrics plots. 
+        Which metrics are to be plotted on x-axis in line metrics plots.
     line_y_metrics : list or string, optional
         Which metrics are to be plotted on y-axis in line metrics plots.
     score_metric : list or string, optional
@@ -1015,7 +1057,7 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         If True, also save the counts from the final iteration for each problem in the json files. The default is True.
     detailed_save_names : bool, optional
         If true, the data and plots will be saved with more detailed names. Default is False
-    confort : bool, optional    
+    confort : bool, optional
         If true, print comfort dots during execution
     """
 
@@ -1023,31 +1065,31 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
     # This dictionary will later be stored in a json file
     # It will also be used for sending parameters to the plotting function
     dict_of_inputs = locals()
-    
-    thetas = []   # a default empty list of thetas 
-    
+
+    thetas = []  # a default empty list of thetas
+
     # Update the dictionary of inputs
-    dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
-    
+    dict_of_inputs = {**dict_of_inputs, **{"thetas_array": thetas, "max_circuits": max_circuits}}
+
     # Delete some entries from the dictionary; they may contain secrets or function pointers
     for key in ["hub", "group", "project", "provider_backend", "exec_options", "minimizer_function"]:
         dict_of_inputs.pop(key)
-    
+
     global hydrogen_lattice_inputs
     hydrogen_lattice_inputs = dict_of_inputs
-    
+
     ###########################
     # Benchmark Initializeation
-    
+
     global QC_
     global circuits_done
     global minimizer_loop_index
     global opt_ts
-    
+
     print("Hydrogen Lattice Benchmark Program - Qiskit")
 
     QC_ = None
-    
+
     # validate parameters
     max_qubits = max(2, max_qubits)
     max_qubits = min(MAX_QUBITS, max_qubits)
@@ -1057,7 +1099,11 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         print("Validating user inputs...")
         # raise an exception if either min_qubits or max_qubits is not even
         if min_qubits % 2 != 0 or max_qubits % 2 != 0:
-            raise ValueError("min_qubits and max_qubits must be even. min_qubits = {}, max_qubits = {}".format(min_qubits, max_qubits))
+            raise ValueError(
+                "min_qubits and max_qubits must be even. min_qubits = {}, max_qubits = {}".format(
+                    min_qubits, max_qubits
+                )
+            )
     except ValueError as err:
         # display error message and stop execution if min_qubits or max_qubits is not even
         logger.error(err)
@@ -1067,39 +1113,37 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
             max_qubits -= 1
             max_qubits = min(max_qubits, MAX_QUBITS)
         print(err.args[0] + "\n Running for for values min_qubits = {}, max_qubits = {}".format(min_qubits, max_qubits))
-    
+
     # don't compute exectation unless fidelity is is needed
     global do_compute_expectation
     do_compute_expectation = do_fidelities
-    
+
     # save the desired parameter mode globally (for now, during dev)
     global saved_parameter_mode
     saved_parameter_mode = parameter_mode
-    
+
     # given that this benchmark does every other width, set y_size default to 1.5
-    if y_size == None:
+    if y_size is None:
         y_size = 1.5
-        
+
     # Initialize metrics module with empty metrics arrays
     metrics.init_metrics()
 
     # Add custom metric names to metrics module
     add_custom_metric_names()
-    
+
     # Define custom result handler
-    def execution_handler (qc, result, num_qubits, s_int, num_shots):  
-     
+    def execution_handler(qc, result, num_qubits, s_int, num_shots):
         # determine fidelity of result set
         num_qubits = int(num_qubits)
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
-        metrics.store_metric(num_qubits, s_int, 'solution_quality', fidelity)
+        metrics.store_metric(num_qubits, s_int, "solution_quality", fidelity)
 
-    def execution_handler2 (qc, result, num_qubits, s_int, num_shots):
-    
+    def execution_handler2(qc, result, num_qubits, s_int, num_shots):
         # Stores the results to the global saved_result variable
         global saved_result
         saved_result = result
-        
+
     # Initialize execution module using the execution result handler above and specified backend_id
     # for method=2 we need to set max_jobs_active to 1, so each circuit completes before continuing
     if method == 2:
@@ -1107,10 +1151,11 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
         ex.init_execution(execution_handler2)
     else:
         ex.init_execution(execution_handler)
-    
+
     # initialize the execution module with target information
-    ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+    ex.set_execution_target(
+        backend_id, provider_backend=provider_backend, hub=hub, group=group, project=project, exec_options=exec_options
+    )
 
     # create a data folder for the results
     create_data_folder(save_res_to_file, detailed_save_names, backend_id)
@@ -1128,128 +1173,131 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
             print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
         else:
             print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
-        
-        # # If radius is negative, 
+
+        # # If radius is negative,
         # if radius < 0 :
         #     radius = max(3, (num_qubits + radius))
-            
-        # loop over all instance files according to max_circuits given 
+
+        # loop over all instance files according to max_circuits given
         # instance_num index starts from 1
         for instance_num in range(1, max_circuits + 1):
  
             # get the file identifier (path) for the problem at this width, radius, and instance
             # DEVNOTE: this identifier should NOT be the filepath, use another method
             instance_filepath = get_problem_identifier(num_qubits, radius, instance_num)
-            if instance_filepath == None:
-                print(f"WARNING: cannot find problem file for num_qubits={num_qubits}, radius={radius}, instance={instance_num}\n")
+            if instance_filepath is None:
+                print(
+                    f"WARNING: cannot find problem file for num_qubits={num_qubits}, radius={radius}, instance={instance_num}\n"
+                )
                 break
-            
+
             # if radius given, each instance will use this same radius
-            if radius != None:  
+            if radius is not None:
                 current_radius = radius
-                
+
             # else find current radius from the filename found for this num_qubits and instance_num
             # DEVNOTE: klunky, improve later
             else:
-                current_radius = float(os.path.basename(instance_filepath).split('_')[2])
-                current_radius += float(os.path.basename(instance_filepath).split('_')[3][:2])*.01
-            
+                current_radius = float(os.path.basename(instance_filepath).split("_")[2])
+                current_radius += float(os.path.basename(instance_filepath).split("_")[3][:2]) * 0.01
+
             if verbose:
                 print(f"... executing problem num_qubits={num_qubits}, radius={radius}, instance={instance_num}")
-            
+
             # obtain the Hamiltonian operator object for the current problem
             # if the problem is not pre-defined, we are done with this number of qubits
-            operator = get_operator_for_problem(instance_filepath) 
-            if operator == None:
+            operator = get_operator_for_problem(instance_filepath)
+            if operator is None:
                 print(f"  ... problem not found.")
                 break
-            
+
             # get a list of the classical solutions for this problem
             solution = get_classical_solutions(instance_filepath)
-            
+
             # get the 'random_energy' associated with the problem
             random_energy = get_random_energy(instance_filepath)
-            
+
             # create an intial thetas_array, given the circuit width and user input
             thetas_array_0 = get_initial_parameters(num_qubits, thetas_array)
-            
+
             ###############
             if method == 1:
             
                 # create the circuit(s) for given qubit size and secret string, store time metric
                 ts = time.time()
-                
+
                 # create the circuits to be tested
-                qc_array, frmt_obs, params = HydrogenLattice(num_qubits=num_qubits,
-                            secret_int=instance_num,
-                            operator=operator,
-                            thetas_array=thetas_array_0,
-                            parameterized=parameterized)
-                
-                # We only execute one of the circuits created, the last one. which is in the 
+                qc_array, frmt_obs, params = HydrogenLattice(
+                    num_qubits=num_qubits,
+                    secret_int=instance_num,
+                    operator=operator,
+                    thetas_array=thetas_array_0,
+                    parameterized=parameterized,
+                )
+
+                # We only execute one of the circuits created, the last one. which is in the
                 # z-basis.  This is the one that is most illustrative of a device's fidelity.
                 # DEVNOTE: maybe we should do all three, and aggregate, just as in method 2?
                 qc = qc_array[-1]
-                
-                ''' TMI ...
+
+                """ TMI ...
                 # for testing and debugging ...
                 #if using parameter objects, bind before printing
                 if verbose:
                     print(qc.bind_parameters(params) if parameterized else qc)
-                ''' 
-                # store the creation time for these circuits  
-                metrics.store_metric(num_qubits, instance_num, 'create_time', time.time()-ts)
-                
+                """
+                # store the creation time for these circuits
+                metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
+
                 # classically pre-compute and cache an array of expected measurement counts
                 # for comparison against actual measured counts for fidelity calc (in analysis)
-                
+
                 if do_compute_expectation:
-                    logger.info('Computing expectation')
-                    
+                    logger.info("Computing expectation")
+
                     # pass parameters as they are used during execution
                     compute_expectation(qc, num_qubits, instance_num, params=params)
-            
+
                 # submit circuit for execution on target, with parameters
                 ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
             
 
             ###############
             if method == 2:
-            
-                logger.info(f'===============  Begin method 2 loop, enabling transpile')
-                
+                logger.info(f"===============  Begin method 2 loop, enabling transpile")
+
                 # a unique circuit index used inside the inner minimizer loop as identifier
                 # Value of 0 corresponds to the 0th iteration of the minimizer
-                minimizer_loop_index = 0 
-                
+                minimizer_loop_index = 0
+
                 # Always start by enabling transpile ...
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
-                    
+
                 # get the classically computed expected energy variables from solution object
-                doci_energy = float(next(value for key, value in solution if key == 'doci_energy'))
-                fci_energy = float(next(value for key, value in solution if key == 'fci_energy'))
-                
+                doci_energy = float(next(value for key, value in solution if key == "doci_energy"))
+                fci_energy = float(next(value for key, value in solution if key == "fci_energy"))
+
                 # begin timer accumulation
                 cumlative_iter_time = [0]
                 start_iters_t = time.time()
-                
+
                 #########################################
                 #### Objective function to compute energy
-                
+
                 def objective_function(thetas_array):
-                    '''
+                    """
                     Objective function that calculates the expected energy for the given parameterized circuit
 
                     Parameters
                     ----------
                     thetas_array : list
                         list of theta values.
-                    '''
-                    
+                    """
+
                     # Every circuit needs a unique id; add unique_circuit_index instead of s_int
                     global minimizer_loop_index
                     unique_id = instance_num * 1000 + minimizer_loop_index
-                    
+
                     # variables used to aggregate metrics for all terms
                     result_array = []
                     quantum_execution_time = 0.0
@@ -1259,122 +1307,128 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                     # call the HydrogenLattice ansatz to generate a parameterized hamiltonian
                     ts = time.time()
                     qc_array, frmt_obs, params = HydrogenLattice(
-                            num_qubits=num_qubits,
-                            secret_int=unique_id,
-                            thetas_array=thetas_array,
-                            parameterized=parameterized,
-                            operator=operator)
-                    
+                        num_qubits=num_qubits,
+                        secret_int=unique_id,
+                        thetas_array=thetas_array,
+                        parameterized=parameterized,
+                        operator=operator,
+                    )
+
                     # store the time it took to create the circuit
-                    metrics.store_metric(num_qubits, unique_id, 'create_time', time.time()-ts)
-                    
+                    metrics.store_metric(num_qubits, unique_id, "create_time", time.time() - ts)
+
                     #####################
                     # loop over each of the circuits that are generated with basis measurements and execute
-                    
+
                     if verbose:
                         print(f"... ** compute energy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params}, thetas_array={thetas_array}")
                     
                     # loop over each circuit and execute
-                    for qc in qc_array:      
-
+                    for qc in qc_array:
                         # bind parameters to circuit before execution
                         if parameterized:
                             qc.bind_parameters(params)
 
                         # submit circuit for execution on target with the current parameters
                         ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
-    
+
                         # wait for circuit to complete by calling finalize  ...
                         # finalize execution of group (each circuit in loop accumulates metrics)
                         ex.finalize_execution(None, report_end=False)
-                        
+
                         # after first execution and thereafter, no need for transpilation if parameterized
                         if parameterized:
-                        
                             # DEVNOTE: since Hydro uses 3 circuits inside this loop, and execute.py can only
                             # cache 1 at a time, we cannot yet implement caching.  Transpile every time for now.
                             cached_circuits = False
                             if cached_circuits:
-                                ex.set_tranpilation_flags(do_transpile_metrics=False,
-                                                    do_transpile_for_execute=False)
-                                logger.info(f'**** First execution complete, disabling transpile')
-                             
+                                ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                                logger.info(f"**** First execution complete, disabling transpile")
+
                         # result array stores the multiple results we measure along different Pauli basis.
                         global saved_result
                         result_array.append(saved_result)
 
-                        # Aggregate execution and elapsed time for running all three circuits 
+                        # Aggregate execution and elapsed time for running all three circuits
                         # corresponding to different measurements along the different Pauli bases
-                        quantum_execution_time = quantum_execution_time + \
-                                metrics.circuit_metrics[str(num_qubits)][str(unique_id)]['exec_time']
-                        quantum_elapsed_time = quantum_elapsed_time + \
-                                metrics.circuit_metrics[str(num_qubits)][str(unique_id)]['elapsed_time']
+                        quantum_execution_time = (
+                            quantum_execution_time
+                            + metrics.circuit_metrics[str(num_qubits)][str(unique_id)]["exec_time"]
+                        )
+                        quantum_elapsed_time = (
+                            quantum_elapsed_time
+                            + metrics.circuit_metrics[str(num_qubits)][str(unique_id)]["elapsed_time"]
+                        )
 
                     #####################
-                    # classical processing of results 
-                        
+                    # classical processing of results
+
                     global opt_ts
                     global cumulative_iter_time
 
                     cumlative_iter_time.append(cumlative_iter_time[-1] + quantum_execution_time)
 
                     # store the new exec time and elapsed time back to metrics
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'exec_time', quantum_execution_time)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'elapsed_time', quantum_elapsed_time)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "exec_time", quantum_execution_time)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "elapsed_time", quantum_elapsed_time)
 
                     # increment the minimizer loop index, the index is increased by one
                     # for the group of three circuits created ( three measurement basis circuits)
                     minimizer_loop_index += 1
-                    
+
                     # print "comfort dots" (newline before the first iteration)
                     if comfort:
-                        if minimizer_loop_index == 1: print("")
-                        print(".", end ="")
-                        if verbose: print("")
+                        if minimizer_loop_index == 1:
+                            print("")
+                        print(".", end="")
+                        if verbose:
+                            print("")
 
                     # Start counting classical optimizer time here again
                     tc1 = time.time()
-                    
+
                     # compute energy for this combination of observables and measurements
                     global energy
-                    energy = compute_energy(result_array = result_array,
-                            formatted_observables = frmt_obs, num_qubits=num_qubits)
+                    energy = compute_energy(
+                        result_array=result_array, formatted_observables=frmt_obs, num_qubits=num_qubits
+                    )
 
                     # append the most recent energy value to the list
                     lowest_energy_values.append(energy)
-    
+
                     # calculate the solution quality, accuracy volume and accuracy ratio
                     global solution_quality, accuracy_volume, accuracy_ratio
                     solution_quality, accuracy_volume, accuracy_ratio = calculate_quality_metric(
-                            energy=energy,
-                            fci_energy=fci_energy,
-                            random_energy=random_energy, 
-                            precision=0.5,
-                            num_electrons=num_qubits)
+                        energy=energy,
+                        fci_energy=fci_energy,
+                        random_energy=random_energy,
+                        precision=0.5,
+                        num_electrons=num_qubits,
+                    )
 
                     # store the metrics for the current iteration
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'energy', energy)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'random_energy', random_energy)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'solution_quality', solution_quality)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'accuracy_volume', accuracy_volume)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'accuracy_ratio', accuracy_ratio)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'fci_energy', fci_energy)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'doci_energy', doci_energy)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'radius', current_radius)
-                    metrics.store_metric(str(num_qubits), str(unique_id), 'iteration_count', minimizer_loop_index)
-                    
+                    metrics.store_metric(str(num_qubits), str(unique_id), "energy", energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "random_energy", random_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "solution_quality", solution_quality)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "accuracy_volume", accuracy_volume)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "accuracy_ratio", accuracy_ratio)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "fci_energy", fci_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "doci_energy", doci_energy)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "radius", current_radius)
+                    metrics.store_metric(str(num_qubits), str(unique_id), "iteration_count", minimizer_loop_index)
+
                     return energy
-                
+
                 # callback for each iteration (currently unused)
                 def callback_thetas_array(thetas_array):
                     pass
-                     
+
                 ###########################
                 # End of Objective Function
-                
+
                 # if in verbose mode, comfort dots need a newline before optimizer gets going
-                #if comfort and verbose:
-                    #print("")
+                # if comfort and verbose:
+                # print("")
 
                 # Initialize an empty list to store the energy values from each iteration
                 lowest_energy_values = []
@@ -1382,69 +1436,80 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
                 # execute COPYLA classical optimizer to minimize the objective function
                 # objective function is called repeatedly with varying parameters
                 # until the lowest energy found
-                if minimizer_function == None:
-                    ret = minimize(objective_function,
-                            x0=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
-                            method='COBYLA',
-                            tol=minimizer_tolerance,
-                            options={'maxiter': max_iter, 'disp': False},
-                            callback=callback_thetas_array) 
-                            
+                if minimizer_function is None:
+                    ret = minimize(
+                        objective_function,
+                        x0=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
+                        method="COBYLA",
+                        tol=minimizer_tolerance,
+                        options={"maxiter": max_iter, "disp": False},
+                        callback=callback_thetas_array,
+                    )
+
                 # or, execute a custom minimizer
                 else:
-                    ret = minimizer_function(objective_function=objective_function,
-                            initial_parameters=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
-                            callback=callback_thetas_array
-                            )
-                            
-                #if verbose:
-                #print(f"\nEnergies for problem of {num_qubits} qubits and radius {current_radius} of paired hamiltionians")
-                #print(f"  PUCCD calculated energy : {ideal_energy}")
-            
-                if comfort: print("")
-                print(f"Classically Computed Energies from solution file for {num_qubits} qubits and radius {current_radius}")
+                    ret = minimizer_function(
+                        objective_function=objective_function,
+                        initial_parameters=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
+                        callback=callback_thetas_array,
+                    )
+
+                # if verbose:
+                # print(f"\nEnergies for problem of {num_qubits} qubits and radius {current_radius} of paired hamiltionians")
+                # print(f"  PUCCD calculated energy : {ideal_energy}")
+
+                if comfort:
+                    print("")
+                print(
+                    f"Classically Computed Energies from solution file for {num_qubits} qubits and radius {current_radius}"
+                )
                 print(f"  DOCI calculated energy : {doci_energy}")
                 print(f"  FCI calculated energy : {fci_energy}")
                 print(f"  Random Solution calculated energy : {random_energy}")
-                
+
                 print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
                 print(f"  Lowest Energy : {lowest_energy_values[-1]}")
                 print(f"  Solution Quality : {solution_quality}, Accuracy Ratio : {accuracy_ratio}")
-                
-                # pLotting each instance of qubit count given 
-                cumlative_iter_time = cumlative_iter_time[1:]                
+
+                # pLotting each instance of qubit count given
+                cumlative_iter_time = cumlative_iter_time[1:]
 
                 # save the data for this qubit width, and instance number
-                store_final_iter_to_metrics_json(backend_id=backend_id,
-                                num_qubits=num_qubits, 
-                                radius = radius,
-                                instance_num=instance_num,
-                                num_shots=num_shots, 
-                                converged_thetas_list=ret.x.tolist(),
-                                energy = lowest_energy_values[-1],
-                                # iter_size_dist=iter_size_dist, iter_dist=iter_dist,
-                                detailed_save_names=detailed_save_names,
-                                dict_of_inputs=dict_of_inputs, save_final_counts=save_final_counts,
-                                save_res_to_file=save_res_to_file, _instances=_instances)
+                store_final_iter_to_metrics_json(
+                    backend_id=backend_id,
+                    num_qubits=num_qubits,
+                    radius=radius,
+                    instance_num=instance_num,
+                    num_shots=num_shots,
+                    converged_thetas_list=ret.x.tolist(),
+                    energy=lowest_energy_values[-1],
+                    # iter_size_dist=iter_size_dist, iter_dist=iter_dist,
+                    detailed_save_names=detailed_save_names,
+                    dict_of_inputs=dict_of_inputs,
+                    save_final_counts=save_final_counts,
+                    save_res_to_file=save_res_to_file,
+                    _instances=_instances,
+                )
 
             ###### End of instance processing
 
         # for method 2, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
-        if method == 2:                  
+        if method == 2:
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
-            
+
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
-        
+
     # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)       
-    
+    ex.finalize_execution(metrics.finalize_group)
+
     # print a sample circuit
     if print_sample_circuit:
-        if method == 1: 
-            print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+        if method == 1:
+            print("Sample Circuit:")
+            print(QC_ if QC_ is not None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
     if method == 1:
@@ -1459,7 +1524,8 @@ def run (min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=10
 # MAIN
 
 # # if main, execute method
-if __name__ == '__main__': run()
+if __name__ == "__main__":
+    run()
 
 # # %%
 
