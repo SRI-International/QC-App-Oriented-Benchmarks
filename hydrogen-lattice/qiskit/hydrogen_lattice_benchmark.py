@@ -21,9 +21,6 @@ from qiskit.exceptions import QiskitError
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
 
-# DEVNOTE: opflow dependency
-from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
-from qiskit.opflow.primitive_ops import PauliSumOp
 
 sys.path[1:1] = ["_common", "_common/qiskit", "hydrogen-lattice/_common"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/"]
@@ -252,13 +249,12 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
         logger.info(f"*** Constructing parameterized circuit for {num_qubits = } {secret_int}")
 
         _qc, parameter_vector, thetas_array = VQE_ansatz(
-                num_qubits=num_qubits,
-                thetas_array=thetas_array, parameterized=parameterized,
-                num_occ_pairs = None )
-    
-    _measurable_expression = StateFn(operator, is_measurement=True)
-    _observables = PauliExpectation().convert(_measurable_expression)
-    _qc_array, _formatted_observables = prepare_circuits(_qc, observables=_observables)
+			num_qubits=num_qubits,
+			thetas_array=thetas_array, parameterized=parameterized,
+			num_occ_pairs=None
+        )
+
+    _qc_array, _formatted_observables = prepare_circuits(_qc, operator)
 
     # create a binding of Parameter values
     params = {parameter_vector: thetas_array} if parameterized else None
@@ -293,28 +289,73 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
 #     return pauli_sum_op_list
 # ---- classical Pauli sum operator from list of Pauli operators and coefficients ----
 
-def prepare_circuits(base_circuit, observables):
+def prepare_circuits(base_circuit, operator):
     """
     Prepare the qubit-wise commuting circuits for a given operator.
+
+    Parameters
+    ----------
+    base_circuit : QuantumCircuit
+        Initial quantum circuit without basis rotations.
+    operator : SparsePauliOp
+        Sparse Pauli operator / Hamiltonian.
+
+    Returns
+    -------
+    list
+        Array of QuantumCircuits with applied basis change.
+    list
+        Array of observables formatted as SparsePauliOps.
     """
-    circuits = list()
 
-    if isinstance(observables, ComposedOp):
-        observables = SummedOp([observables])
-        
-    for obs in observables:
-        circuit = base_circuit.copy()
-        circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
-        circuit.measure_all()
-        circuits.append(circuit)
-        
-    return circuits, observables
+    # Mapping from Pauli operators to basis change gates
+    basis_change_map = {"X": ["h"], "Y": ["sdg", "h"], "Z": [], "I": []}
 
-def compute_energy(result_array, formatted_observables, num_qubits): 
+    # Group commuting Pauli operators
+    commuting_ops = operator.group_commuting(qubit_wise=True)
+
+    # Initialize empty lists for storing output quantum circuits and formatted observables
+    qc_list = []
+    formatted_obs = []
+
+    # Loop over each group of commuting operators
+    for comm_op in commuting_ops:
+        # Separate terms and coefficients
+        term_coeff_list = comm_op.to_list()
+        terms, coeffs = zip(*term_coeff_list)
+
+        # Initialize list for storing new terms
+        new_terms = []
+
+        # Loop to transform terms from 'X' and 'Y' to 'Z'
+        for term in terms:
+            new_term = ""
+            for c in term:
+                new_term += "Z" if c in "XY" else c
+            new_terms.append(new_term)
+
+        # Create and store new SparsePauliOp
+        new_op = SparsePauliOp.from_list(list(zip(new_terms, coeffs)))
+        formatted_obs.append(new_op)
+
+        # Create single quantum circuit for each group of commuting operators
+        basis_circuit = QuantumCircuit(len(terms[0]))
+        basis_circuit.barrier()
+        for idx, pauli in enumerate(reversed(terms[0])):
+            for gate in basis_change_map[pauli]:
+                getattr(basis_circuit, gate)(idx)
+        composed_qc = base_circuit.compose(basis_circuit)
+        composed_qc.measure_all()
+        qc_list.append(composed_qc)
+
+    return qc_list, formatted_obs
+
+
+def compute_energy(result_array, formatted_observables, num_qubits):
     """
     Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
     """
-    
+
     _probabilities = list()
 
     for _res in result_array:
@@ -334,7 +375,7 @@ def calculate_expectation_values(probabilities, observables):
     """
     expectation_values = list()
     for idx, op in enumerate(observables):
-        expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
+        expectation_value = sampled_expectation_value(probabilities[idx], op)
         expectation_values.append(expectation_value)
 
     return expectation_values
@@ -369,10 +410,10 @@ def get_operator_for_problem(instance_filepath):
 
     Returns:
     operator : an object encapsulating the Hamiltoian for the problem
-    """        
-    # operator is paired hamiltonian  for each instance in the loop  
-    ops,coefs = common.read_paired_instance(instance_filepath)
-    operator = PauliSumOp.from_list(list(zip(ops, coefs)))
+    """
+    # operator is paired hamiltonian  for each instance in the loop
+    ops, coefs = common.read_paired_instance(instance_filepath)
+    operator = SparsePauliOp.from_list(list(zip(ops, coefs)))
     return operator
 
 # A dictionary of random energy filename, obtained once
