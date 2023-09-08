@@ -342,7 +342,24 @@ def plot_line_metric(ax=None, subtitle:str="",
                     x_val, x_metric_name)
         
         y_data_2 = [1 - y for y in y_data_2]
-                    
+        
+    # special case for accuracy_ratio and accuracy_ratio_error
+    if metric_name.startswith("accuracy_ratio"):
+        metric_name_2 = metric_name.replace("accuracy_ratio", "solution_quality")
+        
+        x_data_2, x_label_2, y_data_2, y_label_2 = \
+            find_metrics_array_for_group(group, instance,
+                    metric_name_2 if not metric_name_2.endswith("_error") else metric_name_2[0:-6],
+                    x_val, x_metric_name)
+        
+        y_data_2 = [1 - y for y in y_data_2]
+    
+    # always get the std_error data for energy 
+    _, _, standard_error_data, standard_error_label = \
+        find_metrics_array_for_group(group, instance,
+                "standard_error",
+                x_val, x_metric_name)
+        
     # make the x_data cumulative if the cumulative flag is on
     if cumulative_flag:
         x_data = cumulative_sum(x_data)
@@ -376,6 +393,7 @@ def plot_line_metric(ax=None, subtitle:str="",
     # fulltitle = f"{metrics.known_score_labels[metric_name]} vs. {metrics.known_x_labels[x_val]} "
     # ax.set_title(fulltitle, fontsize=12)
     
+    # DEVNOTE: decided to eliminate the markers for now
     # plot the data as a scatter plot where the color of the point depends on the y value
     # if the metric is solution quality or accuracy ratio invert the color map   
     '''
@@ -383,11 +401,11 @@ def plot_line_metric(ax=None, subtitle:str="",
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm_r)
     else:
         ax.scatter(x_data, y_data, c=y_data, cmap=cm.coolwarm)
+    ### ax.scatter(x_data, y_data, c='darkblue')
     '''
-    ax.scatter(x_data, y_data, c='darkblue')
-    
-    # the scatter points are connected with a line plot
-    ax.plot(x_data, y_data, color='darkblue', linestyle='-.', linewidth=2, markersize=12)
+    # draw a line plot for the primary data
+    #ax.plot(x_data, y_data, color='darkblue', linestyle='-.', linewidth=2, markersize=12)
+    ax.plot(x_data, y_data, color='darkblue', linewidth=1.5, markersize=12)
     
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
@@ -398,21 +416,24 @@ def plot_line_metric(ax=None, subtitle:str="",
     
     # if the score metric is energy or solution quality, plot the FCI and DOCI energy lines
     if metric_name == 'energy':
-        ax.axhline(y=doci_energy, color='g', linestyle='--', label=f'DOCI Energy = {doci_energy:.4f}')
-        ax.axhline(y=fci_energy, color='r', linestyle='-.', label=f'FCI Energy    = {fci_energy:.4f}')
+        ax.axhline(y=fci_energy, color='r', linestyle='--', label=f'FCI Energy    = {fci_energy:.4f}')
+        ax.axhline(y=doci_energy, color='g', linestyle='-.', label=f'DOCI Energy = {doci_energy:.4f}')
         if random_energy != 0:
-            ax.axhline(y=random_energy, color='lightseagreen', linestyle='-.', label=f'Random Energy = {random_energy:.4f}')
+            ax.axhline(y=random_energy, color='darkblue', linestyle=':', label=f'Random Energy = {random_energy:.4f}')
         metric_legend_label = f'Solution Energy = {energy:.4f}'
-        add_legend_item(ax, metric_legend_label, 'darkblue')
+        add_legend_item(ax, metric_legend_label, 'darkblue', '-')
         
         # start the y-ticks at 0 and end at y max
         ax.set_ylim([fci_energy-0.08*y_range, y_max+0.08*y_range])
+        
+        # error bars for the energy plot
+        ax.errorbar(x_data, y_data, yerr=standard_error_data, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='', marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
 
     # solution quality
     elif metric_name == 'solution_quality':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution = 1.0000')
         metric_legend_label = f'Solution Quality = {final_solution_quality:.4f}'
-        add_legend_item(ax, metric_legend_label, 'darkblue')
+        add_legend_item(ax, metric_legend_label, 'darkblue', '-')
         
         # start the y-ticks at 0 and end at 1.1
         ax.set_ylim([0.0, 1.08])
@@ -421,7 +442,7 @@ def plot_line_metric(ax=None, subtitle:str="",
     elif metric_name == 'accuracy_ratio':
         ax.axhline(y=1, color='r', linestyle='--', label='Ideal Solution = 1.0000')
         metric_legend_label = f'Accuracy Ratio = {final_accuracy_ratio:.4f}'
-        add_legend_item(ax, metric_legend_label, 'darkblue')
+        add_legend_item(ax, metric_legend_label, 'darkblue', '-')
         
         # start the y-ticks at just below min and just above 1.0
         ax.set_ylim([y_min-0.08*y_range, 1.0+0.08*y_range])
@@ -430,13 +451,18 @@ def plot_line_metric(ax=None, subtitle:str="",
     elif metric_name == 'solution_quality_error':
         ax.set_ylabel("Solution Quality Error")
         
-        # compute chemical accuracy relative to exact ennergy (FCI)
+        # compute chemical accuracy relative to exact energy (FCI)
         # and using solution quality formula
-        precision = 0.5
-        chacc = -math.atan((CHEM_ACC_HARTREE/fci_energy) * precision) / (math.pi/2)
+        #precision = 0.5
+        #chacc = -math.atan((CHEM_ACC_HARTREE/fci_energy) * precision) / (math.pi/2)
+        chacc = get_solution_quality_value(CHEM_ACC_HARTREE, fci_energy)
         
         # define the lowest y value a fraction below the chemical accuracy line
         y_base = chacc/3
+
+        # if lowest value is below this base, make base a little lower
+        if min(y_data) < y_base:
+            y_base = 0.75 * min(y_data)
         
         # draw a shaded rectangle from bottom of plot to chem accuracy level
         rect = Rectangle((0.0, y_base), x_data[-1], chacc-y_base, color='lightgrey')
@@ -448,35 +474,43 @@ def plot_line_metric(ax=None, subtitle:str="",
         # add legend item for solution quality
         final_solution_quality = 1.0 - y_data[-1]
         metric_legend_label = f'Solution Quality = {final_solution_quality:.4f}'
-        #add_legend_item(ax, metric_legend_label, 'darkblue')
         
         # make this a log axis from base to 1.0
         ax.set_ylim(y_base, 1.0)
         ax.set_yscale('log') 
         
-        # draw the accuracy ratio plot also
-        ax.plot(x_data, y_data_2, color='lightseagreen', linestyle='-.', linewidth=2, markersize=12)
+        # draw the accuracy ratio error plot 
+        ax.plot(x_data, y_data_2, color='darkblue', linestyle='-.', linewidth=1, markersize=12)
+        
+        # scale the standard error data to the range between random_energy and fci_energy
+        standard_error_data = [get_accuracy_ratio_value(err, fci_energy, random_energy) for err in standard_error_data]
+        
+        # error bars for the accuracy ratio error plot 
+        ax.errorbar(x_data, y_data, yerr=standard_error_data, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='', marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,label = None, alpha = 0.75, zorder = 5)
 
         # add legend item for accuracy ratio
         final_accuracy_ratio = 1.0 - y_data_2[-1]
         metric_legend_label_2 = f'Accuracy Ratio = {final_accuracy_ratio:.4f}'
-        #add_legend_item(ax, metric_legend_label, 'lightseagreen')
         
-        add_two_legend_items(ax, metric_legend_label_2, 'lightseagreen',
-                            metric_legend_label, 'darkblue')
+        add_two_legend_items(ax, metric_legend_label_2, "darkblue", "-.",
+                            metric_legend_label, "darkblue", "-")
         
     # accuracy ratio error
     elif metric_name == 'accuracy_ratio_error':
         ax.set_ylabel("Accuracy Ratio Error")
         
-        # compute chemical accuracy relative to exact ennergy (FCI)
+        # compute chemical accuracy relative to exact energy (FCI)
         # and using solution quality formula
         precision = 0.5
-        chacc = -math.atan((CHEM_ACC_HARTREE/fci_energy) * precision) / (math.pi/2)
+        chacc = get_accuracy_ratio_value(CHEM_ACC_HARTREE, fci_energy, random_energy)
         
         # define the lowest y value a fraction below the chemical accuracy line
         y_base = chacc/3
         
+        # if lowest value is below this base, make base a little lower
+        if min(y_data) < y_base:
+            y_base = 0.75 * min(y_data)
+            
         # draw a shaded rectangle from bottom of plot to chem accuracy level
         rect = Rectangle((0.0, y_base), x_data[-1], chacc-y_base, color='lightgrey')
         ax.add_patch(rect)
@@ -484,16 +518,32 @@ def plot_line_metric(ax=None, subtitle:str="",
         # draw horiz line representing level of error that would be chemical accuracy
         ax.axhline(y=chacc, color='r', linestyle='--', label=f'Chem. Accuracy = {1 - chacc:.4f}')
         
+        # draw the solution_quality error plot 
+        ax.plot(x_data, y_data_2, color='darkblue', linestyle='-.', linewidth=1, markersize=12)
+        
+        # scale the standard error data to the range between random_energy and fci_energy
+        standard_error_data = [get_accuracy_ratio_value(err, fci_energy, random_energy) for err in standard_error_data]
+        
+        # error bars for the accuracy ratio error plot 
+        ax.errorbar(x_data, y_data, yerr=standard_error_data, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='', marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5, label = None, alpha = 0.75, zorder = 5)
+        
         # add legend item for solution quality
-        final_solution_quality = 1.0 - y_data[-1]
-        metric_legend_label = f'Accuracy Ratio = {final_solution_quality:.4f}'
-        add_legend_item(ax, metric_legend_label, 'darkblue')
+        final_accuracy_ratio = 1.0 - y_data[-1]
+        metric_legend_label = f'Accuracy Ratio = {final_accuracy_ratio:.4f}'
+        add_legend_item(ax, metric_legend_label, 'darkblue', '-')
+        
+        # add legend item for accuracy ratio
+        final_solution_quality = 1.0 - y_data_2[-1]
+        metric_legend_label_2 = f'Solution Quality = {final_solution_quality:.4f}'
         
         # make this a log axis from base to 1.0
         ax.set_ylim(y_base, 1.0)
         ax.set_yscale('log') 
         
-
+        add_two_legend_items(ax,
+                    metric_legend_label, "darkblue", "-",
+                    metric_legend_label_2, "darkblue", "-.")
+        
     # add a horizontal line at y=0 for accuracy volume
     elif metric_name == 'accuracy_volume':
         ax.axhline(y=0, color='r', linestyle='--', label='Ideal Solution')
@@ -502,16 +552,26 @@ def plot_line_metric(ax=None, subtitle:str="",
     ax.grid(True)
 
     return
+
+# Returns a value scaled between infinity and fci_energy
+def get_solution_quality_value(value, fci_energy):
+    precision = 0.5
+    return -math.atan((value/fci_energy) * precision) / (math.pi/2)
+    
+# Returns a value scaled between random_energy and fci_energy
+def get_accuracy_ratio_value(value, fci_energy, random_energy):
+    return abs(value / (random_energy - fci_energy))  
     
 # add a new legend item
 # add a copy of first legend item and change to blue with the metric value shown
-def add_legend_item(ax, item_label, item_color):
+def add_legend_item(ax, item_label, item_color, item_linestyle):
 
     handles, labels = ax.get_legend_handles_labels()
     
     newhandle = matplotlib.lines.Line2D([0,1],[0,1])
     newhandle.update_from(handles[0])
     newhandle.set_color(item_color)
+    newhandle.set_linestyle(item_linestyle)
     handles.append(newhandle)
     labels.append(item_label)
     
@@ -519,19 +579,23 @@ def add_legend_item(ax, item_label, item_color):
   
 # add two new legend items (can only do this once, it seems)
 # should make this an array function later
-def add_two_legend_items(ax, item_label, item_color, item_label2, item_color2):
+def add_two_legend_items(ax,
+                item_label, item_color, item_linestyle,
+                item_label2, item_color2, item_linestyle2):
 
     handles, labels = ax.get_legend_handles_labels()
    
     newhandle = matplotlib.lines.Line2D([0,1],[0,1])
     newhandle.update_from(handles[0])
     newhandle.set_color(item_color)
+    newhandle.set_linestyle(item_linestyle)
     handles.append(newhandle)
     labels.append(item_label)
     
     newhandle2 = matplotlib.lines.Line2D([0,1],[0,1])
     newhandle2.update_from(handles[0])
     newhandle2.set_color(item_color2)
+    newhandle2.set_linestyle(item_linestyle2)
     handles.append(newhandle2)
     labels.append(item_label2)
     

@@ -93,6 +93,7 @@ def add_custom_metric_names():
             "accuracy_volume": "Accuracy Volume",
             "accuracy_ratio": "Accuracy Ratio",
             "energy": "Energy (Hartree)",
+            "standard_error": "Std Error",
         }
     )
     metrics.score_label_save_str.update(
@@ -320,6 +321,13 @@ def prepare_circuits(base_circuit, operator):
 
     # Loop over each group of commuting operators
     for comm_op in commuting_ops:
+        basis = ""
+        pauli_labels = np.array([list(pauli_label) for pauli_label in comm_op.paulis.to_labels()])
+        for qubit in range(pauli_labels.shape[1]):
+            # return the pauli operations on qubits that aren't identity so we can rotate them
+            qubit_ops = "".join(filter(lambda x: x != "I", pauli_labels[:, qubit]))
+            basis += qubit_ops[0] if qubit_ops else "Z"
+
         # Separate terms and coefficients
         term_coeff_list = comm_op.to_list()
         terms, coeffs = zip(*term_coeff_list)
@@ -339,9 +347,9 @@ def prepare_circuits(base_circuit, operator):
         formatted_obs.append(new_op)
 
         # Create single quantum circuit for each group of commuting operators
-        basis_circuit = QuantumCircuit(len(terms[0]))
+        basis_circuit = QuantumCircuit(len(basis))
         basis_circuit.barrier()
-        for idx, pauli in enumerate(reversed(terms[0])):
+        for idx, pauli in enumerate(reversed(basis)):
             for gate in basis_change_map[pauli]:
                 getattr(basis_circuit, gate)(idx)
         composed_qc = base_circuit.compose(basis_circuit)
@@ -364,10 +372,17 @@ def compute_energy(result_array, formatted_observables, num_qubits):
         _probabilities.append(_probs)
 
     _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
-
     energy = sum(_expectation_values)
 
-    return energy
+    # now get <H^2>, assuming Cov[si,si'] = 0
+    formatted_observables_sq = [(obs @ obs).simplify(atol=0) for obs in formatted_observables]
+    _expectation_values_sq = calculate_expectation_values(_probabilities, formatted_observables_sq)
+
+    # now since Cov is assumed to be zero, we compute each term's variance and sum the result.
+    # see Eq 5, e.g. in https://arxiv.org/abs/2004.06252
+    variance = sum([exp_sq - exp**2 for exp_sq, exp in zip(_expectation_values_sq, _expectation_values)])
+
+    return energy, variance
 
 def calculate_expectation_values(probabilities, observables):
     """
@@ -918,9 +933,9 @@ def plot_results_from_data(
     max_circuits=1,
     method=2,
     line_x_metrics=["iteration_count", "cumulative_exec_time"],
-    line_y_metrics=["energy", "solution_quality_error"],
+    line_y_metrics=["energy", "accuracy_ratio_error"],
     plot_layout_style="grid",
-    score_metric=["solution_quality", "accuracy_ratio"],
+    score_metric=["accuracy_ratio", "solution_quality"],
     y_metric=["num_qubits"],
     x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
     fixed_metrics={},
@@ -1011,8 +1026,8 @@ def run(
     minimizer_function=None,
     minimizer_tolerance=1e-3, max_iter=30, comfort=False,
     line_x_metrics=["iteration_count", "cumulative_exec_time"],
-    line_y_metrics=["energy", "solution_quality_error"],
-    score_metric=["solution_quality", "accuracy_ratio"],
+    line_y_metrics=["energy", "accuracy_ratio_error"],
+    score_metric=["accuracy_ratio", "solution_quality"],
     y_metric="num_qubits",
     x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
     fixed_metrics={},
@@ -1430,9 +1445,16 @@ def run(
 
                     # compute energy for this combination of observables and measurements
                     global energy
-                    energy = compute_energy(
+                    global variance
+                    global standard_error
+                    energy, variance = compute_energy(
                         result_array=result_array, formatted_observables=frmt_obs, num_qubits=num_qubits
                     )
+                    # calculate std error from the variance
+                    standard_error = np.sqrt(variance/num_shots)
+
+                    if verbose:
+                        print(f"   ... energy={energy:.5f} +/- stderr={standard_error:.5f}")
 
                     # append the most recent energy value to the list
                     lowest_energy_values.append(energy)
@@ -1449,6 +1471,8 @@ def run(
 
                     # store the metrics for the current iteration
                     metrics.store_metric(num_qubits, unique_id, "energy", energy)
+                    metrics.store_metric(num_qubits, unique_id, "variance", variance)
+                    metrics.store_metric(num_qubits, unique_id, "standard_error", standard_error)
                     metrics.store_metric(num_qubits, unique_id, "random_energy", random_energy)
                     metrics.store_metric(num_qubits, unique_id, "solution_quality", solution_quality)
                     metrics.store_metric(num_qubits, unique_id, "accuracy_volume", accuracy_volume)
