@@ -70,9 +70,12 @@ def find_last_metrics_for_group(group, instance):
             metrics_for_circuit = h_lattice_metrics[group][circuit_id]
             
             energy = metrics_for_circuit['energy']
-            doci_energy = metrics_for_circuit['doci_energy']
             fci_energy = metrics_for_circuit['fci_energy']
-            current_radius = metrics_for_circuit['radius']
+            
+            doci_energy = metrics_for_circuit['doci_energy'] if 'doci_energy' in metrics_for_circuit else fci_energy
+            
+            current_radius = metrics_for_circuit['radius'] if 'radius' in metrics_for_circuit else 0.75
+            
             solution_quality = metrics_for_circuit['solution_quality']
             
             # recent additions (backwards compat)
