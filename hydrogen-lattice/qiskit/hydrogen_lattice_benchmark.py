@@ -935,6 +935,8 @@ def plot_results_from_data(
     line_x_metrics=["iteration_count", "cumulative_exec_time"],
     line_y_metrics=["energy", "accuracy_ratio_error"],
     plot_layout_style="grid",
+    show_elapsed_times=True,
+    use_logscale_for_times=False,
     score_metric=["accuracy_ratio", "solution_quality"],
     y_metric=["num_qubits"],
     x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
@@ -990,6 +992,8 @@ def plot_results_from_data(
         suptitle,
         score_metrics=["energy", "solution_quality", "accuracy_ratio"],
         x_vals=["iteration_count", "cumulative_exec_time"],
+        show_elapsed_times=show_elapsed_times,
+        use_logscale_for_times=use_logscale_for_times,
         plot_layout_style=plot_layout_style,
         backend_id=backend_id,
         options=options,
@@ -1036,6 +1040,8 @@ def run(
     x_size=None,
     plot_results=True,
     plot_layout_style="grid",
+    show_elapsed_times=True,
+    use_logscale_for_times=False,
     save_res_to_file=True, save_final_counts=False, detailed_save_names=False,
     backend_id="qasm_simulator",
     provider_backend=None, hub="ibm-q", group="open", project="main",
@@ -1079,6 +1085,10 @@ def run(
         Which metrics are to be plotted on x-axis in line metrics plots.
     line_y_metrics : list or string, optional
         Which metrics are to be plotted on y-axis in line metrics plots.
+    show_elapsed_times : bool, optional
+        In execution times bar chart, include elapsed times if True
+    use_logscale_for_times : bool, optional
+        In execution times bar plot, use a log scale to show data
     score_metric : list or string, optional
         Which metrics are to be plotted in area metrics plots. The default is 'fidelity'.
     x_metric : list or string, optional
