@@ -101,8 +101,12 @@ def find_metrics_array_for_group(group, instance, metric_name, x_val, x_metric_n
     for circuit_id in h_lattice_metrics[group]:
         if np.floor(int(circuit_id)/1000) == instance:
         
-            # get the metric value
-            metric_value = h_lattice_metrics[group][circuit_id][metric_name]
+            # get the metric value (0 if not there)
+            if metric_name in h_lattice_metrics[group][circuit_id]:
+                metric_value = h_lattice_metrics[group][circuit_id][metric_name]
+            else:
+                metric_value = 0
+                
             # set the y label 
             y_label = metrics.known_score_labels[metric_name]
 
@@ -975,7 +979,8 @@ def plot_exec_time_metrics(suptitle="",
     if show_elapsed_times:
         elapsed_patch = Patch(color='skyblue', label='Elapsed')
         exec_patch = Patch(color='#1f77b4', label='Quantum')
-        ax1.legend(handles=[elapsed_patch, exec_patch], loc='upper left')
+        #ax1.legend(handles=[elapsed_patch, exec_patch], loc='upper left')
+        ax1.legend(handles=[elapsed_patch, exec_patch])
         #ax1.legend(['Elapsed', 'Quantum'], loc='upper left')
     #else:
         #ax1.legend(['Quantum'], loc='upper left')
