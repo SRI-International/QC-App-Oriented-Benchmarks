@@ -667,7 +667,7 @@ def plot_all_cumulative_metrics(suptitle=None,
 
             # search metrics store for final metrics for this group
             current_radius, doci_energy, fci_energy, random_energy, \
-                    energy, solution_quality, accuracy_ratio = \
+                    energy, accuracy_ratio, solution_quality = \
                         find_last_metrics_for_group(group, instance)
             
             ###### find the execution time array for "energy" metric         
@@ -714,7 +714,7 @@ def plot_all_cumulative_metrics(suptitle=None,
         average_solution_quality_error.append(error_sq * 100)
 
         qubit_counts.append(num_qubits)
- 
+
     ##########################
     
     individual=True
