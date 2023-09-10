@@ -66,6 +66,12 @@ print_sample_circuit = True
 # Indicates whether to perform the (expensive) pre compute of expectations
 do_compute_expectation = True
 
+# Array of energy values collected during iterations of VQE
+lowest_energy_values = []
+
+# Key metrics collected on last iteration of VQE
+key_metrics = {}
+
 # saved circuits for display
 QC_ = None
 Uf_ = None
@@ -1031,9 +1037,9 @@ def run(
     minimizer_tolerance=1e-3, max_iter=30, comfort=False,
     line_x_metrics=["iteration_count", "cumulative_exec_time"],
     line_y_metrics=["energy", "accuracy_ratio_error"],
-    score_metric=["accuracy_ratio", "solution_quality"],
-    y_metric="num_qubits",
+    score_metric=["accuracy_ratio"],
     x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
+    y_metric="num_qubits",
     fixed_metrics={},
     num_x_bins=15,
     y_size=None,
@@ -1492,6 +1498,19 @@ def run(
                     metrics.store_metric(num_qubits, unique_id, "radius", current_radius)
                     metrics.store_metric(num_qubits, unique_id, "iteration_count", minimizer_loop_index)
 
+                    # store most recent metrics for export
+                    key_metrics["radius"] = current_radius
+                    key_metrics["fci_energy"] = fci_energy
+                    key_metrics["doci_energy"] = doci_energy
+                    key_metrics["random_energy"] = random_energy
+                    key_metrics["iteration_count"] = minimizer_loop_index
+                    key_metrics["energy"] = energy
+                    key_metrics["variance"] = variance
+                    key_metrics["standard_error"] = standard_error
+                    key_metrics["accuracy_ratio"] = accuracy_ratio
+                    key_metrics["solution_quality"] = solution_quality
+                    key_metrics["accuracy_volume"] = accuracy_volume
+
                     return energy
 
                 # callback for each iteration (currently unused)
@@ -1506,7 +1525,7 @@ def run(
                 # print("")
 
                 # Initialize an empty list to store the energy values from each iteration
-                lowest_energy_values = []
+                lowest_energy_values.clear()
 
                 # execute COPYLA classical optimizer to minimize the objective function
                 # objective function is called repeatedly with varying parameters
@@ -1543,8 +1562,8 @@ def run(
                 print(f"  Random Solution calculated energy : {random_energy}")
 
                 print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
-                print(f"  Lowest Energy : {lowest_energy_values[-1]}")
-                print(f"  Solution Quality : {solution_quality}, Accuracy Ratio : {accuracy_ratio}")
+                print(f"  Solution Energy : {lowest_energy_values[-1]}")
+                print(f"  Accuracy Ratio : {accuracy_ratio}, Solution Quality : {solution_quality}")
 
                 # pLotting each instance of qubit count given
                 cumlative_iter_time = cumlative_iter_time[1:]
@@ -1594,6 +1613,46 @@ def run(
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
+
+
+###################################
+
+# DEVNOTE: This function should be re-implemented as just the objective function
+# as it is defined in the run loop above with the necessary parameters
+
+def run_objective_function(**kwargs):
+    """
+    Define a function to perform one iteration of the objective function.
+    These argruments are preset to single execution: method=2, max_circuits=1, max+iter=1
+    """
+    
+    # Fix arguments required to execute of single instance
+    hl_single_args = dict(
+
+        method=2,                   # method 2 defines the objective function
+        max_circuits=1,             # only one repetition
+        max_iter=1,                 # maximum minimizer iterations to perform, set to 1
+        
+        # disable display options for line plots
+        line_y_metrics=None, 
+        line_x_metrics=None,
+
+        # disable display options for area plots
+        score_metric=None,
+        x_metric=None,
+        
+    )
+    # get the num_qubits are so we can force min and max to it.
+    num_qubits = kwargs.pop("num_qubits")
+      
+    # Run the benchmark in method 2 at just one qubit size
+    run(min_qubits=num_qubits, max_qubits=num_qubits,
+            **kwargs, **hl_single_args)
+
+    # find the final energy value and return it
+    energy=lowest_energy_values[-1] if len(lowest_energy_values) > 0 else None
+    
+    return energy, key_metrics
 
 #################################
 # MAIN
