@@ -171,6 +171,10 @@ def plot_all_line_metrics(suptitle=None,
         dictionary of options used for execution
     '''
 
+    # if no metrics to plot, just return
+    if line_x_metrics is None or line_y_metrics is None:
+        return
+        
     # if score_metrics and x_val are strings, convert to lists
     if type(line_x_metrics) is str:
         line_x_metrics = [line_x_metrics]
@@ -624,7 +628,7 @@ def add_two_legend_items(ax,
 
 # function to plot all cumulative/final metrics
 def plot_all_cumulative_metrics(suptitle=None,
-        score_metrics=["energy", "solution_quality", "accuracy_volume"],
+        score_metrics=["energy", "solution_quality"],
         x_vals=["iteration_count", "cumulative_exec_time"],
         show_elapsed_times=True,
         use_logscale_for_times=False,
