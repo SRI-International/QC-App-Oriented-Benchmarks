@@ -389,6 +389,12 @@ def plot_line_metric(ax=None, subtitle:str="",
     else:
         final_accuracy_ratio = 0
 
+    # final accuracy ratio after all iterations
+    if metric_name == 'accuracy_volume':
+        final_accuracy_volume = y_data[-1]
+    else:
+        final_accuracy_volume = 0
+        
     # if this is an 'error' metric, subtract all values from optimal (1.0)
     # DEVNOTE: may want to add 'energy_error' later, where optimal is not 1
     if metric_name == 'solution_quality_error' or metric_name == 'accuracy_ratio_error':
@@ -555,6 +561,7 @@ def plot_line_metric(ax=None, subtitle:str="",
     elif metric_name == 'accuracy_volume':
         ax.axhline(y=0, color='r', linestyle='--', label='Ideal Solution')
         metric_legend_label = f'Accuracy Volume = {final_accuracy_volume:.3f}' 
+        add_legend_item(ax, metric_legend_label, 'darkblue', '-')
     
     ax.grid(True)
 
