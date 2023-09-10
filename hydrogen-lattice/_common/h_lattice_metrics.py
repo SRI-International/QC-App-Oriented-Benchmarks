@@ -49,7 +49,10 @@ save_plot_images = True
 
 # chemical accuracy in Hartrees
 CHEM_ACC_HARTREE = 0.0016
-        
+ 
+# used for testing error bars in cumulative plots by faking data
+testing_error_bars = False
+ 
 #################################################
 # ADDITIONAL METRIC FUNCTIONS
 
@@ -825,29 +828,35 @@ def plot_cumulative_metrics(suptitle="",
         if x_labels != None:
             plt.xticks(x_data, x_labels)
 
-    # plot xdata1 vs ydata1 on fig1
-    #ax1 = fig1.gca()
-    ax1.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=8, marker='x')
-
+    # for testing of error bars
+    if testing_error_bars:
+        y_err = [y * 0.15 for y in y_data]
+    
+    ##########
+    
     # autoscale y axis to user-specified min
     if y_lim_min != None and max(y_data) < y_lim_min:
         ax1.set_ylim(0.0, y_lim_min)
     
-    # set the title
-    #ax1.set_title("Cumulative Execution Time per iteration vs. Number of Qubits")
-    #ax1.set_title(suptitle + "\n" + subtitle, fontsize=12)
+    # set the axis labels
     ax1.set_xlabel(x_label)
     ax1.set_ylabel(y_label)
 
     # add the background grid
     ax1.grid(True, axis = 'y', color='silver', zorder = 0)
     
-    # also plot a bar plot on the same figure
-    ax1.bar(x_data, y_data, 0.75, alpha = 0.8, zorder = 3)
+    # plot a bar plot of the data values
+    ax1.bar(x_data, y_data, zorder = 3)
+    
+    # plot a dotted line to connect the values
+    ax1.plot(x_data, y_data, color='darkblue',
+            linestyle='dotted', linewidth=1, markersize=6, zorder = 3)
     
     # error bars for the bar plot
-    ax1.errorbar(x_data, y_data, yerr=y_err, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
-            
+    ax1.errorbar(x_data, y_data, yerr=y_err, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='', marker = "D", markersize = 5, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
+    
+    ##########
+        
     # add padding below suptitle, and between plots, due to multi-line titles
     padding=0.8
     fig1.tight_layout(pad=padding, h_pad=2.0, w_pad=3.0)
@@ -928,25 +937,20 @@ def plot_exec_time_metrics(suptitle="",
         if x_labels != None:
             plt.xticks(x_data, x_labels)
 
+    # for testing of error bars
+    if testing_error_bars:
+        y_err = [y * 0.15 for y in y_data]
+        y_err_2 = [y * 0.15 for y in y_data_2]
+        
     #############
     
-    # set the title
-    #ax1.set_title("Cumulative Execution Time per iteration vs. Number of Qubits")
-    #ax1.set_title(suptitle + "\n" + subtitle, fontsize=12)
+    # set the axis labels
     ax1.set_xlabel(x_label)
     ax1.set_ylabel(y_label)
-    
-    #ax1.set_ylabel('Avg Execution Time (sec)')
     
     # add the background grid
     ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
   
-    ##############
-    
-    # for testing
-    y_err = [y * 0.15 for y in y_data]
-    y_err_2 = [y * 0.15 for y in y_data_2]
-
     # determine max of both data sets, with a lower limit of 0.1
     # DEVNOTE: we are suppressing range of the first plot if show_elapsed times is False, backwards?
     y_max_0 = 0.1
