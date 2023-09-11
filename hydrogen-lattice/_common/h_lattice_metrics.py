@@ -147,11 +147,11 @@ def cumulative_sum(input_list: list):
 # PLOT LINE METRICS
 
 # function to plot all line metrics
-def plot_all_line_metrics(suptitle=None,
+def plot_all_line_metrics(suptitle=None, options=None,
         line_x_metrics=['iteration_count', 'cumulative_exec_time'],
         line_y_metrics=['energy', 'solution_quality_error'],
         plot_layout_style='grid',
-        backend_id="UNKNOWN", options=None):
+        backend_id="UNKNOWN"):
     '''
     Function to plot all line metrics (energy, solution quality) vs different x values (iteration count, cumulative execution time)
 
@@ -207,19 +207,9 @@ def plot_all_line_metrics(suptitle=None,
                     energy, solution_quality, accuracy_ratio = \
                             find_last_metrics_for_group(group, instance)
 
-            # create common title
-            suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
-            '''
-            # draw a single plot
-            if not individual:
-                plot_count = 1
-                subplot_count = min(4, len(line_y_metrics))
-                
-            # or multiple individual plots
-            else:
-                plot_count = min(4, len(line_y_metrics))
-                subplot_count = 1
-            '''
+            # create common title (with hardcoded list of options, for now)
+            suptitle = toptitle + f"\nqubits={num_qubits}, shots={options['shots']}, radius={current_radius}, restarts={options['restarts']}"
+            
             # if drawing plots individually, get plot count from metrics length
             if plot_layout_style == 'individual':
                 plot_count = min(4, len(line_y_metrics))
@@ -746,8 +736,8 @@ def plot_all_cumulative_metrics(suptitle=None,
     toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
     subtitle = ""
     
-    # create common title
-    suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
+    # create common title (with hardcoded list of options, for now)
+    suptitle = toptitle + f"\nqubits={num_qubits}, shots={options['shots']}, radius={current_radius}, restarts={options['restarts']}"
     
     # since all subplots share the same header, give user and indication of the grouping
     if individual:
