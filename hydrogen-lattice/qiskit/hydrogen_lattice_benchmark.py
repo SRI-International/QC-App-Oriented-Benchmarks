@@ -66,6 +66,12 @@ print_sample_circuit = True
 # Indicates whether to perform the (expensive) pre compute of expectations
 do_compute_expectation = True
 
+# Array of energy values collected during iterations of VQE
+lowest_energy_values = []
+
+# Key metrics collected on last iteration of VQE
+key_metrics = {}
+
 # saved circuits for display
 QC_ = None
 Uf_ = None
@@ -935,7 +941,11 @@ def plot_results_from_data(
     line_x_metrics=["iteration_count", "cumulative_exec_time"],
     line_y_metrics=["energy", "accuracy_ratio_error"],
     plot_layout_style="grid",
-    score_metric=["accuracy_ratio", "solution_quality"],
+    bar_y_metrics=["average_exec_times", "accuracy_ratio_error"],
+    bar_x_metrics=["num_qubits"],
+    show_elapsed_times=True,
+    use_logscale_for_times=False,
+    score_metric=["accuracy_ratio"],
     y_metric=["num_qubits"],
     x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
     fixed_metrics={},
@@ -984,12 +994,14 @@ def plot_results_from_data(
         options=options,
     )
 
-    # plot all cumulative metrics, including average_iteration_time and accuracy ratio
+    # plot all cumulative metrics, including average_execution_time and accuracy ratio
     # over number of qubits
     h_metrics.plot_all_cumulative_metrics(
         suptitle,
-        score_metrics=["energy", "solution_quality", "accuracy_ratio"],
-        x_vals=["iteration_count", "cumulative_exec_time"],
+        bar_y_metrics=bar_y_metrics,
+        bar_x_metrics=bar_x_metrics,
+        show_elapsed_times=show_elapsed_times,
+        use_logscale_for_times=use_logscale_for_times,
         plot_layout_style=plot_layout_style,
         backend_id=backend_id,
         options=options,
@@ -1027,15 +1039,20 @@ def run(
     minimizer_tolerance=1e-3, max_iter=30, comfort=False,
     line_x_metrics=["iteration_count", "cumulative_exec_time"],
     line_y_metrics=["energy", "accuracy_ratio_error"],
-    score_metric=["accuracy_ratio", "solution_quality"],
-    y_metric="num_qubits",
+    bar_y_metrics=["average_exec_times", "accuracy_ratio_error"],
+    bar_x_metrics=["num_qubits"],
+    score_metric=["accuracy_ratio"],
     x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
+    y_metric="num_qubits",
     fixed_metrics={},
     num_x_bins=15,
     y_size=None,
     x_size=None,
+    show_results_summary=True,
     plot_results=True,
     plot_layout_style="grid",
+    show_elapsed_times=True,
+    use_logscale_for_times=False,
     save_res_to_file=True, save_final_counts=False, detailed_save_names=False,
     backend_id="qasm_simulator",
     provider_backend=None, hub="ibm-q", group="open", project="main",
@@ -1079,6 +1096,10 @@ def run(
         Which metrics are to be plotted on x-axis in line metrics plots.
     line_y_metrics : list or string, optional
         Which metrics are to be plotted on y-axis in line metrics plots.
+    show_elapsed_times : bool, optional
+        In execution times bar chart, include elapsed times if True
+    use_logscale_for_times : bool, optional
+        In execution times bar plot, use a log scale to show data
     score_metric : list or string, optional
         Which metrics are to be plotted in area metrics plots. The default is 'fidelity'.
     x_metric : list or string, optional
@@ -1482,6 +1503,19 @@ def run(
                     metrics.store_metric(num_qubits, unique_id, "radius", current_radius)
                     metrics.store_metric(num_qubits, unique_id, "iteration_count", minimizer_loop_index)
 
+                    # store most recent metrics for export
+                    key_metrics["radius"] = current_radius
+                    key_metrics["fci_energy"] = fci_energy
+                    key_metrics["doci_energy"] = doci_energy
+                    key_metrics["random_energy"] = random_energy
+                    key_metrics["iteration_count"] = minimizer_loop_index
+                    key_metrics["energy"] = energy
+                    key_metrics["variance"] = variance
+                    key_metrics["standard_error"] = standard_error
+                    key_metrics["accuracy_ratio"] = accuracy_ratio
+                    key_metrics["solution_quality"] = solution_quality
+                    key_metrics["accuracy_volume"] = accuracy_volume
+
                     return energy
 
                 # callback for each iteration (currently unused)
@@ -1496,7 +1530,7 @@ def run(
                 # print("")
 
                 # Initialize an empty list to store the energy values from each iteration
-                lowest_energy_values = []
+                lowest_energy_values.clear()
 
                 # execute COPYLA classical optimizer to minimize the objective function
                 # objective function is called repeatedly with varying parameters
@@ -1525,16 +1559,19 @@ def run(
 
                 if comfort:
                     print("")
-                print(
-                    f"Classically Computed Energies from solution file for {num_qubits} qubits and radius {current_radius}"
-                )
-                print(f"  DOCI calculated energy : {doci_energy}")
-                print(f"  FCI calculated energy : {fci_energy}")
-                print(f"  Random Solution calculated energy : {random_energy}")
+                
+                # show results to console
+                if show_results_summary:
+                    print(
+                        f"Classically Computed Energies from solution file for {num_qubits} qubits and radius {current_radius}"
+                    )
+                    print(f"  DOCI calculated energy : {doci_energy}")
+                    print(f"  FCI calculated energy : {fci_energy}")
+                    print(f"  Random Solution calculated energy : {random_energy}")
 
-                print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
-                print(f"  Lowest Energy : {lowest_energy_values[-1]}")
-                print(f"  Solution Quality : {solution_quality}, Accuracy Ratio : {accuracy_ratio}")
+                    print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
+                    print(f"  Solution Energy : {lowest_energy_values[-1]}")
+                    print(f"  Accuracy Ratio : {accuracy_ratio}, Solution Quality : {solution_quality}")
 
                 # pLotting each instance of qubit count given
                 cumlative_iter_time = cumlative_iter_time[1:]
@@ -1584,6 +1621,49 @@ def run(
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
+
+
+###################################
+
+# DEVNOTE: This function should be re-implemented as just the objective function
+# as it is defined in the run loop above with the necessary parameters
+
+def run_objective_function(**kwargs):
+    """
+    Define a function to perform one iteration of the objective function.
+    These argruments are preset to single execution: method=2, max_circuits=1, max+iter=1
+    """
+    
+    # Fix arguments required to execute of single instance
+    hl_single_args = dict(
+
+        method=2,                   # method 2 defines the objective function
+        max_circuits=1,             # only one repetition
+        max_iter=1,                 # maximum minimizer iterations to perform, set to 1
+        
+        # disable display options for line plots
+        line_y_metrics=None,
+        line_x_metrics=None,
+        
+        # disable display options for bar plots
+        bar_y_metrics=None,
+        bar_x_metrics=None,
+
+        # disable display options for area plots
+        score_metric=None,
+        x_metric=None,
+    )
+    # get the num_qubits are so we can force min and max to it.
+    num_qubits = kwargs.pop("num_qubits")
+      
+    # Run the benchmark in method 2 at just one qubit size
+    run(min_qubits=num_qubits, max_qubits=num_qubits,
+            **kwargs, **hl_single_args)
+
+    # find the final energy value and return it
+    energy=lowest_energy_values[-1] if len(lowest_energy_values) > 0 else None
+    
+    return energy, key_metrics
 
 #################################
 # MAIN

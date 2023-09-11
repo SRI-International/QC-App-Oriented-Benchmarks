@@ -28,7 +28,7 @@ import os
 import json
 import traceback
 import matplotlib, matplotlib.pyplot as plt, matplotlib.cm as cm
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, Patch
 
 import numpy as np
 import math
@@ -49,7 +49,10 @@ save_plot_images = True
 
 # chemical accuracy in Hartrees
 CHEM_ACC_HARTREE = 0.0016
-        
+ 
+# used for testing error bars in cumulative plots by faking data
+testing_error_bars = False
+ 
 #################################################
 # ADDITIONAL METRIC FUNCTIONS
 
@@ -70,9 +73,12 @@ def find_last_metrics_for_group(group, instance):
             metrics_for_circuit = h_lattice_metrics[group][circuit_id]
             
             energy = metrics_for_circuit['energy']
-            doci_energy = metrics_for_circuit['doci_energy']
             fci_energy = metrics_for_circuit['fci_energy']
-            current_radius = metrics_for_circuit['radius']
+            
+            doci_energy = metrics_for_circuit['doci_energy'] if 'doci_energy' in metrics_for_circuit else fci_energy
+            
+            current_radius = metrics_for_circuit['radius'] if 'radius' in metrics_for_circuit else 0.75
+            
             solution_quality = metrics_for_circuit['solution_quality']
             
             # recent additions (backwards compat)
@@ -101,8 +107,12 @@ def find_metrics_array_for_group(group, instance, metric_name, x_val, x_metric_n
     for circuit_id in h_lattice_metrics[group]:
         if np.floor(int(circuit_id)/1000) == instance:
         
-            # get the metric value
-            metric_value = h_lattice_metrics[group][circuit_id][metric_name]
+            # get the metric value (0 if not there)
+            if metric_name in h_lattice_metrics[group][circuit_id]:
+                metric_value = h_lattice_metrics[group][circuit_id][metric_name]
+            else:
+                metric_value = 0
+                
             # set the y label 
             y_label = metrics.known_score_labels[metric_name]
 
@@ -137,11 +147,11 @@ def cumulative_sum(input_list: list):
 # PLOT LINE METRICS
 
 # function to plot all line metrics
-def plot_all_line_metrics(suptitle=None,
+def plot_all_line_metrics(suptitle=None, options=None,
         line_x_metrics=['iteration_count', 'cumulative_exec_time'],
         line_y_metrics=['energy', 'solution_quality_error'],
         plot_layout_style='grid',
-        backend_id="UNKNOWN", options=None):
+        backend_id="UNKNOWN"):
     '''
     Function to plot all line metrics (energy, solution quality) vs different x values (iteration count, cumulative execution time)
 
@@ -161,7 +171,11 @@ def plot_all_line_metrics(suptitle=None,
         dictionary of options used for execution
     '''
 
-    # if score_metrics and x_val are strings, convert to lists
+    # if no metrics to plot, just return
+    if line_x_metrics is None or line_y_metrics is None:
+        return
+        
+    # if metrics are strings, convert to lists
     if type(line_x_metrics) is str:
         line_x_metrics = [line_x_metrics]
     if type(line_y_metrics) is str:
@@ -193,19 +207,9 @@ def plot_all_line_metrics(suptitle=None,
                     energy, solution_quality, accuracy_ratio = \
                             find_last_metrics_for_group(group, instance)
 
-            # create common title
-            suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
-            '''
-            # draw a single plot
-            if not individual:
-                plot_count = 1
-                subplot_count = min(4, len(line_y_metrics))
-                
-            # or multiple individual plots
-            else:
-                plot_count = min(4, len(line_y_metrics))
-                subplot_count = 1
-            '''
+            # create common title (with hardcoded list of options, for now)
+            suptitle = toptitle + f"\nqubits={num_qubits}, shots={options['shots']}, radius={current_radius}, restarts={options['restarts']}"
+            
             # if drawing plots individually, get plot count from metrics length
             if plot_layout_style == 'individual':
                 plot_count = min(4, len(line_y_metrics))
@@ -382,6 +386,12 @@ def plot_line_metric(ax=None, subtitle:str="",
     else:
         final_accuracy_ratio = 0
 
+    # final accuracy ratio after all iterations
+    if metric_name == 'accuracy_volume':
+        final_accuracy_volume = y_data[-1]
+    else:
+        final_accuracy_volume = 0
+        
     # if this is an 'error' metric, subtract all values from optimal (1.0)
     # DEVNOTE: may want to add 'energy_error' later, where optimal is not 1
     if metric_name == 'solution_quality_error' or metric_name == 'accuracy_ratio_error':
@@ -548,6 +558,7 @@ def plot_line_metric(ax=None, subtitle:str="",
     elif metric_name == 'accuracy_volume':
         ax.axhline(y=0, color='r', linestyle='--', label='Ideal Solution')
         metric_legend_label = f'Accuracy Volume = {final_accuracy_volume:.3f}' 
+        add_legend_item(ax, metric_legend_label, 'darkblue', '-')
     
     ax.grid(True)
 
@@ -607,8 +618,10 @@ def add_two_legend_items(ax,
 
 # function to plot all cumulative/final metrics
 def plot_all_cumulative_metrics(suptitle=None,
-        score_metrics=["energy", "solution_quality", "accuracy_volume"],
-        x_vals=["iteration_count", "cumulative_exec_time"],
+        bar_y_metrics=["average_exec_times", "accuracy_ratio_error"],
+        bar_x_metrics=["num_qubits"],
+        show_elapsed_times=True,
+        use_logscale_for_times=False,
         plot_layout_style='grid',
         backend_id="UNKNOWN", options=None):
     '''
@@ -618,9 +631,9 @@ def plot_all_cumulative_metrics(suptitle=None,
     ----------
     suptitle: str   
         first line of the title of the figure
-    score_metrics: list
-        list of score metrics to plot
-    x_vals: list
+    bar_y_metrics: list
+        list of metrics to plot
+    bar_x_metrics: list
         list of x values to plot
     plot_layout_style : str, optional
         Style of plot layout, 'grid', 'stacked', or 'individual', default = 'grid'
@@ -630,13 +643,14 @@ def plot_all_cumulative_metrics(suptitle=None,
         dictionary of options used for execution
     '''
 
-    # if score_metrics and x_val are strings, convert to lists
-    '''
-    '''
-    if type(score_metrics) is str:
-        score_metrics = [score_metrics]
-    if type(x_vals) is str:
-        x_vals = [x_vals]
+    # if no metrics, just return
+    if bar_y_metrics is None or bar_x_metrics is None:
+        return
+        
+    if type(bar_y_metrics) is str:
+        bar_y_metrics = [bar_y_metrics]
+    if type(bar_x_metrics) is str:
+        bar_x_metrics = [bar_x_metrics]
     
     average_exec_time_per_iteration = []
     average_exec_time_per_iteration_error = []
@@ -665,7 +679,7 @@ def plot_all_cumulative_metrics(suptitle=None,
 
             # search metrics store for final metrics for this group
             current_radius, doci_energy, fci_energy, random_energy, \
-                    energy, solution_quality, accuracy_ratio = \
+                    energy, accuracy_ratio, solution_quality = \
                         find_last_metrics_for_group(group, instance)
             
             ###### find the execution time array for "energy" metric         
@@ -712,7 +726,7 @@ def plot_all_cumulative_metrics(suptitle=None,
         average_solution_quality_error.append(error_sq * 100)
 
         qubit_counts.append(num_qubits)
- 
+
     ##########################
     
     individual=True
@@ -722,30 +736,30 @@ def plot_all_cumulative_metrics(suptitle=None,
     toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
     subtitle = ""
     
-    # create common title
-    suptitle = toptitle + f"\nqubits={num_qubits}, radius={current_radius}, shots={options['shots']}"
+    # create common title (with hardcoded list of options, for now)
+    suptitle = toptitle + f"\nqubits={num_qubits}, shots={options['shots']}, radius={current_radius}, restarts={options['restarts']}"
     
     # since all subplots share the same header, give user and indication of the grouping
     if individual:
         print(f"----- Cumulative Plots for all qubit groups -----")
     
-    plot_cumulative_metrics(suptitle=suptitle,
+    # draw the average execution time plots
+    if "average_exec_times" in bar_y_metrics:
+        plot_exec_time_metrics(suptitle=suptitle,
             x_data=qubit_counts,
             x_label="Number of Qubits",
             y_data=average_elapsed_time_per_iteration,
             y_err=average_elapsed_time_per_iteration_error,
-            y_label="Cumulative Elapsed Execution Time/ iteration (s)",
-            suffix="avg_elapsed_time_per_iteration")
-            
-    plot_cumulative_metrics(suptitle=suptitle,
-            x_data=qubit_counts,
-            x_label="Number of Qubits",
-            y_data=average_exec_time_per_iteration,
-            y_err=average_exec_time_per_iteration_error,
-            y_label="Cumulative Execution Time/ iteration (s)",
-            suffix="avg_exec_time_per_iteration")
-            
-    plot_cumulative_metrics(suptitle=suptitle,
+            y_data_2=average_exec_time_per_iteration,
+            y_err_2=average_exec_time_per_iteration_error,
+            y_label="Cumulative Execution Times / iteration (s)",
+            show_elapsed_times=show_elapsed_times,
+            use_logscale_for_times=use_logscale_for_times,
+            suffix="avg_exec_times_per_iteration")
+    
+    # draw the accuracy ratio error plot
+    if "accuracy_ratio_error" in bar_y_metrics:
+        plot_cumulative_metrics(suptitle=suptitle,
             x_data=qubit_counts,
             x_label="Number of Qubits",
             y_data=average_accuracy_ratio,
@@ -754,11 +768,15 @@ def plot_all_cumulative_metrics(suptitle=None,
             y_lim_min=1.0,
             suffix="accuracy_ratio_error")
 
-# method to plot cumulative execution time vs. number of qubits
+#####################################
+
+# method to plot cumulative accuracy ratio vs. number of qubits
 def plot_cumulative_metrics(suptitle="",
             x_data:list=None, x_label:str="",
-            y_data:list=None, y_err:list=None, y_label:str="", y_lim_min=None,
-            plot_layout_style='grid', suffix=None):
+            y_data:list=None, y_err:list=None,
+            y_label:str="", y_lim_min=None,
+            plot_layout_style='grid', 
+            suffix=None):
     '''
     Function to plot cumulative metrics (accuracy ratio, execution time per iteration) over different number of qubits
 
@@ -809,27 +827,179 @@ def plot_cumulative_metrics(suptitle="",
         if x_labels != None:
             plt.xticks(x_data, x_labels)
 
-    # plot xdata1 vs ydata1 on fig1
-    #ax1 = fig1.gca()
-    ax1.plot(x_data, y_data, linestyle='solid', linewidth=2, markersize=12, marker='x')
-
+    # for testing of error bars
+    if testing_error_bars:
+        y_err = [y * 0.15 for y in y_data]
+    
+    ##########
+    
     # autoscale y axis to user-specified min
     if y_lim_min != None and max(y_data) < y_lim_min:
         ax1.set_ylim(0.0, y_lim_min)
     
-    # set the title
-    #ax1.set_title("Cumulative Execution Time per iteration vs. Number of Qubits")
-    #ax1.set_title(suptitle + "\n" + subtitle, fontsize=12)
+    # set the axis labels
     ax1.set_xlabel(x_label)
     ax1.set_ylabel(y_label)
 
-    # also plot a bar plot on the same figure
-    ax1.bar(x_data, y_data, 0.75, alpha = 0.8, zorder = 3)
+    # add the background grid
     ax1.grid(True, axis = 'y', color='silver', zorder = 0)
-
+    
+    # plot a bar plot of the data values
+    ax1.bar(x_data, y_data, zorder = 3)
+    
+    # plot a dotted line to connect the values
+    ax1.plot(x_data, y_data, color='darkblue',
+            linestyle='dotted', linewidth=1, markersize=6, zorder = 3)
+    
     # error bars for the bar plot
-    ax1.errorbar(x_data, y_data, yerr=y_err, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5,ls='', marker = "D", markersize = 8, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
+    ax1.errorbar(x_data, y_data, yerr=y_err, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='', marker = "D", markersize = 5, mfc = 'c', mec = 'k', mew = 0.5,label = 'Error', alpha = 0.75, zorder = 5)
+    
+    ##########
+        
+    # add padding below suptitle, and between plots, due to multi-line titles
+    padding=0.8
+    fig1.tight_layout(pad=padding, h_pad=2.0, w_pad=3.0)
+                
+    # save the plot image
+    if save_plot_images:
+        metrics.save_plot_image(plt, os.path.join(f"Hydrogen-Lattice-(2)" +
+                                            "-" + suffix),
+                                            backend_id)
+    # show the plot(s)
+    plt.show(block=True)
 
+#####################################
+
+# method to plot cumulative exec and execution time vs. number of qubits
+def plot_exec_time_metrics(suptitle="",
+            x_data:list=None, x_label:str="",
+            y_data:list=None, y_err:list=None,
+            y_data_2:list=None, y_err_2:list=None,
+            y_label:str="", y_lim_min=None,
+            show_elapsed_times=True,
+            use_logscale_for_times=False,
+            plot_layout_style='grid', 
+            suffix=None):
+    '''
+    Function to plot execution time metrics (elapsed/execution time per iteration) over different number of qubits
+
+    parameters:
+    ----------
+    x_data: list
+        list of x data for plot
+    x_label: str
+        label for x axis
+    y_data: list
+        list of y data for plot
+    y_err: list
+        list of y error data for plot
+    y_data: list
+        list of y data for plot 2
+    y_err: list
+        list of y error data for plot 2
+    y_label: str
+        label for y axis
+    y_lim_min: float    
+        minimum value to autoscale y axis 
+    '''
+
+    # get subtitle from metrics
+    m_subtitle = metrics.circuit_metrics['subtitle']
+
+    # get backend id from subtitle
+    backend_id = m_subtitle[9:]
+
+    # create a figure for the plot
+    fig1, ax1 = plt.subplots(1, 1, figsize=(6, 4.2))
+    
+    # and add the title (shifted to the right a bit if single column plot)
+    fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
+    
+    ###### DEVNOTE: these arrays should be converted to float (and sorted?) at higher level
+    
+    # sort the arrays, in case they come out of order
+    x_data = [float(x) for x in x_data]
+    y_data = [float(y) for y in y_data]
+    y_data_2 = [float(y) for y in y_data_2]
+    z = sorted(zip(x_data, y_data, y_data_2))
+    x_data = [x for x, y, y2 in z]
+    y_data = [y for x, y, y2 in z]
+    y_data_2 = [y2 for x, y, y2 in z]
+    
+    #############
+    
+    # check if we have sparse or non-linear axis data and linearize if so
+    # (convert irregular x-axis data to linear if any non-linear gaps in the data)
+    if metrics.needs_linearize(x_data, gap=2):
+        x_data, x_labels = metrics.linearize_axis(x_data, gap=1, outer=0, fill=False) 
+        ax1.set_xticks(x_data)
+        if x_labels != None:
+            plt.xticks(x_data, x_labels)
+
+    # for testing of error bars
+    if testing_error_bars:
+        y_err = [y * 0.15 for y in y_data]
+        y_err_2 = [y * 0.15 for y in y_data_2]
+        
+    #############
+    
+    # set the axis labels
+    ax1.set_xlabel(x_label)
+    ax1.set_ylabel(y_label)
+    
+    # add the background grid
+    ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
+  
+    # determine max of both data sets, with a lower limit of 0.1
+    # DEVNOTE: we are suppressing range of the first plot if show_elapsed times is False, backwards?
+    y_max_0 = 0.1
+    y_max_0 = max(y_max_0, max(y_data_2))
+    if show_elapsed_times:
+        y_max_0 = max(y_max_0, max(y_data))
+        
+    if y_max_0 > 0.1:
+            y_max_0 *= 1.2
+     
+    # set up log scale if specified
+    y_min_0 = 0.0
+    if use_logscale_for_times:
+        ax1.set_yscale('log') 
+        y_min_0 = min(0.01, min(y_data_2) / 2.0)    # include smallest data value
+        
+        if y_max_0 > 0.1:
+            y_max_0 *= 2.0 
+   
+    ax1.set_ylim([y_min_0, y_max_0])
+    
+    # elapsed time bar plot
+    if show_elapsed_times:
+        ax1.bar(x_data, y_data, 0.75, color='skyblue', zorder = 3)
+        
+        ax1.plot(x_data, y_data, color='darkblue',
+            linestyle='dotted', linewidth=1, markersize=6, zorder = 3)
+            
+        ax1.errorbar(x_data, y_data, yerr=y_err, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='', marker = "D", markersize = 5, mfc = 'c', mec = 'k', mew = 0.5, label = 'Error', alpha = 0.75, zorder = 5)
+    
+    # execution time bar plot
+    ax1.bar(x_data, y_data_2, zorder = 3)
+    
+    ax1.plot(x_data, y_data_2, color='darkblue',
+            linestyle='dotted', linewidth=1, markersize=6, zorder = 3)
+            
+    ax1.errorbar(x_data, y_data_2, yerr=y_err_2, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='', marker = "D", markersize = 5, mfc = 'c', mec = 'k', mew = 0.5, label = 'Error', alpha = 0.75, zorder = 5)
+    
+    # legend
+    if show_elapsed_times:
+        elapsed_patch = Patch(color='skyblue', label='Elapsed')
+        exec_patch = Patch(color='#1f77b4', label='Quantum')
+        #ax1.legend(handles=[elapsed_patch, exec_patch], loc='upper left')
+        ax1.legend(handles=[elapsed_patch, exec_patch])
+        #ax1.legend(['Elapsed', 'Quantum'], loc='upper left')
+    #else:
+        #ax1.legend(['Quantum'], loc='upper left')
+
+    ##############
+    
     # add padding below suptitle, and between plots, due to multi-line titles
     padding=0.8
     fig1.tight_layout(pad=padding, h_pad=2.0, w_pad=3.0)

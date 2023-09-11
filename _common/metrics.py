@@ -1635,6 +1635,10 @@ def plot_all_area_metrics(suptitle='',
             y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
             options=None, suffix='', which_metric='approx_ratio'):
 
+    # if no metrics to plot, just return
+    if score_metric is None or x_metric is None or y_metric is None:
+        return
+        
     if type(score_metric) == str:
         score_metric = [score_metric]
     if type(x_metric) == str:

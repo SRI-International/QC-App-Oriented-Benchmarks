@@ -248,6 +248,10 @@ def set_execution_target(backend_id='qasm_simulator',
     elif backend_id == 'qasm_simulator':
         backend = Aer.get_backend("qasm_simulator") 
 
+    # handle Statevector simulator specially
+    elif backend_id == 'statevector_simulator':
+        backend = Aer.get_backend("statevector_simulator")
+        
     # handle 'fake' backends here
     elif 'fake' in backend_id:
         backend = getattr(
