@@ -1048,6 +1048,7 @@ def run(
     num_x_bins=15,
     y_size=None,
     x_size=None,
+    show_results_summary=True,
     plot_results=True,
     plot_layout_style="grid",
     show_elapsed_times=True,
@@ -1558,16 +1559,19 @@ def run(
 
                 if comfort:
                     print("")
-                print(
-                    f"Classically Computed Energies from solution file for {num_qubits} qubits and radius {current_radius}"
-                )
-                print(f"  DOCI calculated energy : {doci_energy}")
-                print(f"  FCI calculated energy : {fci_energy}")
-                print(f"  Random Solution calculated energy : {random_energy}")
+                
+                # show results to console
+                if show_results_summary:
+                    print(
+                        f"Classically Computed Energies from solution file for {num_qubits} qubits and radius {current_radius}"
+                    )
+                    print(f"  DOCI calculated energy : {doci_energy}")
+                    print(f"  FCI calculated energy : {fci_energy}")
+                    print(f"  Random Solution calculated energy : {random_energy}")
 
-                print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
-                print(f"  Solution Energy : {lowest_energy_values[-1]}")
-                print(f"  Accuracy Ratio : {accuracy_ratio}, Solution Quality : {solution_quality}")
+                    print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
+                    print(f"  Solution Energy : {lowest_energy_values[-1]}")
+                    print(f"  Accuracy Ratio : {accuracy_ratio}, Solution Quality : {solution_quality}")
 
                 # pLotting each instance of qubit count given
                 cumlative_iter_time = cumlative_iter_time[1:]
