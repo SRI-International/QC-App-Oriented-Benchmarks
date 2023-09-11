@@ -175,7 +175,7 @@ def plot_all_line_metrics(suptitle=None,
     if line_x_metrics is None or line_y_metrics is None:
         return
         
-    # if score_metrics and x_val are strings, convert to lists
+    # if metrics are strings, convert to lists
     if type(line_x_metrics) is str:
         line_x_metrics = [line_x_metrics]
     if type(line_y_metrics) is str:
@@ -628,8 +628,8 @@ def add_two_legend_items(ax,
 
 # function to plot all cumulative/final metrics
 def plot_all_cumulative_metrics(suptitle=None,
-        score_metrics=["energy", "solution_quality"],
-        x_vals=["iteration_count", "cumulative_exec_time"],
+        bar_y_metrics=["average_exec_times", "accuracy_ratio_error"],
+        bar_x_metrics=["num_qubits"],
         show_elapsed_times=True,
         use_logscale_for_times=False,
         plot_layout_style='grid',
@@ -641,9 +641,9 @@ def plot_all_cumulative_metrics(suptitle=None,
     ----------
     suptitle: str   
         first line of the title of the figure
-    score_metrics: list
-        list of score metrics to plot
-    x_vals: list
+    bar_y_metrics: list
+        list of metrics to plot
+    bar_x_metrics: list
         list of x values to plot
     plot_layout_style : str, optional
         Style of plot layout, 'grid', 'stacked', or 'individual', default = 'grid'
@@ -653,13 +653,14 @@ def plot_all_cumulative_metrics(suptitle=None,
         dictionary of options used for execution
     '''
 
-    # if score_metrics and x_val are strings, convert to lists
-    '''
-    '''
-    if type(score_metrics) is str:
-        score_metrics = [score_metrics]
-    if type(x_vals) is str:
-        x_vals = [x_vals]
+    # if no metrics, just return
+    if bar_y_metrics is None or bar_x_metrics is None:
+        return
+        
+    if type(bar_y_metrics) is str:
+        bar_y_metrics = [bar_y_metrics]
+    if type(bar_x_metrics) is str:
+        bar_x_metrics = [bar_x_metrics]
     
     average_exec_time_per_iteration = []
     average_exec_time_per_iteration_error = []
@@ -752,7 +753,9 @@ def plot_all_cumulative_metrics(suptitle=None,
     if individual:
         print(f"----- Cumulative Plots for all qubit groups -----")
     
-    plot_exec_time_metrics(suptitle=suptitle,
+    # draw the average execution time plots
+    if "average_exec_times" in bar_y_metrics:
+        plot_exec_time_metrics(suptitle=suptitle,
             x_data=qubit_counts,
             x_label="Number of Qubits",
             y_data=average_elapsed_time_per_iteration,
@@ -763,8 +766,10 @@ def plot_all_cumulative_metrics(suptitle=None,
             show_elapsed_times=show_elapsed_times,
             use_logscale_for_times=use_logscale_for_times,
             suffix="avg_exec_times_per_iteration")
-     
-    plot_cumulative_metrics(suptitle=suptitle,
+    
+    # draw the accuracy ratio error plot
+    if "accuracy_ratio_error" in bar_y_metrics:
+        plot_cumulative_metrics(suptitle=suptitle,
             x_data=qubit_counts,
             x_label="Number of Qubits",
             y_data=average_accuracy_ratio,

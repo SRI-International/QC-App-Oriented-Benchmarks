@@ -941,9 +941,11 @@ def plot_results_from_data(
     line_x_metrics=["iteration_count", "cumulative_exec_time"],
     line_y_metrics=["energy", "accuracy_ratio_error"],
     plot_layout_style="grid",
+    bar_y_metrics=["average_exec_times", "accuracy_ratio_error"],
+    bar_x_metrics=["num_qubits"],
     show_elapsed_times=True,
     use_logscale_for_times=False,
-    score_metric=["accuracy_ratio", "solution_quality"],
+    score_metric=["accuracy_ratio"],
     y_metric=["num_qubits"],
     x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
     fixed_metrics={},
@@ -992,12 +994,12 @@ def plot_results_from_data(
         options=options,
     )
 
-    # plot all cumulative metrics, including average_iteration_time and accuracy ratio
+    # plot all cumulative metrics, including average_execution_time and accuracy ratio
     # over number of qubits
     h_metrics.plot_all_cumulative_metrics(
         suptitle,
-        score_metrics=["energy", "solution_quality", "accuracy_ratio"],
-        x_vals=["iteration_count", "cumulative_exec_time"],
+        bar_y_metrics=bar_y_metrics,
+        bar_x_metrics=bar_x_metrics,
         show_elapsed_times=show_elapsed_times,
         use_logscale_for_times=use_logscale_for_times,
         plot_layout_style=plot_layout_style,
@@ -1037,6 +1039,8 @@ def run(
     minimizer_tolerance=1e-3, max_iter=30, comfort=False,
     line_x_metrics=["iteration_count", "cumulative_exec_time"],
     line_y_metrics=["energy", "accuracy_ratio_error"],
+    bar_y_metrics=["average_exec_times", "accuracy_ratio_error"],
+    bar_x_metrics=["num_qubits"],
     score_metric=["accuracy_ratio"],
     x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
     y_metric="num_qubits",
@@ -1634,13 +1638,16 @@ def run_objective_function(**kwargs):
         max_iter=1,                 # maximum minimizer iterations to perform, set to 1
         
         # disable display options for line plots
-        line_y_metrics=None, 
+        line_y_metrics=None,
         line_x_metrics=None,
+        
+        # disable display options for bar plots
+        bar_y_metrics=None,
+        bar_x_metrics=None,
 
         # disable display options for area plots
         score_metric=None,
         x_metric=None,
-        
     )
     # get the num_qubits are so we can force min and max to it.
     num_qubits = kwargs.pop("num_qubits")
