@@ -1,6 +1,9 @@
 import sys
+import os
 
-sys.path.insert(1, "hydrogen-lattice/qiskit")
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(1, os.path.join(current_dir, '..', 'qiskit'))
+
 import hydrogen_lattice_benchmark
 import numpy as np
 
