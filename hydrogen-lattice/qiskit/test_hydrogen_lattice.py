@@ -174,3 +174,37 @@ def test_h10_preoptimized():
 
     assert np.isclose(energy, key_metrics["doci_energy"], atol=1e-5)
     assert np.isclose(energy, -5.24830435)
+
+
+def test_h6_full_opt():
+    def L_BFGS_B(objective_function, initial_parameters, callback):
+        ret = minimize(objective_function, x0=initial_parameters, method="l-bfgs-b", tol=1e-8)
+
+        return ret
+
+    # Arguments specific to Hydrogen Lattice benchmark method (2)
+    hl_app_args = dict(
+        min_qubits=6,
+        max_qubits=6,  # do h6
+        method=2,
+        backend_id="statevector_simulator",
+        radius=1.25,  # select single problem radius, None = use max_circuits problems
+        parameter_mode=2,  # 1 - use single theta parameter, 2 - map multiple thetas to pairs
+        max_circuits=1,  # just run once
+        minimizer_function=L_BFGS_B,
+        # disable display options for line plots
+        line_y_metrics=None,
+        line_x_metrics=None,
+        # disable display options for bar plots
+        bar_y_metrics=None,
+        bar_x_metrics=None,
+        # disable display options for area plots
+        score_metric=None,
+        x_metric=None,
+    )
+
+    # Run the benchmark in method 2
+    energy, key_metrics = hydrogen_lattice_benchmark.run(**hl_app_args)
+
+    assert np.isclose(energy, key_metrics["doci_energy"], atol=1e-4)
+    assert np.isclose(energy, -3.01129635)
