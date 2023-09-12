@@ -1,6 +1,0 @@
-numpy
-matplotlib
-qiskit
-qiskit[visualization]
-notebook
-pytest
