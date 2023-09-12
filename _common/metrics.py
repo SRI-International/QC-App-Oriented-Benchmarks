@@ -81,6 +81,10 @@ do_volumetric_plots = True
 # Option to include all app charts with vplots at end
 do_app_charts_with_all_metrics = False
 
+# Toss out elapsed times for any run if the initial value is this factor of the second value 
+# (applies only to area plots - remove once queue time is removed earlier)
+omit_initial_elapsed_time_factor = 10
+
 # Number of ticks on volumetric depth axis
 max_depth_log = 22
 
@@ -1733,14 +1737,27 @@ def plot_area_metrics(suptitle='',
             x_last, score_last = 0, 0
             x_sizes, x_points, y_points, score_points = [], [], [], []            
             
-            for it in circuit_metrics_detail_2[group][circuit_id]:
-                mets = circuit_metrics_detail_2[group][circuit_id][it]
-                
+            metrics_array = circuit_metrics_detail_2[group][circuit_id]
+      
+            for it in metrics_array:
+                mets = metrics_array[it]
+                        
                 if x_metric not in mets: break
                 if score_metric not in mets: break
                 
+                x_value = mets[x_metric]
+                
+                # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
+                # that are most likely due to either queueing or system initialization
+                if x_metric == 'elapsed_time' and it == 0 and omit_initial_elapsed_time_factor > 0:
+                    if (it + 1) in metrics_array:
+                        mets2 = metrics_array[it + 1]
+                        x_value2 = mets2[x_metric]
+                        if x_value > (omit_initial_elapsed_time_factor * x_value2):
+                            x_value = x_value2
+                            
                 # get each metric and accumulate if indicated
-                x_raw = x_now = mets[x_metric]
+                x_raw = x_now = x_value
                 if cumulative_flag:
                     x_now += x_last
                 x_last = x_now
