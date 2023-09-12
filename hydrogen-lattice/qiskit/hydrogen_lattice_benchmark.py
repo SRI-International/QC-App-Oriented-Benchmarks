@@ -1629,12 +1629,16 @@ def run(
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
+def get_final_results():
+    """
+    Return the energy and dict of key metrics of the last run().
+    """
+    
     # find the final energy value and return it
     energy=lowest_energy_values[-1] if len(lowest_energy_values) > 0 else None
     
     return energy, key_metrics
-
-
+    
 ###################################
 
 # DEVNOTE: This function should be re-implemented as just the objective function

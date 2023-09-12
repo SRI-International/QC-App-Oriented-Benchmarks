@@ -204,7 +204,10 @@ def test_h6_full_opt():
     )
 
     # Run the benchmark in method 2
-    energy, key_metrics = hydrogen_lattice_benchmark.run(**hl_app_args)
+    hydrogen_lattice_benchmark.run(**hl_app_args)
+
+    # Get final results from last run
+    energy, key_metrics = hydrogen_lattice_benchmark.get_final_results()
 
     assert np.isclose(energy, key_metrics["doci_energy"], atol=1e-4)
     assert np.isclose(energy, -3.01129635)
