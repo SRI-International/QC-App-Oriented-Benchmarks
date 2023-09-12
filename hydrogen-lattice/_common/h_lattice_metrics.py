@@ -52,7 +52,10 @@ CHEM_ACC_HARTREE = 0.0016
  
 # used for testing error bars in cumulative plots by faking data
 testing_error_bars = False
- 
+
+# Toss out elapsed times for any run if the initial value is this factor of the second value 
+omit_initial_elapsed_time_factor = 10
+
 #################################################
 # ADDITIONAL METRIC FUNCTIONS
 
@@ -695,6 +698,11 @@ def plot_all_cumulative_metrics(suptitle=None,
             ###### find the elapsed execution time array for "energy" metric         
             x_data, x_label, y_data, y_label = \
                 find_metrics_array_for_group(group, instance, "energy", "cumulative_elapsed_time", "elapsed_time")
+            
+            # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
+            # that are most likely due to either queueing or system initialization
+            if len(x_data) > 1 and omit_initial_elapsed_time_factor > 0 and (x_data[0] > omit_initial_elapsed_time_factor * x_data[1]):
+                x_data[0] = x_data[1]
                 
             # make the x_data cumulative if the cumulative flag is on
             x_data = cumulative_sum(x_data)
