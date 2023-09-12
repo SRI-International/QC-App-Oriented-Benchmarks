@@ -1476,8 +1476,11 @@ def run(
                     energy, variance = compute_energy(
                         result_array=result_array, formatted_observables=frmt_obs, num_qubits=num_qubits
                     )
-                    # calculate std error from the variance
-                    standard_error = np.sqrt(variance/num_shots)
+                    # calculate std error from the variance -- identically zero if using statevector simulator
+                    if backend_id.lower() != "statevector_simulator":
+                        standard_error = np.sqrt(variance/num_shots)
+                    else:
+                        standard_error = 0.0
 
                     if verbose:
                         print(f"   ... energy={energy:.5f} +/- stderr={standard_error:.5f}")
