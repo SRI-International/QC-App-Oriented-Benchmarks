@@ -1351,6 +1351,7 @@ def run(
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
 
                 # get the classically computed expected energy variables from solution object
+                hf_energy = float(next(value for key, value in solution if key == "hf_energy"))
                 doci_energy = float(next(value for key, value in solution if key == "doci_energy"))
                 fci_energy = float(next(value for key, value in solution if key == "fci_energy"))
                 hf_energy = float(next(value for key, value in solution if key == "hf_energy"))
@@ -1406,6 +1407,10 @@ def run(
                         # bind parameters to circuit before execution
                         if parameterized:
                             qc.bind_parameters(params)
+
+                        # to execute on Aer state vector simulator, need to remove measurements
+                        if backend_id.lower() == "statevector_simulator":
+                            qc = qc.remove_final_measurements(inplace=False)
 
                         # submit circuit for execution on target with the current parameters
                         ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
@@ -1472,8 +1477,11 @@ def run(
                     energy, variance = compute_energy(
                         result_array=result_array, formatted_observables=frmt_obs, num_qubits=num_qubits
                     )
-                    # calculate std error from the variance
-                    standard_error = np.sqrt(variance/num_shots)
+                    # calculate std error from the variance -- identically zero if using statevector simulator
+                    if backend_id.lower() != "statevector_simulator":
+                        standard_error = np.sqrt(variance/num_shots)
+                    else:
+                        standard_error = 0.0
 
                     if verbose:
                         print(f"   ... energy={energy:.5f} +/- stderr={standard_error:.5f}")
@@ -1570,6 +1578,7 @@ def run(
                     )
                     print(f"  DOCI calculated energy : {doci_energy}")
                     print(f"  FCI calculated energy : {fci_energy}")
+                    print(f"  Hartree-Fock calculated energy : {hf_energy}")
                     print(f"  Random Solution calculated energy : {random_energy}")
 
                     print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
@@ -1624,6 +1633,11 @@ def run(
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
+
+    # find the final energy value and return it
+    energy=lowest_energy_values[-1] if len(lowest_energy_values) > 0 else None
+    
+    return energy, key_metrics
 
 
 ###################################
