@@ -1351,6 +1351,7 @@ def run(
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
 
                 # get the classically computed expected energy variables from solution object
+                hf_energy = float(next(value for key, value in solution if key == "hf_energy"))
                 doci_energy = float(next(value for key, value in solution if key == "doci_energy"))
                 fci_energy = float(next(value for key, value in solution if key == "fci_energy"))
 
@@ -1405,6 +1406,10 @@ def run(
                         # bind parameters to circuit before execution
                         if parameterized:
                             qc.bind_parameters(params)
+
+                        # to execute on Aer state vector simulator, need to remove measurements
+                        if backend_id.lower() == "statevector_simulator":
+                            qc = qc.remove_final_measurements(inplace=False)
 
                         # submit circuit for execution on target with the current parameters
                         ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
@@ -1500,6 +1505,7 @@ def run(
                     metrics.store_metric(num_qubits, unique_id, "accuracy_ratio", accuracy_ratio)
                     metrics.store_metric(num_qubits, unique_id, "fci_energy", fci_energy)
                     metrics.store_metric(num_qubits, unique_id, "doci_energy", doci_energy)
+                    metrics.store_metric(num_qubits, unique_id, "hf_energy", hf_energy)
                     metrics.store_metric(num_qubits, unique_id, "radius", current_radius)
                     metrics.store_metric(num_qubits, unique_id, "iteration_count", minimizer_loop_index)
 
@@ -1507,6 +1513,7 @@ def run(
                     key_metrics["radius"] = current_radius
                     key_metrics["fci_energy"] = fci_energy
                     key_metrics["doci_energy"] = doci_energy
+                    key_metrics["hf_energy"] = hf_energy
                     key_metrics["random_energy"] = random_energy
                     key_metrics["iteration_count"] = minimizer_loop_index
                     key_metrics["energy"] = energy
@@ -1567,6 +1574,7 @@ def run(
                     )
                     print(f"  DOCI calculated energy : {doci_energy}")
                     print(f"  FCI calculated energy : {fci_energy}")
+                    print(f"  Hartree-Fock calculated energy : {hf_energy}")
                     print(f"  Random Solution calculated energy : {random_energy}")
 
                     print(f"Computed Energies for {num_qubits} qubits and radius {current_radius}")
