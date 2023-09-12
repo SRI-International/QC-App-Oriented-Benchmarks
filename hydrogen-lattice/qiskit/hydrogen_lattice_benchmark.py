@@ -1353,6 +1353,7 @@ def run(
                 # get the classically computed expected energy variables from solution object
                 doci_energy = float(next(value for key, value in solution if key == "doci_energy"))
                 fci_energy = float(next(value for key, value in solution if key == "fci_energy"))
+                hf_energy = float(next(value for key, value in solution if key == "hf_energy"))
 
                 # begin timer accumulation
                 cumlative_iter_time = [0]
@@ -1500,6 +1501,7 @@ def run(
                     metrics.store_metric(num_qubits, unique_id, "accuracy_ratio", accuracy_ratio)
                     metrics.store_metric(num_qubits, unique_id, "fci_energy", fci_energy)
                     metrics.store_metric(num_qubits, unique_id, "doci_energy", doci_energy)
+                    metrics.store_metric(num_qubits, unique_id, "hf_energy", hf_energy)
                     metrics.store_metric(num_qubits, unique_id, "radius", current_radius)
                     metrics.store_metric(num_qubits, unique_id, "iteration_count", minimizer_loop_index)
 
@@ -1507,6 +1509,7 @@ def run(
                     key_metrics["radius"] = current_radius
                     key_metrics["fci_energy"] = fci_energy
                     key_metrics["doci_energy"] = doci_energy
+                    key_metrics["hf_energy"] = hf_energy
                     key_metrics["random_energy"] = random_energy
                     key_metrics["iteration_count"] = minimizer_loop_index
                     key_metrics["energy"] = energy
