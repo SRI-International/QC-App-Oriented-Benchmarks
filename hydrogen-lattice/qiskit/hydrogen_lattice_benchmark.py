@@ -1407,10 +1407,6 @@ def run(
                         if parameterized:
                             qc.bind_parameters(params)
 
-                        # to execute on Aer state vector simulator, need to remove measurements
-                        if backend_id.lower() == "statevector_simulator":
-                            qc = qc.remove_final_measurements(inplace=False)
-
                         # submit circuit for execution on target with the current parameters
                         ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
 

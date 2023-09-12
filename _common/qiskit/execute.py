@@ -602,6 +602,10 @@ def execute_circuit(circuit):
                 if width_processor:
                     width_processor(qc)
 
+                # to execute on Aer state vector simulator, need to remove measurements
+                if backend.name().lower() == "statevector_simulator":
+                    trans_qc = trans_qc.remove_final_measurements(inplace=False)
+                            
                 #*************************************
                 # perform circuit execution on backend
                 logger.info(f'Running trans_qc, shots={shots}')
