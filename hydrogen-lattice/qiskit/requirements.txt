@@ -1,7 +1,5 @@
 numpy
-matplotlib
 qiskit
-qiskit[visualization]
 qiskit-aer
-notebook
 pytest
+scipy
