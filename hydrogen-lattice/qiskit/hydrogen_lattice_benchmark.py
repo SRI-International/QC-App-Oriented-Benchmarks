@@ -1354,6 +1354,7 @@ def run(
                 hf_energy = float(next(value for key, value in solution if key == "hf_energy"))
                 doci_energy = float(next(value for key, value in solution if key == "doci_energy"))
                 fci_energy = float(next(value for key, value in solution if key == "fci_energy"))
+                hf_energy = float(next(value for key, value in solution if key == "hf_energy"))
 
                 # begin timer accumulation
                 cumlative_iter_time = [0]
