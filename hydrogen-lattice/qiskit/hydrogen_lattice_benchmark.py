@@ -1351,7 +1351,6 @@ def run(
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
 
                 # get the classically computed expected energy variables from solution object
-                hf_energy = float(next(value for key, value in solution if key == "hf_energy"))
                 doci_energy = float(next(value for key, value in solution if key == "doci_energy"))
                 fci_energy = float(next(value for key, value in solution if key == "fci_energy"))
                 hf_energy = float(next(value for key, value in solution if key == "hf_energy"))
