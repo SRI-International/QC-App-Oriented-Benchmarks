@@ -603,7 +603,8 @@ def execute_circuit(circuit):
                     width_processor(qc)
 
                 # to execute on Aer state vector simulator, need to remove measurements
-                if backend.name().lower() == "statevector_simulator":
+                backend_name = backend.name if use_sessions else backend.name()
+                if backend_name.lower() == "statevector_simulator":
                     trans_qc = trans_qc.remove_final_measurements(inplace=False)
                             
                 #*************************************
