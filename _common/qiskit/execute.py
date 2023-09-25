@@ -248,6 +248,10 @@ def set_execution_target(backend_id='qasm_simulator',
     elif backend_id == 'qasm_simulator':
         backend = Aer.get_backend("qasm_simulator") 
 
+    # handle Statevector simulator specially
+    elif backend_id == 'statevector_simulator':
+        backend = Aer.get_backend("statevector_simulator")
+        
     # handle 'fake' backends here
     elif 'fake' in backend_id:
         backend = getattr(
@@ -301,6 +305,21 @@ def set_execution_target(backend_id='qasm_simulator',
                     options.resilience_level = exec_options.get("resilience_level", 1)
                     options.optimization_level = exec_options.get("optimization_level", 3)
                     
+                    # special handling for ibmq_qasm_simulator to set noise model
+                    if backend_id == "ibmq_qasm_simulator":
+                        this_noise = noise
+                        # get noise model from options; used only in simulator for now
+                        if "noise_model" in exec_options:
+                            this_noise = exec_options.get("noise_model", None)
+                            if verbose:
+                                print(f"... using custom noise model: {this_noise}")
+                        # attach to backend if not None
+                        if this_noise != None:
+                            options.simulator = {"noise_model": this_noise}
+                            metrics.QV = this_noise.QV
+                            if verbose:
+                                print(f"... setting noise model, QV={this_noise.QV} on {backend_id}")
+                        
                     if verbose:
                         print(f"... execute using Sampler on backend_id {backend_id} with options = {options}")
                     
@@ -583,6 +602,11 @@ def execute_circuit(circuit):
                 if width_processor:
                     width_processor(qc)
 
+                # to execute on Aer state vector simulator, need to remove measurements
+                backend_name = backend.name if use_sessions else backend.name()
+                if backend_name.lower() == "statevector_simulator":
+                    trans_qc = trans_qc.remove_final_measurements(inplace=False)
+                            
                 #*************************************
                 # perform circuit execution on backend
                 logger.info(f'Running trans_qc, shots={shots}')

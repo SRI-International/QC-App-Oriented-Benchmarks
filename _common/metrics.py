@@ -81,6 +81,10 @@ do_volumetric_plots = True
 # Option to include all app charts with vplots at end
 do_app_charts_with_all_metrics = False
 
+# Toss out elapsed times for any run if the initial value is this factor of the second value 
+# (applies only to area plots - remove once queue time is removed earlier)
+omit_initial_elapsed_time_factor = 10
+
 # Number of ticks on volumetric depth axis
 max_depth_log = 22
 
@@ -176,11 +180,15 @@ def end_metrics():
     print(f'... execution complete at {get_timestr()} in {total_run_time} secs')
     print("")
 
+##################################################
+# METRICS STORE AND GET FUNCTIONS
 
-# Store an individual metric associate with a group and circuit in the group
+# Store a single or multiple metric(s) associated with a group and circuit in the group
 def store_metric (group, circuit, metric, value):
     group = str(group)
     circuit = str(circuit)
+    
+    # ensure that a table for this group and circuit exists
     if group not in circuit_metrics:
         circuit_metrics[group] = { }
     if circuit not in circuit_metrics[group]:
@@ -195,21 +203,48 @@ def store_metric (group, circuit, metric, value):
             store_metric(group, circuit, key, value[key]) 
     else:
         circuit_metrics[group][circuit][metric] = value
-    #print(f'{group} {circuit} {metric} -> {value}')
+    #print(f'{group} {circuit} {metric} -> {value}')  
     
-    
-
+# Store "final iteration" metric(s) associated with a group and circuit in the group
 def store_props_final_iter(group, circuit, metric, value):
     group = str(group)
     circuit = str(circuit)
-    if group not in circuit_metrics_final_iter: circuit_metrics_final_iter[group] = {}
-    if circuit not in circuit_metrics_final_iter[group]: circuit_metrics_final_iter[group][circuit] = { }
+    
+    # ensure that a table for this group and circuit exists
+    if group not in circuit_metrics_final_iter:
+        circuit_metrics_final_iter[group] = {}
+    if circuit not in circuit_metrics_final_iter[group]:
+        circuit_metrics_final_iter[group][circuit] = { }
+        
+    # store value or values to the final iteration tables
     if type(value) is dict:
         for key in value:
             store_props_final_iter(group, circuit, key, value[key])
     else:
         circuit_metrics_final_iter[group][circuit][metric] = value
-    
+
+# Return the value for a single or multiple metric(s) in the given a group and circuit
+def get_metric (group, circuit, metric):
+    group = str(group)
+    circuit = str(circuit)
+
+    # if the metric is a dict, return an array of metric values
+    if type(metric) is dict:
+        values = []
+        for key in value:
+            values.append(get_metric(group, circuit, key)) 
+        return values
+
+    # otherwise return single value
+    if metric in circuit_metrics[group][circuit]:
+        return circuit_metrics[group][circuit][metric]
+    else:
+        return 0    # DEVNOTE: might want to raise exception?
+
+
+##################################################
+# METRICS AGGREGATION FUNCTIONS
+   
 # Aggregate metrics for a specific group, creating average across circuits in group
 def aggregate_metrics_for_group (group):
     group = str(group)
@@ -382,7 +417,8 @@ def report_metrics ():
        
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete
 def finalize_group(group, report=True):
-
+    group = str(group)
+    
     #print(f"... finalize group={group}")
 
     # loop over circuits in group to generate totals
@@ -905,6 +941,11 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
+        
+        if show_elapsed_times:
+            axs[axi].legend(['Elapsed', 'Quantum'], loc='upper left')
+        #else:
+            #axs[axi].legend(['Quantum'], loc='upper left')
             
         # none of these methods of sharing the x axis gives proper effect; makes extra white space
         #axs[axi].sharex(axs[2])
@@ -1596,8 +1637,12 @@ def plot_all_area_metrics(suptitle='',
             score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
             fixed_metrics={}, num_x_bins=100,
             y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
-            options=None, suffix=''):
+            options=None, suffix='', which_metric='approx_ratio'):
 
+    # if no metrics to plot, just return
+    if score_metric is None or x_metric is None or y_metric is None:
+        return
+        
     if type(score_metric) == str:
         score_metric = [score_metric]
     if type(x_metric) == str:
@@ -1609,7 +1654,8 @@ def plot_all_area_metrics(suptitle='',
     for s_m in score_metric:
         for x_m in x_metric:
             for y_m in y_metric:
-                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=options, suffix=suffix)
+                #print("plotting area metrics for " + s_m + " " + x_m + " " + y_m)
+                plot_area_metrics(suptitle, s_m, x_m, y_m, fixed_metrics, num_x_bins, y_size, x_size, x_min, x_max, offset_flag=offset_flag, options=options, suffix=suffix, which_metric=which_metric)
 
 def get_best_restart_ind(group, which_metric = 'approx_ratio'):
     """
@@ -1633,7 +1679,7 @@ def get_best_restart_ind(group, which_metric = 'approx_ratio'):
 def plot_area_metrics(suptitle='',
             score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={}, num_x_bins=100,
             y_size=None, x_size=None, x_min=None, x_max=None, offset_flag=False,
-            options=None, suffix=''):
+            options=None, suffix='', which_metric='approx_ratio'):
     """
     Plots a score metric as an area plot, on axes defined by x_metric and y_metric
     
@@ -1658,6 +1704,7 @@ def plot_area_metrics(suptitle='',
     x_label = known_x_labels[x_metric]
     y_label = known_y_labels[y_metric]
     score_label = known_score_labels[score_metric]
+    #print("plotting area metrics for " + score_label + " " + x_label + " " + y_label)
     
     # process cumulative and maximum options
     xs, x, y, scores = [], [], [], []
@@ -1681,7 +1728,7 @@ def plot_area_metrics(suptitle='',
         x_size_groups, x_groups, y_groups, score_groups = [], [], [], []
         
         # Get the best AR index
-        restart_index = get_best_restart_ind(group, which_metric = 'approx_ratio')
+        restart_index = get_best_restart_ind(group, which_metric = which_metric)
         
         # Each problem instance at size num_qubits; need to collate across iterations
         for circuit_id in [restart_index]:#circuit_metrics_detail_2[group]:
@@ -1690,14 +1737,27 @@ def plot_area_metrics(suptitle='',
             x_last, score_last = 0, 0
             x_sizes, x_points, y_points, score_points = [], [], [], []            
             
-            for it in circuit_metrics_detail_2[group][circuit_id]:
-                mets = circuit_metrics_detail_2[group][circuit_id][it]
-                
+            metrics_array = circuit_metrics_detail_2[group][circuit_id]
+      
+            for it in metrics_array:
+                mets = metrics_array[it]
+                        
                 if x_metric not in mets: break
                 if score_metric not in mets: break
                 
+                x_value = mets[x_metric]
+                
+                # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
+                # that are most likely due to either queueing or system initialization
+                if x_metric == 'elapsed_time' and it == 0 and omit_initial_elapsed_time_factor > 0:
+                    if (it + 1) in metrics_array:
+                        mets2 = metrics_array[it + 1]
+                        x_value2 = mets2[x_metric]
+                        if x_value > (omit_initial_elapsed_time_factor * x_value2):
+                            x_value = x_value2
+                            
                 # get each metric and accumulate if indicated
-                x_raw = x_now = mets[x_metric]
+                x_raw = x_now = x_value
                 if cumulative_flag:
                     x_now += x_last
                 x_last = x_now
@@ -1815,8 +1875,9 @@ def plot_area_metrics(suptitle='',
         if save_plot_images:
             save_plot_image(plt, os.path.join(f"{appname}-area-"
                                               + score_label_save_str[score_metric] + '-'
-                                              + x_label_save_str[x_metric] + '-'
-                                              + suffix), backend_id)
+                                              + x_label_save_str[x_metric]
+                                              + (('-' + suffix) if len(suffix) > 0 else '')),
+                                              backend_id)
 
 # Check if axis data needs to be linearized
 # Returns true if data sparse or non-linear; sparse means with any gap > gap size
@@ -2534,6 +2595,7 @@ cmap_custom_spectral = None
 
 # the default colormap is the spectral map
 cmap = cmap_spectral
+cmap_orig = cmap_spectral
 
 # current cmap normalization function (default None)
 cmap_norm = None
@@ -2558,11 +2620,12 @@ def set_custom_cmap_style(
             fade_low_fidelity_level=default_fade_low_fidelity_level,
             fade_rate=default_fade_rate):
             
-    print("... set custom map style")
-    global cmap, cmap_custom_spectral
+    #print("... set custom map style")
+    global cmap, cmap_custom_spectral, cmap_orig
     cmap_custom_spectral = create_custom_spectral_cmap(
                 fade_low_fidelity_level=fade_low_fidelity_level, fade_rate=fade_rate)
     cmap = cmap_custom_spectral
+    cmap_orig = cmap_custom_spectral
        
 # Create the custom spectral colormap from the base spectral
 def create_custom_spectral_cmap(
@@ -2638,11 +2701,10 @@ def create_custom_spectral_cmap(
     
     return cmap_custom_spectral
 
-cmap_custom_spectral = create_custom_spectral_cmap()
+# Make the custom spectral color map the default on module init
+set_custom_cmap_style()
 
-
-############### Helper functions
-
+# Return the color associated with the spcific value, using color map norm
 def get_color(value):
     
     # if there is a normalize function installed, scale the data
@@ -2657,8 +2719,10 @@ def get_color(value):
         value = 0.0 + value*0.95
         
     return cmap(value)
-    
-    
+
+
+############### Helper functions
+ 
 # return the base index for a circuit depth value
 # take the log in the depth base, and add 1
 def depth_index(d, depth_base):
@@ -3087,9 +3151,22 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
 
     if ylabels != None:
         plt.yticks(ybasis, ylabels)
-    
-    # add colorbar to right of plot (scale if normalize function installed)
-    plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+      
+    # if score label is accuracy volume, get the cmap colors and invert them
+    if score_label == 'Accuracy Volume':
+        global cmap
+        cmap_colors = [cmap_orig(v/1000) for v in range(1000)]
+        cmap_colors.reverse()
+        cmap = ListedColormap(cmap_colors)
+
+    else:
+        cmap = cmap_orig
+
+
+    # add colorbar to right of plot (scale if normalize function installed)    
+    cbar = plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+    if score_label == 'Accuracy Volume':
+        cbar.ax.invert_yaxis()
         
     return ax
 
