@@ -2174,7 +2174,7 @@ def run_objective_function(**kwargs):
 
 # # if main, execute method
 if __name__ == "__main__":
-    run(min_qubits=8, max_qubits=8, num_shots=1000, max_iter=2, method=2, test_pass_count=300)
+    run(min_qubits=8, max_qubits=8, num_shots=1000, max_iter=10, method=2, test_pass_count=300)
 
 # # %%
 
