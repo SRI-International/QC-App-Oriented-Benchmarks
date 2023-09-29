@@ -24,8 +24,7 @@
 #
 
 import sys
-import metrics
-
+import os
 import time
 import copy
 import importlib
@@ -35,9 +34,11 @@ import logging
 import numpy as np
 
 from datetime import datetime, timedelta
-from qiskit import execute, Aer, transpile
-from qiskit import IBMQ
+from qiskit import IBMQ, execute, Aer, transpile
 from qiskit.providers.jobstatus import JobStatus
+
+# QED-C modules
+import metrics
 
 # Noise
 from qiskit.providers.aer.noise import NoiseModel, ReadoutError
@@ -65,8 +66,11 @@ verbose_time = False
 
 #### the following variables are accessed only through functions ...
 
-# specify whether to execute using sessions (and currently using Sampler only)
+# Specify whether to execute using sessions (and currently using Sampler only)
 use_sessions = False
+
+# Session counter for use in creating session name
+session_count = 0
 
 # internal session variables: users do not access
 service = None
@@ -237,13 +241,44 @@ def set_execution_target(backend_id='qasm_simulator',
                         provider_name='Honeywell')
     """
     global backend
+    global session
+    global use_sessions
+    global session_count
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
 
     # if a custom provider backend is given, use it ...
-    # in this case, the backend_id is an arbitrary identifier that shows up in plots
+    # Note: in this case, the backend_id is an identifier that shows up in plots
     if provider_backend != None:
         backend = provider_backend
-    
+        
+        # The hub variable is used to identify an Azure Quantum backend
+        if hub == "azure-quantum":
+            from azure.quantum.job.session import Session   
+            session_count += 1
+            
+            # open a session on the backend
+            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}")
+            '''
+            DEVNOTE: we don't use this approach because it asks for account confirmation every time
+            # get resource_id and location from environmane variables
+            resource_id = os.environ.get("AZURE_QUANTUM_RESOURCE_ID")
+            location = os.environ.get("AZURE_QUANTUM_LOCATION")
+
+            # Worspace creation used to handle Sessions
+            from azure.quantum import Workspace
+            workspace = Workspace(
+                resource_id = resource_id,
+                location = location
+            )
+
+            session = Session(workspace=workspace, name=project, target=backend.name())
+            session.open()
+            '''
+            backend.latest_session = session
+            
+            # force use of sessions with Azure
+            #use_sessions = True
+            
     # handle QASM simulator specially
     elif backend_id == 'qasm_simulator':
         backend = Aer.get_backend("qasm_simulator") 
@@ -284,7 +319,6 @@ def set_execution_target(backend_id='qasm_simulator',
                 IBMQ.load_account()
                 
                 # set use_sessions in provided by user - NOTE: this will modify the global setting
-                global use_sessions
                 this_use_sessions = exec_options.get("use_sessions", None)
                 if this_use_sessions != None:
                     use_sessions = this_use_sessions
@@ -293,12 +327,13 @@ def set_execution_target(backend_id='qasm_simulator',
                 if use_sessions:
                     from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session, Options
                     global service
-                    service = QiskitRuntimeService()
-                    global session
                     global sampler
                     
+                    service = QiskitRuntimeService()
+                    session_count += 1
+                    
                     backend = service.backend(backend_id)
-                    session= Session(service=service, backend=backend_id)
+                    session = Session(service=service, backend=backend_id)
                     
                     # get Sampler resilience level and transpiler optimization level from exec_options
                     options = Options()
@@ -664,7 +699,6 @@ def wait_on_job_result(job, active_circuit):
     while retry_count < 40:
         try:
             retry_count += 1
-            #print(f"... calling job.result()")
             result = job.result()
             break
                          
@@ -680,7 +714,7 @@ def wait_on_job_result(job, active_circuit):
     else:
         #print(f"... job.result() is done, with result data, continuing")
         pass
-
+    
 # Check and return job_status
 # handle network timeouts by doing up to 40 retries once every 15 seconds
 def get_job_status(job, active_circuit):
@@ -1263,9 +1297,9 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
         
     # also, close any active session at end of the app
     global session
-    if report_end and use_sessions and session != None:
+    if report_end and session != None:
         if verbose:
-            print("... closing active session!\n")
+            print(f"... closing active session: {session_count}\n")
         
         session.close()
         session = None
