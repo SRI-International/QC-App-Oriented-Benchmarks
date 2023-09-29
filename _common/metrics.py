@@ -83,7 +83,10 @@ do_app_charts_with_all_metrics = False
 
 # Toss out elapsed times for any run if the initial value is this factor of the second value 
 # (applies only to area plots - remove once queue time is removed earlier)
-omit_initial_elapsed_time_factor = 10
+omit_initial_elapsed_time_factor = 0
+
+# if tossing large elapsed times, assume elapsed is this multiple of exec time
+initial_elapsed_time_multiplier = 1.1
 
 # Number of ticks on volumetric depth axis
 max_depth_log = 22
@@ -924,18 +927,29 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_executes:
+    
+        avg_exec_times = group_metrics["avg_exec_times"]
+        avg_elapsed_times = [et for et in group_metrics["avg_elapsed_times"]]
+        
+        # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
+        # that are most likely due to either queueing or system initialization
+        if show_elapsed_times and omit_initial_elapsed_time_factor > 0:
+            for i in range(len(avg_elapsed_times)):
+                if avg_elapsed_times[i] > omit_initial_elapsed_time_factor * avg_exec_times[i]:
+                    avg_elapsed_times[i] = avg_exec_times[i] * initial_elapsed_time_multiplier
+        
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
         
         if show_elapsed_times:    # a global setting
-            axs[axi].bar(group_metrics["groups"], group_metrics["avg_elapsed_times"], 0.75, color='skyblue', alpha = 0.8, zorder = 3)
+            axs[axi].bar(group_metrics["groups"], avg_elapsed_times, 0.75, color='skyblue', alpha = 0.8, zorder = 3)
             
-            if max(group_metrics["avg_elapsed_times"]) < 0.1 and max(group_metrics["avg_exec_times"]) < 0.1:
+            if max(avg_elapsed_times) < 0.1 and max(avg_exec_times) < 0.1:
                 axs[axi].set_ylim([0, 0.1])
         else:
-            if max(group_metrics["avg_exec_times"]) < 0.1:
+            if max(avg_exec_times) < 0.1:
                 axs[axi].set_ylim([0, 0.1])
             
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"], zorder = 3)
+        axs[axi].bar(group_metrics["groups"], avg_exec_times, zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
         
         if rows > 0 and not xaxis_set:
