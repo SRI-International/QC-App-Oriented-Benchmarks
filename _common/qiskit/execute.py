@@ -34,7 +34,7 @@ import logging
 import numpy as np
 
 from datetime import datetime, timedelta
-from qiskit import IBMQ, execute, Aer, transpile
+from qiskit import execute, Aer, transpile
 from qiskit.providers.jobstatus import JobStatus
 
 # QED-C modules
@@ -73,9 +73,14 @@ use_sessions = False
 session_count = 0
 
 # internal session variables: users do not access
-service = None
 session = None
 sampler = None
+
+# IBM-Q Service save here if created
+service = None
+
+# Azure Quantum Provider saved here if created
+azure_provider = None
 
 # logger for this module
 logger = logging.getLogger(__name__)
@@ -253,31 +258,17 @@ def set_execution_target(backend_id='qasm_simulator',
         
         # The hub variable is used to identify an Azure Quantum backend
         if hub == "azure-quantum":
-            from azure.quantum.job.session import Session   
+            from azure.quantum.job.session import Session
+  
+            # increment session counter
             session_count += 1
             
+            if verbose:
+                print(f"... creating session {session_count} on Azure backend {backend_id}")
+                
             # open a session on the backend
             session = backend.open_session(name=f"QED-C Benchmark Session {session_count}")
-            '''
-            DEVNOTE: we don't use this approach because it asks for account confirmation every time
-            # get resource_id and location from environmane variables
-            resource_id = os.environ.get("AZURE_QUANTUM_RESOURCE_ID")
-            location = os.environ.get("AZURE_QUANTUM_LOCATION")
-
-            # Worspace creation used to handle Sessions
-            from azure.quantum import Workspace
-            workspace = Workspace(
-                resource_id = resource_id,
-                location = location
-            )
-
-            session = Session(workspace=workspace, name=project, target=backend.name())
-            session.open()
-            '''
             backend.latest_session = session
-            
-            # force use of sessions with Azure
-            #use_sessions = True
             
     # handle QASM simulator specially
     elif backend_id == 'qasm_simulator':
@@ -298,7 +289,7 @@ def set_execution_target(backend_id='qasm_simulator',
         backend = backend()
         logger.info(f'Set {backend = }')   
 
-    # otherwise use the given provider and backend_id to find the backend
+    # otherwise use the given providername or backend_id to find the backend
     else:
     
         # if provider_module name and provider_name are provided, obtain a custom provider
@@ -310,9 +301,44 @@ def set_execution_target(backend_id='qasm_simulator',
                 backend = provider.get_backend(backend_id)
             except:
                 print(authentication_error_msg.format(provider_name))
+        
+        # If hub variable indicates an Azure Quantum backend
+        elif hub == "azure-quantum":
+            global azure_provider
+            from azure.quantum.qiskit import AzureQuantumProvider
+            from azure.quantum.job.session import Session 
+            
+            # create an Azure Provider only the first time it is needed
+            if azure_provider is None:
+                if verbose:
+                    print("... creating Azure provider")
+                azure_provider = AzureQuantumProvider(
+                     resource_id = os.getenv("AZURE_QUANTUM_RESOURCE_ID"),
+                     location = os.getenv("AZURE_QUANTUM_LOCATION") 
+                )  
+                # List the available backends in the workspace
+                if verbose:
+                    print("Available backends:")
+                    for backend in azure_provider.backends():
+                        print(backend)
+
+            # increment session counter
+            session_count += 1
+            
+            if verbose:
+                print(f"... creating Azure backend {backend_id} and session {session_count}")
                 
-        # otherwise, assume the backend_id is given and assume it is IBMQ device
+            # then find backend from the backend_id
+            # we should cache this and only change if backend_id changes
+            backend = azure_provider.get_backend(backend_id)
+ 
+            # open a session on the backend
+            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}")
+            backend.latest_session = session
+            
+        # otherwise, assume the backend_id is given only and assume it is IBMQ device
         else:
+            from qiskit import IBMQ
             if IBMQ.stored_account():
             
                 # load a stored account
