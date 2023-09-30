@@ -25,11 +25,34 @@ You are now ready to run the benchmark programs.
 
 ## Configuring Quantum Hardware
 
-The `qiskit` package allows quantum circuits to be run in a real quantum hardware hosted by [IBM Q Experience](https://quantum-computing.ibm.com/). To use a hardware backend, 
-[create an account](https://quantum-computing.ibm.com/docs/manage/account/) in IBM Q Experience and save the account token in your local machine using instructions [here](https://quantum-computing.ibm.com/docs/manage/account/ibmq).
- 
+The Azure Quantum `qiskit` package allows quantum circuits to be executed on real quantum hardware or simulators provided by a variety of Azure Quantum partners.
+Please see the Azure Quantum documentation for information about how to configure Azure Quantun to enable access to any of these backend systems.
 
-## Run the benchmark programs in an Anaconda command window.
+To configure the benchmark notebooks to select a specific Azure Quantum target for execution, the run() method of each benchmark would require the following arguments be set. 
+
+    hub = "azure-quantum";
+    backend_id = "<YOUR_BACKEND_NAME_HERE>"
+
+Using the Jupyter notebook described below makes this easy.
+
+## Run the benchmark programs in a Jupyter Notebook
+
+Many Python users prefer to execute their Python programs in a Jupyter notebook.
+Execute the following commands in the top-level directory of the benchmarks and invoke the Jupyter notebook server.
+
+    jupyter-notebook
+    
+This will invoke the Jupyter notebook in a new browser tab. There you can select the benchmarks-qiskit.ipynb notebook and execute most of the benchmarks.
+
+In the first code cell of the notebook, un-commenting these lines in the Azure Quantum section will select an Azure Quantum backend for the execution.
+
+    hub = "azure-quantum"; backend_id = "<YOUR_BACKEND_NAME_HERE>"
+    
+Once configured, you can do a Run All command to execute all the top-level benchmarks at once.
+
+Important note: there may be costs associated with execution on some hardware systems. You may consider lowering the value of the num_shots, max_circuits, and max_quibts settings in the first code cell, during your initial testing to avoid unexpected charges.
+
+## Run the benchmark programs in a command window.
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:
 
@@ -39,23 +62,7 @@ For example, in an Anaconda command window, you can enter the following commands
     
 This will execute the benchmark program and report the benchmark metrics to the console.
 
-The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark pgrogram filename).
-
-## Run the benchmark programs in a Jupyter Notebook
-
-Many Python users prefer to execute their Python programs in a Jupyter notebook, which is automatically available with your Anaconda installation.
-Execute the following commands to change directory to one that contains a Jupyter notebook and execute and invoke Jupyter notebook server.
-
-    cd to directory containing jupyter notebook
-    jupyter-notebook
-    
-This will then invoke the Jupyter notebook in a new browser tab. There you can copy and paste any of the benchmark program code and execute the programs interactively.
-    
-Note; In some Windows environments, it is necessary to install one additional package (if running a Jupyter notebook results in a Windows "kernel error"):
-
-    conda install pywin32
-
-Once installed, you should be able to successfully start your Jupyter notebook.
+The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark program filename).
 
 ## Tested Versions
 
@@ -65,4 +72,4 @@ The repository has been validated on Linux using the following versions as minim
     Python Versions: 3.8.5 and 3.9.7
     Qiskit-Terra Version: 0.18.3
 
-Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.
+Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise a bug report in the issues tab of the repository.
