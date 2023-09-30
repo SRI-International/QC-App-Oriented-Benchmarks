@@ -62,12 +62,11 @@ omit_initial_elapsed_time_factor = 10
 # Find the last energy and radius associated with specific group of circuits
 def find_last_metrics_for_group(group, instance):
 
-    current_radius = 0
-    doci_energy = 0
-    fci_energy = 0
-    energy = 0
-    accuracy_ratio = 0
-    solution_quality = 0
+
+    test_accuracy = 0
+    train_accuracy = 0
+    train_loss = 0
+
     
     # DEVNOTE: would it be easier to just get the last entry of array, rather than this loop?
     for circuit_id in image_recognition_metrics[group]:
@@ -75,23 +74,14 @@ def find_last_metrics_for_group(group, instance):
         
             metrics_for_circuit = image_recognition_metrics[group][circuit_id]
             
-            energy = metrics_for_circuit['energy']
-            fci_energy = metrics_for_circuit['fci_energy']
-            
-            doci_energy = metrics_for_circuit['doci_energy'] if 'doci_energy' in metrics_for_circuit else fci_energy
-            
-            current_radius = metrics_for_circuit['radius'] if 'radius' in metrics_for_circuit else 0.75
-            
-            solution_quality = metrics_for_circuit['solution_quality']
-            
-            # recent additions (backwards compat)
-            accuracy_ratio = metrics_for_circuit['accuracy_ratio'] if 'accuracy_ratio' in metrics_for_circuit else solution_quality
-            random_energy = metrics_for_circuit['random_energy'] if 'random_energy' in metrics_for_circuit else 0
+            test_accuracy = metrics_for_circuit['test_accuracy'] if 'test_accuracy' in metrics_for_circuit else 0
+            train_accuracy = metrics_for_circuit['train_accuracy'] if 'train_accuracy' in metrics_for_circuit else 0
+            train_loss = metrics_for_circuit['train_loss'] if 'train_loss' in metrics_for_circuit else 0
 
         else:
             continue
             
-    return current_radius, doci_energy, fci_energy, random_energy, energy, accuracy_ratio, solution_quality
+    return train_accuracy, train_loss, test_accuracy
 
 # Find the array of metrics associated with specific group of circuits
 def find_metrics_array_for_group(group, instance, metric_name, x_val, x_metric_name):   
@@ -198,6 +188,11 @@ def plot_all_line_metrics(suptitle=None, options=None,
     # if method!=3 remove test_accuracy from y metrics
     if method != 3:
         line_y_metrics = [metric for metric in line_y_metrics if metric != 'test_accuracy']
+
+    if method ==3:
+        line_y_metrics = ['test_accuracy','test_accuracy']
+        line_x_metrics = ['iteration_count', 'cumulative_exec_time']
+
     
     # iterate over number of qubits and score metrics and plot each
     for qubit_count in group_keys:
@@ -274,7 +269,7 @@ def plot_all_line_metrics(suptitle=None, options=None,
                     # draw a single subplot
                     plot_line_metric(ax=axes[subplot_index], subtitle=subtitle,
                         metric_name=metric_name, x_val=x_val,
-                        num_qubits=qubit_count, instance=instance)
+                        num_qubits=qubit_count, instance=instance, method=method)
                     
                     subplot_index += 1
                         
@@ -299,7 +294,7 @@ def plot_all_line_metrics(suptitle=None, options=None,
 # function to create a single subplot
 def plot_line_metric(ax=None, subtitle:str="",
         metric_name:str="energy", x_val:str='cumulative_exec_time',
-        num_qubits:int=None, instance:str=None):
+        num_qubits:int=None, instance:str=None, method=2):
     '''
     Function to create subplot for one line metrics (energy, solution quality, accuracy volume)
     vs different x values (iteration count, cumulative execution time)
@@ -343,7 +338,7 @@ def plot_line_metric(ax=None, subtitle:str="",
                     x_val, x_metric_name)
     
     
-    y_data = [y_data[-1]] + y_data[0:-1]
+
 
     # current_radius, doci_energy, fci_energy, random_energy, \
     #         energy, solution_quality, accuracy_ratio = \
@@ -631,12 +626,12 @@ def add_two_legend_items(ax,
 
 # function to plot all cumulative/final metrics
 def plot_all_cumulative_metrics(suptitle=None,
-        bar_y_metrics=["average_exec_times", "accuracy_ratio_error"],
+        bar_y_metrics=["train_accuracy", "test_accuracy"],
         bar_x_metrics=["num_qubits"],
         show_elapsed_times=True,
         use_logscale_for_times=False,
         plot_layout_style='grid',
-        backend_id="UNKNOWN", options=None):
+        backend_id="UNKNOWN", options=None, method=2):
     '''
     Function to plot all cumulative metrics (average_iteration_time, final_accuracy_ratio)
 
@@ -673,6 +668,12 @@ def plot_all_cumulative_metrics(suptitle=None,
     average_accuracy_ratio = []
     average_solution_quality_error = []
     average_accuracy_ratio_error = []
+    average_train_accuracy = []
+    average_train_accuracy_error = []
+    average_test_accuracy = []
+    average_test_accuracy_error = []
+    average_train_loss = []
+    average_train_loss_error = []
     qubit_counts = []
     
     # iterate over number of qubits and instances to compute averages
@@ -686,18 +687,19 @@ def plot_all_cumulative_metrics(suptitle=None,
         elapsed_time_array = []
         sol_quality_array = []
         acc_ratio_array = []
+        train_loss_array = []
+        train_accuracy_array = []
+        test_accuracy_array = []
         
         # generate a set of plots for each instance (radius) in data set
         for instance in range(1, total_instances + 1):
 
             # search metrics store for final metrics for this group
-            current_radius, doci_energy, fci_energy, random_energy, \
-                    energy, accuracy_ratio, solution_quality = \
-                        find_last_metrics_for_group(group, instance)
-            
-            ###### find the execution time array for "energy" metric         
+            train_accuracy, train_loss, test_accuracy = find_last_metrics_for_group(group, instance)
+                        
+            ###### find the execution time array for "train_accuracy" metric         
             x_data, x_label, y_data, y_label = \
-                find_metrics_array_for_group(group, instance, "energy", "cumulative_exec_time", "exec_time")
+                find_metrics_array_for_group(group, instance, "train_accuracy", "cumulative_exec_time", "exec_time")
                 
             # make the x_data cumulative if the cumulative flag is on
             x_data = cumulative_sum(x_data)
@@ -705,9 +707,9 @@ def plot_all_cumulative_metrics(suptitle=None,
             # and compute average execution time
             exec_time_per_iteration = x_data[-1]/len(x_data)
 
-            ###### find the elapsed execution time array for "energy" metric         
+            ###### find the elapsed execution time array for "train_accuracy" metric         
             x_data, x_label, y_data, y_label = \
-                find_metrics_array_for_group(group, instance, "energy", "cumulative_elapsed_time", "elapsed_time")
+                find_metrics_array_for_group(group, instance, "train_accuracy", "cumulative_elapsed_time", "elapsed_time")
             
             # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
             # that are most likely due to either queueing or system initialization
@@ -722,26 +724,34 @@ def plot_all_cumulative_metrics(suptitle=None,
             
             exec_time_array.append(exec_time_per_iteration)
             elapsed_time_array.append(elapsed_time_per_iteration)
-            sol_quality_array.append(1 - solution_quality)
-            acc_ratio_array.append(1 - accuracy_ratio)
+            train_accuracy_array.append(train_accuracy)
+            test_accuracy_array.append(test_accuracy)
+            train_loss_array.append(train_loss)
                    
         average_et = np.average(exec_time_array)
         error_et = np.std(exec_time_array)/np.sqrt(len(exec_time_array))
         average_elt = np.average(elapsed_time_array)
         error_elt = np.std(elapsed_time_array)/np.sqrt(len(elapsed_time_array))
-        average_ar = np.average(acc_ratio_array)
-        error_ar = np.std(acc_ratio_array)/np.sqrt(len(acc_ratio_array))
-        average_sq = np.average(sol_quality_array)
-        error_sq = np.std(sol_quality_array)/np.sqrt(len(sol_quality_array))
+
+        average_trnacc = np.average(train_accuracy_array)
+        error_trnacc = np.std(train_accuracy_array)/np.sqrt(len(train_accuracy_array))
+        average_tstacc = np.average(test_accuracy_array)
+        error_tstacc = np.std(test_accuracy_array)/np.sqrt(len(test_accuracy_array))
+        average_trnlss = np.average(train_loss_array)
+        error_trnlss = np.std(train_loss_array)/np.sqrt(len(train_loss_array))
+
 
         average_exec_time_per_iteration.append(average_et)
         average_exec_time_per_iteration_error.append(error_et)
         average_elapsed_time_per_iteration.append(average_elt)
         average_elapsed_time_per_iteration_error.append(error_elt)
-        average_accuracy_ratio.append(average_ar * 100)
-        average_accuracy_ratio_error.append(error_ar * 100)
-        average_solution_quality.append(average_sq * 100)
-        average_solution_quality_error.append(error_sq * 100)
+        average_train_accuracy.append(average_trnacc * 100)
+        average_train_accuracy_error.append(error_trnacc * 100)
+        average_test_accuracy.append(average_tstacc * 100)
+        average_test_accuracy_error.append(error_tstacc * 100)
+        average_train_loss.append(average_trnlss * 100)
+        average_train_loss_error.append(error_trnlss * 100)
+
 
         qubit_counts.append(num_qubits)
 
@@ -750,12 +760,11 @@ def plot_all_cumulative_metrics(suptitle=None,
     individual=True
     
     # Create standard title for all plots
-    method = 2
     toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
     subtitle = ""
     
     # create common title (with hardcoded list of options, for now)
-    suptitle = toptitle + f"\nqubits={num_qubits}, shots={options['shots']}, radius={current_radius}, restarts={options['restarts']}"
+    suptitle = toptitle + f"\nqubits={num_qubits}, shots={options['shots']}, restarts={options['restarts']}"
     
     # since all subplots share the same header, give user and indication of the grouping
     if individual:
@@ -775,16 +784,30 @@ def plot_all_cumulative_metrics(suptitle=None,
             use_logscale_for_times=use_logscale_for_times,
             suffix="avg_exec_times_per_iteration")
     
-    # draw the accuracy ratio error plot
-    if "accuracy_ratio_error" in bar_y_metrics:
-        plot_cumulative_metrics(suptitle=suptitle,
-            x_data=qubit_counts,
-            x_label="Number of Qubits",
-            y_data=average_accuracy_ratio,
-            y_err=average_accuracy_ratio_error,
-            y_label="Error in Accuracy Ratio (%)",
-            y_lim_min=1.0,
-            suffix="accuracy_ratio_error")
+    if method == 2:
+        # draw the accuracy ratio error plot
+        if "train_accuracy" in bar_y_metrics:
+            plot_cumulative_metrics(suptitle=suptitle,
+                x_data=qubit_counts,
+                x_label="Number of Qubits",
+                y_data=average_train_accuracy,
+                y_err=average_train_accuracy_error,
+                y_label="Training Accuracy (%)",
+                y_lim_min=1.0,
+                suffix="accuracy_ratio_error")
+
+    if method == 3:
+        # draw the accuracy ratio error plot
+        if "test_accuracy" in bar_y_metrics:
+            plot_cumulative_metrics(suptitle=suptitle,
+                x_data=qubit_counts,
+                x_label="Number of Qubits",
+                y_data=average_test_accuracy,
+                y_err=average_test_accuracy_error,
+                y_label="Testing Accuracy (%)",
+                y_lim_min=1.0,
+                suffix="accuracy_ratio_error")
+
 
 #####################################
 
