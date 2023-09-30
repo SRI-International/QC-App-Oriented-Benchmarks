@@ -6,6 +6,7 @@ All versions of the benchmark programs require that you have available the Pytho
 
 ## Links to API Specific Setup
 * [Qiskit](qiskit/README.md)
+* [Qiskit in Azure Quantum](qiskit-azure-quantum/README.md)
 * [Cirq](cirq/README.md)
 * [Braket](braket/README.md)
 * [Ocean](ocean/README.md)
