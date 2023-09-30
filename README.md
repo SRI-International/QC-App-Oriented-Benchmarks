@@ -56,7 +56,7 @@ In addition to the application directories at the highest level, there are sever
 
 The prototype benchmark applications are easy to run and contain few dependencies. The primary dependency is on the Python packages needed for the target environment in which you would like to execute the examples.
 
-In the [`_setup`](./_setup/) folder you will find a subdirectory for each of the target environments that contains a README with everything you need to know to install and configure the specific environment in which you would like to run.
+In the [`Preparing to Run Benchmarks`](./_setup/) section you will find a subdirectory for each of the target environments that contains a README with everything you need to know to install and configure the specific environment in which you would like to run.
 
 Important Note:
 ```
