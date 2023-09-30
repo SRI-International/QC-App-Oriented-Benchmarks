@@ -1,6 +1,6 @@
 # Quantum Computing - Toolkit Information
 
-# Qiskit Version
+# Qiskit Version for Azure Quantum
 
 This directory describes the requirements and operational conventions for using Qiskit as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
 In particular, this document explains how to set up the tools needed to run the Qiskit implementation of these benchmarks.
