@@ -3,10 +3,10 @@
 # Qiskit Version for Azure Quantum
 
 This directory describes the requirements and operational conventions for using Qiskit as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
-In particular, this document explains how to set up the tools needed to run the Qiskit implementation of these benchmarks.
+In particular, this document explains how to set up the tools needed to run the Qiskit implementation of these benchmarks using the Azure Quantum SDK.
 
 ## Configure a Qiskit Environment
-Create an environment named "qiskit" and then "activate" it using the following commands:
+If you are using Anaconda environments, create an environment named "qiskit" and then "activate" it using the following commands:
 
     conda create -n qiskit python=3
 
@@ -16,17 +16,10 @@ The conda environment is now ready for you to install the Qiskit package.
 
 ## Install Qiskit
 
-After activating the conda environment, to ensure you are using the correct installation of `pip`, run the following command:
+Enter the following commands to install the latest version of the Azure Quantum Qiskit SDK and the other required packages.
 
-    pip show pip
-
-If everything is working correctly, the `Location` field should have your newly created environment's name present. For example:
-
-    Location: c:\users\[user]\miniconda\envs\qiskit\lib\site-packages
-
-Enter the following commands to install the latest version of Qiskit and the other required packages.
-
-    pip install numpy matplotlib qiskit "qiskit[visualization]" notebook
+    pip install -U azure-quantum
+    pip install -U azure-quantum[qiskit]
 
 You are now ready to run the benchmark programs.
 
