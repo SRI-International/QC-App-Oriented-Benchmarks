@@ -23,7 +23,7 @@ Enter the following commands to install the latest version of the Azure Quantum 
 
 You are now ready to run the benchmark programs.
 
-## Configuring Quantum Hardware
+## Configure Azure Quantum for Access to Quantum Computing Systems
 
 The Azure Quantum `qiskit` package allows quantum circuits to be executed on real quantum hardware or simulators provided by a variety of Azure Quantum partners.
 Please see the Azure Quantum documentation for information about how to configure Azure Quantun to enable access to any of these backend systems.
@@ -40,7 +40,8 @@ Before running in either a Jupyter notebook or from the command line, you will n
     set AZURE_QUANTUM_RESOUCE_ID="<YOUR_RESOURCE_ID>"
     set AZURE_QUANTUM_LOCATION="<YOUR_LOCATION>"
 
-You can find this information in the Azure portal under your workspace > Overview > "Resource ID" and "Location". To create an Azure Quantum workspace, you can read documentation at https://aka.ms/AQ/Docs/CreateWorkspace
+You can find this information in the Azure portal under your workspace > Overview > "Resource ID" and "Location". To create an Azure Quantum workspace, you can read documentation at
+[`https://aka.ms/AQ/Docs/CreateWorkspace`](https://aka.ms/AQ/Docs/CreateWorkspace)
 
 ## Run the benchmark programs in a Jupyter Notebook
 
