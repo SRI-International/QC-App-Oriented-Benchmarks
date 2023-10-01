@@ -1027,17 +1027,15 @@ def job_complete(job):
         # for Azure Quantum, need to obtain execution time from sessions object
         # Since there may be multiple jobs, need to find the one that matches the current job_id
         if azure_provider is not None and session is not None:
-            session_jobs = session.list_jobs()
-            for session_job in reversed(session_jobs):
-              #print(session_job.id)
-              details = session_job.details
-              if job.job_id() != details.id:
-                continue
-              #print("... session_job.details = ", details)
-              exec_time = (details.end_execution_time - details.begin_execution_time).total_seconds()
-              startup_time = (details.begin_execution_time - details.creation_time).total_seconds()
-              break
-              
+            details = job._azure_job.details
+            
+            # print("... session_job.details = ", details)
+            exec_time = (details.end_execution_time - details.begin_execution_time).total_seconds()
+            
+            # DEVNOTE: startup time is not currently used or stored
+            # it seesm to include queue time, so it has no added value over the elapsed time we currently store
+            startup_time = (details.begin_execution_time - details.creation_time).total_seconds()
+            
         # counts = result.get_counts(qc)
         # print("Total counts are:", counts)
         
