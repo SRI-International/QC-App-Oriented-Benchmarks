@@ -318,9 +318,9 @@ def set_execution_target(backend_id='qasm_simulator',
                 )  
                 # List the available backends in the workspace
                 if verbose:
-                    print("Available backends:")
+                    print("    Available backends:")
                     for backend in azure_provider.backends():
-                        print(backend)
+                        print(f"      {backend}")
 
             # increment session counter
             session_count += 1
@@ -1024,6 +1024,20 @@ def job_complete(job):
         result = job.result()
         # print("... result = ", str(result))
 
+        # for Azure Quantum, need to obtain execution time from sessions object
+        # Since there may be multiple jobs, need to find the one that matches the current job_id
+        if azure_provider is not None and session is not None:
+            session_jobs = session.list_jobs()
+            for session_job in session_jobs:
+              #print(session_job.id)
+              details = session_job.details
+              if job.job_id() != details.id:
+                continue
+              #print("... session_job.details = ", details)
+              exec_time = (details.end_execution_time - details.begin_execution_time).total_seconds()
+              startup_time = (details.begin_execution_time - details.creation_time).total_seconds()
+              break
+              
         # counts = result.get_counts(qc)
         # print("Total counts are:", counts)
         
