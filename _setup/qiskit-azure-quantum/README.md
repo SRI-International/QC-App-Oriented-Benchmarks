@@ -54,6 +54,12 @@ Once configured, you can do a Run All command to execute all the top-level bench
     You may consider lowering the value of the num_shots, max_circuits, and max_quibts settings in the first code cell
     during your initial testing to avoid unexpected charges.
 
+Another note: executing the benchmarks from an unauthenticated command window will result in Azure Quantum requesting authentication upon execution. To avoid this, you can download and install the Azure Quantum Command Line Tool (CLI). In a command window, execute the login command:
+
+    az login
+
+Once you are authenticated, executing the benchmarks will not request further authentication.
+
 ## Run the benchmark programs in a command window.
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:
