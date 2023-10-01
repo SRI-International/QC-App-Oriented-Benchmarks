@@ -981,8 +981,58 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if show_elapsed_times:
             axs[axi].legend(['Elapsed', 'Quantum'], loc='upper left')
         #else:
-            #axs[axi].legend(['Quantum'], loc='upper left')
+            #axs[axi].legend(['Quantum'], loc='upper left') 
+        
+        ###################################
+        # optional log axis processing
+        
+        use_logscale_for_times = False
+        logscale_for_times_threshold = 50
+        
+        # determine min and max of both data sets, with a lower limit of 0.1
+        y_max_0 = max(avg_exec_times)
+        y_max_0 = max(0.10, y_max_0)
+        
+        # for min, assume 0.001 is the minimum, in case it is 0
+        y_min_0 = min(filter(lambda x: x > 0, avg_exec_times))
+
+        if show_elapsed_times:
+            y_max_0 = max(y_max_0, max(avg_elapsed_times))
+            y_min_0 = min(y_min_0, min(filter(lambda x: x > 0, avg_elapsed_times)))
+        
+        # make just a little larger for autoscaling
+        y_max_0 *= 1.1                
+        y_min_0 = y_min_0 / 1.1
+        
+        # for min, assume 0.001 is the minimum, in case it is 0
+        if y_min_0 <= 0:
+            y_min_0 = 0.001
+        
+        # print(f"{y_min_0} {y_max_0}")
+        
+        # force use of logscale if total range ratio above the threshold
+        if y_max_0 / y_min_0 > logscale_for_times_threshold:
+            use_logscale_for_times = True
             
+        # set up log scale if specified
+        if use_logscale_for_times:
+            axs[axi].set_yscale('log') 
+            
+            #if y_max_0 > 0.01:
+            y_max_0 *= 1.6
+            y_min_0 /= 1.6
+            
+            if y_max_0 / y_min_0 < logscale_for_times_threshold:
+                y_min_0 = y_max_0 / logscale_for_times_threshold
+        
+        # always start at 0 if not log scale
+        else:
+            y_min_0 = 0
+        
+        # set full range of the y-axis
+        # print(f"{y_min_0} {y_max_0}")
+        axs[axi].set_ylim([y_min_0, y_max_0])
+        
         # none of these methods of sharing the x axis gives proper effect; makes extra white space
         #axs[axi].sharex(axs[2])
         #plt.setp(axs[axi].get_xticklabels(), visible=False)
