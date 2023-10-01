@@ -35,10 +35,17 @@ To configure the benchmark notebooks to select a specific Azure Quantum target f
 
 Using the Jupyter notebook described below makes this easy.
 
+Before running in either a Jupyter notebook or from the command line, you will need to set the Azure Quantum resource_id and location information in the following environment variables:
+ 
+    set AZURE_QUANTUM_RESOUCE_ID="<YOUR_RESOURCE_ID>"
+    set AZURE_QUANTUM_LOCATION="<YOUR_LOCATION>"
+
+You can find this information in the Azure portal under your workspace > Overview > "Resource ID" and "Location". To create an Azure Quantum workspace, you can read documentation at https://aka.ms/AQ/Docs/CreateWorkspace
+
 ## Run the benchmark programs in a Jupyter Notebook
 
 Many Python users prefer to execute these benchmark programs in a Jupyter notebook.
-Execute the following commands in the top-level directory of the benchmark repository and invoke the Jupyter notebook server.
+Execute the following command in the top-level directory of the benchmark repository and invoke the Jupyter notebook server.
 
     jupyter-notebook
     
