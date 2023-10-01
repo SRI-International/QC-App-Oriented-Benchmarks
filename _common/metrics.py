@@ -915,6 +915,15 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axs[axi].bar(group_metrics["groups"], group_metrics["avg_create_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Creation Time (sec)')
         
+        # error bars
+        zeros = [0] * len(group_metrics["avg_create_times"])
+        std_create_times = group_metrics["std_create_times"] if "std_create_times" in group_metrics else zeros
+        
+        axs[axi].errorbar(group_metrics["groups"], group_metrics["avg_create_times"], yerr=std_create_times,
+                ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                label = 'Error', alpha = 0.75, zorder = 3)
+        
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
@@ -925,6 +934,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     
         avg_exec_times = group_metrics["avg_exec_times"]
         avg_elapsed_times = [et for et in group_metrics["avg_elapsed_times"]]
+        
+        zeros = [0] * len(avg_exec_times)
+        std_exec_times = group_metrics["std_exec_times"] if "std_exec_times" in group_metrics else zeros
+        std_elapsed_times = group_metrics["std_elapsed_times"] if "std_elapsed_times" in group_metrics else zeros
         
         # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
         # that are most likely due to either queueing or system initialization
@@ -947,6 +960,20 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axs[axi].bar(group_metrics["groups"], avg_exec_times, zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
         
+        # error bars
+        if show_elapsed_times:
+            if std_elapsed_times is not None:
+                axs[axi].errorbar(group_metrics["groups"], avg_elapsed_times, yerr=std_elapsed_times,
+                    ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                    marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                    label = 'Error', alpha = 0.75, zorder = 3)
+        
+        if std_exec_times is not None:
+            axs[axi].errorbar(group_metrics["groups"], avg_exec_times, yerr=std_exec_times,
+                ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                label = 'Error', alpha = 0.75, zorder = 3)
+
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
@@ -969,6 +996,21 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], 0.4, color='skyblue', alpha = 0.8, zorder = 3) 
         axs[axi].set_ylabel('Avg Result Fidelity')
         
+        # error bars
+        zeros = [0] * len(group_metrics["avg_fidelities"])
+        std_fidelities = group_metrics["std_fidelities"] if "std_fidelities" in group_metrics else zeros
+        std_hf_fidelities = group_metrics["std_hf_fidelities"] if "std_hf_fidelities" in group_metrics else zeros
+        
+        axs[axi].errorbar(group_metrics["groups"], group_metrics["avg_fidelities"], yerr=std_fidelities,
+                ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                label = 'Error', alpha = 0.75, zorder = 3)
+        
+        axs[axi].errorbar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], yerr=std_hf_fidelities,
+                ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                label = 'Error', alpha = 0.75, zorder = 3)
+                
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
