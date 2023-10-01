@@ -45,8 +45,11 @@ circuit_metrics_detail_2 = {  }  # used to break down to 3rd dimension
 circuit_metrics_final_iter = {  } # used to store final results for the last circuit in iterative algorithms.
 
 group_metrics = { "groups": [],
-    "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [], "avg_hf_fidelities": [],
     "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [], "avg_tr_n2qs": [],
+    "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [],
+    "avg_fidelities": [], "avg_hf_fidelities": [],
+    "std_create_times": [], "std_elapsed_times": [], "std_exec_times": [],
+    "std_fidelities": [], "std_hf_fidelities": [],    
     "avg_exec_creating_times": [], "avg_exec_validating_times": [], "avg_exec_running_times": [],
     "job_ids": []
 }
@@ -151,6 +154,12 @@ def init_metrics ():
     
     # create empty arrays for group metrics
     group_metrics["groups"] = []
+
+    group_metrics["avg_depths"] = []
+    group_metrics["avg_xis"] = []
+    group_metrics["avg_tr_depths"] = []
+    group_metrics["avg_tr_xis"] = []
+    group_metrics["avg_tr_n2qs"] = []
     
     group_metrics["avg_create_times"] = []
     group_metrics["avg_elapsed_times"] = []
@@ -158,11 +167,11 @@ def init_metrics ():
     group_metrics["avg_fidelities"] = []
     group_metrics["avg_hf_fidelities"] = []
     
-    group_metrics["avg_depths"] = []
-    group_metrics["avg_xis"] = []
-    group_metrics["avg_tr_depths"] = []
-    group_metrics["avg_tr_xis"] = []
-    group_metrics["avg_tr_n2qs"] = []
+    group_metrics["std_create_times"] = []
+    group_metrics["std_elapsed_times"] = []
+    group_metrics["std_exec_times"] = []
+    group_metrics["std_fidelities"] = []
+    group_metrics["std_hf_fidelities"] = []
     
     group_metrics["avg_exec_creating_times"] = []
     group_metrics["avg_exec_validating_times"] = []
@@ -254,49 +263,17 @@ def aggregate_metrics_for_group (group):
     
     # generate totals, then divide by number of circuits to calculate averages    
     if group in circuit_metrics:
-        #num_circuits = 0
-        '''
-        group_create_time = 0
-        group_elapsed_time = 0
-        group_exec_time = 0
-        group_fidelity = 0
-        group_hf_fidelity = 0
-        
-        group_depth = 0
-        group_xi = 0
-        group_tr_depth = 0
-        group_tr_xi = 0
-        group_tr_n2q = 0
-        group_exec_creating_time = 0
-        group_exec_validating_time = 0
-        group_exec_running_time = 0
-        '''
+
+        # job ids handled specially, maintain array in the aggregate
         group_job_ids = []
 
         # loop over circuits in group to generate totals
         for circuit in circuit_metrics[group]:
-            #num_circuits += 1
             for metric in circuit_metrics[group][circuit]:
                 value = circuit_metrics[group][circuit][metric]
                 #print(f'{group} {circuit} {metric} -> {value}')
                 if metric == "job_id": group_job_ids.append(value)
-                '''
-                if metric == "create_time": group_create_time += value
-                if metric == "elapsed_time": group_elapsed_time += value
-                if metric == "exec_time": group_exec_time += value
-                if metric == "fidelity": group_fidelity += value
-                if metric == "hf_fidelity": group_hf_fidelity += value
-                
-                if metric == "depth": group_depth += value
-                if metric == "xi": group_xi += value
-                if metric == "tr_depth": group_tr_depth += value
-                if metric == "tr_xi": group_tr_xi += value
-                if metric == "tr_n2q": group_tr_n2q += value
-                
-                if metric == "exec_creating_time": group_exec_creating_time += value
-                if metric == "exec_validating_time": group_exec_validating_time += value
-                if metric == "exec_running_time": group_exec_running_time += value
-                '''
+ 
         # store averages in arrays keyed by group and structured for reporting and plotting
         group_metrics["groups"].append(group)
         
@@ -324,16 +301,21 @@ def aggregate_metrics_for_group (group):
         # aggregate time metrics
         avg, std = get_circuit_stats_for_metric(group, "create_time", 3)
         group_metrics["avg_create_times"].append(avg)
+        group_metrics["std_create_times"].append(std)
         avg, std = get_circuit_stats_for_metric(group, "elapsed_time", 3)
         group_metrics["avg_elapsed_times"].append(avg)
+        group_metrics["std_elapsed_times"].append(std)
         avg, std = get_circuit_stats_for_metric(group, "exec_time", 3)
         group_metrics["avg_exec_times"].append(avg)
+        group_metrics["std_exec_times"].append(std)
 
         # aggregate fidelity metrics
         avg, std = get_circuit_stats_for_metric(group, "fidelity", 3)
         group_metrics["avg_fidelities"].append(avg)
+        group_metrics["std_fidelities"].append(std)
         avg, std = get_circuit_stats_for_metric(group, "hf_fidelity", 3)
         group_metrics["avg_hf_fidelities"].append(avg)
+        group_metrics["std_hf_fidelities"].append(std)
         
         # aggregate specal time metrics (not used everywhere)
         # skip if not collected at all
@@ -346,55 +328,7 @@ def aggregate_metrics_for_group (group):
         avg, std = get_circuit_stats_for_metric(group, "exec_running_time", 3)
         if avg > 0:
             group_metrics["avg_exec_running_times"].append(avg)
-        
-        '''
-        # calculate averages
-        avg_create_time = round(group_create_time / num_circuits, 3)
-        avg_elapsed_time = round(group_elapsed_time / num_circuits, 3)
-        avg_exec_time = round(group_exec_time / num_circuits, 3)
-        avg_fidelity = round(group_fidelity / num_circuits, 3)
-        avg_hf_fidelity = round(group_hf_fidelity / num_circuits, 3)
-        
-        avg_depth = round(group_depth / num_circuits, 0)
-        avg_xi = round(group_xi / num_circuits, 3)
-        avg_tr_depth = round(group_tr_depth / num_circuits, 0)
-        avg_tr_xi = round(group_tr_xi / num_circuits, 3)
-        avg_tr_n2q = round(group_tr_n2q / num_circuits, 3)
-        
-        avg_exec_creating_time = round(group_exec_creating_time / num_circuits, 3)
-        avg_exec_validating_time = round(group_exec_validating_time / num_circuits, 3)
-        avg_exec_running_time = round(group_exec_running_time / num_circuits, 3)
-        '''
-        
-        '''
-        group_metrics["avg_create_times"].append(avg_create_time)
-        group_metrics["avg_elapsed_times"].append(avg_elapsed_time)
-        group_metrics["avg_exec_times"].append(avg_exec_time)
-        group_metrics["avg_fidelities"].append(avg_fidelity)        
-        group_metrics["avg_hf_fidelities"].append(avg_hf_fidelity)
-        '''
-        '''
-        # skip these if there is not a real circuit for this group
-        if avg_depth > 0:
-            group_metrics["avg_depths"].append(avg_depth)
-        if avg_tr_depth > 0:
-            group_metrics["avg_tr_depths"].append(avg_tr_depth)
-        
-        # any of these could be 0 and should be aggregated
-        #if avg_xi > 0:
-        group_metrics["avg_xis"].append(avg_xi)
-        #if avg_tr_xi > 0:
-        group_metrics["avg_tr_xis"].append(avg_tr_xi)
-        #if avg_tr_n2q > 0:
-        group_metrics["avg_tr_n2qs"].append(avg_tr_n2q)
-        
-        if avg_exec_creating_time > 0:
-            group_metrics["avg_exec_creating_times"].append(avg_exec_creating_time)
-        if avg_exec_validating_time > 0:
-            group_metrics["avg_exec_validating_times"].append(avg_exec_validating_time)
-        if avg_exec_running_time > 0:
-            group_metrics["avg_exec_running_times"].append(avg_exec_running_time)
-        '''
+ 
         
 # Compute average and stddev for a metric in a given circuit group
 # DEVNOTE: this creates new array every time; could be more efficient if multiple metrics done at once
