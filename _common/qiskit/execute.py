@@ -1028,7 +1028,7 @@ def job_complete(job):
         # Since there may be multiple jobs, need to find the one that matches the current job_id
         if azure_provider is not None and session is not None:
             session_jobs = session.list_jobs()
-            for session_job in session_jobs:
+            for session_job in reversed(session_jobs):
               #print(session_job.id)
               details = session_job.details
               if job.job_id() != details.id:
