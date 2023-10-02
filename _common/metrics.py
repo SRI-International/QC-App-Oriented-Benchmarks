@@ -76,7 +76,7 @@ save_plot_images = True
 show_plot_images = True
 
 # Option to show elapsed times in the metrics plots
-show_elapsed_times = True
+show_elapsed_times = False
 
 # When ratio of max time to min time exceeds this use a logscale
 logscale_for_times_threshold = 50
