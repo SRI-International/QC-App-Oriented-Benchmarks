@@ -53,7 +53,7 @@ from qiskit.providers.aer.noise import depolarizing_error, reset_error
 #### these variables are currently accessed as globals from user code
 
 # maximum number of active jobs
-max_jobs_active = 5
+max_jobs_active = 3
 
 # job mode: False = wait, True = submit multiple jobs
 job_mode = False
