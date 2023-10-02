@@ -76,7 +76,10 @@ save_plot_images = True
 show_plot_images = True
 
 # Option to show elapsed times in the metrics plots
-show_elapsed_times = False
+show_elapsed_times = True
+
+# When ratio of max time to min time exceeds this use a logscale
+logscale_for_times_threshold = 50
 
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
@@ -1024,7 +1027,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             if max(avg_exec_times) < 0.1:
                 axs[axi].set_ylim([0, 0.1])
             
-        axs[axi].bar(groups, avg_exec_times, zorder = 3)
+        axs[axi].bar(groups, avg_exec_times, 0.55 if show_elapsed_times is True else 0.7, zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
         
         # error bars
@@ -1054,7 +1057,6 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         # optional log axis processing
         
         use_logscale_for_times = False
-        logscale_for_times_threshold = 50
         
         # determine min and max of both data sets, with a lower limit of 0.1
         y_max_0 = max(avg_exec_times)
@@ -1078,7 +1080,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         # print(f"{y_min_0} {y_max_0}")
         
         # force use of logscale if total range ratio above the threshold
-        if y_max_0 / y_min_0 > logscale_for_times_threshold:
+        if logscale_for_times_threshold > 0 and y_max_0 / y_min_0 > logscale_for_times_threshold:
             use_logscale_for_times = True
             
         # set up log scale if specified
@@ -1140,7 +1142,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             
         # data bars
         axs[axi].bar(groups, avg_hf_fidelities, color='skyblue', alpha = 0.8, zorder = 3)
-        axs[axi].bar(groups, avg_fidelities, 0.5, zorder = 3) 
+        axs[axi].bar(groups, avg_fidelities, 0.55, zorder = 3) 
         
         # error bars
         axs[axi].errorbar(groups, avg_fidelities, yerr=std_fidelities,
