@@ -1502,7 +1502,7 @@ def run(
     reps:int = 1,
     batch_size:int = 50,
     backend_id_train:str = 'statevector_simulator',
-    test_pass_count:int = 10,
+    test_pass_count:int = 30,
 ):
     """
     Parameters
@@ -2141,7 +2141,7 @@ def run(
 
             # save the data for this qubit width, and instance number
             store_final_iter_to_metrics_json(
-                backend_id=backend_id,
+                backend_id=backend_id_train,
                 num_qubits=num_qubits,
                 radius=radius,
                 instance_num=instance_num,
