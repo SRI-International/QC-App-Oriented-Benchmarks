@@ -92,6 +92,9 @@ do_compute_expectation = True
 # Array of energy values collected during iterations of VQE
 lowest_energy_values = []
 
+# Array of accuracy values collected during iterations of image_recognition
+accuracy_values = []
+
 # Key metrics collected on last iteration of VQE
 key_metrics = {}
 
@@ -1123,7 +1126,7 @@ def store_final_iter_to_metrics_json(
     instance_num,
     num_shots,
     converged_thetas_list,
-    energy,
+    accuracy,
     detailed_save_names,
     dict_of_inputs,
     save_final_counts,
@@ -1140,7 +1143,7 @@ def store_final_iter_to_metrics_json(
     # Store properties of the final iteration, the converged theta values,
     # as well as the known optimal value for the current problem,
     # in metrics.circuit_metrics_final_iter. 
-    metrics.store_props_final_iter(num_qubits, instance_num, "energy", energy)
+    metrics.store_props_final_iter(num_qubits, instance_num, "train_accuracy", accuracy)
     metrics.store_props_final_iter(num_qubits, instance_num, "converged_thetas_list", converged_thetas_list)
 
     # Save final iteration data to metrics.circuit_metrics_final_iter
@@ -1155,7 +1158,7 @@ def store_final_iter_to_metrics_json(
             instance_num,
             dict_of_inputs,
             converged_thetas_list,
-            energy,
+            accuracy,
             save_final_counts=save_final_counts,
         )
 
@@ -1166,7 +1169,7 @@ def dump_to_json(
     instance_num,
     dict_of_inputs,
     converged_thetas_list,
-    energy,
+    accuracy,
     save_final_counts=False,
 ):
     """
@@ -1190,7 +1193,7 @@ def dump_to_json(
     dict_to_store = {"iterations": iterations_dict_this_restart}
     dict_to_store["general_properties"] = dict_of_inputs
     dict_to_store["converged_thetas_list"] = converged_thetas_list
-    dict_to_store["energy"] = energy
+    dict_to_store["train_accuracy"] = accuracy
     # dict_to_store['unif_dict'] = unif_dict
 
     # Also store the value of counts obtained for the final counts
@@ -1874,6 +1877,7 @@ def run(
 
             # # append the most recent energy value to the list
             # lowest_energy_values.append(energy)
+            accuracy_values.append(accuracy)
 
             # # calculate the solution quality, accuracy volume and accuracy ratio
             # global solution_quality, accuracy_volume, accuracy_ratio
@@ -2084,9 +2088,9 @@ def run(
             # Initialize an empty list to store the energy values from each iteration
             lowest_energy_values.clear()
 
-            # execute COPYLA classical optimizer to minimize the objective function
+            # execute SPSA optimizer to minimize the objective function
             # objective function is called repeatedly with varying parameters
-            # until the lowest energy found
+            # until the max_iter are run
             if minimizer_function is None:
                 ret = minimizeSPSA(objective_function, x0=thetas_array_0, a=0.3, c=0.3, niter=max_iter, callback= callback_thetas_array, paired=False)
 
@@ -2136,21 +2140,21 @@ def run(
             cumlative_iter_time = cumlative_iter_time[1:]
 
             # save the data for this qubit width, and instance number
-            # store_final_iter_to_metrics_json(
-            #     backend_id=backend_id,
-            #     num_qubits=num_qubits,
-            #     radius=radius,
-            #     instance_num=instance_num,
-            #     num_shots=num_shots,
-            #     converged_thetas_list=ret.x.tolist(),
-            #     energy=lowest_energy_values[-1],
-            #     # iter_size_dist=iter_size_dist, iter_dist=iter_dist,
-            #     detailed_save_names=detailed_save_names,
-            #     dict_of_inputs=dict_of_inputs,
-            #     save_final_counts=save_final_counts,
-            #     save_res_to_file=save_res_to_file,
-            #     _instances=_instances,
-            # )
+            store_final_iter_to_metrics_json(
+                backend_id=backend_id,
+                num_qubits=num_qubits,
+                radius=radius,
+                instance_num=instance_num,
+                num_shots=num_shots,
+                converged_thetas_list=ret.x.tolist(),
+                accuracy=accuracy_values[-1],
+                # iter_size_dist=iter_size_dist, iter_dist=iter_dist,
+                detailed_save_names=detailed_save_names,
+                dict_of_inputs=dict_of_inputs,
+                save_final_counts=save_final_counts,
+                save_res_to_file=save_res_to_file,
+                _instances=_instances,
+            )
 
             ###### End of instance processing
 
@@ -2217,43 +2221,14 @@ def run(
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
-        # print current time
-        # current pacific time
-        
-        # # plot the loss and accuracy in two subplots
-        # fig, ax = plt.subplots(2, 1, figsize=(10, 10))
-        # ax[0].plot(loss_history)
-        # ax[0].set_ylabel("Loss")
-        # ax[0].set_xlabel("Iteration")
-        # ax[1].plot(accuracy_history)
-        # ax[1].set_ylabel("Accuracy")
-        # ax[1].set_xlabel("Iteration")
-        # ax[0].grid()
-        # ax[1].grid()
-        # plt.savefig("loss_accuracy_history.png")
-        # plt.show(block=True)
+
         
     elif method == 3:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
         
-        # # plot the loss and accuracy in two subplots
-        # fig, ax = plt.subplots(3, 1, figsize=(10, 10))
-        # ax[0].plot(loss_history)
-        # ax[0].set_ylabel("Loss")
-        # ax[0].set_xlabel("Iteration")
-        # ax[1].plot(accuracy_history)
-        # ax[1].set_ylabel("Accuracy")
-        # ax[1].set_xlabel("Iteration")
-        # ax[0].grid()
-        # ax[1].grid()
-        # ax[2].plot(test_accuracy_history)
-        # ax[2].set_ylabel("Test Accuracy")
-        # ax[2].set_xlabel("Iteration")
-        # ax[2].grid()
-        # plt.savefig("loss_accuracy_test_history")
-        # plt.show(block=True)
+
 
 
 
@@ -2314,7 +2289,7 @@ def run_objective_function(**kwargs):
 
 # # if main, execute method
 if __name__ == "__main__":
-    run(min_qubits=8, max_qubits=8, num_shots=1000, max_iter=10, method=2, test_pass_count=300)
+    run(min_qubits=6, max_qubits=8, num_shots=1000, max_iter=3, method=2, test_pass_count=30)
 
 # # %%
 
