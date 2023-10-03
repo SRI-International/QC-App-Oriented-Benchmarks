@@ -335,11 +335,19 @@ def aggregate_metrics_for_group (group):
         
 # Compute average and stddev for a metric in a given circuit group
 # DEVNOTE: this creates new array every time; could be more efficient if multiple metrics done at once
-def get_circuit_stats_for_metric(group, metric, precision):   
-    metric_array = [circuit_metrics[group][circuit][metric] for circuit in circuit_metrics[group]]
-    avg = round(np.average(metric_array), precision)
-    std = round(np.std(metric_array)/np.sqrt(len(metric_array)), precision)
+def get_circuit_stats_for_metric(group, metric, precision): 
+    try:
+        metric_array = [circuit_metrics[group][circuit][metric] for circuit in circuit_metrics[group]]
+        avg = round(np.average(metric_array), precision)
+        std = round(np.std(metric_array)/np.sqrt(len(metric_array)), precision)
+        
+    # on failure, usually due to KeyError, return 0s
+    except Exception as e:
+        avg = 0
+        std = 0
+        
     return avg, std
+    
             
 # Aggregate all metrics by group
 def aggregate_metrics ():
