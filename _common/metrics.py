@@ -78,6 +78,9 @@ show_plot_images = True
 # Option to show elapsed times in the metrics plots
 show_elapsed_times = False
 
+# When ratio of max time to min time exceeds this use a logscale
+logscale_for_times_threshold = 50
+
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
 
@@ -907,19 +910,81 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if rows == 1:
         ax = axs
         axs = [ax]
+        
+    groups = group_metrics["groups"]
+    # print(f"... groups - {groups}")
+    
+    xlabels = None
+    
+    # check if elements of groups are unique
+    # if not, there are multiple execution groups within each group
+    # and we need to reduce to unique set of data for plotting
+    if len(set(groups)) != len(groups):
+        # print("*** groups are NOT unique")
+        
+        xlabels = groups
+        # print(f"... labels = {xlabels}")
+        
+        groups = [i for i in range(len(groups))]
+        # print(f"... new groups = {groups}")
+        
+        '''   DEVNOTE --- WIP. Attempt to reduce duplicate widths by averaging. 
+        g = []
+        ahf = []
+        af = []
+        shf = []
+        sf = []
+        
+        lastgroup = 0
+        ii = 0
+        jj = 0
+        for group in groups:
+            print(group)
+          
+            if group != lastgroup:
+                g.append([])
+                g[jj] = group
+                
+                ahf.append([])
+                af.append([])
+                shf.append([])
+                sf.append([])
+                
+                jj += 1
+
+            else:
+                print("same")
+                
+            ahf[jj] = group
+            af[jj] = group
+            
+            lastgroup = group
+         
+        print("... new:")
+        print(g)
+        print(ahf)
+        print(af)
+        '''
+ 
     
     if do_creates:
+    
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
+            
         if max(group_metrics["avg_create_times"]) < 0.01:
             axs[axi].set_ylim([0, 0.01])
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_create_times"], zorder = 3)
+        axs[axi].bar(groups, group_metrics["avg_create_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Creation Time (sec)')
         
         # error bars
         zeros = [0] * len(group_metrics["avg_create_times"])
         std_create_times = group_metrics["std_create_times"] if "std_create_times" in group_metrics else zeros
         
-        axs[axi].errorbar(group_metrics["groups"], group_metrics["avg_create_times"], yerr=std_create_times,
+        axs[axi].errorbar(groups, group_metrics["avg_create_times"], yerr=std_create_times,
                 ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
                 marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
                 label = 'Error', alpha = 0.75, zorder = 3)
@@ -931,6 +996,11 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_executes:
+    
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
     
         avg_exec_times = group_metrics["avg_exec_times"]
         avg_elapsed_times = [et for et in group_metrics["avg_elapsed_times"]]
@@ -949,7 +1019,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
         
         if show_elapsed_times:    # a global setting
-            axs[axi].bar(group_metrics["groups"], avg_elapsed_times, 0.75, color='skyblue', alpha = 0.8, zorder = 3)
+            axs[axi].bar(groups, avg_elapsed_times, 0.75, color='skyblue', alpha = 0.8, zorder = 3)
             
             if max(avg_elapsed_times) < 0.1 and max(avg_exec_times) < 0.1:
                 axs[axi].set_ylim([0, 0.1])
@@ -957,19 +1027,19 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             if max(avg_exec_times) < 0.1:
                 axs[axi].set_ylim([0, 0.1])
             
-        axs[axi].bar(group_metrics["groups"], avg_exec_times, zorder = 3)
+        axs[axi].bar(groups, avg_exec_times, 0.55 if show_elapsed_times is True else 0.7, zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
         
         # error bars
         if show_elapsed_times:
             if std_elapsed_times is not None:
-                axs[axi].errorbar(group_metrics["groups"], avg_elapsed_times, yerr=std_elapsed_times,
+                axs[axi].errorbar(groups, avg_elapsed_times, yerr=std_elapsed_times,
                     ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
                     marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
                     label = 'Error', alpha = 0.75, zorder = 3)
         
         if std_exec_times is not None:
-            axs[axi].errorbar(group_metrics["groups"], avg_exec_times, yerr=std_exec_times,
+            axs[axi].errorbar(groups, avg_exec_times, yerr=std_exec_times,
                 ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
                 marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
                 label = 'Error', alpha = 0.75, zorder = 3)
@@ -981,8 +1051,57 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if show_elapsed_times:
             axs[axi].legend(['Elapsed', 'Quantum'], loc='upper left')
         #else:
-            #axs[axi].legend(['Quantum'], loc='upper left')
+            #axs[axi].legend(['Quantum'], loc='upper left') 
+        
+        ###################################
+        # optional log axis processing
+        
+        use_logscale_for_times = False
+        
+        # determine min and max of both data sets, with a lower limit of 0.1
+        y_max_0 = max(avg_exec_times)
+        y_max_0 = max(0.10, y_max_0)
+        
+        # for min, assume 0.001 is the minimum, in case it is 0
+        y_min_0 = min(filter(lambda x: x > 0, avg_exec_times))
+
+        if show_elapsed_times:
+            y_max_0 = max(y_max_0, max(avg_elapsed_times))
+            y_min_0 = min(y_min_0, min(filter(lambda x: x > 0, avg_elapsed_times)))
+        
+        # make just a little larger for autoscaling
+        y_max_0 *= 1.1                
+        y_min_0 = y_min_0 / 1.1
+        
+        # for min, assume 0.001 is the minimum, in case it is 0
+        if y_min_0 <= 0:
+            y_min_0 = 0.001
+        
+        # print(f"{y_min_0} {y_max_0}")
+        
+        # force use of logscale if total range ratio above the threshold
+        if logscale_for_times_threshold > 0 and y_max_0 / y_min_0 > logscale_for_times_threshold:
+            use_logscale_for_times = True
             
+        # set up log scale if specified
+        if use_logscale_for_times:
+            axs[axi].set_yscale('log') 
+            
+            #if y_max_0 > 0.01:
+            y_max_0 *= 1.6
+            y_min_0 /= 1.6
+            
+            if y_max_0 / y_min_0 < logscale_for_times_threshold:
+                y_min_0 = y_max_0 / logscale_for_times_threshold
+        
+        # always start at 0 if not log scale
+        else:
+            y_min_0 = 0
+        
+        # set full range of the y-axis
+        # print(f"{y_min_0} {y_max_0}")
+        axs[axi].set_ylim([y_min_0, y_max_0])
+        
         # none of these methods of sharing the x axis gives proper effect; makes extra white space
         #axs[axi].sharex(axs[2])
         #plt.setp(axs[axi].get_xticklabels(), visible=False)
@@ -990,40 +1109,74 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_fidelities:
+    
+        #print(f"... do fidelities for group {group_metrics}")
+        
         axs[axi].set_ylim([0, 1.1])
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"], zorder = 3) 
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], 0.4, color='skyblue', alpha = 0.8, zorder = 3) 
+        
         axs[axi].set_ylabel('Avg Result Fidelity')
         
-        # error bars
-        zeros = [0] * len(group_metrics["avg_fidelities"])
-        std_fidelities = group_metrics["std_fidelities"] if "std_fidelities" in group_metrics else zeros
-        std_hf_fidelities = group_metrics["std_hf_fidelities"] if "std_hf_fidelities" in group_metrics else zeros
+        #groups = group_metrics["groups"]
+        #print(f"... groups - {groups}")
         
-        axs[axi].errorbar(group_metrics["groups"], group_metrics["avg_fidelities"], yerr=std_fidelities,
+        # fidelity data
+        avg_hf_fidelities = group_metrics["avg_hf_fidelities"]
+        avg_fidelities = group_metrics["avg_fidelities"]
+        
+        #print(avg_hf_fidelities)
+        #print(avg_fidelities)
+
+        # standard error data
+        zeros = [0] * len(group_metrics["avg_fidelities"])
+        std_hf_fidelities = group_metrics["std_hf_fidelities"] if "std_hf_fidelities" in group_metrics else zeros
+        std_fidelities = group_metrics["std_fidelities"] if "std_fidelities" in group_metrics else zeros
+        
+        #print(std_hf_fidelities)
+        #print(std_fidelities)
+           
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
+            
+        # data bars
+        axs[axi].bar(groups, avg_hf_fidelities, color='skyblue', alpha = 0.8, zorder = 3)
+        axs[axi].bar(groups, avg_fidelities, 0.55, zorder = 3) 
+        
+        # error bars
+        axs[axi].errorbar(groups, avg_fidelities, yerr=std_fidelities,
                 ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
                 marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
                 label = 'Error', alpha = 0.75, zorder = 3)
         
-        axs[axi].errorbar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], yerr=std_hf_fidelities,
+        axs[axi].errorbar(groups, avg_hf_fidelities, yerr=std_hf_fidelities,
                 ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
                 marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
                 label = 'Error', alpha = 0.75, zorder = 3)
                 
+        #[axi].set_xticklabels(xlabels)
+        
+        # share the x axis if it isn't already
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
             
-        axs[axi].legend(['Normalized', 'Hellinger'], loc='upper right')
+        axs[axi].legend(['Hellinger', 'Normalized'], loc='upper right')
         axi += 1
         
     if do_depths:
+    
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
+            
         if max(group_metrics["avg_tr_depths"]) < 20:
             axs[axi].set_ylim([0, 20])  
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_depths"], 0.8, zorder = 3)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
+        axs[axi].bar(groups, group_metrics["avg_depths"], 0.8, zorder = 3)
+        axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
         axs[axi].set_ylabel('Circuit Depth')
         
         if rows > 0 and not xaxis_set:
@@ -1034,10 +1187,16 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_2qs:
+    
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
+            
         if max(group_metrics["avg_tr_n2qs"]) < 20:
             axs[axi].set_ylim([0, 20])  
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_n2qs"], 0.5, color='C9', zorder = 3) 
+        axs[axi].bar(groups, group_metrics["avg_tr_n2qs"], 0.5, color='C9', zorder = 3) 
         axs[axi].set_ylabel('2Q Gates')
         
         if rows > 0 and not xaxis_set:

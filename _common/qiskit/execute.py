@@ -53,7 +53,7 @@ from qiskit.providers.aer.noise import depolarizing_error, reset_error
 #### these variables are currently accessed as globals from user code
 
 # maximum number of active jobs
-max_jobs_active = 5
+max_jobs_active = 3
 
 # job mode: False = wait, True = submit multiple jobs
 job_mode = False
@@ -1181,7 +1181,10 @@ def process_step_times(job, result, active_circuit):
 
     # when sessions and sampler used, we obtain metrics differently
     if use_sessions:
-        job_timestamps= job.metrics()['timestamps']
+        job_timestamps = job.metrics()['timestamps']
+        job_metrics = job.metrics()
+        # print(f"... usage = {job_metrics['usage']} {job_metrics['executions']}")
+        
         if verbose:
             print(f"... job.metrics() = {job.metrics()}")
             print(f"... job.result().metadata[0] = {result.metadata[0]}")
@@ -1203,12 +1206,21 @@ def process_step_times(job, result, active_circuit):
             exec_validating_time = 0.001
             exec_queued_time = 0.001
             
+            # when using sessions, the 'running_time' is the 'quantum exec time' - override it here.
+            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
+            
+            # use the data in usage field if it is returned, usually by hardware
+            # here we use the executions field to indicate we are on hardware
+            if "usage" in job_metrics and "executions" in job_metrics:
+                if job_metrics['executions'] > 0:
+                    exec_time = job_metrics['usage']['quantum_seconds'] 
+                    
+                    # and use this one as it seems to be valid for this case
+                    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
+            
             # DEVNOTE: we do not compute this yet
             # exec_quantum_classical_time = job.metrics()['bss']
-            #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
-            
-            # when using sessions, the 'running_time' is the 'quantum exec time' - override it.
-            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
+            # metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)     
         
         except Exception as e:
             if verbose:
