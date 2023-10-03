@@ -67,7 +67,10 @@ end_time = 0
 verbose = False
 
 # Option to save metrics to data file
-save_metrics = True 
+save_metrics = True
+
+# Suffix to append to filename of DATA- files
+data_suffix = ""
 
 # Option to save plot images (all of them)
 save_plot_images = True
@@ -799,6 +802,15 @@ def get_backend_id():
     subtitle = circuit_metrics["subtitle"]
     backend_id = subtitle[9:]
     return backend_id
+    
+# Get the label to be used in plots for the device, with the data_suffix concatenated
+def get_backend_label():
+    return get_backend_id() + data_suffix
+
+# Get the title string showing the device name and current date_of_file
+# DEVNOTE: we might want to change to the date contained in the data file (to show when data collected) 
+def get_backend_title():  
+    return f"\nDevice={get_backend_label()}  {get_timestr()}"
  
 # Extract short app name from the title passed in by user
 def get_appname_from_title(suptitle):
@@ -901,7 +913,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     fig, axs = plt.subplots(rows, cols, sharex=True, figsize=(fig_w, fig_h))
     
     # append key circuit metrics info to the title
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    fulltitle = suptitle + get_backend_title()
     if options != None:
         options_str = ''
         for key, value in options.items():
@@ -1232,7 +1244,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     suptitle = f"Volumetric Positioning - {appname}"
     
     # append key circuit metrics info to the title
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    fulltitle = suptitle + get_backend_title()
     if options != None:
         options_str = ''
         for key, value in options.items():
@@ -1536,7 +1548,7 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
                    do_border=False)
         
         if appname == None:
-            print(f"ERROR: cannot find data file for: {backend_id}")
+            print(f"ERROR: cannot find data file for: {get_backend_label()}")
             
         # do annotation separately, spreading labels for readability
         anno_volumetric_data(ax, depth_base,
@@ -1739,7 +1751,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
 
         # draw the volumetric plot and append the circuit metrics subtitle to the title
         suptitle = f"Volumetric Positioning - All Applications (Merged)"
-        fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+        fulltitle = suptitle + get_backend_title()
         
         plot_metrics_all_merged(shared_data, backend_id, suptitle=fulltitle, 
                 imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits,
@@ -1760,7 +1772,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
 def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, options=None, suffix=""):
     global circuit_metrics
     global group_metrics
-    
+
     # load saved data from file
     api = "qiskit"
     shared_data = load_app_metrics(api, backend_id)
@@ -1787,9 +1799,9 @@ def save_plot_image(plt, imagename, backend_id):
     date_of_file = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     if not os.path.exists('__images'): os.makedirs('__images')
-    if not os.path.exists(f'__images/{backend_id}'): os.makedirs(f'__images/{backend_id}')
+    if not os.path.exists(f'__images/{backend_id}{data_suffix}'): os.makedirs(f'__images/{backend_id}{data_suffix}')
     
-    pngfilename = f"{backend_id}/{imagename}"
+    pngfilename = f"{backend_id}{data_suffix}/{imagename}"
     pngfilepath = os.path.join(os.getcwd(),"__images", pngfilename + ".jpg")
     
     plt.savefig(pngfilepath)
@@ -2033,7 +2045,7 @@ def plot_area_metrics(suptitle='',
         scores = scores + scores_
 
     # append the circuit metrics subtitle to the title
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    fulltitle = suptitle + get_backend_title()
     if options != None:
         options_str = ''
         for key, value in options.items():
@@ -2244,7 +2256,7 @@ def plot_ECDF(suptitle="",
         suptitle = "Cumulative Distribution (ECDF) - " + appname
         
         # append key circuit metrics info to the title
-        fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+        fulltitle = suptitle + get_backend_title()
         if options != None:
             options_str = ''
             for key, value in options.items():
@@ -2366,9 +2378,8 @@ def get_full_title(suptitle = '', options = dict()):
     """
     Return title for figure
     """
-    # get backend id for this set of circuits
-    backend_id = get_backend_id()
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    # create title for this set of circuits
+    fulltitle = suptitle + get_backend_title()
     if options != None:
         options_str = ''
         for key, value in options.items():
@@ -2730,8 +2741,8 @@ def store_app_metrics (backend_id, circuit_metrics, group_metrics, app, start_ti
     # be sure we have a __data directory
     if not os.path.exists('__data'): os.makedirs('__data')
     
-    # create filename based on the backend_id
-    filename = f"__data/DATA-{backend_id}.json"
+    # create filename based on the backend_id and optional data_suffix
+    filename = f"__data/DATA-{backend_id}{data_suffix}.json"
     
     # overwrite the existing file with the merged data
     with open(filename, 'w+') as f:
@@ -2744,9 +2755,10 @@ def load_app_metrics (api, backend_id):
 
     # don't leave slashes in the filename
     backend_id = backend_id.replace("/", "_")
-
-    filename = f"__data/DATA-{backend_id}.json"
     
+    # create filename based on the backend_id and optional data_suffix
+    filename = f"__data/DATA-{backend_id}{data_suffix}.json"
+        
     shared_data = None
     
     # attempt to load shared_data from file
