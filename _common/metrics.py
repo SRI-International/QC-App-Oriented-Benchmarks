@@ -798,19 +798,20 @@ def get_aq_width(shared_data, w_min, w_max, fidelity_metric):
     return AQ
 
 # Get the backend_id for current set of circuits
-def get_backend_id():
-    subtitle = circuit_metrics["subtitle"]
-    backend_id = subtitle[9:]
+def get_backend_id(backend_id=None):
+    if backend_id is None:
+        subtitle = circuit_metrics["subtitle"]
+        backend_id = subtitle[9:]
     return backend_id
     
 # Get the label to be used in plots for the device, with the data_suffix concatenated
-def get_backend_label():
-    return get_backend_id() + data_suffix
+def get_backend_label(backend_id=None): 
+    return get_backend_id(backend_id=backend_id) + data_suffix
 
 # Get the title string showing the device name and current date_of_file
 # DEVNOTE: we might want to change to the date contained in the data file (to show when data collected) 
-def get_backend_title():  
-    return f"\nDevice={get_backend_label()}  {get_timestr()}"
+def get_backend_title(backend_id=None):  
+    return f"\nDevice={get_backend_label(backend_id=backend_id)}  {get_timestr()}"
  
 # Extract short app name from the title passed in by user
 def get_appname_from_title(suptitle):

@@ -792,7 +792,7 @@ def load_data_and_plot(folder=None, backend_id=None, **kwargs):
         gen_prop = {**_gen_prop, **kwargs}
         plot_results_from_data(**gen_prop)
 
-def load_all_metrics(folder, backend_id=None):
+def load_all_metrics(folder=None, backend_id=None):
     """
     Load all data that was saved in a folder.
     The saved data will be in json files in this folder
