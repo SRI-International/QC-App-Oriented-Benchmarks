@@ -186,7 +186,7 @@ def plot_all_line_metrics(suptitle=None, options=None,
     
     # Create standard title for all plots
     method = 2
-    toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
+    toptitle = suptitle + metrics.get_backend_title() 
     subtitle = ""
     
     # get group keys, sorted by qubit number
@@ -741,7 +741,7 @@ def plot_all_cumulative_metrics(suptitle=None,
     
     # Create standard title for all plots
     method = 2
-    toptitle = suptitle + f"\nDevice={backend_id}  {metrics.get_timestr()}" 
+    toptitle = suptitle + metrics.get_backend_title() 
     subtitle = ""
     
     # create common title (with hardcoded list of options, for now)
