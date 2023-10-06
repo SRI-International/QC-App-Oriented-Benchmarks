@@ -673,11 +673,11 @@ def create_data_folder(save_res_to_file, detailed_save_names, backend_id):
     # if detailed filenames requested, use directory name with timestamp
     if detailed_save_names:
         start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        parent_folder_save = os.path.join("__data", f"{backend_id}", f"run_start_{start_time_str}")
+        parent_folder_save = os.path.join("__data", f"{backend_id}{metrics.data_suffix}", f"run_start_{start_time_str}")
 
     # otherwise, just put all json files under __data/backend_id
     else:
-        parent_folder_save = os.path.join("__data", f"{backend_id}")
+        parent_folder_save = os.path.join("__data", f"{backend_id}{metrics.data_suffix}")
 
     # create the folder if it doesn't exist already
     if save_res_to_file and not os.path.exists(parent_folder_save):
@@ -777,7 +777,7 @@ def dump_to_json(
 
 # %% Loading saved data (from json files)
 
-def load_data_and_plot(folder, backend_id=None, **kwargs):
+def load_data_and_plot(folder=None, backend_id=None, **kwargs):
     """
     The highest level function for loading stored data from a previous run
     and plotting optgaps and area metrics
@@ -792,7 +792,7 @@ def load_data_and_plot(folder, backend_id=None, **kwargs):
         gen_prop = {**_gen_prop, **kwargs}
         plot_results_from_data(**gen_prop)
 
-def load_all_metrics(folder, backend_id=None):
+def load_all_metrics(folder=None, backend_id=None):
     """
     Load all data that was saved in a folder.
     The saved data will be in json files in this folder
@@ -807,6 +807,11 @@ def load_all_metrics(folder, backend_id=None):
     gen_prop : dict
         of inputs that were used in maxcut_benchmark.run method
     """
+    
+    # if folder not passed in, create its name using standard format
+    if folder is None:
+        folder = f"__data/{metrics.get_backend_label(backend_id=backend_id)}"
+        
     # Note: folder here should be the folder where only the width=... files are stored, and not a folder higher up in the directory
     assert os.path.isdir(folder), f"Specified folder ({folder}) does not exist."
 
