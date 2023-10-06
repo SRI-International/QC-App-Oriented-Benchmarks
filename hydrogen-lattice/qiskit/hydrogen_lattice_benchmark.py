@@ -20,6 +20,7 @@ from qiskit.circuit import ParameterVector
 from qiskit.exceptions import QiskitError
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
+from qiskit.primitives import BackendEstimator, Estimator
 
 
 sys.path[1:1] = ["_common", "_common/qiskit", "hydrogen-lattice/_common"]
@@ -261,7 +262,7 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
 			num_occ_pairs=None
         )
 
-    _qc_array, _formatted_observables = prepare_circuits(_qc, operator)
+    # _qc_array, _formatted_observables = prepare_circuits(_qc, operator)
 
     # create a binding of Parameter values
     params = {parameter_vector: thetas_array} if parameterized else None
@@ -273,7 +274,8 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
 
     # save the first circuit in the array returned from prepare_circuits (with appendage)
     # to be used an example for display purposes
-    qc = _qc_array[0]
+    # qc = _qc_array[0]
+    qc = _qc
     # print(qc)
 
     # save small circuit example for display
@@ -283,7 +285,8 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
             QC_ = qc
 
     # return a handle on the circuit, the observables, and parameters
-    return _qc_array, _formatted_observables, params
+    # return _qc_array, _formatted_observables, params
+    return _qc, operator, params
    
 ############### Prepare Circuits from Observables
 
@@ -1304,7 +1307,8 @@ def run(
                 ts = time.time()
 
                 # create the circuits to be tested
-                qc_array, frmt_obs, params = HydrogenLattice(
+                # qc_array, frmt_obs, params = HydrogenLattice(
+                qc, operator, params = HydrogenLattice(
                     num_qubits=num_qubits,
                     secret_int=instance_num,
                     operator=operator,
@@ -1315,7 +1319,7 @@ def run(
                 # We only execute one of the circuits created, the last one. which is in the
                 # z-basis.  This is the one that is most illustrative of a device's fidelity.
                 # DEVNOTE: maybe we should do all three, and aggregate, just as in method 2?
-                qc = qc_array[-1]
+                # qc = qc_array[-1]
 
                 """ TMI ...
                 # for testing and debugging ...
@@ -1384,7 +1388,8 @@ def run(
                     # create ansatz from the operator, in multiple circuits, one for each measured basis
                     # call the HydrogenLattice ansatz to generate a parameterized hamiltonian
                     ts = time.time()
-                    qc_array, frmt_obs, params = HydrogenLattice(
+                    # qc_array, frmt_obs, params = HydrogenLattice(
+                    qc, _, params = HydrogenLattice(
                         num_qubits=num_qubits,
                         secret_int=unique_id,
                         thetas_array=thetas_array,
@@ -1400,43 +1405,86 @@ def run(
 
                     if verbose:
                         print(f"... ** compute energy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params}, thetas_array={thetas_array}")
+#                    # loop over each circuit and execute
+#                    for qc in qc_array:
+#                        # bind parameters to circuit before execution
+#                        if parameterized:
+#                            qc.bind_parameters(params)
+#
+#                        # submit circuit for execution on target with the current parameters
+#                        ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
+#
+#                        # wait for circuit to complete by calling finalize  ...
+#                        # finalize execution of group (each circuit in loop accumulates metrics)
+#                        ex.finalize_execution(None, report_end=False)
+#
+#                        # after first execution and thereafter, no need for transpilation if parameterized
+#                        if parameterized:
+#                            # DEVNOTE: since Hydro uses 3 circuits inside this loop, and execute.py can only
+#                            # cache 1 at a time, we cannot yet implement caching.  Transpile every time for now.
+#                            cached_circuits = False
+#                            if cached_circuits:
+#                                ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+#                                logger.info(f"**** First execution complete, disabling transpile")
+#
+#                        # result array stores the multiple results we measure along different Pauli basis.
+#                        global saved_result
+#                        result_array.append(saved_result)
+#
+#                        # Aggregate execution and elapsed time for running all three circuits
+#                        # corresponding to different measurements along the different Pauli bases
+#                        quantum_execution_time = (
+#                            quantum_execution_time
+#                            + metrics.get_metric(num_qubits, unique_id, "exec_time")
+#                        )
+#                        quantum_elapsed_time = (
+#                            quantum_elapsed_time
+#                            + metrics.get_metric(num_qubits, unique_id, "elapsed_time")
+#                        )
                     
-                    # loop over each circuit and execute
-                    for qc in qc_array:
-                        # bind parameters to circuit before execution
-                        if parameterized:
-                            qc.bind_parameters(params)
+                    # bind parameters to circuit before execution
+                    if parameterized:
+                        qc_bound = qc.assign_parameters(params, inplace=False)
+                    else:
+                        qc_bound = qc
 
-                        # submit circuit for execution on target with the current parameters
-                        ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
+                    if backend_id.lower() == "statevector_simulator":
+                        estimator = Estimator()  # statevector doesn't work w/ vanilla BackendEstimator
+                    else:
+                        estimator = BackendEstimator(backend=Aer.get_backend(backend_id))  # FIXME: won't work for vendor QPUs
 
-                        # wait for circuit to complete by calling finalize  ...
-                        # finalize execution of group (each circuit in loop accumulates metrics)
-                        ex.finalize_execution(None, report_end=False)
+                    result = estimator.run(qc_bound, operator, shots=num_shots).result()
 
-                        # after first execution and thereafter, no need for transpilation if parameterized
-                        if parameterized:
-                            # DEVNOTE: since Hydro uses 3 circuits inside this loop, and execute.py can only
-                            # cache 1 at a time, we cannot yet implement caching.  Transpile every time for now.
-                            cached_circuits = False
-                            if cached_circuits:
-                                ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                                logger.info(f"**** First execution complete, disabling transpile")
+                    ## submit circuit for execution on target with the current parameters
+                    #ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
 
-                        # result array stores the multiple results we measure along different Pauli basis.
-                        global saved_result
-                        result_array.append(saved_result)
+                    ## wait for circuit to complete by calling finalize  ...
+                    ## finalize execution of group (each circuit in loop accumulates metrics)
+                    #ex.finalize_execution(None, report_end=False)
 
-                        # Aggregate execution and elapsed time for running all three circuits
-                        # corresponding to different measurements along the different Pauli bases
-                        quantum_execution_time = (
-                            quantum_execution_time
-                            + metrics.get_metric(num_qubits, unique_id, "exec_time")
-                        )
-                        quantum_elapsed_time = (
-                            quantum_elapsed_time
-                            + metrics.get_metric(num_qubits, unique_id, "elapsed_time")
-                        )
+                    # after first execution and thereafter, no need for transpilation if parameterized
+                    if parameterized:
+                        # DEVNOTE: since Hydro uses 3 circuits inside this loop, and execute.py can only
+                        # cache 1 at a time, we cannot yet implement caching.  Transpile every time for now.
+                        cached_circuits = False
+                        if cached_circuits:
+                            ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                            logger.info(f"**** First execution complete, disabling transpile")
+
+                    # result array stores the multiple results we measure along different Pauli basis.
+                    global saved_result
+                    #result_array.append(saved_result)
+
+                    # Aggregate execution and elapsed time for running all three circuits
+                    # corresponding to different measurements along the different Pauli bases
+                    quantum_execution_time = (
+                        quantum_execution_time
+                        + metrics.get_metric(num_qubits, unique_id, "exec_time")
+                    )
+                    quantum_elapsed_time = (
+                        quantum_elapsed_time
+                        + metrics.get_metric(num_qubits, unique_id, "elapsed_time")
+                    )
 
                     #####################
                     # classical processing of results
@@ -1469,9 +1517,11 @@ def run(
                     global energy
                     global variance
                     global standard_error
-                    energy, variance = compute_energy(
-                        result_array=result_array, formatted_observables=frmt_obs, num_qubits=num_qubits
-                    )
+                    # energy, variance = compute_energy(
+                    #      result_array=result_array, formatted_observables=frmt_obs, num_qubits=num_qubits
+                    # )
+                    energy = result.values[0]
+                    variance = result.metadata[0]['variance']
                     # calculate std error from the variance -- identically zero if using statevector simulator
                     if backend_id.lower() != "statevector_simulator":
                         standard_error = np.sqrt(variance/num_shots)
@@ -1687,6 +1737,7 @@ def run_objective_function(**kwargs):
 # # if main, execute method
 if __name__ == "__main__":
     run()
+    # run(backend_id="statevector_simulator", minimizer_tolerance=1e-5)
 
 # # %%
 
