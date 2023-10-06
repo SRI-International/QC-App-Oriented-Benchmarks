@@ -143,8 +143,6 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
 
     print("Deutsch-Jozsa Benchmark Program - Qiskit")
 
-    print(skip_qubits)
-
     # validate parameters (smallest circuit is 3 qubits)
     max_qubits = max(3, max_qubits)
     min_qubits = min(max(3, min_qubits), max_qubits)

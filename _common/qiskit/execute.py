@@ -24,8 +24,7 @@
 #
 
 import sys
-import metrics
-
+import os
 import time
 import copy
 import importlib
@@ -36,8 +35,10 @@ import numpy as np
 
 from datetime import datetime, timedelta
 from qiskit import execute, Aer, transpile
-from qiskit import IBMQ
 from qiskit.providers.jobstatus import JobStatus
+
+# QED-C modules
+import metrics
 
 # Noise
 from qiskit.providers.aer.noise import NoiseModel, ReadoutError
@@ -52,7 +53,7 @@ from qiskit.providers.aer.noise import depolarizing_error, reset_error
 #### these variables are currently accessed as globals from user code
 
 # maximum number of active jobs
-max_jobs_active = 5
+max_jobs_active = 3
 
 # job mode: False = wait, True = submit multiple jobs
 job_mode = False
@@ -65,13 +66,21 @@ verbose_time = False
 
 #### the following variables are accessed only through functions ...
 
-# specify whether to execute using sessions (and currently using Sampler only)
+# Specify whether to execute using sessions (and currently using Sampler only)
 use_sessions = False
 
+# Session counter for use in creating session name
+session_count = 0
+
 # internal session variables: users do not access
-service = None
 session = None
 sampler = None
+
+# IBM-Q Service save here if created
+service = None
+
+# Azure Quantum Provider saved here if created
+azure_provider = None
 
 # logger for this module
 logger = logging.getLogger(__name__)
@@ -237,17 +246,38 @@ def set_execution_target(backend_id='qasm_simulator',
                         provider_name='Honeywell')
     """
     global backend
+    global session
+    global use_sessions
+    global session_count
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
 
     # if a custom provider backend is given, use it ...
-    # in this case, the backend_id is an arbitrary identifier that shows up in plots
+    # Note: in this case, the backend_id is an identifier that shows up in plots
     if provider_backend != None:
         backend = provider_backend
-    
+        
+        # The hub variable is used to identify an Azure Quantum backend
+        if hub == "azure-quantum":
+            from azure.quantum.job.session import Session
+  
+            # increment session counter
+            session_count += 1
+            
+            if verbose:
+                print(f"... creating session {session_count} on Azure backend {backend_id}")
+                
+            # open a session on the backend
+            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}")
+            backend.latest_session = session
+            
     # handle QASM simulator specially
     elif backend_id == 'qasm_simulator':
         backend = Aer.get_backend("qasm_simulator") 
 
+    # handle Statevector simulator specially
+    elif backend_id == 'statevector_simulator':
+        backend = Aer.get_backend("statevector_simulator")
+        
     # handle 'fake' backends here
     elif 'fake' in backend_id:
         backend = getattr(
@@ -259,7 +289,7 @@ def set_execution_target(backend_id='qasm_simulator',
         backend = backend()
         logger.info(f'Set {backend = }')   
 
-    # otherwise use the given provider and backend_id to find the backend
+    # otherwise use the given providername or backend_id to find the backend
     else:
     
         # if provider_module name and provider_name are provided, obtain a custom provider
@@ -271,16 +301,50 @@ def set_execution_target(backend_id='qasm_simulator',
                 backend = provider.get_backend(backend_id)
             except:
                 print(authentication_error_msg.format(provider_name))
+        
+        # If hub variable indicates an Azure Quantum backend
+        elif hub == "azure-quantum":
+            global azure_provider
+            from azure.quantum.qiskit import AzureQuantumProvider
+            from azure.quantum.job.session import Session 
+            
+            # create an Azure Provider only the first time it is needed
+            if azure_provider is None:
+                if verbose:
+                    print("... creating Azure provider")
+                azure_provider = AzureQuantumProvider(
+                     resource_id = os.getenv("AZURE_QUANTUM_RESOURCE_ID"),
+                     location = os.getenv("AZURE_QUANTUM_LOCATION") 
+                )  
+                # List the available backends in the workspace
+                if verbose:
+                    print("    Available backends:")
+                    for backend in azure_provider.backends():
+                        print(f"      {backend}")
+
+            # increment session counter
+            session_count += 1
+            
+            if verbose:
+                print(f"... creating Azure backend {backend_id} and session {session_count}")
                 
-        # otherwise, assume the backend_id is given and assume it is IBMQ device
+            # then find backend from the backend_id
+            # we should cache this and only change if backend_id changes
+            backend = azure_provider.get_backend(backend_id)
+ 
+            # open a session on the backend
+            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}")
+            backend.latest_session = session
+            
+        # otherwise, assume the backend_id is given only and assume it is IBMQ device
         else:
+            from qiskit import IBMQ
             if IBMQ.stored_account():
             
                 # load a stored account
                 IBMQ.load_account()
                 
                 # set use_sessions in provided by user - NOTE: this will modify the global setting
-                global use_sessions
                 this_use_sessions = exec_options.get("use_sessions", None)
                 if this_use_sessions != None:
                     use_sessions = this_use_sessions
@@ -289,18 +353,34 @@ def set_execution_target(backend_id='qasm_simulator',
                 if use_sessions:
                     from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session, Options
                     global service
-                    service = QiskitRuntimeService()
-                    global session
                     global sampler
                     
+                    service = QiskitRuntimeService()
+                    session_count += 1
+                    
                     backend = service.backend(backend_id)
-                    session= Session(service=service, backend=backend_id)
+                    session = Session(service=service, backend=backend_id)
                     
                     # get Sampler resilience level and transpiler optimization level from exec_options
                     options = Options()
                     options.resilience_level = exec_options.get("resilience_level", 1)
                     options.optimization_level = exec_options.get("optimization_level", 3)
                     
+                    # special handling for ibmq_qasm_simulator to set noise model
+                    if backend_id == "ibmq_qasm_simulator":
+                        this_noise = noise
+                        # get noise model from options; used only in simulator for now
+                        if "noise_model" in exec_options:
+                            this_noise = exec_options.get("noise_model", None)
+                            if verbose:
+                                print(f"... using custom noise model: {this_noise}")
+                        # attach to backend if not None
+                        if this_noise != None:
+                            options.simulator = {"noise_model": this_noise}
+                            metrics.QV = this_noise.QV
+                            if verbose:
+                                print(f"... setting noise model, QV={this_noise.QV} on {backend_id}")
+                        
                     if verbose:
                         print(f"... execute using Sampler on backend_id {backend_id} with options = {options}")
                     
@@ -583,6 +663,11 @@ def execute_circuit(circuit):
                 if width_processor:
                     width_processor(qc)
 
+                # to execute on Aer state vector simulator, need to remove measurements
+                backend_name = backend.name if use_sessions else backend.name()
+                if backend_name.lower() == "statevector_simulator":
+                    trans_qc = trans_qc.remove_final_measurements(inplace=False)
+                            
                 #*************************************
                 # perform circuit execution on backend
                 logger.info(f'Running trans_qc, shots={shots}')
@@ -640,7 +725,6 @@ def wait_on_job_result(job, active_circuit):
     while retry_count < 40:
         try:
             retry_count += 1
-            #print(f"... calling job.result()")
             result = job.result()
             break
                          
@@ -656,7 +740,7 @@ def wait_on_job_result(job, active_circuit):
     else:
         #print(f"... job.result() is done, with result data, continuing")
         pass
-
+    
 # Check and return job_status
 # handle network timeouts by doing up to 40 retries once every 15 seconds
 def get_job_status(job, active_circuit):
@@ -940,6 +1024,18 @@ def job_complete(job):
         result = job.result()
         # print("... result = ", str(result))
 
+        # for Azure Quantum, need to obtain execution time from sessions object
+        # Since there may be multiple jobs, need to find the one that matches the current job_id
+        if azure_provider is not None and session is not None:
+            details = job._azure_job.details
+            
+            # print("... session_job.details = ", details)
+            exec_time = (details.end_execution_time - details.begin_execution_time).total_seconds()
+            
+            # DEVNOTE: startup time is not currently used or stored
+            # it seesm to include queue time, so it has no added value over the elapsed time we currently store
+            startup_time = (details.begin_execution_time - details.creation_time).total_seconds()
+            
         # counts = result.get_counts(qc)
         # print("Total counts are:", counts)
         
@@ -1085,7 +1181,10 @@ def process_step_times(job, result, active_circuit):
 
     # when sessions and sampler used, we obtain metrics differently
     if use_sessions:
-        job_timestamps= job.metrics()['timestamps']
+        job_timestamps = job.metrics()['timestamps']
+        job_metrics = job.metrics()
+        # print(f"... usage = {job_metrics['usage']} {job_metrics['executions']}")
+        
         if verbose:
             print(f"... job.metrics() = {job.metrics()}")
             print(f"... job.result().metadata[0] = {result.metadata[0]}")
@@ -1107,12 +1206,21 @@ def process_step_times(job, result, active_circuit):
             exec_validating_time = 0.001
             exec_queued_time = 0.001
             
+            # when using sessions, the 'running_time' is the 'quantum exec time' - override it here.
+            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
+            
+            # use the data in usage field if it is returned, usually by hardware
+            # here we use the executions field to indicate we are on hardware
+            if "usage" in job_metrics and "executions" in job_metrics:
+                if job_metrics['executions'] > 0:
+                    exec_time = job_metrics['usage']['quantum_seconds'] 
+                    
+                    # and use this one as it seems to be valid for this case
+                    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
+            
             # DEVNOTE: we do not compute this yet
             # exec_quantum_classical_time = job.metrics()['bss']
-            #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
-            
-            # when using sessions, the 'running_time' is the 'quantum exec time' - override it.
-            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
+            # metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)     
         
         except Exception as e:
             if verbose:
@@ -1239,9 +1347,9 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
         
     # also, close any active session at end of the app
     global session
-    if report_end and use_sessions and session != None:
+    if report_end and session != None:
         if verbose:
-            print("... closing active session!\n")
+            print(f"... closing active session: {session_count}\n")
         
         session.close()
         session = None

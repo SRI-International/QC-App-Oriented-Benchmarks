@@ -25,9 +25,10 @@ import common
 import execute as ex
 import metrics as metrics
 
+# DEVNOTE: this logging feature should be moved to common level
 logger = logging.getLogger(__name__)
 fname, _, ext = os.path.basename(__file__).partition(".")
-log_to_file = True
+log_to_file = False
 
 try:
     if log_to_file:
@@ -41,7 +42,7 @@ try:
         )
     else:
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.WARNING,
             format='%(asctime)s %(name)s - %(levelname)s:%(message)s')
         
 except Exception as e:
@@ -641,7 +642,7 @@ def save_runtime_data(result_dict): # This function will need changes, since cir
 
             
             converged_thetas_list = finIterDict.get('converged_thetas_list')
-            parent_folder_save = os.path.join('__data', f'{backend_id}')
+            parent_folder_save = os.path.join('__data', f'{metrics.get_backend_label(backend_id)}')
             store_final_iter_to_metrics_json(
                 num_qubits=int(width),
                 degree = int(degree),
@@ -739,7 +740,7 @@ def dump_to_json(parent_folder_save, num_qubits, degree, restart_ind, iter_size_
 
 #%% Loading saved data (from json files)
 
-def load_data_and_plot(folder, backend_id=None, **kwargs):
+def load_data_and_plot(folder=None, backend_id=None, **kwargs):
     """
     The highest level function for loading stored data from a previous run
     and plotting optgaps and area metrics
@@ -755,7 +756,7 @@ def load_data_and_plot(folder, backend_id=None, **kwargs):
         plot_results_from_data(**gen_prop)
 
 
-def load_all_metrics(folder, backend_id=None):
+def load_all_metrics(folder=None, backend_id=None):
     """
     Load all data that was saved in a folder.
     The saved data will be in json files in this folder
@@ -770,6 +771,11 @@ def load_all_metrics(folder, backend_id=None):
     gen_prop : dict
         of inputs that were used in maxcut_benchmark.run method
     """
+    
+    # if folder not passed in, create its name using standard format
+    if folder is None:
+        folder = f"__data/{metrics.get_backend_label(backend_id)}"
+        
     # Note: folder here should be the folder where only the width=... files are stored, and not a folder higher up in the directory
     assert os.path.isdir(folder), f"Specified folder ({folder}) does not exist."
     
