@@ -45,8 +45,11 @@ circuit_metrics_detail_2 = {  }  # used to break down to 3rd dimension
 circuit_metrics_final_iter = {  } # used to store final results for the last circuit in iterative algorithms.
 
 group_metrics = { "groups": [],
-    "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [], "avg_fidelities": [], "avg_hf_fidelities": [],
     "avg_depths": [], "avg_xis": [], "avg_tr_depths": [], "avg_tr_xis": [], "avg_tr_n2qs": [],
+    "avg_create_times": [], "avg_elapsed_times": [], "avg_exec_times": [],
+    "avg_fidelities": [], "avg_hf_fidelities": [],
+    "std_create_times": [], "std_elapsed_times": [], "std_exec_times": [],
+    "std_fidelities": [], "std_hf_fidelities": [],    
     "avg_exec_creating_times": [], "avg_exec_validating_times": [], "avg_exec_running_times": [],
     "job_ids": []
 }
@@ -64,7 +67,10 @@ end_time = 0
 verbose = False
 
 # Option to save metrics to data file
-save_metrics = True 
+save_metrics = True
+
+# Suffix to append to filename of DATA- files
+data_suffix = ""
 
 # Option to save plot images (all of them)
 save_plot_images = True
@@ -75,6 +81,9 @@ show_plot_images = True
 # Option to show elapsed times in the metrics plots
 show_elapsed_times = False
 
+# When ratio of max time to min time exceeds this use a logscale
+logscale_for_times_threshold = 50
+
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
 
@@ -83,7 +92,10 @@ do_app_charts_with_all_metrics = False
 
 # Toss out elapsed times for any run if the initial value is this factor of the second value 
 # (applies only to area plots - remove once queue time is removed earlier)
-omit_initial_elapsed_time_factor = 10
+omit_initial_elapsed_time_factor = 0
+
+# if tossing large elapsed times, assume elapsed is this multiple of exec time
+initial_elapsed_time_multiplier = 1.1
 
 # Number of ticks on volumetric depth axis
 max_depth_log = 22
@@ -148,6 +160,12 @@ def init_metrics ():
     
     # create empty arrays for group metrics
     group_metrics["groups"] = []
+
+    group_metrics["avg_depths"] = []
+    group_metrics["avg_xis"] = []
+    group_metrics["avg_tr_depths"] = []
+    group_metrics["avg_tr_xis"] = []
+    group_metrics["avg_tr_n2qs"] = []
     
     group_metrics["avg_create_times"] = []
     group_metrics["avg_elapsed_times"] = []
@@ -155,11 +173,11 @@ def init_metrics ():
     group_metrics["avg_fidelities"] = []
     group_metrics["avg_hf_fidelities"] = []
     
-    group_metrics["avg_depths"] = []
-    group_metrics["avg_xis"] = []
-    group_metrics["avg_tr_depths"] = []
-    group_metrics["avg_tr_xis"] = []
-    group_metrics["avg_tr_n2qs"] = []
+    group_metrics["std_create_times"] = []
+    group_metrics["std_elapsed_times"] = []
+    group_metrics["std_exec_times"] = []
+    group_metrics["std_fidelities"] = []
+    group_metrics["std_hf_fidelities"] = []
     
     group_metrics["avg_exec_creating_times"] = []
     group_metrics["avg_exec_validating_times"] = []
@@ -204,7 +222,7 @@ def store_metric (group, circuit, metric, value):
     else:
         circuit_metrics[group][circuit][metric] = value
     #print(f'{group} {circuit} {metric} -> {value}')  
-
+    
 # method to pop the all metrics associated with a group and circuit in the group
 def pop_metric (group, circuit):
     group = str(group)
@@ -217,7 +235,7 @@ def pop_metric (group, circuit):
     
             return pop_metric_dict
 
-    
+        
 # Store "final iteration" metric(s) associated with a group and circuit in the group
 def store_props_final_iter(group, circuit, metric, value):
     group = str(group)
@@ -264,95 +282,89 @@ def aggregate_metrics_for_group (group):
     
     # generate totals, then divide by number of circuits to calculate averages    
     if group in circuit_metrics:
-        num_circuits = 0
-        group_create_time = 0
-        group_elapsed_time = 0
-        group_exec_time = 0
-        group_fidelity = 0
-        group_hf_fidelity = 0
-        group_depth = 0
-        group_xi = 0
-        group_tr_depth = 0
-        group_tr_xi = 0
-        group_tr_n2q = 0
-        group_exec_creating_time = 0
-        group_exec_validating_time = 0
-        group_exec_running_time = 0
+
+        # job ids handled specially, maintain array in the aggregate
         group_job_ids = []
 
         # loop over circuits in group to generate totals
         for circuit in circuit_metrics[group]:
-            num_circuits += 1
             for metric in circuit_metrics[group][circuit]:
                 value = circuit_metrics[group][circuit][metric]
                 #print(f'{group} {circuit} {metric} -> {value}')
                 if metric == "job_id": group_job_ids.append(value)
-                
-                if metric == "create_time": group_create_time += value
-                if metric == "elapsed_time": group_elapsed_time += value
-                if metric == "exec_time": group_exec_time += value
-                if metric == "fidelity": group_fidelity += value
-                if metric == "hf_fidelity": group_hf_fidelity += value
-                
-                if metric == "depth": group_depth += value
-                if metric == "xi": group_xi += value
-                if metric == "tr_depth": group_tr_depth += value
-                if metric == "tr_xi": group_tr_xi += value
-                if metric == "tr_n2q": group_tr_n2q += value
-                
-                if metric == "exec_creating_time": group_exec_creating_time += value
-                if metric == "exec_validating_time": group_exec_validating_time += value
-                if metric == "exec_running_time": group_exec_running_time += value
-
-        # calculate averages
-        avg_create_time = round(group_create_time / num_circuits, 3)
-        avg_elapsed_time = round(group_elapsed_time / num_circuits, 3)
-        avg_exec_time = round(group_exec_time / num_circuits, 3)
-        avg_fidelity = round(group_fidelity / num_circuits, 3)
-        avg_hf_fidelity = round(group_hf_fidelity / num_circuits, 3)
-        
-        avg_depth = round(group_depth / num_circuits, 0)
-        avg_xi = round(group_xi / num_circuits, 3)
-        avg_tr_depth = round(group_tr_depth / num_circuits, 0)
-        avg_tr_xi = round(group_tr_xi / num_circuits, 3)
-        avg_tr_n2q = round(group_tr_n2q / num_circuits, 3)
-        
-        avg_exec_creating_time = round(group_exec_creating_time / num_circuits, 3)
-        avg_exec_validating_time = round(group_exec_validating_time / num_circuits, 3)
-        avg_exec_running_time = round(group_exec_running_time / num_circuits, 3)
-        
-        # store averages in arrays structured for reporting and plotting by group
+ 
+        # store averages in arrays keyed by group and structured for reporting and plotting
         group_metrics["groups"].append(group)
         
+        # store an array of job ids to permit access later to stored job data
         group_metrics["job_ids"].append(group_job_ids)
         
-        group_metrics["avg_create_times"].append(avg_create_time)
-        group_metrics["avg_elapsed_times"].append(avg_elapsed_time)
-        group_metrics["avg_exec_times"].append(avg_exec_time)
-        group_metrics["avg_fidelities"].append(avg_fidelity)        
-        group_metrics["avg_hf_fidelities"].append(avg_hf_fidelity)
-
+        # aggregate depth metrics
         # skip these if there is not a real circuit for this group
-        if avg_depth > 0:
-            group_metrics["avg_depths"].append(avg_depth)
-        if avg_tr_depth > 0:
-            group_metrics["avg_tr_depths"].append(avg_tr_depth)
+        # DEVNOTE: this is a klunky way to flag plot behavior; improve later
+        avg, std = get_circuit_stats_for_metric(group, "depth", 0)
+        if avg > 0:
+            group_metrics["avg_depths"].append(avg)
+        avg, std = get_circuit_stats_for_metric(group, "tr_depth", 0)
+        if avg > 0:
+            group_metrics["avg_tr_depths"].append(avg)
         
-        # any of these could be 0 and should be aggregated
-        #if avg_xi > 0:
-        group_metrics["avg_xis"].append(avg_xi)
-        #if avg_tr_xi > 0:
-        group_metrics["avg_tr_xis"].append(avg_tr_xi)
-        #if avg_tr_n2q > 0:
-        group_metrics["avg_tr_n2qs"].append(avg_tr_n2q)
+        # aggregate depth derivatives
+        avg, std = get_circuit_stats_for_metric(group, "xi", 3)
+        group_metrics["avg_xis"].append(avg)
+        avg, std = get_circuit_stats_for_metric(group, "tr_xi", 3)
+        group_metrics["avg_tr_xis"].append(avg)
+        avg, std = get_circuit_stats_for_metric(group, "tr_n2q", 3)
+        group_metrics["avg_tr_n2qs"].append(avg)
         
-        if avg_exec_creating_time > 0:
-            group_metrics["avg_exec_creating_times"].append(avg_exec_creating_time)
-        if avg_exec_validating_time > 0:
-            group_metrics["avg_exec_validating_times"].append(avg_exec_validating_time)
-        if avg_exec_running_time > 0:
-            group_metrics["avg_exec_running_times"].append(avg_exec_running_time)
+        # aggregate time metrics
+        avg, std = get_circuit_stats_for_metric(group, "create_time", 3)
+        group_metrics["avg_create_times"].append(avg)
+        group_metrics["std_create_times"].append(std)
+        avg, std = get_circuit_stats_for_metric(group, "elapsed_time", 3)
+        group_metrics["avg_elapsed_times"].append(avg)
+        group_metrics["std_elapsed_times"].append(std)
+        avg, std = get_circuit_stats_for_metric(group, "exec_time", 3)
+        group_metrics["avg_exec_times"].append(avg)
+        group_metrics["std_exec_times"].append(std)
+
+        # aggregate fidelity metrics
+        avg, std = get_circuit_stats_for_metric(group, "fidelity", 3)
+        group_metrics["avg_fidelities"].append(avg)
+        group_metrics["std_fidelities"].append(std)
+        avg, std = get_circuit_stats_for_metric(group, "hf_fidelity", 3)
+        group_metrics["avg_hf_fidelities"].append(avg)
+        group_metrics["std_hf_fidelities"].append(std)
+        
+        # aggregate specal time metrics (not used everywhere)
+        # skip if not collected at all
+        avg, std = get_circuit_stats_for_metric(group, "exec_creating_time", 3)
+        if avg > 0:
+            group_metrics["avg_exec_creating_times"].append(avg)
+        avg, std = get_circuit_stats_for_metric(group, "exec_validating_time", 3)
+        if avg > 0:
+            group_metrics["avg_exec_validating_times"].append(avg)
+        avg, std = get_circuit_stats_for_metric(group, "exec_running_time", 3)
+        if avg > 0:
+            group_metrics["avg_exec_running_times"].append(avg)
  
+        
+# Compute average and stddev for a metric in a given circuit group
+# DEVNOTE: this creates new array every time; could be more efficient if multiple metrics done at once
+def get_circuit_stats_for_metric(group, metric, precision): 
+    try:
+        metric_array = [circuit_metrics[group][circuit][metric] for circuit in circuit_metrics[group]]
+        avg = round(np.average(metric_array), precision)
+        std = round(np.std(metric_array)/np.sqrt(len(metric_array)), precision)
+        
+    # on failure, usually due to KeyError, return 0s
+    except Exception as e:
+        avg = 0
+        std = 0
+        
+    return avg, std
+    
+            
 # Aggregate all metrics by group
 def aggregate_metrics ():
     for group in circuit_metrics:
@@ -799,10 +811,20 @@ def get_aq_width(shared_data, w_min, w_max, fidelity_metric):
     return AQ
 
 # Get the backend_id for current set of circuits
-def get_backend_id():
-    subtitle = circuit_metrics["subtitle"]
-    backend_id = subtitle[9:]
+def get_backend_id(backend_id=None):
+    if backend_id is None:
+        subtitle = circuit_metrics["subtitle"]
+        backend_id = subtitle[9:]
     return backend_id
+    
+# Get the label to be used in plots for the device, with the data_suffix concatenated
+def get_backend_label(backend_id=None): 
+    return get_backend_id(backend_id=backend_id) + data_suffix
+
+# Get the title string showing the device name and current date_of_file
+# DEVNOTE: we might want to change to the date contained in the data file (to show when data collected) 
+def get_backend_title(backend_id=None):  
+    return f"\nDevice={get_backend_label(backend_id=backend_id)}  {get_timestr()}"
  
 # Extract short app name from the title passed in by user
 def get_appname_from_title(suptitle):
@@ -905,7 +927,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     fig, axs = plt.subplots(rows, cols, sharex=True, figsize=(fig_w, fig_h))
     
     # append key circuit metrics info to the title
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    fulltitle = suptitle + get_backend_title()
     if options != None:
         options_str = ''
         for key, value in options.items():
@@ -922,13 +944,84 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     if rows == 1:
         ax = axs
         axs = [ax]
+        
+    groups = group_metrics["groups"]
+    # print(f"... groups - {groups}")
+    
+    xlabels = None
+    
+    # check if elements of groups are unique
+    # if not, there are multiple execution groups within each group
+    # and we need to reduce to unique set of data for plotting
+    if len(set(groups)) != len(groups):
+        # print("*** groups are NOT unique")
+        
+        xlabels = groups
+        # print(f"... labels = {xlabels}")
+        
+        groups = [i for i in range(len(groups))]
+        # print(f"... new groups = {groups}")
+        
+        '''   DEVNOTE --- WIP. Attempt to reduce duplicate widths by averaging. 
+        g = []
+        ahf = []
+        af = []
+        shf = []
+        sf = []
+        
+        lastgroup = 0
+        ii = 0
+        jj = 0
+        for group in groups:
+            print(group)
+          
+            if group != lastgroup:
+                g.append([])
+                g[jj] = group
+                
+                ahf.append([])
+                af.append([])
+                shf.append([])
+                sf.append([])
+                
+                jj += 1
+
+            else:
+                print("same")
+                
+            ahf[jj] = group
+            af[jj] = group
+            
+            lastgroup = group
+         
+        print("... new:")
+        print(g)
+        print(ahf)
+        print(af)
+        '''
+ 
     
     if do_creates:
+    
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
+            
         if max(group_metrics["avg_create_times"]) < 0.01:
             axs[axi].set_ylim([0, 0.01])
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_create_times"], zorder = 3)
+        axs[axi].bar(groups, group_metrics["avg_create_times"], zorder = 3)
         axs[axi].set_ylabel('Avg Creation Time (sec)')
+        
+        # error bars
+        zeros = [0] * len(group_metrics["avg_create_times"])
+        std_create_times = group_metrics["std_create_times"] if "std_create_times" in group_metrics else zeros
+        
+        axs[axi].errorbar(groups, group_metrics["avg_create_times"], yerr=std_create_times,
+                ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                label = 'Error', alpha = 0.75, zorder = 3)
         
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
@@ -937,20 +1030,54 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_executes:
+    
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
+    
+        avg_exec_times = group_metrics["avg_exec_times"]
+        avg_elapsed_times = [et for et in group_metrics["avg_elapsed_times"]]
+        
+        zeros = [0] * len(avg_exec_times)
+        std_exec_times = group_metrics["std_exec_times"] if "std_exec_times" in group_metrics else zeros
+        std_elapsed_times = group_metrics["std_elapsed_times"] if "std_elapsed_times" in group_metrics else zeros
+        
+        # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
+        # that are most likely due to either queueing or system initialization
+        if show_elapsed_times and omit_initial_elapsed_time_factor > 0:
+            for i in range(len(avg_elapsed_times)):
+                if avg_elapsed_times[i] > omit_initial_elapsed_time_factor * avg_exec_times[i]:
+                    avg_elapsed_times[i] = avg_exec_times[i] * initial_elapsed_time_multiplier
+        
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
         
         if show_elapsed_times:    # a global setting
-            axs[axi].bar(group_metrics["groups"], group_metrics["avg_elapsed_times"], 0.75, color='skyblue', alpha = 0.8, zorder = 3)
+            axs[axi].bar(groups, avg_elapsed_times, 0.75, color='skyblue', alpha = 0.8, zorder = 3)
             
-            if max(group_metrics["avg_elapsed_times"]) < 0.1 and max(group_metrics["avg_exec_times"]) < 0.1:
+            if max(avg_elapsed_times) < 0.1 and max(avg_exec_times) < 0.1:
                 axs[axi].set_ylim([0, 0.1])
         else:
-            if max(group_metrics["avg_exec_times"]) < 0.1:
+            if max(avg_exec_times) < 0.1:
                 axs[axi].set_ylim([0, 0.1])
             
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_exec_times"], zorder = 3)
+        axs[axi].bar(groups, avg_exec_times, 0.55 if show_elapsed_times is True else 0.7, zorder = 3)
         axs[axi].set_ylabel('Avg Execution Time (sec)')
         
+        # error bars
+        if show_elapsed_times:
+            if std_elapsed_times is not None:
+                axs[axi].errorbar(groups, avg_elapsed_times, yerr=std_elapsed_times,
+                    ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                    marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                    label = 'Error', alpha = 0.75, zorder = 3)
+        
+        if std_exec_times is not None:
+            axs[axi].errorbar(groups, avg_exec_times, yerr=std_exec_times,
+                ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                label = 'Error', alpha = 0.75, zorder = 3)
+
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
@@ -958,8 +1085,57 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if show_elapsed_times:
             axs[axi].legend(['Elapsed', 'Quantum'], loc='upper left')
         #else:
-            #axs[axi].legend(['Quantum'], loc='upper left')
+            #axs[axi].legend(['Quantum'], loc='upper left') 
+        
+        ###################################
+        # optional log axis processing
+        
+        use_logscale_for_times = False
+        
+        # determine min and max of both data sets, with a lower limit of 0.1
+        y_max_0 = max(avg_exec_times)
+        y_max_0 = max(0.10, y_max_0)
+        
+        # for min, assume 0.001 is the minimum, in case it is 0
+        y_min_0 = min(filter(lambda x: x > 0, avg_exec_times))
+
+        if show_elapsed_times:
+            y_max_0 = max(y_max_0, max(avg_elapsed_times))
+            y_min_0 = min(y_min_0, min(filter(lambda x: x > 0, avg_elapsed_times)))
+        
+        # make just a little larger for autoscaling
+        y_max_0 *= 1.1                
+        y_min_0 = y_min_0 / 1.1
+        
+        # for min, assume 0.001 is the minimum, in case it is 0
+        if y_min_0 <= 0:
+            y_min_0 = 0.001
+        
+        # print(f"{y_min_0} {y_max_0}")
+        
+        # force use of logscale if total range ratio above the threshold
+        if logscale_for_times_threshold > 0 and y_max_0 / y_min_0 > logscale_for_times_threshold:
+            use_logscale_for_times = True
             
+        # set up log scale if specified
+        if use_logscale_for_times:
+            axs[axi].set_yscale('log') 
+            
+            #if y_max_0 > 0.01:
+            y_max_0 *= 1.6
+            y_min_0 /= 1.6
+            
+            if y_max_0 / y_min_0 < logscale_for_times_threshold:
+                y_min_0 = y_max_0 / logscale_for_times_threshold
+        
+        # always start at 0 if not log scale
+        else:
+            y_min_0 = 0
+        
+        # set full range of the y-axis
+        # print(f"{y_min_0} {y_max_0}")
+        axs[axi].set_ylim([y_min_0, y_max_0])
+        
         # none of these methods of sharing the x axis gives proper effect; makes extra white space
         #axs[axi].sharex(axs[2])
         #plt.setp(axs[axi].get_xticklabels(), visible=False)
@@ -967,25 +1143,74 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_fidelities:
+    
+        #print(f"... do fidelities for group {group_metrics}")
+        
         axs[axi].set_ylim([0, 1.1])
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_fidelities"], zorder = 3) 
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_hf_fidelities"], 0.4, color='skyblue', alpha = 0.8, zorder = 3) 
+        
         axs[axi].set_ylabel('Avg Result Fidelity')
         
+        #groups = group_metrics["groups"]
+        #print(f"... groups - {groups}")
+        
+        # fidelity data
+        avg_hf_fidelities = group_metrics["avg_hf_fidelities"]
+        avg_fidelities = group_metrics["avg_fidelities"]
+        
+        #print(avg_hf_fidelities)
+        #print(avg_fidelities)
+
+        # standard error data
+        zeros = [0] * len(group_metrics["avg_fidelities"])
+        std_hf_fidelities = group_metrics["std_hf_fidelities"] if "std_hf_fidelities" in group_metrics else zeros
+        std_fidelities = group_metrics["std_fidelities"] if "std_fidelities" in group_metrics else zeros
+        
+        #print(std_hf_fidelities)
+        #print(std_fidelities)
+           
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
+            
+        # data bars
+        axs[axi].bar(groups, avg_hf_fidelities, color='skyblue', alpha = 0.8, zorder = 3)
+        axs[axi].bar(groups, avg_fidelities, 0.55, zorder = 3) 
+        
+        # error bars
+        axs[axi].errorbar(groups, avg_fidelities, yerr=std_fidelities,
+                ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                label = 'Error', alpha = 0.75, zorder = 3)
+        
+        axs[axi].errorbar(groups, avg_hf_fidelities, yerr=std_hf_fidelities,
+                ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='',
+                marker = "D", markersize = 3, mfc = 'c', mec = 'k', mew = 0.5,
+                label = 'Error', alpha = 0.75, zorder = 3)
+                
+        #[axi].set_xticklabels(xlabels)
+        
+        # share the x axis if it isn't already
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
             xaxis_set = True
             
-        axs[axi].legend(['Normalized', 'Hellinger'], loc='upper right')
+        axs[axi].legend(['Hellinger', 'Normalized'], loc='upper right')
         axi += 1
         
     if do_depths:
+    
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
+            
         if max(group_metrics["avg_tr_depths"]) < 20:
             axs[axi].set_ylim([0, 20])  
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_depths"], 0.8, zorder = 3)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
+        axs[axi].bar(groups, group_metrics["avg_depths"], 0.8, zorder = 3)
+        axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
         axs[axi].set_ylabel('Circuit Depth')
         
         if rows > 0 and not xaxis_set:
@@ -996,10 +1221,16 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
     
     if do_2qs:
+    
+        # set ticks specially if we had non-unique group names
+        if xlabels is not None:
+            axs[axi].set_xticks(groups)
+            axs[axi].set_xticklabels(xlabels)
+            
         if max(group_metrics["avg_tr_n2qs"]) < 20:
             axs[axi].set_ylim([0, 20])  
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(group_metrics["groups"], group_metrics["avg_tr_n2qs"], 0.5, color='C9', zorder = 3) 
+        axs[axi].bar(groups, group_metrics["avg_tr_n2qs"], 0.5, color='C9', zorder = 3) 
         axs[axi].set_ylabel('2Q Gates')
         
         if rows > 0 and not xaxis_set:
@@ -1027,7 +1258,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     suptitle = f"Volumetric Positioning - {appname}"
     
     # append key circuit metrics info to the title
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    fulltitle = suptitle + get_backend_title()
     if options != None:
         options_str = ''
         for key, value in options.items():
@@ -1331,7 +1562,7 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
                    do_border=False)
         
         if appname == None:
-            print(f"ERROR: cannot find data file for: {backend_id}")
+            print(f"ERROR: cannot find data file for: {get_backend_label()}")
             
         # do annotation separately, spreading labels for readability
         anno_volumetric_data(ax, depth_base,
@@ -1534,7 +1765,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
 
         # draw the volumetric plot and append the circuit metrics subtitle to the title
         suptitle = f"Volumetric Positioning - All Applications (Merged)"
-        fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+        fulltitle = suptitle + get_backend_title()
         
         plot_metrics_all_merged(shared_data, backend_id, suptitle=fulltitle, 
                 imagename="_ALL-vplot-2"+suffix, avail_qubits=avail_qubits,
@@ -1555,7 +1786,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
 def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, options=None, suffix=""):
     global circuit_metrics
     global group_metrics
-    
+
     # load saved data from file
     api = "qiskit"
     shared_data = load_app_metrics(api, backend_id)
@@ -1582,9 +1813,9 @@ def save_plot_image(plt, imagename, backend_id):
     date_of_file = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     if not os.path.exists('__images'): os.makedirs('__images')
-    if not os.path.exists(f'__images/{backend_id}'): os.makedirs(f'__images/{backend_id}')
+    if not os.path.exists(f'__images/{backend_id}{data_suffix}'): os.makedirs(f'__images/{backend_id}{data_suffix}')
     
-    pngfilename = f"{backend_id}/{imagename}"
+    pngfilename = f"{backend_id}{data_suffix}/{imagename}"
     pngfilepath = os.path.join(os.getcwd(),"__images", pngfilename + ".jpg")
     
     plt.savefig(pngfilepath)
@@ -1828,7 +2059,7 @@ def plot_area_metrics(suptitle='',
         scores = scores + scores_
 
     # append the circuit metrics subtitle to the title
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    fulltitle = suptitle + get_backend_title()
     if options != None:
         options_str = ''
         for key, value in options.items():
@@ -2039,7 +2270,7 @@ def plot_ECDF(suptitle="",
         suptitle = "Cumulative Distribution (ECDF) - " + appname
         
         # append key circuit metrics info to the title
-        fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+        fulltitle = suptitle + get_backend_title()
         if options != None:
             options_str = ''
             for key, value in options.items():
@@ -2161,9 +2392,8 @@ def get_full_title(suptitle = '', options = dict()):
     """
     Return title for figure
     """
-    # get backend id for this set of circuits
-    backend_id = get_backend_id()
-    fulltitle = suptitle + f"\nDevice={backend_id}  {get_timestr()}"
+    # create title for this set of circuits
+    fulltitle = suptitle + get_backend_title()
     if options != None:
         options_str = ''
         for key, value in options.items():
@@ -2525,8 +2755,8 @@ def store_app_metrics (backend_id, circuit_metrics, group_metrics, app, start_ti
     # be sure we have a __data directory
     if not os.path.exists('__data'): os.makedirs('__data')
     
-    # create filename based on the backend_id
-    filename = f"__data/DATA-{backend_id}.json"
+    # create filename based on the backend_id and optional data_suffix
+    filename = f"__data/DATA-{backend_id}{data_suffix}.json"
     
     # overwrite the existing file with the merged data
     with open(filename, 'w+') as f:
@@ -2539,9 +2769,10 @@ def load_app_metrics (api, backend_id):
 
     # don't leave slashes in the filename
     backend_id = backend_id.replace("/", "_")
-
-    filename = f"__data/DATA-{backend_id}.json"
     
+    # create filename based on the backend_id and optional data_suffix
+    filename = f"__data/DATA-{backend_id}{data_suffix}.json"
+        
     shared_data = None
     
     # attempt to load shared_data from file
