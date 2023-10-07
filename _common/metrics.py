@@ -221,7 +221,8 @@ def store_metric (group, circuit, metric, value):
             store_metric(group, circuit, key, value[key]) 
     else:
         circuit_metrics[group][circuit][metric] = value
-    #print(f'{group} {circuit} {metric} -> {value}')  
+    #print(f'{group} {circuit} {metric} -> {value}') 
+    
 # method to pop the all metrics associated with a group and circuit in the group
 def pop_metric (group, circuit):
     group = str(group)
@@ -233,7 +234,6 @@ def pop_metric (group, circuit):
             pop_metric_dict = circuit_metrics[group].pop(circuit)
     
             return pop_metric_dict
-
     
 # Store "final iteration" metric(s) associated with a group and circuit in the group
 def store_props_final_iter(group, circuit, metric, value):
