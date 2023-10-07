@@ -148,7 +148,7 @@ def add_custom_metric_names():
 # fetch mnist data
 
 def fetch_mnist_data(int1=7, int2=9, test_size=50, train_size=200, random_state=42, verbose=False, normalize=True):
-    mnist = fetch_openml('mnist_784', parser='auto', version=1, as_frame=False)
+    mnist = fetch_openml('mnist_784', version=1, as_frame=False)
     
     # x has all the pixel values of image and has Data shape of (70000, 784)  here 784 is 28*28
     x = mnist.data
