@@ -1096,11 +1096,11 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         y_max_0 = max(0.10, y_max_0)
         
         # for min, assume 0.001 is the minimum, in case it is 0
-        y_min_0 = min(filter(lambda x: x > 0, avg_exec_times))
+        y_min_0 = get_nonzero_min(avg_exec_times)
 
         if show_elapsed_times:
             y_max_0 = max(y_max_0, max(avg_elapsed_times))
-            y_min_0 = min(y_min_0, min(filter(lambda x: x > 0, avg_elapsed_times)))
+            y_min_0 = min(y_min_0, get_nonzero_min(avg_elapsed_times))
         
         # make just a little larger for autoscaling
         y_max_0 *= 1.1                
@@ -1124,7 +1124,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             y_max_0 *= 1.6
             y_min_0 /= 1.6
             
-            if y_max_0 / y_min_0 < logscale_for_times_threshold:
+            if y_max_0 > 0.001 and (y_max_0 / y_min_0) < logscale_for_times_threshold:
                 y_min_0 = y_max_0 / logscale_for_times_threshold
         
         # always start at 0 if not log scale
@@ -1371,7 +1371,12 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if show_plot_images:
             plt.show()
 
-
+# Return the minimum value in an array, but if all elements 0, return 0.001
+def get_nonzero_min(array):
+    f_array = list(filter(lambda x: x > 0, array)) 
+    if len(f_array) < 1: f_array = [0.001]
+    return min(f_array)
+    
 #################################################
 
 # DEVNOTE: this function is not used, as the overlaid rectanges are not useful
