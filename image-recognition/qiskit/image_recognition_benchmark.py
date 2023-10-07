@@ -595,233 +595,9 @@ def loss_function(result, y_data, num_qubits, formatted_observables, verbose=Fal
 
     return loss, accuracy
 
-    
-    
 
 ##########################################################
 
-# Create the  ansatz quantum circuit for the VQE algorithm.
-def VQE_ansatz(num_qubits: int,
-            thetas_array,
-            parameterized,
-            num_occ_pairs: Optional[int] = None,
-            *args, **kwargs) -> QuantumCircuit:
-    
-    if verbose:    
-        print(f"  ... VQE_ansatz(num_qubits={num_qubits}, thetas_array={thetas_array}")  
-    
-    # Generate the ansatz circuit for the VQE algorithm.
-    if num_occ_pairs is None:
-        num_occ_pairs = (num_qubits // 2)  # e.g., half-filling, which is a reasonable chemical case
-
-    # do all possible excitations if not passed a list of excitations directly
-    excitation_pairs = []
-    for i in range(num_occ_pairs):
-        for a in range(num_occ_pairs, num_qubits):
-            excitation_pairs.append([i, a])
-
-    # create circuit of num_qubits
-    circuit = QuantumCircuit(num_qubits)
-
-    # Hartree Fock initial state
-    for occ in range(num_occ_pairs):
-        circuit.x(occ)
-
-    # if parameterized flag set, create a ParameterVector
-    parameter_vector = None
-    if parameterized:
-        parameter_vector = ParameterVector("t", length=len(excitation_pairs))
-
-    # for parameter mode 1, make all thetas the same as the first
-    if saved_parameter_mode == 1:
-        thetas_array = np.repeat(thetas_array, len(excitation_pairs))
-
-    # create a Hartree Fock initial state
-    for idx, pair in enumerate(excitation_pairs):
-        # if parameterized, use ParamterVector, otherwise raw theta value
-        theta = parameter_vector[idx] if parameterized else thetas_array[idx]
-
-        # apply excitation
-        i, a = pair[0], pair[1]
-
-        # implement the magic gate
-        circuit.s(i)
-        circuit.s(a)
-        circuit.h(a)
-        circuit.cx(a, i)
-
-        # Ry rotation
-        circuit.ry(theta, i)
-        circuit.ry(theta, a)
-
-        # implement M^-1
-        circuit.cx(a, i)
-        circuit.h(a)
-        circuit.sdg(a)
-        circuit.sdg(i)
-
-    """ TMI ...
-    if verbose:
-        print(f"      --> thetas_array={thetas_array}")
-        print(f"      --> parameter_vector={str(parameter_vector)}")
-    """
-    return circuit, parameter_vector, thetas_array
-    
-# Create the benchmark program circuit array, for the given operator
-def HydrogenLattice (num_qubits, operator, secret_int = 000000,
-            thetas_array = None, parameterized = None):
-    
-    if verbose:    
-        print(f"... HydrogenLattice(num_qubits={num_qubits}, thetas_array={thetas_array}") 
-        
-    # if no thetas_array passed in, create defaults 
-    if thetas_array is None:
-        thetas_array = [1.0]
-
-    # create parameters in the form expected by the ansatz generator
-    # this is an array of betas followed by array of gammas, each of length = rounds
-    global _qc
-    global theta
-
-    # create the circuit the first time, add measurements
-    if ex.do_transpile_for_execute:
-        logger.info(f"*** Constructing parameterized circuit for {num_qubits = } {secret_int}")
-
-        _qc, parameter_vector, thetas_array = VQE_ansatz(
-			num_qubits=num_qubits,
-			thetas_array=thetas_array, parameterized=parameterized,
-			num_occ_pairs=None
-        )
-
-    _qc_array, _formatted_observables = prepare_circuits(_qc, operator)
-
-    # create a binding of Parameter values
-    params = {parameter_vector: thetas_array} if parameterized else None
-
-    if verbose:
-        print(f"    --> params={params}")
-
-    logger.info(f"Create binding parameters for {thetas_array} {params}")
-
-    # save the first circuit in the array returned from prepare_circuits (with appendage)
-    # to be used an example for display purposes
-    qc = _qc_array[0]
-    # print(qc)
-
-    # save small circuit example for display
-    global QC_
-    if QC_ is None or num_qubits <= 4:
-        if num_qubits <= 8:
-            QC_ = qc
-            print("QC_ = ", QC_)
-
-    # return a handle on the circuit, the observables, and parameters
-    return _qc_array, _formatted_observables, params
-   
-############### Prepare Circuits from Observables
-
-# ---- classical Pauli sum operator from list of Pauli operators and coefficients ----
-# Below function is to reduce some dependency on qiskit ( String data type issue) ----
-# def pauli_sum_op(ops, coefs):
-#     if len(ops) != len(coefs):
-#         raise ValueError("The number of Pauli operators and coefficients must be equal.")
-#     pauli_sum_op_list = [(op, coef) for op, coef in zip(ops, coefs)]
-#     return pauli_sum_op_list
-# ---- classical Pauli sum operator from list of Pauli operators and coefficients ----
-
-def prepare_circuits(base_circuit, operator):
-    """
-    Prepare the qubit-wise commuting circuits for a given operator.
-
-    Parameters
-    ----------
-    base_circuit : QuantumCircuit
-        Initial quantum circuit without basis rotations.
-    operator : SparsePauliOp
-        Sparse Pauli operator / Hamiltonian.
-
-    Returns
-    -------
-    list
-        Array of QuantumCircuits with applied basis change.
-    list
-        Array of observables formatted as SparsePauliOps.
-    """
-
-    # Mapping from Pauli operators to basis change gates
-    basis_change_map = {"X": ["h"], "Y": ["sdg", "h"], "Z": [], "I": []}
-
-    # Group commuting Pauli operators
-    commuting_ops = operator.group_commuting(qubit_wise=True)
-
-    # Initialize empty lists for storing output quantum circuits and formatted observables
-    qc_list = []
-    formatted_obs = []
-
-    # Loop over each group of commuting operators
-    for comm_op in commuting_ops:
-        basis = ""
-        pauli_labels = np.array([list(pauli_label) for pauli_label in comm_op.paulis.to_labels()])
-        for qubit in range(pauli_labels.shape[1]):
-            # return the pauli operations on qubits that aren't identity so we can rotate them
-            qubit_ops = "".join(filter(lambda x: x != "I", pauli_labels[:, qubit]))
-            basis += qubit_ops[0] if qubit_ops else "Z"
-
-        # Separate terms and coefficients
-        term_coeff_list = comm_op.to_list()
-        terms, coeffs = zip(*term_coeff_list)
-
-        # Initialize list for storing new terms
-        new_terms = []
-
-        # Loop to transform terms from 'X' and 'Y' to 'Z'
-        for term in terms:
-            new_term = ""
-            for c in term:
-                new_term += "Z" if c in "XY" else c
-            new_terms.append(new_term)
-
-        # Create and store new SparsePauliOp
-        new_op = SparsePauliOp.from_list(list(zip(new_terms, coeffs)))
-        formatted_obs.append(new_op)
-
-        # Create single quantum circuit for each group of commuting operators
-        basis_circuit = QuantumCircuit(len(basis))
-        basis_circuit.barrier()
-        for idx, pauli in enumerate(reversed(basis)):
-            for gate in basis_change_map[pauli]:
-                getattr(basis_circuit, gate)(idx)
-        composed_qc = base_circuit.compose(basis_circuit)
-        composed_qc.measure_all()
-        qc_list.append(composed_qc)
-
-    return qc_list, formatted_obs
-
-
-def compute_energy(result_array, formatted_observables, num_qubits):
-    """
-    Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
-    """
-
-    _probabilities = list()
-
-    for _res in result_array:
-        _counts = _res.get_counts()
-        _probs = normalize_counts(_counts, num_qubits=num_qubits)
-        _probabilities.append(_probs)
-
-    _expectation_values = calculate_expectation_values(_probabilities, formatted_observables)
-    energy = sum(_expectation_values)
-
-    # now get <H^2>, assuming Cov[si,si'] = 0
-    formatted_observables_sq = [(obs @ obs).simplify(atol=0) for obs in formatted_observables]
-    _expectation_values_sq = calculate_expectation_values(_probabilities, formatted_observables_sq)
-
-    # now since Cov is assumed to be zero, we compute each term's variance and sum the result.
-    # see Eq 5, e.g. in https://arxiv.org/abs/2004.06252
-    variance = sum([exp_sq - exp**2 for exp_sq, exp in zip(_expectation_values_sq, _expectation_values)])
-
-    return energy, variance
 
 def calculate_expectation_values(probabilities, observables):
     """
@@ -1597,8 +1373,8 @@ def run(
     for key in ["hub", "group", "project", "provider_backend", "exec_options", "minimizer_function"]:
         dict_of_inputs.pop(key)
 
-    global hydrogen_lattice_inputs
-    hydrogen_lattice_inputs = dict_of_inputs
+    global image_recognition_inputs
+    image_recognition_inputs = dict_of_inputs
 
     ###########################
     # Benchmark Initializeation
@@ -1708,7 +1484,6 @@ def run(
         x_batch = x_train_scaled[indices]
         y_batch = y_train[indices]
 
-
         # global variables to store execution and elapsed time
         global quantum_execution_time, quantum_elapsed_time
         quantum_execution_time = 0.0
@@ -1760,7 +1535,7 @@ def run(
 
 
             # create ansatz from the operator, in multiple circuits, one for each measured basis
-            # call the HydrogenLattice ansatz to generate a parameterized hamiltonian
+            # Create the ImageRegonition ansatz to generate a parameterized hamiltonian
             ts = time.time()
             for data_point in x_batch:
                 qc, frmt_obs, params = ImageRecognition(
