@@ -18,7 +18,7 @@ The conda environment is now ready for you to install the Qiskit package.
 
 Enter the following commands to install the latest version of Qiskit and the other required packages.
 
-    pip install numpy matplotlib qiskit "qiskit[visualization] qiskit-ibm-runtime" notebook
+    pip install numpy matplotlib qiskit qiskit-ibm-runtime "qiskit[visualization]" notebook
 
 You are now ready to run the benchmark programs.
 
