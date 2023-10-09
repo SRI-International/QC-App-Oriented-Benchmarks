@@ -1326,23 +1326,12 @@ def run(
                 ts = time.time()
 
                 # create the circuits to be tested
-                '''
-                # qc_array, frmt_obs, params = HydrogenLattice(
-                qc, operator, params = HydrogenLattice(
-                    num_qubits=num_qubits,
-                    secret_int=instance_num,
-                    operator=operator,
-                    thetas_array=thetas_array_0,
-                    parameterized=parameterized,
-                    use_estimator=use_estimator
-                )
-                '''
                 
                 # for Estimator, we only need circuit and params, we have operator
                 if use_estimator:
                     qc, _, params = HydrogenLattice(
                         num_qubits=num_qubits,
-                        secret_int=unique_id,
+                        secret_int=instance_num,
                         thetas_array=thetas_array,
                         parameterized=parameterized,
                         operator=operator,
@@ -1353,7 +1342,7 @@ def run(
                 else:
                     qc_array, frmt_obs, params = HydrogenLattice(
                         num_qubits=num_qubits,
-                        secret_int=unique_id,
+                        secret_int=instance_num,
                         thetas_array=thetas_array,
                         parameterized=parameterized,
                         operator=operator,
