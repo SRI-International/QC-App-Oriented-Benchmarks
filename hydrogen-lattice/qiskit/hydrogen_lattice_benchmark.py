@@ -237,7 +237,7 @@ def VQE_ansatz(num_qubits: int,
     
 # Create the benchmark program circuit array, for the given operator
 def HydrogenLattice (num_qubits, operator, secret_int = 000000,
-            thetas_array = None, parameterized = None):
+            thetas_array = None, parameterized = None, use_estimator=False):
     
     if verbose:    
         print(f"... HydrogenLattice(num_qubits={num_qubits}, thetas_array={thetas_array}") 
@@ -261,8 +261,6 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
 			num_occ_pairs=None
         )
 
-    _qc_array, _formatted_observables = prepare_circuits(_qc, operator)
-
     # create a binding of Parameter values
     params = {parameter_vector: thetas_array} if parameterized else None
 
@@ -270,20 +268,33 @@ def HydrogenLattice (num_qubits, operator, secret_int = 000000,
         print(f"    --> params={params}")
 
     logger.info(f"Create binding parameters for {thetas_array} {params}")
-
+    
+    # for estimator, save the ansatz circuit to be used an example for display purposes
+    if use_estimator:
+        qc = _qc
+    
+    # Prepare an array of circuits from the ansatz, with measurements in different bases 
     # save the first circuit in the array returned from prepare_circuits (with appendage)
-    # to be used an example for display purposes
-    qc = _qc_array[0]
+    # to be used an example for display purposes    
+    else:
+        _qc_array, _formatted_observables = prepare_circuits(_qc, operator)
+        qc = _qc_array[0]
+    
     # print(qc)
-
+    
     # save small circuit example for display
     global QC_
     if QC_ is None or num_qubits <= 4:
         if num_qubits <= 7:
             QC_ = qc
 
-    # return a handle on the circuit, the observables, and parameters
-    return _qc_array, _formatted_observables, params
+    # for estimator, return the ansatz circuit, operator, and parameters
+    if use_estimator:
+        return _qc, operator, params
+    
+    # for single circuit execution, return a handle on the circuit array, the observables, and parameters
+    else:
+        return _qc_array, _formatted_observables, params
    
 ############### Prepare Circuits from Observables
 
@@ -1039,7 +1050,11 @@ MAX_QUBITS = 16
 def run(
     min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
     method=2,
-    radius=None, thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
+    radius=None,
+    thetas_array=None,
+    parameterized=False, parameter_mode=1,
+    use_estimator=False,
+    do_fidelities=True,
     minimizer_function=None,
     minimizer_tolerance=1e-3, max_iter=30, comfort=False,
     line_x_metrics=["iteration_count", "cumulative_exec_time"],
@@ -1086,7 +1101,9 @@ def run(
     parameterized : bool, optional
         Whether to use parameter objects in circuits or not. The default is False.
     parameter_mode : bool, optional
-        If 1, use thetas_array of length 1, otherwise (num_qubits//2)**2, to match excitation pairs
+        If True, use thetas_array of length 1, otherwise (num_qubits//2)**2, to match excitation pairs
+    use_estimator : bool, optional
+        If True, use the estimator within the objective function, instead of multiple circuits
     do_fidelities : bool, optional
         Compute circuit fidelity. The default is True.
     minimizer_function : function
@@ -1309,18 +1326,33 @@ def run(
                 ts = time.time()
 
                 # create the circuits to be tested
-                qc_array, frmt_obs, params = HydrogenLattice(
-                    num_qubits=num_qubits,
-                    secret_int=instance_num,
-                    operator=operator,
-                    thetas_array=thetas_array_0,
-                    parameterized=parameterized,
-                )
-
-                # We only execute one of the circuits created, the last one. which is in the
-                # z-basis.  This is the one that is most illustrative of a device's fidelity.
-                # DEVNOTE: maybe we should do all three, and aggregate, just as in method 2?
-                qc = qc_array[-1]
+                
+                # for Estimator, we only need circuit and params, we have operator
+                if use_estimator:
+                    qc, _, params = HydrogenLattice(
+                        num_qubits=num_qubits,
+                        secret_int=instance_num,
+                        thetas_array=thetas_array,
+                        parameterized=parameterized,
+                        operator=operator,
+                        use_estimator=use_estimator
+                    )
+                
+                # for single circuit execution, we need an array of ciruiits and observables
+                else:
+                    qc_array, frmt_obs, params = HydrogenLattice(
+                        num_qubits=num_qubits,
+                        secret_int=instance_num,
+                        thetas_array=thetas_array,
+                        parameterized=parameterized,
+                        operator=operator,
+                        use_estimator=use_estimator
+                    )
+ 
+                    # We only execute one of the circuits created, the last one. which is in the
+                    # z-basis.  This is the one that is most illustrative of a device's fidelity.
+                    # DEVNOTE: maybe we should do all three, and aggregate, just as in method 2?
+                    qc = qc_array[-1]
 
                 """ TMI ...
                 # for testing and debugging ...
@@ -1385,17 +1417,32 @@ def run(
                     result_array = []
                     quantum_execution_time = 0.0
                     quantum_elapsed_time = 0.0
-
+                    
                     # create ansatz from the operator, in multiple circuits, one for each measured basis
                     # call the HydrogenLattice ansatz to generate a parameterized hamiltonian
                     ts = time.time()
-                    qc_array, frmt_obs, params = HydrogenLattice(
-                        num_qubits=num_qubits,
-                        secret_int=unique_id,
-                        thetas_array=thetas_array,
-                        parameterized=parameterized,
-                        operator=operator,
-                    )
+                    
+                    # for Estimator, we only need circuit and params, we have operator
+                    if use_estimator:
+                        qc, _, params = HydrogenLattice(
+                            num_qubits=num_qubits,
+                            secret_int=unique_id,
+                            thetas_array=thetas_array,
+                            parameterized=parameterized,
+                            operator=operator,
+                            use_estimator=use_estimator
+                        )
+                    
+                    # for single circuit execution, we need an array of ciruiits and observables
+                    else:
+                        qc_array, frmt_obs, params = HydrogenLattice(
+                            num_qubits=num_qubits,
+                            secret_int=unique_id,
+                            thetas_array=thetas_array,
+                            parameterized=parameterized,
+                            operator=operator,
+                            use_estimator=use_estimator
+                        )
 
                     # store the time it took to create the circuit
                     metrics.store_metric(num_qubits, unique_id, "create_time", time.time() - ts)
@@ -1406,18 +1453,11 @@ def run(
                     if verbose:
                         print(f"... ** compute energy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params}, thetas_array={thetas_array}")
                     
-                    # loop over each circuit and execute
-                    for qc in qc_array:
-                        # bind parameters to circuit before execution
-                        if parameterized:
-                            qc.bind_parameters(params)
+                    # If using Estimator, pass the ansatz to Estimator with operator and get result energy
+                    if use_estimator:
 
-                        # submit circuit for execution on target with the current parameters
-                        ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
-
-                        # wait for circuit to complete by calling finalize  ...
-                        # finalize execution of group (each circuit in loop accumulates metrics)
-                        ex.finalize_execution(None, report_end=False)
+                        # submit the ansatz circuit to the Estimator for execution
+                        result = submit_to_estimator(qc, num_qubits, unique_id, parameterized, params, operator, num_shots, backend_id, provider_backend)
 
                         # after first execution and thereafter, no need for transpilation if parameterized
                         if parameterized:
@@ -1429,8 +1469,7 @@ def run(
                                 logger.info(f"**** First execution complete, disabling transpile")
 
                         # result array stores the multiple results we measure along different Pauli basis.
-                        global saved_result
-                        result_array.append(saved_result)
+                        #global saved_result
 
                         # Aggregate execution and elapsed time for running all three circuits
                         # corresponding to different measurements along the different Pauli bases
@@ -1442,6 +1481,45 @@ def run(
                             quantum_elapsed_time
                             + metrics.get_metric(num_qubits, unique_id, "elapsed_time")
                         )
+                   
+                    # with single circuit mode, execute array of circuits and computer energy from observables 
+                    else:
+                        # loop over each circuit and execute
+                        for qc in qc_array:
+                            # bind parameters to circuit before execution
+                            if parameterized:
+                                qc.bind_parameters(params)
+                                
+                            # submit circuit for execution on target with the current parameters
+                            ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
+                            
+                            # wait for circuit to complete by calling finalize  ...
+                            # finalize execution of group (each circuit in loop accumulates metrics)
+                            ex.finalize_execution(None, report_end=False)
+     
+                            # after first execution and thereafter, no need for transpilation if parameterized
+                            if parameterized:
+                                # DEVNOTE: since Hydro uses 3 circuits inside this loop, and execute.py can only
+                                # cache 1 at a time, we cannot yet implement caching.  Transpile every time for now.
+                                cached_circuits = False
+                                if cached_circuits:
+                                    ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                                    logger.info(f"**** First execution complete, disabling transpile")
+     
+                            # result array stores the multiple results we measure along different Pauli basis.
+                            global saved_result
+                            result_array.append(saved_result)
+     
+                            # Aggregate execution and elapsed time for running all three circuits
+                            # corresponding to different measurements along the different Pauli bases
+                            quantum_execution_time = (
+                                quantum_execution_time
+                                + metrics.get_metric(num_qubits, unique_id, "exec_time")
+                            )
+                            quantum_elapsed_time = (
+                                quantum_elapsed_time
+                                + metrics.get_metric(num_qubits, unique_id, "elapsed_time")
+                            )
 
                     #####################
                     # classical processing of results
@@ -1474,9 +1552,18 @@ def run(
                     global energy
                     global variance
                     global standard_error
-                    energy, variance = compute_energy(
-                        result_array=result_array, formatted_observables=frmt_obs, num_qubits=num_qubits
-                    )
+                    
+                    # for Estimator, energy and variance are returned directly
+                    if use_estimator:
+                        energy = result.values[0]
+                        variance = result.metadata[0]['variance']
+                    
+                    # for single circuit execution, need to compute energy from results and observables
+                    else:
+                        energy, variance = compute_energy(
+                             result_array=result_array, formatted_observables=frmt_obs, num_qubits=num_qubits
+                        )
+                    
                     # calculate std error from the variance -- identically zero if using statevector simulator
                     if backend_id.lower() != "statevector_simulator":
                         standard_error = np.sqrt(variance/num_shots)
@@ -1686,6 +1773,53 @@ def run_objective_function(**kwargs):
     
     return energy, key_metrics
 
+
+#################################
+# QISKit ESTIMATOR EXECUTION
+
+# DEVNOTE: This code will be moved to common/qiskit/execute.py so it can be used elsewhere
+
+def submit_to_estimator(qc=None, num_qubits=1, unique_id=-1, parameterized=False, params=None, operator=None, num_shots=100, backend_id=None, provider_backend=None):
+
+    #print(f"... *** using Estimator")
+    
+    from qiskit.primitives import BackendEstimator, Estimator
+    
+    # start timing of estimator here
+    ts_launch = time.time()
+    
+    # bind parameters to circuit before execution
+    if parameterized:
+        qc_bound = qc.assign_parameters(params, inplace=False)
+    else:
+        qc_bound = qc
+
+    if backend_id.lower() == "statevector_simulator":
+        estimator = Estimator()  # statevector doesn't work w/ vanilla BackendEstimator
+    else:
+        estimator = BackendEstimator(backend=Aer.get_backend(backend_id))  # FIXME: won't work for vendor QPUs
+        #estimator = BackendEstimator(backend=provider_backend)
+    
+    ts_start = time.time()
+    
+    #print(operator)
+    job = estimator.run(qc_bound, operator, shots=num_shots)
+    #print(job)
+    
+    #print(job.metrics())
+    result = job.result()
+    
+    ts_done = time.time()
+    exec_time = ts_done - ts_start
+    elapsed_time = ts_done - ts_launch
+    
+    #print(f"... elapsed, exec = {elapsed_time}, {exec_time}")
+    
+    metrics.store_metric(num_qubits, unique_id, "exec_time", exec_time)
+    metrics.store_metric(num_qubits, unique_id, "elapsed_time", elapsed_time)
+    
+    return result
+                    
 #################################
 # MAIN
 
