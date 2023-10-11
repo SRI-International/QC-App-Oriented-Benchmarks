@@ -3186,7 +3186,8 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
                 bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
                 
     # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), cax=None, ax=ax,
+            shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
             
     return ax
 
