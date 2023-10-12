@@ -391,21 +391,25 @@ def report_metrics_for_group (group):
             avg_exec_time = group_metrics["avg_exec_times"][group_index]
             print(f"Average Creation, Elapsed, Execution Time for the {group} qubit group = {avg_create_time}, {avg_elapsed_time}, {avg_exec_time} secs")
             
-            #if verbose:
+            # report these detailed times, but only if they have been collected (i.e., len of array > 0)
+            # not all backedns generate these data elements
             if len(group_metrics["avg_exec_creating_times"]) > 0:
-                avg_exec_creating_time = group_metrics["avg_exec_creating_times"][group_index]
-                #if avg_exec_creating_time > 0:
-                    #print(f"Average Creating Time for group {group} = {avg_exec_creating_time}")
-                    
+                if len(group_metrics["avg_exec_creating_times"]) > group_index:
+                    avg_exec_creating_time = group_metrics["avg_exec_creating_times"][group_index]
+                else:
+                    avg_exec_creating_time = 0
+
                 if len(group_metrics["avg_exec_validating_times"]) > 0:
-                    avg_exec_validating_time = group_metrics["avg_exec_validating_times"][group_index]
-                    #if avg_exec_validating_time > 0:
-                        #print(f"Average Validating Time for group {group} = {avg_exec_validating_time}")
+                    if len(group_metrics["avg_exec_validating_times"]) > group_index:
+                        avg_exec_validating_time = group_metrics["avg_exec_validating_times"][group_index]
+                    else:
+                        avg_exec_validating_time = 0
                         
                 if len(group_metrics["avg_exec_running_times"]) > 0:
-                    avg_exec_running_time = group_metrics["avg_exec_running_times"][group_index]
-                    #if avg_exec_running_time > 0:
-                        #print(f"Average Running Time for group {group} = {avg_exec_running_time}")
+                    if len(group_metrics["avg_exec_running_times"]) > group_index:
+                        avg_exec_running_time = group_metrics["avg_exec_running_times"][group_index]
+                    else:
+                        avg_exec_running_time = 0
                             
                 print(f"Average Transpiling, Validating, Running Times for group {group} = {avg_exec_creating_time}, {avg_exec_validating_time}, {avg_exec_running_time} secs")
             
