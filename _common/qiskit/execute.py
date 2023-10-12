@@ -258,8 +258,8 @@ def set_execution_target(backend_id='qasm_simulator',
         
         # The hub variable is used to identify an Azure Quantum backend
         if hub == "azure-quantum":
-            from azure.quantum.job.session import Session
-  
+            from azure.quantum.job.session import Session, SessionJobFailurePolicy 
+            
             # increment session counter
             session_count += 1
             
@@ -267,7 +267,9 @@ def set_execution_target(backend_id='qasm_simulator',
                 print(f"... creating session {session_count} on Azure backend {backend_id}")
                 
             # open a session on the backend
-            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}")
+            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}",
+                    job_failure_policy=SessionJobFailurePolicy.CONTINUE)
+                    
             backend.latest_session = session
             
     # handle QASM simulator specially
@@ -306,7 +308,7 @@ def set_execution_target(backend_id='qasm_simulator',
         elif hub == "azure-quantum":
             global azure_provider
             from azure.quantum.qiskit import AzureQuantumProvider
-            from azure.quantum.job.session import Session 
+            from azure.quantum.job.session import Session, SessionJobFailurePolicy
             
             # create an Azure Provider only the first time it is needed
             if azure_provider is None:
@@ -333,7 +335,9 @@ def set_execution_target(backend_id='qasm_simulator',
             backend = azure_provider.get_backend(backend_id)
  
             # open a session on the backend
-            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}")
+            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}",
+                    job_failure_policy=SessionJobFailurePolicy.CONTINUE)
+                    
             backend.latest_session = session
             
         # otherwise, assume the backend_id is given only and assume it is IBMQ device
