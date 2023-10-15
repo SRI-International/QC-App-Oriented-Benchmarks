@@ -216,7 +216,7 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
     print("\nQuantum Oracle 'Ug' ="); print(Ug_ if Ug_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - {benchmark_name} - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 # if main, execute method
 if __name__ == '__main__': run()

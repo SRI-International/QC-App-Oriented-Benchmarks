@@ -14,6 +14,9 @@ sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
 import execute as ex
 import metrics as metrics
 
+# Benchmark Name
+benchmark_name = "Quantum Fourier Transform"
+
 np.random.seed(0)
 
 verbose = False
@@ -246,15 +249,21 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots, met
 def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, skip_qubits=1, num_shots = 100,
         method=1, 
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Quantum Fourier Transform Benchmark Program - Qiskit")
-    print(f"... using circuit method {method}")
+    print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
     # validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
+    skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
+    
+    # create context identifier
+    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    
+    ##########
     
     # Initialize metrics module
     metrics.init_metrics()
@@ -270,8 +279,11 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, skip_qubits=1, num_sh
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for input_size in range(min_qubits, max_qubits + 1, skip_qubits):
@@ -327,6 +339,8 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, skip_qubits=1, num_sh
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
     
+    ##########
+    
     # print a sample circuit created (if not too large)
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     if method==1:
@@ -334,7 +348,7 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, skip_qubits=1, num_sh
     print("\nInverse QFT Circuit ="); print(QFTI_)
      
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Quantum Fourier Transform ({method}) - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
 
 # if main, execute method 1
 if __name__ == '__main__': run()

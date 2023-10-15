@@ -16,6 +16,9 @@ sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 import execute as ex
 import metrics as metrics
 
+# Benchmark Name
+benchmark_name = "Hamiltonian Simulation"
+
 np.random.seed(0)
 
 verbose = False
@@ -203,21 +206,29 @@ def analyze_and_print_result(qc, result, num_qubits, type, num_shots):
 def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100,
         use_XX_YY_ZZ_gates = False,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Hamiltonian-Simulation Benchmark Program - Qiskit")
+    print(f"{benchmark_name} Benchmark Program - Qiskit")
     
     # validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
     if min_qubits % 2 == 1: min_qubits += 1   # min_qubits must be even
+    skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
 
+    # create context identifier
+    #if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
     # set the flag to use an XX YY ZZ shim if given
     global _use_XX_YY_ZZ_gates
     _use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates
     if _use_XX_YY_ZZ_gates:
         print("... using unoptimized XX YY ZZ gates")
+    
+    ##########
     
     # Initialize metrics module
     metrics.init_metrics()
@@ -232,8 +243,11 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
@@ -280,6 +294,8 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
    
@@ -291,7 +307,7 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
         print(XXYYZZ_)
         
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Hamiltonian Simulation - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 
 # if main, execute method
