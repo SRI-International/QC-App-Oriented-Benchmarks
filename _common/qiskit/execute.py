@@ -229,21 +229,23 @@ def init_execution(handler):
 # Set the backend for execution
 def set_execution_target(backend_id='qasm_simulator',
                 provider_module_name=None, provider_name=None, provider_backend=None,
-                hub=None, group=None, project=None, exec_options=None):
+                hub=None, group=None, project=None, exec_options=None,
+                context=None):
     """
     Used to run jobs on a real hardware
     :param backend_id:  device name. List of available devices depends on the provider
-    :param group: used to load IBMQ accounts.
-    :param project: used to load IBMQ accounts.
-    :param provider_module_name: If using a provider other than IBMQ, the string of the module that contains the
-    Provider class.  For example, for honeywell, this would be 'qiskit.providers.honeywell'
+    :param hub: hub identifier, currently "ibm-q" for IBM Quantum, "azure-quantum" for Azure Quantum 
+    :param group: group identifier, used with IBM-Q accounts.
+    :param project: project identifier, used with IBM-Q accounts.
+    :param provider_module_name: If using a provider other than IBM-Q, the string of the module that contains the Provider class.  For example, for Quantinuum, this would be 'qiskit.providers.quantinuum'
     :param provider_name:  If using a provider other than IBMQ, the name of the provider class.
-    For example, for Honeywell, this would be 'Honeywell'.
+    :param context: context for execution, used to create session names
+    For example, for Quantinuum, this would be 'Quantinuum'.
     :provider_backend: a custom backend object created and passed in, use backend_id as identifier
     example usage.
 
-    set_execution_target(backend_id='honeywell_device_1', provider_module_name='qiskit.providers.honeywell',
-                        provider_name='Honeywell')
+    set_execution_target(backend_id='quantinuum_device_1', provider_module_name='qiskit.providers.quantinuum',
+                        provider_name='Quantinuum')
     """
     global backend
     global session
@@ -263,11 +265,15 @@ def set_execution_target(backend_id='qasm_simulator',
             # increment session counter
             session_count += 1
             
+            # create session name
+            if context is not None: session_name = context
+            else: session_name = f"QED-C Benchmark Session {session_count}"
+            
             if verbose:
-                print(f"... creating session {session_count} on Azure backend {backend_id}")
+                print(f"... creating session {session_name} on Azure backend {backend_id}")
                 
             # open a session on the backend
-            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}",
+            session = backend.open_session(name=session_name,
                     job_failure_policy=SessionJobFailurePolicy.CONTINUE)
                     
             backend.latest_session = session
@@ -327,15 +333,19 @@ def set_execution_target(backend_id='qasm_simulator',
             # increment session counter
             session_count += 1
             
+            # create session name
+            if context is not None: session_name = context
+            else: session_name = f"QED-C Benchmark Session {session_count}"
+            
             if verbose:
-                print(f"... creating Azure backend {backend_id} and session {session_count}")
+                print(f"... creating Azure backend {backend_id} and session {session_name}")
                 
             # then find backend from the backend_id
             # we should cache this and only change if backend_id changes
             backend = azure_provider.get_backend(backend_id)
  
             # open a session on the backend
-            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}",
+            session = backend.open_session(name=session_name,
                     job_failure_policy=SessionJobFailurePolicy.CONTINUE)
                     
             backend.latest_session = session
