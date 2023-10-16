@@ -27,6 +27,9 @@ sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier
 import execute as ex
 import metrics as metrics
 
+# Benchmark Name
+benchmark_name = "HHL"
+
 np.random.seed(0)
 
 verbose = False
@@ -387,6 +390,8 @@ def make_circuit(A, b, num_clock_qubits):
     n = int(np.log2(N))
     n_t = num_clock_qubits # number of qubits in clock register
     
+    num_qubits = 2*n + n_t + 1
+    
     # lower bound on eigenvalues of A. Fixed for now
     C = 1/4
     
@@ -405,7 +410,7 @@ def make_circuit(A, b, num_clock_qubits):
     cr_a = ClassicalRegister(1)
     
     # create the top-level HHL circuit, with all the registers
-    qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a)
+    qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a, name=f"hhl-{num_qubits}-{b}")
 
     ''' Initialize the input and clock qubits '''
     
@@ -647,46 +652,52 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
         method = 1, use_best_widths=True,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):  
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):  
 
-        # we must have at least 4 qubits and min must be less than max
-        max_qubits = max(4, max_qubits)
-        min_qubits = min(max(4, min_qubits), max_qubits)
-        #print(f"... using min_qubits = {min_qubits} and max_qubits = {max_qubits}")
-        
-        ''' first attempt ..
-        min_input_qubits = min_qubits//2
-        if min_qubits%2 == 1:
-            min_clock_qubits = min_qubits//2 + 1
-        else:
-            min_clock_qubits = min_qubits//2
+    # we must have at least 4 qubits and min must be less than max
+    max_qubits = max(4, max_qubits)
+    min_qubits = min(max(4, min_qubits), max_qubits)
+    skip_qubits = max(1, skip_qubits)
+    #print(f"... using min_qubits = {min_qubits} and max_qubits = {max_qubits}")
 
-        max_input_qubits = max_qubits//2
-        if max_qubits%2 == 1:
-            max_clock_qubits = max_qubits//2 + 1
-        else:
-            max_clock_qubits = max_qubits//2
-        '''
-        
-        # the calculation below is based on the formula described above, where I = input, C = clock:
-        
-        # I = int((N - 1) / 3)
-        min_input_qubits = int((min_qubits - 1) / 3)
-        max_input_qubits = int((max_qubits - 1) / 3)
-        
-        # C = N - 1 - 2 * I
-        min_clock_qubits = min_qubits - 1 - 2 * min_input_qubits
-        max_clock_qubits = max_qubits - 1 - 2 * max_input_qubits
-        
-        #print(f"... input, clock qubit width range: {min_input_qubits} : {max_input_qubits}, {min_clock_qubits} : {max_clock_qubits}")
+    # create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
+    ''' first attempt ..
+    min_input_qubits = min_qubits//2
+    if min_qubits%2 == 1:
+        min_clock_qubits = min_qubits//2 + 1
+    else:
+        min_clock_qubits = min_qubits//2
 
-        return run2(min_input_qubits=min_input_qubits,max_input_qubits= max_input_qubits,
-                min_clock_qubits=min_clock_qubits, max_clock_qubits=max_clock_qubits,
-                skip_qubits=skip_qubits,
-                max_circuits=max_circuits, num_shots=num_shots, 
-                method=method, use_best_widths=use_best_widths,
-                backend_id=backend_id, provider_backend=provider_backend,
-                hub=hub, group=group, project=project, exec_options=exec_options)
+    max_input_qubits = max_qubits//2
+    if max_qubits%2 == 1:
+        max_clock_qubits = max_qubits//2 + 1
+    else:
+        max_clock_qubits = max_qubits//2
+    '''
+    
+    # the calculation below is based on the formula described above, where I = input, C = clock:
+    
+    # I = int((N - 1) / 3)
+    min_input_qubits = int((min_qubits - 1) / 3)
+    max_input_qubits = int((max_qubits - 1) / 3)
+    
+    # C = N - 1 - 2 * I
+    min_clock_qubits = min_qubits - 1 - 2 * min_input_qubits
+    max_clock_qubits = max_qubits - 1 - 2 * max_input_qubits
+    
+    #print(f"... input, clock qubit width range: {min_input_qubits} : {max_input_qubits}, {min_clock_qubits} : {max_clock_qubits}")
+
+    return run2(min_input_qubits=min_input_qubits,max_input_qubits= max_input_qubits,
+            min_clock_qubits=min_clock_qubits, max_clock_qubits=max_clock_qubits,
+            skip_qubits=skip_qubits,
+            max_circuits=max_circuits, num_shots=num_shots, 
+            method=method, use_best_widths=use_best_widths,
+            backend_id=backend_id, provider_backend=provider_backend,
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
 
 # Execute program with default parameters and permitting the user to specify an
@@ -698,9 +709,10 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
         max_circuits=3, num_shots=100,
         method=2, use_best_widths=False,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):  
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):  
     
-    print("HHL Benchmark Program - Qiskit")
+    print(f"{benchmark_name} Benchmark Program - Qiskit")
 
     # ensure valid input an clock qubit widths
     min_input_qubits = min(max(1, min_input_qubits), max_input_qubits)
@@ -719,6 +731,8 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     HP_ = None
     INVROT_ = None
 
+    ##########
+    
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -741,7 +755,8 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
     # for noiseless simulation, set noise model to be None
     #ex.set_noise_model(None)
@@ -749,6 +764,8 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     # temporarily fix diag and off-diag matrix elements
     diag_el = 0.5
     off_diag_el = -0.25
+    
+    ##########
     
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
@@ -808,6 +825,8 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
@@ -819,7 +838,7 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     print("\nControlled Rotation Circuit ="); print(INVROT_ if INVROT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - HHL - Qiskit",
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit",
                          transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
 # if main, execute method

@@ -17,6 +17,9 @@ sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 import execute as ex
 import metrics as metrics
 
+# Benchmark Name
+benchmark_name = "VQE Simulation"
+
 verbose= False
 
 # saved circuits for display
@@ -41,7 +44,7 @@ def VQEEnergy(n_spin_orbs, na, nb, circuit_id=0, method=1):
     num_qubits = n_spin_orbs
 
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name = 'main')
+    qc = QuantumCircuit(qr, name=f"vqe-ansatz({method})-{num_qubits}-{circuit_id}")
 
     # initialize the HF state
     Hf = HartreeFock(num_qubits, na, nb)
@@ -298,16 +301,17 @@ def analyze_and_print_result(qc, result, num_qubits, references, num_shots):
 
 ################ Benchmark Loop
 
+# Max qubits must be 12 since the referenced files only go to 12 qubits
+MAX_QUBITS = 12
+    
 # Execute program with default parameters
-def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
+def run(min_qubits=4, max_qubits=8, skip_qubits=1,
+        max_circuits=3, num_shots=4092, method=1,
         backend_id="qasm_simulator", provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Variational Quantum Eigensolver Benchmark Program - Qiskit")
-    print(f"... using circuit method {method}")
-
-    # Max qubits must be 10 since the referenced files only go to 12 qubits
-    MAX_QUBITS = 10
+    print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit") 
 
     max_qubits = max(max_qubits, min_qubits)        # max must be >= min
 
@@ -315,12 +319,19 @@ def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
     max_qubits = min(max_qubits, MAX_QUBITS)
     min_qubits = min(max(4, min_qubits), max_qubits)
     if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even
+    skip_qubits = max(1, skip_qubits)
+    
     if method == 2: max_circuits = 1
 
     if max_qubits < 4:
         print(f"Max number of qubits {max_qubits} is too low to run method {method} of VQE algorithm")
         return
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    
+    ##########
+    
     # Initialize the metrics module
     metrics.init_metrics()
 
@@ -349,8 +360,11 @@ def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for input_size in range(min_qubits, max_qubits + 1, 2):
@@ -418,13 +432,15 @@ def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nHartree Fock Generator 'Hf' ="); print(Hf_ if Hf_ != None else " ... too large!")
     print("\nCluster Operator Example 'Cluster Op' ="); print(CO_ if CO_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - VQE Simulation ({method}) - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
 
 # if main, execute methods     
 if __name__ == "__main__": run()
