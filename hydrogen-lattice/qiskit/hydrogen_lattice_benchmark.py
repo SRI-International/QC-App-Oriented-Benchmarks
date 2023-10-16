@@ -56,6 +56,9 @@ except Exception as e:
     print(f"Exception {e} occured while configuring logger: bypassing logger config to prevent data loss")
     pass
 
+# Benchmark Name
+benchmark_name = "Hydrogen Lattice"
+
 np.random.seed(0)
 
 # Hydrogen Lattice inputs  ( Here input is Hamiltonian matrix --- Need to change)
@@ -995,7 +998,7 @@ def plot_results_from_data(
         dt = cur_time.strftime("%Y-%m-%d_%H-%M-%S")
         suffix = f"s{num_shots}_r{radius}_mi{max_iter}_{dt}"
 
-    suptitle = f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit"
+    suptitle = f"Benchmark Results - {benchmark_name} ({method}) - Qiskit"
     backend_id = metrics.get_backend_id()
     options = {"shots": num_shots, "radius": radius, "restarts": max_circuits}
 
@@ -1077,6 +1080,7 @@ def run(
     backend_id="qasm_simulator",
     provider_backend=None, hub="ibm-q", group="open", project="main",
     exec_options=None,
+    context=None,
     _instances=None,
 ):
     """
@@ -1185,7 +1189,7 @@ def run(
     global minimizer_loop_index
     global opt_ts
 
-    print("Hydrogen Lattice Benchmark Program - Qiskit")
+    print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
     QC_ = None
 
@@ -1193,7 +1197,11 @@ def run(
     max_qubits = max(2, max_qubits)
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
+    skip_qubits = max(2, skip_qubits)
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    
     try:
         print("Validating user inputs...")
         # raise an exception if either min_qubits or max_qubits is not even
@@ -1224,7 +1232,9 @@ def run(
     # given that this benchmark does every other width, set y_size default to 1.5
     if y_size is None:
         y_size = 1.5
-
+    
+    ##########
+    
     # Initialize metrics module with empty metrics arrays
     metrics.init_metrics()
 
@@ -1252,8 +1262,10 @@ def run(
         ex.init_execution(execution_handler)
 
     # initialize the execution module with target information
-    ex.set_execution_target(
-        backend_id, provider_backend=provider_backend, hub=hub, group=group, project=project, exec_options=exec_options
+    ex.set_execution_target(backend_id, provider_backend=provider_backend,
+        hub=hub, group=group, project=project,
+        exec_options=exec_options,
+        context=context
     )
 
     # create a data folder for the results
@@ -1706,6 +1718,8 @@ def run(
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     if print_sample_circuit:
         if method == 1:
@@ -1714,7 +1728,7 @@ def run(
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - Hydrogen Lattice ({method}) - Qiskit",
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
                 options=dict(shots=num_shots))
                 
     elif method == 2:
