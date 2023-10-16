@@ -64,7 +64,8 @@ def Ug_oracle(num_qubits):
 def HiddenShift (num_qubits, secret_int):
     
     # allocate qubits
-    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits); qc = QuantumCircuit(qr, cr, name="main")
+    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits);
+    qc = QuantumCircuit(qr, cr, name=f"hs-{num_qubits}-{secret_int}")
     
     # Start with Hadamard on all input qubits
     for i_qubit in range(num_qubits):

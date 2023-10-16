@@ -35,7 +35,7 @@ def GroversSearch(num_qubits, marked_item, n_iterations):
     # allocate qubits
     qr = QuantumRegister(num_qubits);
     cr = ClassicalRegister(num_qubits);
-    qc = QuantumCircuit(qr, cr, name="main")
+    qc = QuantumCircuit(qr, cr, name=f"grovers-{num_qubits}-{marked_item}")
 
     # Start with Hadamard on all qubits
     for i_qubit in range(num_qubits):

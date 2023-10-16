@@ -44,7 +44,7 @@ def VQEEnergy(n_spin_orbs, na, nb, circuit_id=0, method=1):
     num_qubits = n_spin_orbs
 
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name = 'main')
+    qc = QuantumCircuit(qr, name=f"vqe-ansatz({method})-{num_qubits}-{circuit_id}")
 
     # initialize the HF state
     Hf = HartreeFock(num_qubits, na, nb)

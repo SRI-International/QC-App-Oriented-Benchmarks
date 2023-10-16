@@ -390,6 +390,8 @@ def make_circuit(A, b, num_clock_qubits):
     n = int(np.log2(N))
     n_t = num_clock_qubits # number of qubits in clock register
     
+    num_qubits = 2*n + n_t + 1
+    
     # lower bound on eigenvalues of A. Fixed for now
     C = 1/4
     
@@ -408,7 +410,7 @@ def make_circuit(A, b, num_clock_qubits):
     cr_a = ClassicalRegister(1)
     
     # create the top-level HHL circuit, with all the registers
-    qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a)
+    qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a, name=f"hhl-{num_qubits}-{b}")
 
     ''' Initialize the input and clock qubits '''
     

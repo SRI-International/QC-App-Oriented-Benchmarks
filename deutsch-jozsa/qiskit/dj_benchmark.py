@@ -78,7 +78,8 @@ def DeutschJozsa (num_qubits, type):
     input_size = num_qubits - 1
 
     # allocate qubits
-    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size); qc = QuantumCircuit(qr, cr, name="main")
+    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size);
+    qc = QuantumCircuit(qr, cr, name=f"dj-{num_qubits}-{type}")
 
     for qubit in range(input_size):
         qc.h(qubit)

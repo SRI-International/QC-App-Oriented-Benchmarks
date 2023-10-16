@@ -50,8 +50,12 @@ def HamiltonianSimulation(n_spins, K, t, w, h_x, h_z):
     :return: return a Qiskit circuit for this Hamiltonian
     '''
     
+    num_qubits = n_spins
+    secret_int = f"{K}-{t}"
+    
     # allocate qubits
-    qr = QuantumRegister(n_spins); cr = ClassicalRegister(n_spins); qc = QuantumCircuit(qr, cr, name="main")
+    qr = QuantumRegister(n_spins); cr = ClassicalRegister(n_spins);
+    qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{secret_int}")
     tau = t / K
 
     # start with initial state of 1010101...

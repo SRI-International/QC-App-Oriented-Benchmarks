@@ -71,7 +71,7 @@ def MonteCarloSampling(target_dist, f, num_state_qubits, num_counting_qubits, ep
     A.append(F.to_gate(), A_qr)
 
     # run AE subroutine given our A composed of R and F
-    qc = AE_Subroutine(num_state_qubits, num_counting_qubits, A)
+    qc = AE_Subroutine(num_state_qubits, num_counting_qubits, A, method)
 
     # save smaller circuit example for display
     global QC_, R_, F_
@@ -167,11 +167,14 @@ def uniform_prep(qc, qr, num_state_qubits):
     for i in range(num_state_qubits):
         qc.h(i)
             
-def AE_Subroutine(num_state_qubits, num_counting_qubits, A_circuit):
+def AE_Subroutine(num_state_qubits, num_counting_qubits, A_circuit, method):
+
+    num_qubits = num_state_qubits + num_counting_qubits
+    
     qr_state = QuantumRegister(num_state_qubits+1)
     qr_counting = QuantumRegister(num_counting_qubits)
     cr = ClassicalRegister(num_counting_qubits)
-    qc = QuantumCircuit(qr_state, qr_counting, cr)
+    qc = QuantumCircuit(qr_state, qr_counting, cr, name=f"qmc({method})-{num_qubits}-{0}")
 
     A = A_circuit
     cQ, Q = Ctrl_Q(num_state_qubits, A)

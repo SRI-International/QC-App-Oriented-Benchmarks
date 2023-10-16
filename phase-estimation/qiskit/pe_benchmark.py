@@ -35,7 +35,7 @@ def PhaseEstimation(num_qubits, theta):
     num_counting_qubits = num_qubits - 1 # only 1 state qubit
     
     cr = ClassicalRegister(num_counting_qubits)
-    qc = QuantumCircuit(qr, cr)
+    qc = QuantumCircuit(qr, cr, name=f"qpe-{num_qubits}-{theta}")
 
     # initialize counting qubits in superposition
     for i in range(num_counting_qubits):

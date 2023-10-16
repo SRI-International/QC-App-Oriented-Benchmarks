@@ -32,13 +32,14 @@ QFTI_ = None
 ############### Circuit Definition
 
 def AmplitudeEstimation(num_state_qubits, num_counting_qubits, a, psi_zero=None, psi_one=None):
+
+    num_qubits = num_state_qubits + 1 + num_counting_qubits
+    
     qr_state = QuantumRegister(num_state_qubits+1)
     qr_counting = QuantumRegister(num_counting_qubits)
     cr = ClassicalRegister(num_counting_qubits)
-    qc = QuantumCircuit(qr_counting, qr_state, cr)
+    qc = QuantumCircuit(qr_counting, qr_state, cr, name=f"qae-{num_qubits}-{a}")
     
-    num_qubits = num_state_qubits + 1 + num_counting_qubits
-
     # create the Amplitude Generator circuit
     A = A_gen(num_state_qubits, a, psi_zero, psi_one)
 

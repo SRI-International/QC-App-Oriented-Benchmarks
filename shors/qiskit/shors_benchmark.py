@@ -195,7 +195,8 @@ def ShorsAlgorithm(number, base, method, verbose=verbose):
         qr_mult = QuantumRegister(n)        # Register for multiplications
         qr_aux = QuantumRegister(n+2)       # Register for addition and multiplication
         cr_data = ClassicalRegister(2*n)  # Register for measured values of QFT
-        qc = QuantumCircuit(qr_counting, qr_mult, qr_aux, cr_data, name="main")
+        qc = QuantumCircuit(qr_counting, qr_mult, qr_aux, cr_data,
+                name=f"qmc({method})-{num_qubits}-{number}")
 
         # Initialize multiplication register to 1 and counting register to superposition state
         qc.h(qr_counting)
