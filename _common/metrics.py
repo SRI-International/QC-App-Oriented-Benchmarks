@@ -350,17 +350,18 @@ def aggregate_metrics_for_group (group):
         
 # Compute average and stddev for a metric in a given circuit group
 # DEVNOTE: this creates new array every time; could be more efficient if multiple metrics done at once
-def get_circuit_stats_for_metric(group, metric, precision): 
-    try:
-        metric_array = [circuit_metrics[group][circuit][metric] for circuit in circuit_metrics[group]]
-        avg = round(np.average(metric_array), precision)
-        std = round(np.std(metric_array)/np.sqrt(len(metric_array)), precision)
-        
-    # on failure, usually due to KeyError, return 0s
-    except Exception as e:
-        avg = 0
-        std = 0
-        
+def get_circuit_stats_for_metric(group, metric, precision):
+    metric_array = []
+    for circuit in circuit_metrics[group]:
+        if metric in circuit_metrics[group][circuit]:
+            metric_array.append(circuit_metrics[group][circuit][metric])
+        else:
+            metric_array.append(None)
+    metric_array = [x for x in metric_array if x is not None]
+    if len(metric_array) == 0:
+        return 0, 0
+    avg = round(np.average(metric_array), precision)
+    std = round(np.std(metric_array)/np.sqrt(len(metric_array)), precision)
     return avg, std
     
             
@@ -403,21 +404,25 @@ def report_metrics_for_group (group):
             avg_exec_time = group_metrics["avg_exec_times"][group_index]
             print(f"Average Creation, Elapsed, Execution Time for the {group} qubit group = {avg_create_time}, {avg_elapsed_time}, {avg_exec_time} secs")
             
-            #if verbose:
+            # report these detailed times, but only if they have been collected (i.e., len of array > 0)
+            # not all backedns generate these data elements
             if len(group_metrics["avg_exec_creating_times"]) > 0:
-                avg_exec_creating_time = group_metrics["avg_exec_creating_times"][group_index]
-                #if avg_exec_creating_time > 0:
-                    #print(f"Average Creating Time for group {group} = {avg_exec_creating_time}")
-                    
+                if len(group_metrics["avg_exec_creating_times"]) > group_index:
+                    avg_exec_creating_time = group_metrics["avg_exec_creating_times"][group_index]
+                else:
+                    avg_exec_creating_time = 0
+
                 if len(group_metrics["avg_exec_validating_times"]) > 0:
-                    avg_exec_validating_time = group_metrics["avg_exec_validating_times"][group_index]
-                    #if avg_exec_validating_time > 0:
-                        #print(f"Average Validating Time for group {group} = {avg_exec_validating_time}")
+                    if len(group_metrics["avg_exec_validating_times"]) > group_index:
+                        avg_exec_validating_time = group_metrics["avg_exec_validating_times"][group_index]
+                    else:
+                        avg_exec_validating_time = 0
                         
                 if len(group_metrics["avg_exec_running_times"]) > 0:
-                    avg_exec_running_time = group_metrics["avg_exec_running_times"][group_index]
-                    #if avg_exec_running_time > 0:
-                        #print(f"Average Running Time for group {group} = {avg_exec_running_time}")
+                    if len(group_metrics["avg_exec_running_times"]) > group_index:
+                        avg_exec_running_time = group_metrics["avg_exec_running_times"][group_index]
+                    else:
+                        avg_exec_running_time = 0
                             
                 print(f"Average Transpiling, Validating, Running Times for group {group} = {avg_exec_creating_time}, {avg_exec_validating_time}, {avg_exec_running_time} secs")
             
@@ -3203,7 +3208,8 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
                 bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
                 
     # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), cax=None, ax=ax,
+            shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
             
     return ax
 
