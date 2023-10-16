@@ -229,21 +229,23 @@ def init_execution(handler):
 # Set the backend for execution
 def set_execution_target(backend_id='qasm_simulator',
                 provider_module_name=None, provider_name=None, provider_backend=None,
-                hub=None, group=None, project=None, exec_options=None):
+                hub=None, group=None, project=None, exec_options=None,
+                context=None):
     """
     Used to run jobs on a real hardware
     :param backend_id:  device name. List of available devices depends on the provider
-    :param group: used to load IBMQ accounts.
-    :param project: used to load IBMQ accounts.
-    :param provider_module_name: If using a provider other than IBMQ, the string of the module that contains the
-    Provider class.  For example, for honeywell, this would be 'qiskit.providers.honeywell'
+    :param hub: hub identifier, currently "ibm-q" for IBM Quantum, "azure-quantum" for Azure Quantum 
+    :param group: group identifier, used with IBM-Q accounts.
+    :param project: project identifier, used with IBM-Q accounts.
+    :param provider_module_name: If using a provider other than IBM-Q, the string of the module that contains the Provider class.  For example, for Quantinuum, this would be 'qiskit.providers.quantinuum'
     :param provider_name:  If using a provider other than IBMQ, the name of the provider class.
-    For example, for Honeywell, this would be 'Honeywell'.
+    :param context: context for execution, used to create session names
+    For example, for Quantinuum, this would be 'Quantinuum'.
     :provider_backend: a custom backend object created and passed in, use backend_id as identifier
     example usage.
 
-    set_execution_target(backend_id='honeywell_device_1', provider_module_name='qiskit.providers.honeywell',
-                        provider_name='Honeywell')
+    set_execution_target(backend_id='quantinuum_device_1', provider_module_name='qiskit.providers.quantinuum',
+                        provider_name='Quantinuum')
     """
     global backend
     global session
@@ -258,16 +260,22 @@ def set_execution_target(backend_id='qasm_simulator',
         
         # The hub variable is used to identify an Azure Quantum backend
         if hub == "azure-quantum":
-            from azure.quantum.job.session import Session
-  
+            from azure.quantum.job.session import Session, SessionJobFailurePolicy 
+            
             # increment session counter
             session_count += 1
             
+            # create session name
+            if context is not None: session_name = context
+            else: session_name = f"QED-C Benchmark Session {session_count}"
+            
             if verbose:
-                print(f"... creating session {session_count} on Azure backend {backend_id}")
+                print(f"... creating session {session_name} on Azure backend {backend_id}")
                 
             # open a session on the backend
-            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}")
+            session = backend.open_session(name=session_name,
+                    job_failure_policy=SessionJobFailurePolicy.CONTINUE)
+                    
             backend.latest_session = session
             
     # handle QASM simulator specially
@@ -306,7 +314,7 @@ def set_execution_target(backend_id='qasm_simulator',
         elif hub == "azure-quantum":
             global azure_provider
             from azure.quantum.qiskit import AzureQuantumProvider
-            from azure.quantum.job.session import Session 
+            from azure.quantum.job.session import Session, SessionJobFailurePolicy
             
             # create an Azure Provider only the first time it is needed
             if azure_provider is None:
@@ -325,15 +333,21 @@ def set_execution_target(backend_id='qasm_simulator',
             # increment session counter
             session_count += 1
             
+            # create session name
+            if context is not None: session_name = context
+            else: session_name = f"QED-C Benchmark Session {session_count}"
+            
             if verbose:
-                print(f"... creating Azure backend {backend_id} and session {session_count}")
+                print(f"... creating Azure backend {backend_id} and session {session_name}")
                 
             # then find backend from the backend_id
             # we should cache this and only change if backend_id changes
             backend = azure_provider.get_backend(backend_id)
  
             # open a session on the backend
-            session = backend.open_session(name=f"QED-C Benchmark Session {session_count}")
+            session = backend.open_session(name=session_name,
+                    job_failure_policy=SessionJobFailurePolicy.CONTINUE)
+                    
             backend.latest_session = session
             
         # otherwise, assume the backend_id is given only and assume it is IBMQ device
@@ -514,6 +528,8 @@ def execute_circuit(circuit):
     qc_tr_n2q = qc_n2q
     #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
     
+    backend_name = get_backend_name(backend)
+    
     try:    
         # transpile the circuit to obtain size metrics using normalized basis
         if do_transpile_metrics and use_normalized_depth:
@@ -571,7 +587,7 @@ def execute_circuit(circuit):
             
             # invoke custom executor function with backend options
             qc = circuit["qc"]
-            result = executor(qc, backend.name(), backend, shots=shots, **backend_exec_options_copy)
+            result = executor(qc, backend_name, backend, shots=shots, **backend_exec_options_copy)
             
             if verbose_time:
                 print(f"  *** executor() time = {round(time.time() - st,4)}")
@@ -584,15 +600,12 @@ def execute_circuit(circuit):
         
         ##############        
         # normal execution processing is performed here
-        else:
-            if use_sessions:
-                logger.info(f"Executing on backend: {backend.name}")
-            else:
-                logger.info(f"Executing on backend: {backend.name()}")
+        else:       
+            logger.info(f"Executing on backend: {backend_name}")
 
             #************************************************
             # Initiate execution (with noise if specified and this is a simulator backend)
-            if this_noise is not None and not use_sessions and backend.name().endswith("qasm_simulator"):
+            if this_noise is not None and not use_sessions and backend_name.endswith("qasm_simulator"):
                 logger.info(f"Performing noisy simulation, shots = {shots}")
                 
                 # if the noise model has associated QV value, copy it to metrics module for plotting
@@ -664,7 +677,6 @@ def execute_circuit(circuit):
                     width_processor(qc)
 
                 # to execute on Aer state vector simulator, need to remove measurements
-                backend_name = backend.name if use_sessions else backend.name()
                 if backend_name.lower() == "statevector_simulator":
                     trans_qc = trans_qc.remove_final_measurements(inplace=False)
                             
@@ -716,6 +728,15 @@ def execute_circuit(circuit):
         wait_on_job_result(job, active_circuit)
 
     # return, so caller can do other things while waiting for jobs to complete    
+
+# Utility function to obtain name of backend
+# This is needed because some backends support backend.name and others backend.name()
+def get_backend_name(backend):
+    if callable(backend.name):
+        name = backend.name()
+    else:
+        name = backend.name
+    return name
 
 # block and wait for the job result to be returned
 # handle network timeouts by doing up to 40 retries once every 15 seconds

@@ -149,6 +149,9 @@ def cumulative_sum(input_list: list):
 #################################################
 # PLOT LINE METRICS
 
+# maximum number of instances for which to plot line metrics
+MAX_INSTANCES_FOR_LINE_PLOTS = 3
+
 # function to plot all line metrics
 def plot_all_line_metrics(suptitle=None, options=None,
         line_x_metrics=['iteration_count', 'cumulative_exec_time'],
@@ -204,6 +207,11 @@ def plot_all_line_metrics(suptitle=None, options=None,
         
         # generate a set of plots for each instance (radius) in data set
         for instance in range(1, total_instances + 1):
+        
+            # limit the line plots to a reasonable number
+            if instance > MAX_INSTANCES_FOR_LINE_PLOTS:
+                # print(f"... skipping line plot instance: {instance}")
+                continue
 
             # search metrics store for final metrics for this group
             current_radius, doci_energy, fci_energy, random_energy, \
