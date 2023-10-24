@@ -79,16 +79,10 @@ save_plot_images = True
 show_plot_images = True
 
 # Option to show elapsed times in the metrics plots
-show_elapsed_times = False
+show_elapsed_times = True
 
 # When ratio of max time to min time exceeds this use a logscale
 logscale_for_times_threshold = 50
-
-# Option to generate volumetric positioning charts
-do_volumetric_plots = True
-
-# Option to include all app charts with vplots at end
-do_app_charts_with_all_metrics = False
 
 # Toss out elapsed times for any run if the initial value is this factor of the second value 
 # (applies only to area plots - remove once queue time is removed earlier)
@@ -96,6 +90,16 @@ omit_initial_elapsed_time_factor = 0
 
 # if tossing large elapsed times, assume elapsed is this multiple of exec time
 initial_elapsed_time_multiplier = 1.1
+
+# remove creating time from elapsed time when displaying (default)
+# this seems to remove queue time in some cases (IBM machines only)
+remove_creating_time_from_elapsed = True
+
+# Option to generate volumetric positioning charts
+do_volumetric_plots = True
+
+# Option to include all app charts with vplots at end
+do_app_charts_with_all_metrics = False
 
 # Number of ticks on volumetric depth axis
 max_depth_log = 22
@@ -1041,18 +1045,17 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             axs[axi].set_xticklabels(xlabels)
     
         avg_exec_times = group_metrics["avg_exec_times"]
-        avg_elapsed_times = [et for et in group_metrics["avg_elapsed_times"]]
+        avg_elapsed_times = group_metrics["avg_elapsed_times"]
+        avg_exec_creating_times = group_metrics["avg_exec_creating_times"]
         
+        # Attempt to remove queue time from elapsed, heuristically
+        avg_elapsed_times = modify_elapsed_times(avg_elapsed_times,
+                avg_exec_creating_times, avg_exec_times)
+ 
+        # ensure existence of std arrays (for backwards compatibility)
         zeros = [0] * len(avg_exec_times)
         std_exec_times = group_metrics["std_exec_times"] if "std_exec_times" in group_metrics else zeros
         std_elapsed_times = group_metrics["std_elapsed_times"] if "std_elapsed_times" in group_metrics else zeros
-        
-        # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
-        # that are most likely due to either queueing or system initialization
-        if show_elapsed_times and omit_initial_elapsed_time_factor > 0:
-            for i in range(len(avg_elapsed_times)):
-                if avg_elapsed_times[i] > omit_initial_elapsed_time_factor * avg_exec_times[i]:
-                    avg_elapsed_times[i] = avg_exec_times[i] * initial_elapsed_time_multiplier
         
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
         
@@ -1381,6 +1384,30 @@ def get_nonzero_min(array):
     f_array = list(filter(lambda x: x > 0, array)) 
     if len(f_array) < 1: f_array = [0.001]
     return min(f_array)
+
+# Return a modifed copy of the elapsed time, removing queue time if possible using heuristics
+def modify_elapsed_times(avg_elapsed_times, avg_exec_creating_times, avg_exec_times):
+
+    # Make a copy of the elapsed times array since we may modify it
+    avg_elapsed_times = [et for et in avg_elapsed_times]
+    
+    # DEVNOTE: on some machines (IBM, specifically), the creating time includes the queue time.
+    # We can remove queue time from elapsed time by subtracting the creating time.
+    # The flaw in this is that it also removes the compilation time, which is small
+    # for small circuits, but could be larger for large circuits.
+    # Thus, we've added the variable to enable/disable this.
+    if remove_creating_time_from_elapsed and len(avg_exec_creating_times) > 0:
+        for i in range(len(avg_elapsed_times)):
+            avg_elapsed_times[i] = round(avg_elapsed_times[i] - avg_exec_creating_times[i], 3) 
+
+    # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
+    # that are most likely due to either queueing or system initialization
+    if show_elapsed_times and omit_initial_elapsed_time_factor > 0:
+        for i in range(len(avg_elapsed_times)):
+            if avg_elapsed_times[i] > omit_initial_elapsed_time_factor * avg_exec_times[i]:
+                avg_elapsed_times[i] = avg_exec_times[i] * initial_elapsed_time_multiplier
+    
+    return avg_elapsed_times
     
 #################################################
 
