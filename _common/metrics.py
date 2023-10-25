@@ -108,7 +108,7 @@ max_depth_log = 22
 QV = 0
 
 # Algorithmic Qubits (defaults)
-AQ = 22
+AQ = 12
 aq_cutoff = 0.368   # below this circuits not considered successful
 
 aq_mode = 0         # 0 - use default plot behavior, 1 - use AQ modified plots
