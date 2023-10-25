@@ -13,6 +13,9 @@ sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
 import execute as ex
 import metrics as metrics
 
+# Benchmark Name
+benchmark_name = "Deutsch-Jozsa"
+
 np.random.seed(0)
 
 verbose = False
@@ -67,6 +70,7 @@ def balanced_oracle (input_size, num_qubits):
         if num_qubits < 9: B_ORACLE_ = qc
 
     return qc
+    
 # Create benchmark circuit
 def DeutschJozsa (num_qubits, type):
     
@@ -74,7 +78,8 @@ def DeutschJozsa (num_qubits, type):
     input_size = num_qubits - 1
 
     # allocate qubits
-    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size); qc = QuantumCircuit(qr, cr, name="main")
+    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size);
+    qc = QuantumCircuit(qr, cr, name=f"dj-{num_qubits}-{type}")
 
     for qubit in range(input_size):
         qc.h(qubit)
@@ -137,16 +142,23 @@ def analyze_and_print_result (qc, result, num_qubits, type, num_shots):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
+def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Deutsch-Jozsa Benchmark Program - Qiskit")
+    print(f"{benchmark_name} Benchmark Program - Qiskit")
 
     # validate parameters (smallest circuit is 3 qubits)
     max_qubits = max(3, max_qubits)
     min_qubits = min(max(3, min_qubits), max_qubits)
+    skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
+    
+    # create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
+    ##########
     
     # Initialize metrics module
     metrics.init_metrics()
@@ -162,11 +174,14 @@ def run (min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)       
+    
+    ##########
     
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
     
         input_size = num_qubits - 1
         
@@ -195,13 +210,15 @@ def run (min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nConstant Oracle 'Uf' ="); print(C_ORACLE_ if C_ORACLE_ != None else " ... too large or not used!")
     print("\nBalanced Oracle 'Uf' ="); print(B_ORACLE_ if B_ORACLE_ != None else " ... too large or not used!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Deutsch-Jozsa - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 # if main, execute method
 if __name__ == '__main__': run()

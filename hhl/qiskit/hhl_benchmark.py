@@ -1,8 +1,6 @@
 """
 HHL Benchmark Program - Qiskit
 
-TODO:
-    - switch from total variation distance to Hellinger fidelity
 """
 
 import sys
@@ -28,6 +26,9 @@ sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier
 
 import execute as ex
 import metrics as metrics
+
+# Benchmark Name
+benchmark_name = "HHL"
 
 np.random.seed(0)
 
@@ -370,122 +371,12 @@ def inv_qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1
             qubits = [control] + [q for q in target] + [q for q in extra_qubits] + [ancilla[0]]
             qc.append(con_H_sim, qubits)
     
-'''   
 
-def hhl_routine(qc, ancilla, clock, input_qubits, measurement, extra_qubits=None, A=None, method=1):
-    
-    qpe(qc, clock, input_qubits, extra_qubits, ancilla, A, method)
-    qc.reset(ancilla)
+############### Make HHL Circuit
 
-    qc.barrier()
-    
-    if method == 1:
-        # This section is to test and implement C = 1   
-        # since we are not swapping after the QFT, reverse order of qubits from what is in papers
-        qc.cry(np.pi, clock[1], ancilla)
-        qc.cry(np.pi/3, clock[0], ancilla)
-    
-    # uniformly-controlled rotation
-    elif method == 2:
-        
-        n_clock = clock.size
-        C = 1/2**n_clock # constant in rotation (lower bound on eigenvalues A)
-        
-        # compute angles for inversion rotations
-        alpha = [2*np.arcsin(C)]
-        for x in range(1,2**n_clock):
-            x_bin_rev = np.binary_repr(x, width=n_clock)[::-1]
-            lam = int(x_bin_rev,2)/(2**n_clock)
-            alpha.append(2*np.arcsin(C/lam))
-        theta = ucr.alpha2theta(alpha)
-        
-        # do inversion step
-        qc = ucr.uniformly_controlled_rot(qc, clock, ancilla, theta)
-        
-    qc.barrier()
-    
-    qc.measure(ancilla, measurement[0])
-    qc.reset(ancilla)
-    
-    qc.barrier()
-    inv_qpe(qc, clock, input_qubits, extra_qubits, ancilla, A, method)
-   
-
-def HHL(num_qubits, num_input_qubits, num_clock_qubits, beta, A=None, method=1):
-    
-    if method == 1:
-    
-        print(num_clock_qubits)
-        print(num_input_qubits)
-        # Create the various registers needed
-        clock = QuantumRegister(num_clock_qubits, name='clock')
-        input_qubits = QuantumRegister(num_input_qubits, name='b')
-        ancilla = QuantumRegister(1, name='ancilla')
-        measurement = ClassicalRegister(2, name='c')
-    
-        # Create an empty circuit with the specified registers
-        qc = QuantumCircuit(ancilla, clock, input_qubits, measurement)
-            
-        # State preparation. (various initial values, done with initialize method)
-        # intial_state = [0,1]
-        # intial_state = [1,0]
-        # intial_state = [1/np.sqrt(2),1/np.sqrt(2)]
-        # intial_state = [np.sqrt(0.9),np.sqrt(0.1)]
-        ##intial_state = [np.sqrt(1 - beta), np.sqrt(beta)]
-        ##qc.initialize(intial_state, 3)
-        
-        # use an RY rotation to initialize the input state between 0 and 1
-        qc.ry(2 * np.arcsin(beta), input_qubits)
-    
-        # Put clock qubits into uniform superposition
-        qc.h(clock)
-    
-        # Perform the HHL routine
-        hhl_routine(qc, ancilla, clock, input_qubits, measurement)
-    
-        # Perform a Hadamard Transform on the clock qubits
-        qc.h(clock)
-    
-        qc.barrier()
-    
-        # measure the input, which now contains the answer
-        qc.measure(input_qubits, measurement[1])
-
-    
-    # # save smaller circuit example for display
-    # global QC_, U_, UI_, QFT_, QFTI_
-    # if QC_ == None or num_qubits <= 6:
-    #     if num_qubits < 9: 
-    #         QC_ = qc
-    # if U_ == None or num_qubits <= 6:    
-    #     _, U_ = ctrl_u(1)
-    #     #U_ = ctrl_u(np.pi/2, 2, 0, 1)
-        
-    # if UI_ == None or num_qubits <= 6:    
-    #     _, UI_ = ctrl_ui(1)
-    #     #UI_ = ctrl_ui(np.pi/2, 2, 0, 1)
-        
-    # if QFT_ == None or num_qubits <= 5:
-    #     if num_qubits < 9: QFT_ = qft_gate(len(clock))
-    # if QFTI_ == None or num_qubits <= 5:
-    #     if num_qubits < 9: QFTI_ = inv_qft_gate(len(clock))
-    
-    # return a handle on the circuit
-    return qc
-
-def hamiltonian_phase(n_t):
-    qr_t = QuantumRegister(n_t)
-    qc = QuantumCircuit(qr_t, name = 'H⊗n' )
-    # Hadamard phase estimation register
-    for q in range(n_t):
-        qc.h(qr_t[q])
-
-    return qc
-'''
-
-# Make the HHL circuit (this is the one aactually used right now)
+# Make the HHL circuit 
 def make_circuit(A, b, num_clock_qubits):
-    """ circuit for HHL algo A|x>=|b>
+    """ Generate top-level circuit for HHL algo A|x>=|b>
     
         A : sparse Hermitian matrix
         b (int): between 0,...,2^n-1. Initial basis state |b>
@@ -498,6 +389,8 @@ def make_circuit(A, b, num_clock_qubits):
     N = len(A)
     n = int(np.log2(N))
     n_t = num_clock_qubits # number of qubits in clock register
+    
+    num_qubits = 2*n + n_t + 1
     
     # lower bound on eigenvalues of A. Fixed for now
     C = 1/4
@@ -517,7 +410,7 @@ def make_circuit(A, b, num_clock_qubits):
     cr_a = ClassicalRegister(1)
     
     # create the top-level HHL circuit, with all the registers
-    qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a)
+    qc = QuantumCircuit(qr, qr_b, qr_t, qr_a, cr, cr_a, name=f"hhl-{num_qubits}-{b}")
 
     ''' Initialize the input and clock qubits '''
     
@@ -640,41 +533,12 @@ def make_circuit(A, b, num_clock_qubits):
 
     return qc
 
-
-def sim_circuit(qc, shots):
-    
-    simulator = Aer.get_backend('qasm_simulator')
-    result = execute(qc, simulator, shots=shots).result()
-    outcomes = result.get_counts(qc)
-
-    return outcomes
-
-
-def postselect(outcomes, return_probs=True):
-    
-    mar_out = {}
-    for b_str in outcomes:
-        if b_str[0] == '1':
-            counts = outcomes[b_str]
-            mar_out[b_str[2:]] = counts
-            
-    # compute postselection rate
-    ps_shots = sum(mar_out.values())
-    shots = sum(outcomes.values())
-    rate = ps_shots/shots
-    
-    # convert to probability distribution
-    if return_probs == True:
-        mar_out = {b_str:round(mar_out[b_str]/ps_shots, 4) for b_str in mar_out}
-    
-    
-    return mar_out, rate
-
  
 ############### Result Data Analysis
 
 saved_result = None
 
+# Compute the expected distribution, given the matrix A and input value b
 def true_distr(A, b=0):
     
     N = len(A)
@@ -697,31 +561,27 @@ def true_distr(A, b=0):
     
     return distr
 
-
-# DEVNOTE: This is not used any more and possibly should be removed
-'''
-def TVD(distr1, distr2):  
-    """ compute total variation distance between distr1 and distr2
-        which are represented as dictionaries of bitstrings and probabilities
-    """
+ # post-select counts where ancilla was measured as |1>
+def postselect(outcomes, return_probs=True):
     
-    tvd = 0.0
-    for out1 in distr1:
-        if out1 in distr2:
-            p1, p2 = distr1[out1], distr2[out1]
-            tvd += np.abs(p1-p2)/2
-        else:
-            p1 = distr1[out1]
-            tvd += p1/2
+    mar_out = {}
+    for b_str in outcomes:
+        if b_str[0] == '1':
+            counts = outcomes[b_str]
+            mar_out[b_str[2:]] = counts
+            
+    # compute postselection rate
+    ps_shots = sum(mar_out.values())
+    shots = sum(outcomes.values())
+    rate = ps_shots/shots
     
-    for out2 in distr2:
-        if out2 not in distr1:
-            p2 = distr2[out2]
-            tvd += p2/2
+    # convert to probability distribution
+    if return_probs == True:
+        mar_out = {b_str:round(mar_out[b_str]/ps_shots, 4) for b_str in mar_out}  
     
-    return tvd
-'''
-
+    return mar_out, rate
+    
+# Analyze the quality of the result obtained from executing circuit qc 
 def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
     
     global saved_result
@@ -789,62 +649,70 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
 # assumption that num_input_qubits ~= num_clock_qubits and num_input_qubits < num_clock_qubits:
 #      num_qubits = 2 * num_input_qubits + num_clock_qubits + 1 (the ancilla)
 
-def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
+def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
         method = 1, use_best_widths=True,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):  
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):  
 
-        # we must have at least 4 qubits and min must be less than max
-        max_qubits = max(4, max_qubits)
-        min_qubits = min(max(4, min_qubits), max_qubits)
-        #print(f"... using min_qubits = {min_qubits} and max_qubits = {max_qubits}")
-        
-        ''' first attempt ..
-        min_input_qubits = min_qubits//2
-        if min_qubits%2 == 1:
-            min_clock_qubits = min_qubits//2 + 1
-        else:
-            min_clock_qubits = min_qubits//2
+    # we must have at least 4 qubits and min must be less than max
+    max_qubits = max(4, max_qubits)
+    min_qubits = min(max(4, min_qubits), max_qubits)
+    skip_qubits = max(1, skip_qubits)
+    #print(f"... using min_qubits = {min_qubits} and max_qubits = {max_qubits}")
 
-        max_input_qubits = max_qubits//2
-        if max_qubits%2 == 1:
-            max_clock_qubits = max_qubits//2 + 1
-        else:
-            max_clock_qubits = max_qubits//2
-        '''
-        
-        # the calculation below is based on the formula described above, where I = input, C = clock:
-        
-        # I = int((N - 1) / 3)
-        min_input_qubits = int((min_qubits - 1) / 3)
-        max_input_qubits = int((max_qubits - 1) / 3)
-        
-        # C = N - 1 - 2 * I
-        min_clock_qubits = min_qubits - 1 - 2 * min_input_qubits
-        max_clock_qubits = max_qubits - 1 - 2 * max_input_qubits
-        
-        #print(f"... input, clock qubit width range: {min_input_qubits} : {max_input_qubits}, {min_clock_qubits} : {max_clock_qubits}")
+    # create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
+    ''' first attempt ..
+    min_input_qubits = min_qubits//2
+    if min_qubits%2 == 1:
+        min_clock_qubits = min_qubits//2 + 1
+    else:
+        min_clock_qubits = min_qubits//2
 
-        return run2(min_input_qubits=min_input_qubits,max_input_qubits= max_input_qubits,
-                min_clock_qubits=min_clock_qubits, max_clock_qubits=max_clock_qubits,
-                max_circuits=max_circuits, num_shots=num_shots, 
-                method=method, use_best_widths=use_best_widths,
-                backend_id=backend_id, provider_backend=provider_backend,
-                hub=hub, group=group, project=project, exec_options=exec_options)
+    max_input_qubits = max_qubits//2
+    if max_qubits%2 == 1:
+        max_clock_qubits = max_qubits//2 + 1
+    else:
+        max_clock_qubits = max_qubits//2
+    '''
+    
+    # the calculation below is based on the formula described above, where I = input, C = clock:
+    
+    # I = int((N - 1) / 3)
+    min_input_qubits = int((min_qubits - 1) / 3)
+    max_input_qubits = int((max_qubits - 1) / 3)
+    
+    # C = N - 1 - 2 * I
+    min_clock_qubits = min_qubits - 1 - 2 * min_input_qubits
+    max_clock_qubits = max_qubits - 1 - 2 * max_input_qubits
+    
+    #print(f"... input, clock qubit width range: {min_input_qubits} : {max_input_qubits}, {min_clock_qubits} : {max_clock_qubits}")
+
+    return run2(min_input_qubits=min_input_qubits,max_input_qubits= max_input_qubits,
+            min_clock_qubits=min_clock_qubits, max_clock_qubits=max_clock_qubits,
+            skip_qubits=skip_qubits,
+            max_circuits=max_circuits, num_shots=num_shots, 
+            method=method, use_best_widths=use_best_widths,
+            backend_id=backend_id, provider_backend=provider_backend,
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
 
 # Execute program with default parameters and permitting the user to specify an
 # arbitrary range of input and clock qubit widths
 # The benchmark sweeps over all input widths and clock widths in the range specified
 
-def run2 (min_input_qubits=1, max_input_qubits=3,
+def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
         min_clock_qubits=1, max_clock_qubits=3,
         max_circuits=3, num_shots=100,
         method=2, use_best_widths=False,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):  
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):  
     
-    print("HHL Benchmark Program - Qiskit")
+    print(f"{benchmark_name} Benchmark Program - Qiskit")
 
     # ensure valid input an clock qubit widths
     min_input_qubits = min(max(1, min_input_qubits), max_input_qubits)
@@ -863,6 +731,8 @@ def run2 (min_input_qubits=1, max_input_qubits=3,
     HP_ = None
     INVROT_ = None
 
+    ##########
+    
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -885,7 +755,8 @@ def run2 (min_input_qubits=1, max_input_qubits=3,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
     # for noiseless simulation, set noise model to be None
     #ex.set_noise_model(None)
@@ -894,13 +765,15 @@ def run2 (min_input_qubits=1, max_input_qubits=3,
     diag_el = 0.5
     off_diag_el = -0.25
     
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     #for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
-    for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
+    for num_input_qubits in range(min_input_qubits, max_input_qubits + 1, skip_qubits):
         N = 2**num_input_qubits # matrix size
                     
-        for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1):      
+        for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1, skip_qubits):      
             num_qubits = 2*num_input_qubits + num_clock_qubits + 1
         
             # determine number of circuits to execute for this group
@@ -952,6 +825,8 @@ def run2 (min_input_qubits=1, max_input_qubits=3,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
@@ -963,7 +838,7 @@ def run2 (min_input_qubits=1, max_input_qubits=3,
     print("\nControlled Rotation Circuit ="); print(INVROT_ if INVROT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - HHL - Qiskit",
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit",
                          transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
 # if main, execute method

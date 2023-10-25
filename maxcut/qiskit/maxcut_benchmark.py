@@ -25,9 +25,10 @@ import common
 import execute as ex
 import metrics as metrics
 
+# DEVNOTE: this logging feature should be moved to common level
 logger = logging.getLogger(__name__)
 fname, _, ext = os.path.basename(__file__).partition(".")
-log_to_file = True
+log_to_file = False
 
 try:
     if log_to_file:
@@ -41,12 +42,15 @@ try:
         )
     else:
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.WARNING,
             format='%(asctime)s %(name)s - %(levelname)s:%(message)s')
         
 except Exception as e:
     print(f'Exception {e} occured while configuring logger: bypassing logger config to prevent data loss')
     pass
+
+# Benchmark Name
+benchmark_name = "MaxCut"
 
 np.random.seed(0)
 
@@ -641,7 +645,7 @@ def save_runtime_data(result_dict): # This function will need changes, since cir
 
             
             converged_thetas_list = finIterDict.get('converged_thetas_list')
-            parent_folder_save = os.path.join('__data', f'{backend_id}')
+            parent_folder_save = os.path.join('__data', f'{metrics.get_backend_label(backend_id)}')
             store_final_iter_to_metrics_json(
                 num_qubits=int(width),
                 degree = int(degree),
@@ -739,7 +743,7 @@ def dump_to_json(parent_folder_save, num_qubits, degree, restart_ind, iter_size_
 
 #%% Loading saved data (from json files)
 
-def load_data_and_plot(folder, backend_id=None, **kwargs):
+def load_data_and_plot(folder=None, backend_id=None, **kwargs):
     """
     The highest level function for loading stored data from a previous run
     and plotting optgaps and area metrics
@@ -755,7 +759,7 @@ def load_data_and_plot(folder, backend_id=None, **kwargs):
         plot_results_from_data(**gen_prop)
 
 
-def load_all_metrics(folder, backend_id=None):
+def load_all_metrics(folder=None, backend_id=None):
     """
     Load all data that was saved in a folder.
     The saved data will be in json files in this folder
@@ -770,6 +774,11 @@ def load_all_metrics(folder, backend_id=None):
     gen_prop : dict
         of inputs that were used in maxcut_benchmark.run method
     """
+    
+    # if folder not passed in, create its name using standard format
+    if folder is None:
+        folder = f"__data/{metrics.get_backend_label(backend_id)}"
+        
     # Note: folder here should be the folder where only the width=... files are stored, and not a folder higher up in the directory
     assert os.path.isdir(folder), f"Specified folder ({folder}) does not exist."
     
@@ -896,14 +905,17 @@ iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []
 saved_result = {  }
 instance_filename = None
 
-def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
+def run (min_qubits=3, max_qubits=6, skip_qubits=2,
+        max_circuits=1, num_shots=100,
         method=1, rounds=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, use_fixed_angles=False,
         objective_func_type = 'approx_ratio', plot_results = True,
         save_res_to_file = False, save_final_counts = False, detailed_save_names = False, comfort=False,
         backend_id='qasm_simulator', provider_backend=None, eta=0.5,
-        hub="ibm-q", group="open", project="main", exec_options=None, _instances=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None,
+        _instances=None):
     """
     Parameters
     ----------
@@ -911,6 +923,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         The smallest circuit width for which benchmarking will be done The default is 3.
     max_qubits : int, optional
         The largest circuit width for which benchmarking will be done. The default is 6.
+    skip_qubits : int, optional
+        Skip at least this many qubits during run loop. The default is 2.
     max_circuits : int, optional
         Number of restarts. The default is None.
     num_shots : int, optional
@@ -987,7 +1001,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     dict_of_inputs = {**dict_of_inputs, **{'thetas_array': thetas, 'max_circuits' : max_circuits}}
     
     # Delete some entries from the dictionary
-    for key in ["hub", "group", "project", "provider_backend"]:
+    for key in ["hub", "group", "project", "provider_backend", "exec_options"]:
         dict_of_inputs.pop(key)
     
     global maxcut_inputs
@@ -998,7 +1012,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     global minimizer_loop_index
     global opt_ts
     
-    print("MaxCut Benchmark Program - Qiskit")
+    print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
     QC_ = None
     
@@ -1019,6 +1033,11 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     max_qubits = max(4, max_qubits)
     max_qubits = min(MAX_QUBITS, max_qubits)
     min_qubits = min(max(4, min_qubits), max_qubits)
+    skip_qubits = max(2, skip_qubits)
+    
+    # create context identifier
+    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    
     degree = max(3, degree)
     rounds = max(1, rounds)
     
@@ -1050,8 +1069,8 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         if thetas_array == None:
             print(f"ERROR: no fixed angles for rounds = {rounds}")
             return
-            
-    # ****************************
+           
+    ##########
     
     # Initialize metrics module
     metrics.init_metrics()
@@ -1077,12 +1096,18 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
     else:
         ex.init_execution(execution_handler)
     
+    # initialize the execution module with target information
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+        hub=hub, group=group, project=project, 
+        exec_options=exec_options,
+        context=context
+    )
 
     # for noiseless simulation, set noise model to be None
     # ex.set_noise_model(None)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 to match the collection of problems in 'instance' folder
@@ -1294,7 +1319,9 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-             
+
+    ##########
+    
     global print_sample_circuit
     if print_sample_circuit:
         # print a sample circuit
@@ -1303,12 +1330,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qiskit",
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
                 options=dict(shots=num_shots,rounds=rounds))
     elif method == 2:
         #metrics.print_all_circuit_metrics()
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
+
+# ******************************
 
 def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_circuits = 1,
             objective_func_type='approx_ratio', method=2, use_fixed_angles=False,

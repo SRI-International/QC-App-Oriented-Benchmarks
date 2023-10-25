@@ -14,6 +14,9 @@ import execute as ex
 import metrics as metrics
 from qft_benchmark import inv_qft_gate
 
+# Benchmark Name
+benchmark_name = "Phase Estimation"
+
 np.random.seed(0)
 
 verbose = False
@@ -32,7 +35,7 @@ def PhaseEstimation(num_qubits, theta):
     num_counting_qubits = num_qubits - 1 # only 1 state qubit
     
     cr = ClassicalRegister(num_counting_qubits)
-    qc = QuantumCircuit(qr, cr)
+    qc = QuantumCircuit(qr, cr, name=f"qpe-{num_qubits}-{theta}")
 
     # initialize counting qubits in superposition
     for i in range(num_counting_qubits):
@@ -141,11 +144,12 @@ def bitstring_to_theta(counts, num_counting_qubits):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run(min_qubits=3, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100,
+def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Phase Estimation Benchmark Program - Qiskit")
+    print(f"{benchmark_name} Benchmark Program - Qiskit")
 
     num_state_qubits = 1 # default, not exposed to users, cannot be changed in current implementation
 
@@ -155,8 +159,14 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
         print(f"ERROR: PE Benchmark needs at least {num_state_qubits + 2} qubits to run")
         return
     min_qubits = max(max(3, min_qubits), num_state_qubits + 2)
+    skip_qubits = max(1, skip_qubits)
     #print(f"min, max, state = {min_qubits} {max_qubits} {num_state_qubits}")
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
+    ##########
+    
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -171,8 +181,11 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
@@ -214,13 +227,15 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nPhase Operator 'U' = "); print(U_ if U_ != None else "  ... too large!")
     print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Phase Estimation - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 
 # if main, execute method
