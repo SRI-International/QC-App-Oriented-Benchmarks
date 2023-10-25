@@ -104,8 +104,8 @@ do_app_charts_with_all_metrics = False
 # Number of ticks on volumetric depth axis
 max_depth_log = 22
 
-# Quantum Volume to display on volumetric background
-QV = 256
+# Quantum Volume to display on volumetric background (default = 0)
+QV = 0
 
 # Algorithmic Qubits (defaults)
 AQ = 22
@@ -3064,15 +3064,15 @@ def box4_at(x, y, value, type=1, fill=True, alpha=1.0):
              fill=fill,
              lw=0.1)
 
-def bkg_box_at(x, y, value):
+def bkg_box_at(x, y, value=0.9):
     size = 0.6
     return Rectangle((x - size/2, y - size/2), size, size,
              edgecolor = (.75,.75,.75),
-             facecolor = (.9,.9,.9),
+             facecolor = (value,value,value),
              fill=True,
              lw=0.5)
              
-def bkg_empty_box_at(x, y, value):
+def bkg_empty_box_at(x, y):
     size = 0.6
     return Rectangle((x - size/2, y - size/2), size, size,
              edgecolor = (.75,.75,.75),
@@ -3119,7 +3119,7 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     qv_estimate = False
     est_str = ""
     if QV == 0:                 # QV = 0 indicates "do not draw QV background or label"
-        QV = 8192
+        QV = 2048
         
     elif QV < 0:                # QV < 0 indicates "add est. to label"
         QV = -QV
@@ -3177,6 +3177,8 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     # show a quantum volume rectangle of QV = 64 e.g. (6 x 6)
     if QV0 != 0:
         ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.87, depth_base))
+    else:
+        ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.91, depth_base))
     
     # the untranspiled version is commented out - we do not show this by default
     # also show a quantum volume rectangle un-transpiled
@@ -3213,11 +3215,13 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
             # draw a box at this width and depth
             id = depth_index(d, depth_base) 
             
-            # show vb rectangles; if not showing QV, make all hollow
+            # show vb rectangles; if not showing QV, make all hollow (or less dark)
             if QV0 == 0:
-                ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+                #ax.add_patch(bkg_empty_box_at(id, w))
+                ax.add_patch(bkg_box_at(id, w, 0.95))
+            
             else:
-                ax.add_patch(bkg_box_at(id, w, 0.5))
+                ax.add_patch(bkg_box_at(id, w, 0.9))
             
             # save index of last successful depth
             i_success += 1
@@ -3225,7 +3229,7 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
         # plot empty rectangle after others       
         d = xround[i_success]
         id = depth_index(d, depth_base) 
-        ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+        ax.add_patch(bkg_empty_box_at(id, w))
         
     
     # Add annotation showing quantum volume
@@ -3309,6 +3313,8 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
     # show a quantum volume rectangle of AQ = 6 e.g. (6 x 36)
     if AQ0 != 0:
         ax.add_patch(qv_box_at(1, 1, AQ_width, AQ_depth, 0.87, depth_base))
+    else:
+        ax.add_patch(qv_box_at(1, 1, AQ_width, AQ_depth, 0.91, depth_base))
     
     # the untranspiled version is commented out - we do not show this by default
     # also show a quantum volume rectangle un-transpiled
@@ -3344,9 +3350,10 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
             
             # show vb rectangles; if not showing QV, make all hollow
             if AQ0 == 0:
-                ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+                #ax.add_patch(bkg_empty_box_at(id, w))
+                ax.add_patch(bkg_box_at(id, w, 0.95))
             else:
-                ax.add_patch(bkg_box_at(id, w, 0.5))
+                ax.add_patch(bkg_box_at(id, w, 0.9))
             
             # save index of last successful depth
             i_success += 1
@@ -3354,7 +3361,7 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
         # plot empty rectangle after others       
         d = xround[i_success]
         id = depth_index(d, depth_base) 
-        ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+        ax.add_patch(bkg_empty_box_at(id, w))
         
     
     # Add annotation showing quantum volume
