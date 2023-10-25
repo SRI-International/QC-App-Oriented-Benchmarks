@@ -1396,7 +1396,7 @@ def modify_elapsed_times(avg_elapsed_times, avg_exec_creating_times, avg_exec_ti
     # The flaw in this is that it also removes the compilation time, which is small
     # for small circuits, but could be larger for large circuits.
     # Thus, we've added the variable to enable/disable this.
-    if remove_creating_time_from_elapsed and len(avg_exec_creating_times) > 0:
+    if remove_creating_time_from_elapsed and len(avg_exec_creating_times) >= len(avg_elapsed_times):
         for i in range(len(avg_elapsed_times)):
             avg_elapsed_times[i] = round(avg_elapsed_times[i] - avg_exec_creating_times[i], 3) 
 
