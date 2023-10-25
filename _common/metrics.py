@@ -3245,7 +3245,7 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     return ax
 
 
-def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity"):
+def plot_volumetric_background_aq(max_qubits=11, AQ=12, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity"):
     
     if suptitle == None:
         suptitle = f"Volumetric Positioning\nCircuit Dimensions and Fidelity Overlaid on Algorithmic Qubits = {AQ}"
@@ -3255,7 +3255,7 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
     est_str = ""
 
     if AQ == 0:
-        AQ=20
+        AQ=12
         
     if AQ < 0:   
         AQ0 = 0             # AQ < 0 indicates "add est. to label"
