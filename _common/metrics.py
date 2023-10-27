@@ -1747,6 +1747,7 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
 def plot_all_app_metrics(backend_id, do_all_plots=False,
         include_apps=None, exclude_apps=None, suffix="", avail_qubits=0,
         is_individual=False, score_metric=None,
+        filters=None, options=None,
         max_depth=0, suppress_low_fidelity=False):
 
     global circuit_metrics
@@ -1814,7 +1815,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
             #print("")
             #print(app)
             group_metrics = shared_data[app]["group_metrics"]
-            plot_metrics(app)
+            plot_metrics(app, filters=filters, options=options)
 
 
 ### Plot Metrics for a specific application
