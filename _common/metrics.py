@@ -269,6 +269,9 @@ def aggregate_metrics_for_group (group):
 
         # loop over circuits in group to generate totals
         for circuit in circuit_metrics[group]:
+            # ignore this key that is not a circuit group
+            if group == "subtitle":
+                continue
             num_circuits += 1
             for metric in circuit_metrics[group][circuit]:
                 value = circuit_metrics[group][circuit][metric]
@@ -343,7 +346,8 @@ def aggregate_metrics_for_group (group):
 # Aggregate all metrics by group
 def aggregate_metrics ():
     for group in circuit_metrics:
-        aggregate_metrics_for_group(group)
+        if group != "subtitle":
+            aggregate_metrics_for_group(group)
 
 
 # Report metrics for a specific group
