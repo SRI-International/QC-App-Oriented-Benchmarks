@@ -49,14 +49,14 @@ In addition to the application directories at the highest level, there are sever
     _containerbuildfiles         -- build files and instructions for creating Docker images (optional)
     _setup                       -- information on setting up all environments
     
-    benchmarks-*.ipynb.template  -- Jupyter Notebook templates
+    benchmarks-*.ipynb           -- Jupyter Notebooks convenient for executing the benchmarks
 ```
 
 ## Setup and Configuration
 
 The prototype benchmark applications are easy to run and contain few dependencies. The primary dependency is on the Python packages needed for the target environment in which you would like to execute the examples.
 
-In the [`_setup`](./_setup/) folder you will find a subdirectory for each of the target environments that contains a README with everything you need to know to install and configure the specific environment in which you would like to run.
+In the [`Preparing to Run Benchmarks`](./_setup/) section you will find a subdirectory for each of the target environments that contains a README with everything you need to know to install and configure the specific environment in which you would like to run.
 
 Important Note:
 ```
@@ -88,13 +88,12 @@ As each benchmark program is executed, you should see output that looks like the
 ## Executing the Application Benchmark Programs in a Jupyter Notebook
 
 Alternatively, you may use the Jupyter Notebook templates that are provided in this repository. 
-Simply copy and remove the `.template` extension from the copied `ipynb` template file. 
 There is one template file provided for each of the API environments supported.
 
-In the top level of this repo, start your **jupyter-notebook** process. When the browser listing appears, select the desired notebook `.ipynb` file to launch the notebook.
+In the top level of this repository, start your **jupyter-notebook** process. When the browser listing appears, select the desired notebook `.ipynb` file to launch the notebook.
 There you will have access to a cell for each of the benchmarks in the repository, and may "Run" any one of them independently and see the results presented there.
 
-Some benchmarks, such as MaxCut, include a notebook for running advanced tests, specifically the iterative execution of interleaved class/quantum code for a hybrid algorithm. See the instructions in the README for those benchmarks for procedures and options that are available. 
+Some benchmarks, such as Max-Cut and Hydrogen-Lattice, include a notebook for running advanced tests, specifically the iterative execution of interleaved classical/quantum code for a hybrid algorithm. See the instructions in the README for those benchmarks for procedures and options that are available. 
 
 ## Executing the Application Benchmark Programs via the Qiskit Runner (Qiskit Environment only)
 

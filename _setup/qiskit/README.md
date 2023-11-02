@@ -6,7 +6,7 @@ This directory describes the requirements and operational conventions for using 
 In particular, this document explains how to set up the tools needed to run the Qiskit implementation of these benchmarks.
 
 ## Configure a Qiskit Environment
-Create an environment named "qiskit" and then "activate" it using the following commands:
+If you are using Anaconda environments, create an environment named "qiskit" and then "activate" it using the following commands:
 
     conda create -n qiskit python=3
 
@@ -16,29 +16,40 @@ The conda environment is now ready for you to install the Qiskit package.
 
 ## Install Qiskit
 
-After activating the conda environment, to ensure you are using the correct installation of `pip`, run the following command:
-
-    pip show pip
-
-If everything is working correctly, the `Location` field should have your newly created environment's name present. For example:
-
-    Location: c:\users\[user]\miniconda\envs\qiskit\lib\site-packages
-
 Enter the following commands to install the latest version of Qiskit and the other required packages.
 
-    pip install numpy matplotlib qiskit "qiskit[visualization]" notebook
+    pip install numpy matplotlib qiskit qiskit-ibm-runtime "qiskit[visualization]" notebook
 
 You are now ready to run the benchmark programs.
 
 ## Configuring Quantum Hardware
 
-The `qiskit` package allows quantum circuits to be run in a real quantum hardware hosted by [IBM Q Experience](https://quantum-computing.ibm.com/). To use a hardware backend, 
-[create an account](https://quantum-computing.ibm.com/docs/manage/account/) in IBM Q Experience and save the account token in your local machine using instructions [here](https://quantum-computing.ibm.com/docs/manage/account/ibmq).
- 
+The `qiskit` package allows quantum circuits to be executed on real quantum hardware hosted by [IBM Quantum](https://quantum-computing.ibm.com/) and many other vendors.
 
-## Run the benchmark programs in an Anaconda command window.
+To use a hardware backend from a computer system provider other than IBM, you will need to install the "Qiskit Provider" module that is specific to that manufacturer. Please see the documentation provided by that provider.
 
-For example, in an Anaconda command window, you can enter the following commands to change directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:
+To execute the benchmarks on IBM systems, go your account page (
+[create an account](https://quantum-computing.ibm.com/docs/manage/account/) in IBM Quantum and save the account token in your local machine using instructions [here](https://quantum-computing.ibm.com/docs/manage/account/ibmq).
+
+## Run the benchmark programs in a Jupyter Notebook
+
+Many Python users prefer to execute these benchmark programs in a Jupyter notebook.
+Execute the following commands in the top-level directory of the benchmark repository and invoke the Jupyter notebook server.
+
+    jupyter-notebook
+    
+This will invoke the Jupyter notebook in a new browser tab. There you can select the benchmarks-qiskit.ipynb notebook and execute most of the benchmarks.
+
+The first code cell of the notebook is configured by default to execute all the benchmarks on the Qiskit Aer simulator, running locally. Simply un-commenting the lines in one of the hardware sections will execute the benchmarks on a different backend system.
+    
+Once configured, you can do a Run All command to execute all the top-level benchmarks at once.
+
+Important note: there may be costs associated with execution on some hardware systems. You may consider lowering the value of the num_shots, max_circuits, and max_quibts settings in the first code cell, during your initial testing to avoid unexpected charges.
+
+
+## Run the benchmark programs in a command window.
+
+For example, in an Anaconda command window, you can enter the following commands to change the directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:
 
     cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein-vazirani\qiskit
   
@@ -48,21 +59,7 @@ This will execute the benchmark program and report the benchmark metrics to the 
 
 The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark pgrogram filename).
 
-## Run the benchmark programs in a Jupyter Notebook
 
-Many Python users prefer to execute their Python programs in a Jupyter notebook, which is automatically available with your Anaconda installation.
-Execute the following commands to change directory to one that contains a Jupyter notebook and execute and invoke Jupyter notebook server.
-
-    cd to directory containing jupyter notebook
-    jupyter-notebook
-    
-This will then invoke the Jupyter notebook in a new browser tab. There you can copy and paste any of the benchmark program code and execute the programs interactively.
-    
-Note; In some Windows environments, it is necessary to install one additional package (if running a Jupyter notebook results in a Windows "kernel error"):
-
-    conda install pywin32
-
-Once installed, you should be able to successfully start your Jupyter notebook.
 
 ## Tested Versions
 
