@@ -513,7 +513,7 @@ def dump_to_json(parent_folder_save, num_qubits, degree, restart_ind, iter_size_
     
     # Obtain dictionary with iterations data corresponding to given restart_ind 
     all_restart_ids = list(metrics.circuit_metrics[str(num_qubits)].keys())
-    ids_this_restart = [r_id for r_id in all_restart_ids if int(r_id) // 1000 == restart_ind]
+    ids_this_restart = [r_id for r_id in all_restart_ids if int(r_id) % 1000 == restart_ind]
     iterations_dict_this_restart =  {r_id : metrics.circuit_metrics[str(num_qubits)][r_id] for r_id in ids_this_restart}
     # Values to be stored in json file
     dict_to_store = {'iterations' : iterations_dict_this_restart}
@@ -589,7 +589,7 @@ def load_all_metrics(folder, backend_id=None):
             gen_prop = load_from_width_restart_file(folder, fileName)
         
         # next, do processing for the width
-        method = gen_prop['method']
+        # method = gen_prop['method']
         num_qubits, _ = get_width_restart_tuple_from_filename(width_files[0])
         metrics.process_circuit_metrics_2_level(num_qubits)
         metrics.finalize_group(str(num_qubits))
@@ -643,14 +643,14 @@ def load_from_width_restart_file(folder, fileName):
             for metric, value in data['iterations'][circuit_id].items():
                 metrics.store_metric(num_qubits, circuit_id, metric, value)
                 
-        method = gen_prop['method']
-        if method == 2:
-            metrics.store_props_final_iter(num_qubits, restart_ind, 'optimal_value', opt)
-            metrics.store_props_final_iter(num_qubits, restart_ind, None, final_size_dist)
-            metrics.store_props_final_iter(num_qubits, restart_ind, 'converged_thetas_list', converged_thetas_list)
-            metrics.store_props_final_iter(num_qubits, restart_ind, None, unif_dict)
-            if gen_prop['save_final_counts']:
-                metrics.store_props_final_iter(num_qubits, restart_ind, None, final_counts)
+        # method = gen_prop['method']
+        # if method == 2:
+        metrics.store_props_final_iter(num_qubits, restart_ind, 'optimal_value', opt)
+        metrics.store_props_final_iter(num_qubits, restart_ind, None, final_size_dist)
+        metrics.store_props_final_iter(num_qubits, restart_ind, 'converged_thetas_list', converged_thetas_list)
+        metrics.store_props_final_iter(num_qubits, restart_ind, None, unif_dict)
+        if gen_prop['save_final_counts']:
+            metrics.store_props_final_iter(num_qubits, restart_ind, None, final_counts)
                 
         # after loading data, need to convert times to deltas (compatibility with metrics plots)   
         convert_times_to_deltas(num_qubits)
@@ -695,7 +695,7 @@ instance_filename = None
 minimizer_loop_index = 0
 
 def run (min_qubits=3, max_qubits=MAX_QUBITS, max_circuits=1, num_shots=1,
-        method=1, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
+        method=None, degree=3, alpha=0.1, thetas_array=None, parameterized= False, do_fidelities=True,
         max_iter=30, min_annealing_time=1, max_annealing_time=200, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
         fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None,
         objective_func_type = 'approx_ratio', plot_results = True,
@@ -714,7 +714,7 @@ def run (min_qubits=3, max_qubits=MAX_QUBITS, max_circuits=1, num_shots=1,
     num_shots : int, optional
         Number of times the circut will be measured, for each iteration. The default is 100.
     method : int, optional
-        If 1, then do standard metrics, if 2, implement iterative algo metrics. The default is 1.
+        Not used
     degree : int, optional
         degree of graph. The default is 3.
     thetas_array : list, optional
@@ -864,11 +864,8 @@ def run (min_qubits=3, max_qubits=MAX_QUBITS, max_circuits=1, num_shots=1,
         if num_qubits > max_qubits:
             break
         
-        if method == 1:
-            print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
-        else:
-            print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
-
+        print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+        
         # If degree is negative, 
         if degree < 0 :
             degree = max(3, (num_qubits + degree))
@@ -895,77 +892,72 @@ def run (min_qubits=3, max_qubits=MAX_QUBITS, max_circuits=1, num_shots=1,
         for restart_ind in range(1, max_circuits + 1):
             # restart index should start from 1
             # Loop over restarts for a given graph
-            if method == 1:
             
-                # create the circuit for given qubit size and secret string, store time metric
-                ts = time.time()
-                qc, params = MaxCut(num_qubits, restart_ind, edges, parameterized)   ### DEVNOTE: remove param?
-                metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
+            # create the circuit for given qubit size and secret string, store time metric
+            ts = time.time()
+            qc, params = MaxCut(num_qubits, restart_ind, edges, parameterized)   ### DEVNOTE: remove param?
+            metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
-                # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc, num_qubits, restart_ind, params=params)                
-                        
-                # also store the 'degree' for each execution
-                metrics.store_metric(num_qubits, restart_ind, 'degree', degree)
-                
-                global saved_result
-                #print(saved_result)
-                
-                #************************************************
-                #*** Classical Processing of Results - essential to optimizer ***
-                global opt_ts
-                dict_of_vals = dict()
-                # Start counting classical optimizer time here again
-                tc1 = time.time()
-                cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
-                # Compute the value corresponding to the objective function first
-                dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha)
-                # Store the optimizer time as current time- tc1 + ts - opt_ts, since the time between tc1 and ts is not time used by the classical optimizer.
-                # metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
-                # Note: the first time it is stored it is just the initialization time for optimizer
-                #************************************************
-                
+            # submit circuit for execution on target (simulator, cloud simulator, or hardware)
+            ex.submit_circuit(qc, num_qubits, restart_ind, params=params)                
                     
-                #************************************************
-                #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
-                # Compute the distribution of cut sizes; store them under metrics
-                unique_counts, unique_sizes, cumul_counts = get_size_dist(counts, sizes)
-                global iter_size_dist
-                iter_size_dist = {'unique_sizes' : unique_sizes, 'unique_counts' : unique_counts, 'cumul_counts' : cumul_counts}
-                metrics.store_metric(num_qubits, restart_ind, None, iter_size_dist)
-
-                # Compute and the other metrics (eg. cvar, gibbs and max N % if the obj function was set to approx ratio)
-                for s in non_objFunc_ratios:
-                    dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha)
-                if verbose:
-                    print(dict_of_vals)
-                # Store the ratios
-                dict_of_ratios = { key : -1 * val / opt for (key, val) in dict_of_vals.items()}
-                dict_of_ratios['gibbs_ratio'] = dict_of_ratios['gibbs_ratio'] / eta 
-                if verbose:
-                    print(dict_of_ratios)
-                metrics.store_metric(num_qubits, restart_ind, None, dict_of_ratios)
-                # Get the best measurement and store it
-                best = - compute_best_cut_from_measured(counts, sizes)
-                logger.info("Graph metrics nodes: %d edges: %d avg degree: %d", num_qubits, len(edges), 2*len(edges)/num_qubits )
-                logger.info("Nodes: %d Cuts: %d Opt: %d Ratio: %f", num_qubits, best, opt, max(dict_of_ratios.values()))
-                metrics.store_metric(num_qubits, restart_ind, 'bestcut_ratio', best / opt)
-                # Also compute and store the weights of cuts at three quantile values
-                quantile_sizes = compute_quartiles(counts, sizes)
-                # Store quantile_optgaps as a list (allows storing in json files)
-                metrics.store_metric(num_qubits, restart_ind, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) 
-                    
-                # Also store the cuts, counts and sizes in a global variable, to allow access elsewhere
-                global iter_dist
-                iter_dist = {'cuts' : cuts, 'counts' : counts, 'sizes' : sizes}
-                    
-                #************************************************
-                # reset timer for optimizer execution after each iteration of quantum program completes
-                opt_ts = time.time()
-                
-            else:
-                raise ValueError("method == 1 is the only choice")
+            # also store the 'degree' for each execution
+            metrics.store_metric(num_qubits, restart_ind, 'degree', degree)
             
+            global saved_result
+            #print(saved_result)
+            
+            #************************************************
+            #*** Classical Processing of Results - essential to optimizer ***
+            global opt_ts
+            dict_of_vals = dict()
+            # Start counting classical optimizer time here again
+            tc1 = time.time()
+            cuts, counts, sizes = compute_cutsizes(saved_result, nodes, edges)
+            # Compute the value corresponding to the objective function first
+            dict_of_vals[objective_func_type] = function_mapper[objective_func_type](counts, sizes, alpha = alpha)
+            # Store the optimizer time as current time- tc1 + ts - opt_ts, since the time between tc1 and ts is not time used by the classical optimizer.
+            # metrics.store_metric(num_qubits, unique_id, 'opt_exec_time', time.time() - tc1 + ts - opt_ts)
+            # Note: the first time it is stored it is just the initialization time for optimizer
+            #************************************************
+            
+                
+            #************************************************
+            #*** Classical Processing of Results - not essential for optimizer. Used for tracking metrics ***
+            # Compute the distribution of cut sizes; store them under metrics
+            unique_counts, unique_sizes, cumul_counts = get_size_dist(counts, sizes)
+            global iter_size_dist
+            iter_size_dist = {'unique_sizes' : unique_sizes, 'unique_counts' : unique_counts, 'cumul_counts' : cumul_counts}
+            metrics.store_metric(num_qubits, restart_ind, None, iter_size_dist)
+
+            # Compute and the other metrics (eg. cvar, gibbs and max N % if the obj function was set to approx ratio)
+            for s in non_objFunc_ratios:
+                dict_of_vals[s] = function_mapper[s](counts, sizes, alpha = alpha)
+            if verbose:
+                print(dict_of_vals)
+            # Store the ratios
+            dict_of_ratios = { key : -1 * val / opt for (key, val) in dict_of_vals.items()}
+            dict_of_ratios['gibbs_ratio'] = dict_of_ratios['gibbs_ratio'] / eta 
+            if verbose:
+                print(dict_of_ratios)
+            metrics.store_metric(num_qubits, restart_ind, None, dict_of_ratios)
+            # Get the best measurement and store it
+            best = - compute_best_cut_from_measured(counts, sizes)
+            logger.info("Graph metrics nodes: %d edges: %d avg degree: %d", num_qubits, len(edges), 2*len(edges)/num_qubits )
+            logger.info("Nodes: %d Cuts: %d Opt: %d Ratio: %f", num_qubits, best, opt, max(dict_of_ratios.values()))
+            metrics.store_metric(num_qubits, restart_ind, 'bestcut_ratio', best / opt)
+            # Also compute and store the weights of cuts at three quantile values
+            quantile_sizes = compute_quartiles(counts, sizes)
+            # Store quantile_optgaps as a list (allows storing in json files)
+            metrics.store_metric(num_qubits, restart_ind, 'quantile_optgaps', (1 - quantile_sizes / opt).tolist()) 
+                
+            # Also store the cuts, counts and sizes in a global variable, to allow access elsewhere
+            global iter_dist
+            iter_dist = {'cuts' : cuts, 'counts' : counts, 'sizes' : sizes}
+                
+            #************************************************
+            # reset timer for optimizer execution after each iteration of quantum program completes
+            opt_ts = time.time()
             # DEVNOTE: Do this here, if we want to save deltas to file (which we used to do)         
             # for this benchmark, need to convert times to deltas (for compatibility with metrics)   
             #convert_times_to_deltas(num_qubits)
@@ -1011,9 +1003,9 @@ def run (min_qubits=3, max_qubits=MAX_QUBITS, max_circuits=1, num_shots=1,
     metrics.aggregate_metrics()
     metrics.print_all_circuit_metrics()
     # Plot metrics for all problem sizes
-    metrics.plot_metrics(f"Benchmark Results - MaxCut ({method}) - Qatalyst",
-            options=dict(shots=num_shots))
-    plot_results_from_data(**dict_of_inputs)
+    # metrics.plot_metrics(f"Benchmark Results - MaxCut - Qatalyst",
+    #         options=dict(shots=num_shots))
+    # plot_results_from_data(**dict_of_inputs)
                 
 # Convert elapsed/exec/opt_exec times to deltas from absolute
 # for this benchmark, need to convert the times to deltas (for compatibility with metrics)
@@ -1043,7 +1035,7 @@ def convert_times_to_deltas(num_qubits):
         
 # Method to plot the results from the collected data
 def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 1,
-                 objective_func_type='approx_ratio', method=2, score_metric='fidelity',
+                 objective_func_type='approx_ratio', method=None, score_metric='fidelity',
                  x_metric='cumulative_exec_time', y_metric='num_qubits', fixed_metrics={},
                  num_x_bins=15, y_size=None, x_size=None, x_min=None, x_max=None,
                  offset_flag=True,            # default is True for QA
@@ -1064,7 +1056,7 @@ def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 
         
     obj_str = metrics.known_score_labels[objective_func_type]
     options = {'shots' : num_shots, 'degree' : degree, 'restarts' : max_circuits, '\nObjective Function' : obj_str}
-    suptitle = f"Benchmark Results - MaxCut ({method}) - Qatalyst"
+    suptitle = f"Benchmark Results - MaxCut - Qatalyst"
     
     # ignoring these
     # metrics.plot_all_area_metrics(f"Benchmark Results - MaxCut ({method}) - Qatalyst",
@@ -1082,12 +1074,17 @@ def plot_results_from_data(num_shots=100, degree=3, max_iter=30, max_circuits = 
     all_widths = list(metrics.circuit_metrics_final_iter.keys())
     all_widths = [int(ii) for ii in all_widths]
     list_of_widths = [all_widths[-1]]
-    metrics.plot_cutsize_distribution(suptitle=suptitle,options=options, suffix=suffix, list_of_widths = list_of_widths)
+    # metrics.plot_cutsize_distribution(suptitle=suptitle,options=options, suffix=suffix, list_of_widths = list_of_widths)
     
     # not needed for Qatalyst version
-    #metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
+    metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
 # if main, execute method
-if __name__ == '__main__': run(backend_id="eqc1")
+if __name__ == '__main__': 
+    from qci_client import QciClient
+    # environment variables QCI_API_URL and QCI_TOKEN must be set for this to work without 
+    # specifying the parameters here
+    client = QciClient()
+    run(backend_id="eqc1", provider_backend=client, save_res_to_file=False)
 
 # %%

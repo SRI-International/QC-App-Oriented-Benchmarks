@@ -100,17 +100,15 @@ def set_execution_target(backend_id='eqc1',
     :param project: NOT USED
     :param provider_module_name: NOT USED
     :param provider_name:  NOT USED
-    :provider_backend: NOT USED
+    :provider_backend: Reference to instantiated QciClient
 
-    set_execution_target(backend_id='eqc1')
+    set_execution_target(backend_id='eqc1', provider_backend=client)
     """
-    # global backend, device_name
-    authentication_error_msg = "No credentials for {0} backend found."
     
     global backend_exec_options, backend, device_name
     # create an informative device name
     device_name = backend_id
-    backend = backend_id
+    backend = provider_backend
     metrics.set_plot_subtitle(f"Device = {device_name}")
     #metrics.set_properties( { "api":"ocean", "backend_id":backend_id } )
     
@@ -152,6 +150,7 @@ def submit_circuit(qc:HamiltonianCircuitProxy, group_id, circuit_id, shots=100, 
 
 # Launch execution of one job (circuit)
 def execute_circuit(circuit):
+    global backend, device_name
     logging.info('Entering execute_circuit')
 
     active_circuit = copy.copy(circuit)
@@ -174,61 +173,57 @@ def execute_circuit(circuit):
         
         #***************************************
         # execute on Qatalyst
-        if 1: #device_name == "eqc1":
+    
+        # prepare the sampler with embedding or use a cached embedding
+        ts = time.time() 
         
-            # prepare the sampler with embedding or use a cached embedding
-            ts = time.time() 
-            
-            # environment variables QCI_API_URL and QCI_TOKEN must be set for this to work without 
-            # specifying the parameters here
-            client = qci_client.QciClient()
+        # load the file
+        H = qc.H
+        print("Uploading file shape", H.shape)
+        file_response = backend.upload_file(H, file_type="hamiltonian")
+        file_id = file_response["file_id"]
+        print("Got file_id", file_id)
+        opt_exec_time = time.time() - ts
+        
+        # perform the annealing operation
+        ts = time.time() 
+        print("Building job request", device_name, n_samples)
+        job_body = backend.build_job_body(hamiltonian_file_id=file_id,
+                                            job_type="sample-hamiltonian",
+                                            job_params={"sampler_type": device_name, 
+                                                        "n_samples": n_samples})
+        job_response = backend.process_job(job_body=job_body, job_type="sample-hamiltonian")
+        job_metrics = job_response["job_info"]["metrics"]
+        qatalyst_total_job_time_ns = job_metrics['time_ns']['wall']['total']
 
-            # load the file
-            H = qc.H
-            print("Uploading file shape", H.shape)
-            file_response = client.upload_file(H, file_type="hamiltonian")
-            file_id = file_response["file_id"]
-            print("Got file_id", file_id)
-            opt_exec_time = time.time() - ts
-            
-            # perform the annealing operation
-            ts = time.time() 
-            print("Building job request", device_name, n_samples)
-            job_body = client.build_job_body(hamiltonian_file_id=file_id,
-                                             job_type="sample-hamiltonian",
-                                             job_params={"sampler_type": "eqc1", 
-                                                         "n_samples": n_samples})
-            job_response = client.process_job(job_body=job_body, job_type="sample-hamiltonian")
-            job_metrics = job_response["job_info"]["metrics"]
-            qatalyst_total_job_time_ns = job_metrics['time_ns']['wall']['total']
+        # the total amount of time that the job spent in queue waiting to run
+        qatalyst_total_queue_time_ns = job_metrics['time_ns']['wall']['queue']['total']
 
-            # the total amount of time that the job spent in queue waiting to run
-            qatalyst_total_queue_time_ns = job_metrics['time_ns']['wall']['queue']['total']
+        device = device_name.replace("-", "_")
+        device = device.replace("eqc", "dirac_")
+        provider_name = "qphoton"
+        # device_reference = f"{device}_device"
+        # controller_name = f"{device}_controller"
+        # Total time for the job inside the QPU subsystem
+        qpu_total_time_ns = job_metrics['provider'][provider_name]['time_ns']['wall']['total']
+        
+        # Processing time for the job inside the QPU subsystem
+        qpu_processing_time_ns = job_metrics['provider'][provider_name]['time_ns']['wall']['processing']['total']
+        
+        # Total queue time within the QPU subsystem
+        qpu_queue_time_ns = job_metrics['provider'][provider_name]['time_ns']['wall']['queue']['total']
+        
+        elapsed_time = time.time() - ts
+        # exec_time = (sampleset.info["timing"]["qpu_access_time"] / 1000000)
+        exec_time = qpu_processing_time_ns / ns
+        
+        # opt_exec_time += (sampleset.info["timing"]["total_post_processing_time"] / 1000000)
+        # opt_exec_time += (sampleset.info["timing"]["qpu_access_overhead_time"] / 1000000)
+        opt_exec_time += (qpu_total_time_ns / ns - exec_time)
+        opt_exec_time += qatalyst_total_queue_time_ns
 
-            device = "dirac_1"
-            provider_name = "qphoton"
-            device_name = f"{device}_device"
-            controller_name = f"{device}_controller"
-            # Total time for the job inside the QPU subsystem
-            qpu_total_time_ns = job_metrics['provider'][provider_name]['time_ns']['wall']['total']
-            
-            # Processing time for the job inside the QPU subsystem
-            qpu_processing_time_ns = job_metrics['provider'][provider_name]['time_ns']['wall']['processing']['total']
-            
-            # Total queue time within the QPU subsystem
-            qpu_queue_time_ns = job_metrics['provider'][provider_name]['time_ns']['wall']['queue']['total']
-            
-            elapsed_time = time.time() - ts
-            # exec_time = (sampleset.info["timing"]["qpu_access_time"] / 1000000)
-            exec_time = qpu_processing_time_ns / ns
-            
-            # opt_exec_time += (sampleset.info["timing"]["total_post_processing_time"] / 1000000)
-            # opt_exec_time += (sampleset.info["timing"]["qpu_access_overhead_time"] / 1000000)
-            opt_exec_time += (qpu_total_time_ns / ns - exec_time)
-            opt_exec_time += qatalyst_total_queue_time_ns
-
-            if verbose_time: print(json.dumps(metrics, indent=2))
-            
+        if verbose_time: print(json.dumps(metrics, indent=2))
+        
         #if verbose: print(sampleset.info)
         results = job_response["results"]
         if verbose: print(results)
