@@ -294,7 +294,6 @@ def aggregate_metrics_for_group (group):
             # ignore this key that is not a circuit group
             if group == "subtitle":
                 continue
-            num_circuits += 1
             for metric in circuit_metrics[group][circuit]:
                 value = circuit_metrics[group][circuit][metric]
                 #print(f'{group} {circuit} {metric} -> {value}')
