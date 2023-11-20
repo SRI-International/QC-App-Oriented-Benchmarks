@@ -67,19 +67,47 @@ def find_last_metrics_for_group(group, instance):
     train_accuracy = 0
     train_loss = 0
 
-    
-    # DEVNOTE: would it be easier to just get the last entry of array, rather than this loop?
-    for circuit_id in image_recognition_metrics[group]:
-        if np.floor(int(circuit_id)/1000) == instance:
+    num_average=5
         
-            metrics_for_circuit = image_recognition_metrics[group][circuit_id]
-            
-            test_accuracy = metrics_for_circuit['test_accuracy'] if 'test_accuracy' in metrics_for_circuit else 0
-            train_accuracy = metrics_for_circuit['train_accuracy'] if 'train_accuracy' in metrics_for_circuit else 0
-            train_loss = metrics_for_circuit['train_loss'] if 'train_loss' in metrics_for_circuit else 0
-
+    #Collect the metrics for this group and instance       
+    metrics_for_circuit = {}
+    for circuit_id in image_recognition_metrics[group]:
+        if np.floor(int(circuit_id)/1000) == instance:        
+            metrics_for_circuit[circuit_id] = image_recognition_metrics[group][circuit_id]            
         else:
             continue
+
+    # get the average of the 'num_average' highest test and train accuracy and lowest train loss for this group and instance, if the strings are present; if len of circuit metrics is less than num_average, use the highest/lowest available
+    if len(metrics_for_circuit) >= num_average:
+        test_accuracy = np.average(sorted([metrics_for_circuit[circuit_id]['test_accuracy'] if 'test_accuracy' in metrics_for_circuit[circuit_id] else 0 for circuit_id in metrics_for_circuit], reverse=True)[0:num_average])
+        train_accuracy = np.average(sorted([metrics_for_circuit[circuit_id]['train_accuracy'] if 'train_accuracy' in metrics_for_circuit[circuit_id] else 0 for circuit_id in metrics_for_circuit], reverse=True)[0:num_average])
+        train_loss = np.average(sorted([metrics_for_circuit[circuit_id]['train_loss'] if 'train_loss' in metrics_for_circuit[circuit_id] else 0 for circuit_id in metrics_for_circuit])[0:num_average])
+        
+    else:
+        test_accuracy = sorted([metrics_for_circuit[circuit_id]['test_accuracy'] if 'test_accuracy' in metrics_for_circuit[circuit_id] else 0 for circuit_id in metrics_for_circuit], reverse=True)[0]
+        train_accuracy = sorted([metrics_for_circuit[circuit_id]['train_accuracy'] if 'train_accuracy' in metrics_for_circuit[circuit_id] else 0 for circuit_id in metrics_for_circuit], reverse=True)[0]
+        train_loss = sorted([metrics_for_circuit[circuit_id]['train_loss'] if 'train_loss' in metrics_for_circuit[circuit_id] else 0 for circuit_id in metrics_for_circuit])[0]
+        
+     
+    #test_accuracy = np.average(sorted([metrics_for_circuit[circuit_id]['test_accuracy'] for circuit_id in metrics_for_circuit], reverse=True)[0:num_average])
+    #train_accuracy = np.average(sorted([metrics_for_circuit[circuit_id]['train_accuracy'] for circuit_id in metrics_for_circuit], reverse=True)[0:num_average])
+    #train_loss = np.average(sorted([metrics_for_circuit[circuit_id]['train_loss'] for circuit_id in metrics_for_circuit])[0:num_average])
+    
+ 
+
+
+    ## DEVNOTE: would it be easier to just get the last entry of array, rather than this loop?
+    #for circuit_id in image_recognition_metrics[group]:
+    #    if np.floor(int(circuit_id)/1000) == instance:
+    #    
+    #        metrics_for_circuit = image_recognition_metrics[group][circuit_id]
+    #        
+    #        test_accuracy = metrics_for_circuit['test_accuracy'] if 'test_accuracy' in metrics_for_circuit else 0
+    #        train_accuracy = metrics_for_circuit['train_accuracy'] if 'train_accuracy' in metrics_for_circuit else 0
+    #        train_loss = metrics_for_circuit['train_loss'] if 'train_loss' in metrics_for_circuit else 0
+#
+    #    else:
+    #        continue
             
     return train_accuracy, train_loss, test_accuracy
 

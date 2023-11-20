@@ -79,7 +79,7 @@ except Exception as e:
     print(f"Exception {e} occured while configuring logger: bypassing logger config to prevent data loss")
     pass
 
-np.random.seed(0)
+
 
 # Image Recognition inputs  ( Here input is Hamiltonian matrix --- Need to change)
 hl_inputs = dict()  # inputs to the run method
@@ -90,13 +90,10 @@ print_sample_circuit = True
 do_compute_expectation = True
 
 # Array of energy values collected during iterations of VQE
-lowest_energy_values = []
-
-# Array of accuracy values collected during iterations of image_recognition
-accuracy_values = []
+#lowest_energy_values = []
 
 # Key metrics collected on last iteration of VQE
-key_metrics = {}
+#key_metrics = {}
 
 # saved circuits for display
 QC_ = None
@@ -1445,8 +1442,8 @@ def run(
 
     # Initialize execution module using the execution result handler above and specified backend_id
     # for method=2 we need to set max_jobs_active to 1, so each circuit completes before continuing
-    if method == 2 or 3:
-        ex.max_jobs_active = 1
+    if method == 2 or method == 3:
+        #ex.max_jobs_active = 1
         ex.init_execution(execution_handler2)
     else:
         ex.init_execution(execution_handler)
@@ -1473,21 +1470,20 @@ def run(
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 for paired electron circuits
 
-    for num_qubits in range(min_qubits, max_qubits + 1, 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, 2):
 
-        x_scaled, x_train_scaled, x_test_scaled = preprocess_image_data(x, x_train, x_test, num_qubits)
+        np.random.seed(0)
 
-        # create batch from scaled data
-        global x_batch, y_batch
-
-        indices = np.random.choice(len(x_train_scaled), size=batch_size, replace=False)
-        x_batch = x_train_scaled[indices]
-        y_batch = y_train[indices]
+        x_scaled, x_train_scaled, x_test_scaled = preprocess_image_data(x, x_train, x_test, num_qubits)        
 
         # global variables to store execution and elapsed time
         global quantum_execution_time, quantum_elapsed_time
         quantum_execution_time = 0.0
         quantum_elapsed_time = 0.0
+
+        
+        global x_batch, y_batch
+
         
         if method == 1:
             print(f"************\nExecuting [1] circuit for num_qubits = {num_qubits}")
@@ -1510,10 +1506,6 @@ def run(
         if verbose:
             print(f"... executing problem num_qubits={num_qubits}")
 
-
-
-        # create an intial thetas_array, given the circuit width and user input
-        thetas_array_0 = get_initial_parameters(num_qubits=num_qubits, thetas_array=thetas_array, ansatz_type=ansatz_type, reps=reps)
 
         # define the objective and the callback functions
         def objective_function(thetas_array, return_accuracy=False, test_pass=False, train_pass=False):
@@ -1670,7 +1662,10 @@ def run(
 
             if train_pass:
                 metrics.store_metric(num_qubits, unique_id, "train_loss", loss)
-                metrics.store_metric(num_qubits, unique_id, "train_accuracy", accuracy)
+                metrics.store_metric(num_qubits, unique_id, "train_accuracy", accuracy)                
+            
+            loss_this_iter.append(loss)
+            accuracy_this_iter.append(accuracy)
             
             # metrics.store_metric(num_qubits, unique_id, "energy", energy)
             # metrics.store_metric(num_qubits, unique_id, "variance", variance)
@@ -1706,20 +1701,31 @@ def run(
             
         def callback_thetas_array(thetas_array):
             print("DEBUG calling callback_thetas_array")
-            loss, accuracy =objective_function(thetas_array, return_accuracy=True, train_pass=True)
-            loss_history.append(loss)
-            accuracy_history.append(accuracy)
+            #loss, accuracy =objective_function(thetas_array, return_accuracy=True, train_pass=True)
+            #loss_history.append(loss)
+            #accuracy_history.append(accuracy)
+
+            #Get mean loss and accuracy on this iteration and store it in the metrics
+            loss = np.mean(loss_this_iter)
+            accuracy = np.mean(accuracy_this_iter)
+            
+            metrics.store_metric(num_qubits, unique_id, "train_loss", loss)
+            metrics.store_metric(num_qubits, unique_id, "train_accuracy", accuracy) 
+
+            loss_this_iter.clear()
+            accuracy_this_iter.clear()
             
             global x_batch, y_batch
-            global batch_index, minimizer_loop_index
+            #global batch_index
+            global minimizer_loop_index
 
-            # whenerver batch index is divisible by factor, save the batch_index and thetas_array to a json file
+            # whenerver minimizer_loop_index is divisible by factor, save the minimizer_loop_index and thetas_array to a json file
             factor = np.ceil(max_iter/test_pass_count)
-            if batch_index % factor == 0:
-                # save the batch_index and thetas_array to a json file
-                thetas_array_batch[batch_index + 1] = thetas_array.tolist()                    
+            if minimizer_loop_index % factor == 0:
+                # save the minimizer_loop_index and thetas_array to a json file
+                thetas_array_batch[minimizer_loop_index + 1] = thetas_array.tolist()                    
                 
-                print(f"Saved batch index {batch_index + 1} and thetas_array to a json file")
+                print(f"Saved batch index {minimizer_loop_index + 1} and thetas_array to a json file")
 
             # # add testing pass if method == 3 and batch index is a multiple of 10
             # factor = np.ceil(max_iter/test_pass_count)
@@ -1757,7 +1763,7 @@ def run(
             y_batch = y_train[indices]
 
             # increment the index
-            batch_index=batch_index+1
+            #batch_index=batch_index+1
             minimizer_loop_index += 1
 
             # reset the quantum_execution_time and quantum_elapsed_time
@@ -1765,7 +1771,7 @@ def run(
             quantum_execution_time = 0.0
             quantum_elapsed_time = 0.0
 
-            print(f"Batch {batch_index} loss: {loss} accuracy: {accuracy}")
+            print(f"Batch {minimizer_loop_index} loss: {loss} accuracy: {accuracy}")
 
 
 
@@ -1778,6 +1784,10 @@ def run(
             # set x_batch and y_batch to the test data
             x_batch = x_test_scaled
             y_batch = y_test
+
+            
+            # create an intial thetas_array, given the circuit width and user input
+            thetas_array_0 = get_initial_parameters(num_qubits=num_qubits, thetas_array=thetas_array, ansatz_type=ansatz_type, reps=reps)
 
             # create one circuit with one data point
             data_point = x_batch[0]
@@ -1819,9 +1829,24 @@ def run(
         elif method == 2:
             logger.info(f"===============  Begin method 2 loop, enabling transpile")
 
+            # create batch from scaled data
+            indices = np.random.choice(len(x_train_scaled), size=batch_size, replace=False)
+            x_batch = x_train_scaled[indices]
+            y_batch = y_train[indices]
+
+            # Array of accuracy values collected during iterations of image_recognition
+            accuracy_values = []
+
+            # create an intial thetas_array, given the circuit width and user input
+            thetas_array_0 = get_initial_parameters(num_qubits=num_qubits, thetas_array=thetas_array, ansatz_type=ansatz_type, reps=reps)
+
             # a unique circuit index used inside the inner minimizer loop as identifier
             # Value of 0 corresponds to the 0th iteration of the minimizer
             minimizer_loop_index = 0
+
+            # Set iteration loss and accuracy to empty lists
+            loss_this_iter = []
+            accuracy_this_iter = []
 
             # Always start by enabling transpile ...
             ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
@@ -1839,12 +1864,13 @@ def run(
             #### Objective function to compute energy
 
             
-            global loss_history, accuracy_history, batch_index, test_accuracy_history
-            loss_history = list()
-            accuracy_history = list()
-            test_accuracy_history = list()
+            #global loss_history, accuracy_history, test_accuracy_history
+            #loss_history = list()
+            #accuracy_history = list()
+            #test_accuracy_history = list()
 
-            batch_index = 0
+            #global batch_index
+            #batch_index = 0
 
 
             # callback for each iteration (currently unused)
@@ -1861,7 +1887,7 @@ def run(
             # print("")
 
             # Initialize an empty list to store the energy values from each iteration
-            lowest_energy_values.clear()
+            #lowest_energy_values.clear()
 
             # execute SPSA optimizer to minimize the objective function
             # objective function is called repeatedly with varying parameters
@@ -1957,6 +1983,13 @@ def run(
             # the iteration list is formed from the keys of the thetas_array_batch
             iteration_list = list(thetas_array_batch.keys())
 
+            # Array of accuracy values collected during iterations of image_recognition
+            accuracy_values = []
+
+            # Set iteration loss and accuracy to empty lists
+            loss_this_iter = []
+            accuracy_this_iter = []
+
 
             # begin timer accumulation
             cumlative_iter_time = [0]
@@ -1972,9 +2005,10 @@ def run(
 
 
 
-        if method == 2 or 3:
+        if method == 2 or method == 3:
             metrics.process_circuit_metrics_2_level(num_qubits)
-            metrics.finalize_group(num_qubits)
+        
+        metrics.finalize_group(num_qubits)
 
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
