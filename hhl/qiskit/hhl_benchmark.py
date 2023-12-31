@@ -37,6 +37,9 @@ verbose = False
 # Variable for number of resets to perform after mid circuit measurements
 num_resets = 1
 
+# Minimum qubit size for input and clock registers
+min_register_qubits = 1
+
 # saved circuits for display
 QC_ = None
 U_ = None
@@ -786,7 +789,13 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
                     if verbose:   
                         print(f"... SKIPPING {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
                     continue
-                    
+            
+            # skip if input or clock size smaller than minimum
+            if min_register_qubits > 1 and num_input_qubits < min_register_qubits or num_clock_qubits < min_register_qubits:
+                if verbose:
+                    print(f"... SKIPPING {num_circuits} circuits with {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
+                continue
+                  
             print(f"************\nExecuting {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
             
             # loop over randomly generated problem instances
