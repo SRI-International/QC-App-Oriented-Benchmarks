@@ -79,16 +79,10 @@ save_plot_images = True
 show_plot_images = True
 
 # Option to show elapsed times in the metrics plots
-show_elapsed_times = False
+show_elapsed_times = True
 
 # When ratio of max time to min time exceeds this use a logscale
 logscale_for_times_threshold = 50
-
-# Option to generate volumetric positioning charts
-do_volumetric_plots = True
-
-# Option to include all app charts with vplots at end
-do_app_charts_with_all_metrics = False
 
 # Toss out elapsed times for any run if the initial value is this factor of the second value 
 # (applies only to area plots - remove once queue time is removed earlier)
@@ -97,14 +91,24 @@ omit_initial_elapsed_time_factor = 0
 # if tossing large elapsed times, assume elapsed is this multiple of exec time
 initial_elapsed_time_multiplier = 1.1
 
+# remove creating time from elapsed time when displaying (default)
+# this seems to remove queue time in some cases (IBM machines only)
+remove_creating_time_from_elapsed = True
+
+# Option to generate volumetric positioning charts
+do_volumetric_plots = True
+
+# Option to include all app charts with vplots at end
+do_app_charts_with_all_metrics = False
+
 # Number of ticks on volumetric depth axis
 max_depth_log = 22
 
-# Quantum Volume to display on volumetric background
-QV = 256
+# Quantum Volume to display on volumetric background (default = 0)
+QV = 0
 
 # Algorithmic Qubits (defaults)
-AQ = 22
+AQ = 12
 aq_cutoff = 0.368   # below this circuits not considered successful
 
 aq_mode = 0         # 0 - use default plot behavior, 1 - use AQ modified plots
@@ -1041,18 +1045,17 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             axs[axi].set_xticklabels(xlabels)
     
         avg_exec_times = group_metrics["avg_exec_times"]
-        avg_elapsed_times = [et for et in group_metrics["avg_elapsed_times"]]
+        avg_elapsed_times = group_metrics["avg_elapsed_times"]
+        avg_exec_creating_times = group_metrics["avg_exec_creating_times"]
         
+        # Attempt to remove queue time from elapsed, heuristically
+        avg_elapsed_times = modify_elapsed_times(avg_elapsed_times,
+                avg_exec_creating_times, avg_exec_times)
+ 
+        # ensure existence of std arrays (for backwards compatibility)
         zeros = [0] * len(avg_exec_times)
         std_exec_times = group_metrics["std_exec_times"] if "std_exec_times" in group_metrics else zeros
         std_elapsed_times = group_metrics["std_elapsed_times"] if "std_elapsed_times" in group_metrics else zeros
-        
-        # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
-        # that are most likely due to either queueing or system initialization
-        if show_elapsed_times and omit_initial_elapsed_time_factor > 0:
-            for i in range(len(avg_elapsed_times)):
-                if avg_elapsed_times[i] > omit_initial_elapsed_time_factor * avg_exec_times[i]:
-                    avg_elapsed_times[i] = avg_exec_times[i] * initial_elapsed_time_multiplier
         
         axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
         
@@ -1381,6 +1384,30 @@ def get_nonzero_min(array):
     f_array = list(filter(lambda x: x > 0, array)) 
     if len(f_array) < 1: f_array = [0.001]
     return min(f_array)
+
+# Return a modifed copy of the elapsed time, removing queue time if possible using heuristics
+def modify_elapsed_times(avg_elapsed_times, avg_exec_creating_times, avg_exec_times):
+
+    # Make a copy of the elapsed times array since we may modify it
+    avg_elapsed_times = [et for et in avg_elapsed_times]
+    
+    # DEVNOTE: on some machines (IBM, specifically), the creating time includes the queue time.
+    # We can remove queue time from elapsed time by subtracting the creating time.
+    # The flaw in this is that it also removes the compilation time, which is small
+    # for small circuits, but could be larger for large circuits.
+    # Thus, we've added the variable to enable/disable this.
+    if remove_creating_time_from_elapsed and len(avg_exec_creating_times) >= len(avg_elapsed_times):
+        for i in range(len(avg_elapsed_times)):
+            avg_elapsed_times[i] = round(avg_elapsed_times[i] - avg_exec_creating_times[i], 3) 
+
+    # DEVNOTE: A brutally simplistic way to toss out initially long elapsed times
+    # that are most likely due to either queueing or system initialization
+    if show_elapsed_times and omit_initial_elapsed_time_factor > 0:
+        for i in range(len(avg_elapsed_times)):
+            if avg_elapsed_times[i] > omit_initial_elapsed_time_factor * avg_exec_times[i]:
+                avg_elapsed_times[i] = avg_exec_times[i] * initial_elapsed_time_multiplier
+    
+    return avg_elapsed_times
     
 #################################################
 
@@ -1720,6 +1747,7 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
 def plot_all_app_metrics(backend_id, do_all_plots=False,
         include_apps=None, exclude_apps=None, suffix="", avail_qubits=0,
         is_individual=False, score_metric=None,
+        filters=None, options=None,
         max_depth=0, suppress_low_fidelity=False):
 
     global circuit_metrics
@@ -1787,7 +1815,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
             #print("")
             #print(app)
             group_metrics = shared_data[app]["group_metrics"]
-            plot_metrics(app)
+            plot_metrics(app, filters=filters, options=options)
 
 
 ### Plot Metrics for a specific application
@@ -3037,15 +3065,15 @@ def box4_at(x, y, value, type=1, fill=True, alpha=1.0):
              fill=fill,
              lw=0.1)
 
-def bkg_box_at(x, y, value):
+def bkg_box_at(x, y, value=0.9):
     size = 0.6
     return Rectangle((x - size/2, y - size/2), size, size,
              edgecolor = (.75,.75,.75),
-             facecolor = (.9,.9,.9),
+             facecolor = (value,value,value),
              fill=True,
              lw=0.5)
              
-def bkg_empty_box_at(x, y, value):
+def bkg_empty_box_at(x, y):
     size = 0.6
     return Rectangle((x - size/2, y - size/2), size, size,
              edgecolor = (.75,.75,.75),
@@ -3092,7 +3120,7 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     qv_estimate = False
     est_str = ""
     if QV == 0:                 # QV = 0 indicates "do not draw QV background or label"
-        QV = 8192
+        QV = 2048
         
     elif QV < 0:                # QV < 0 indicates "add est. to label"
         QV = -QV
@@ -3150,6 +3178,8 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     # show a quantum volume rectangle of QV = 64 e.g. (6 x 6)
     if QV0 != 0:
         ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.87, depth_base))
+    else:
+        ax.add_patch(qv_box_at(1, 1, QV_width, QV_depth, 0.91, depth_base))
     
     # the untranspiled version is commented out - we do not show this by default
     # also show a quantum volume rectangle un-transpiled
@@ -3186,11 +3216,13 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
             # draw a box at this width and depth
             id = depth_index(d, depth_base) 
             
-            # show vb rectangles; if not showing QV, make all hollow
+            # show vb rectangles; if not showing QV, make all hollow (or less dark)
             if QV0 == 0:
-                ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+                #ax.add_patch(bkg_empty_box_at(id, w))
+                ax.add_patch(bkg_box_at(id, w, 0.95))
+            
             else:
-                ax.add_patch(bkg_box_at(id, w, 0.5))
+                ax.add_patch(bkg_box_at(id, w, 0.9))
             
             # save index of last successful depth
             i_success += 1
@@ -3198,7 +3230,7 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
         # plot empty rectangle after others       
         d = xround[i_success]
         id = depth_index(d, depth_base) 
-        ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+        ax.add_patch(bkg_empty_box_at(id, w))
         
     
     # Add annotation showing quantum volume
@@ -3214,7 +3246,7 @@ def plot_volumetric_background(max_qubits=11, QV=32, depth_base=2, suptitle=None
     return ax
 
 
-def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity"):
+def plot_volumetric_background_aq(max_qubits=11, AQ=12, depth_base=2, suptitle=None, avail_qubits=0, colorbar_label="Avg Result Fidelity"):
     
     if suptitle == None:
         suptitle = f"Volumetric Positioning\nCircuit Dimensions and Fidelity Overlaid on Algorithmic Qubits = {AQ}"
@@ -3224,7 +3256,7 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
     est_str = ""
 
     if AQ == 0:
-        AQ=20
+        AQ=12
         
     if AQ < 0:   
         AQ0 = 0             # AQ < 0 indicates "add est. to label"
@@ -3282,6 +3314,8 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
     # show a quantum volume rectangle of AQ = 6 e.g. (6 x 36)
     if AQ0 != 0:
         ax.add_patch(qv_box_at(1, 1, AQ_width, AQ_depth, 0.87, depth_base))
+    else:
+        ax.add_patch(qv_box_at(1, 1, AQ_width, AQ_depth, 0.91, depth_base))
     
     # the untranspiled version is commented out - we do not show this by default
     # also show a quantum volume rectangle un-transpiled
@@ -3317,9 +3351,10 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
             
             # show vb rectangles; if not showing QV, make all hollow
             if AQ0 == 0:
-                ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+                #ax.add_patch(bkg_empty_box_at(id, w))
+                ax.add_patch(bkg_box_at(id, w, 0.95))
             else:
-                ax.add_patch(bkg_box_at(id, w, 0.5))
+                ax.add_patch(bkg_box_at(id, w, 0.9))
             
             # save index of last successful depth
             i_success += 1
@@ -3327,7 +3362,7 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=22, depth_base=2, suptitle=N
         # plot empty rectangle after others       
         d = xround[i_success]
         id = depth_index(d, depth_base) 
-        ax.add_patch(bkg_empty_box_at(id, w, 0.5))
+        ax.add_patch(bkg_empty_box_at(id, w))
         
     
     # Add annotation showing quantum volume
