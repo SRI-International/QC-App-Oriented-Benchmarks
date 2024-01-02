@@ -37,9 +37,6 @@ verbose = False
 # Variable for number of resets to perform after mid circuit measurements
 num_resets = 1
 
-# Minimum qubit size for input and clock registers
-min_register_qubits = 1
-
 # saved circuits for display
 QC_ = None
 U_ = None
@@ -653,7 +650,7 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
 #      num_qubits = 2 * num_input_qubits + num_clock_qubits + 1 (the ancilla)
 
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
-        method = 1, use_best_widths=True,
+        method = 1, use_best_widths=True, min_register_qubits=1,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):  
@@ -697,7 +694,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             min_clock_qubits=min_clock_qubits, max_clock_qubits=max_clock_qubits,
             skip_qubits=skip_qubits,
             max_circuits=max_circuits, num_shots=num_shots, 
-            method=method, use_best_widths=use_best_widths,
+            method=method, use_best_widths=use_best_widths, min_register_qubits=min_register_qubits,
             backend_id=backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
@@ -710,7 +707,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
         min_clock_qubits=1, max_clock_qubits=3,
         max_circuits=3, num_shots=100,
-        method=2, use_best_widths=False,
+        method=2, use_best_widths=False, min_register_qubits=1,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):  
@@ -722,6 +719,7 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     max_input_qubits = max(min_input_qubits, max_input_qubits)
     min_clock_qubits = min(max(1, min_clock_qubits), max_clock_qubits)
     max_clock_qubits = max(min_clock_qubits, max_clock_qubits)
+    skip_qubits = max(1, skip_qubits)
     #print(f"... in, clock: {min_input_qubits}, {max_input_qubits}, {min_clock_qubits}, {max_clock_qubits}")
     
     # initialize saved circuits for display
