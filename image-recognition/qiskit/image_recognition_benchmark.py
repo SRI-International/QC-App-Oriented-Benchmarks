@@ -197,7 +197,6 @@ def preprocess_image_data(x, x_train, x_test, num_qubits, norm=True):
     x_train_scaled = scaler.transform(x_train_pca)
     x_test_scaled = scaler.transform(x_test_pca)
 
-
     return x_scaled, x_train_scaled, x_test_scaled
 
 
@@ -1457,11 +1456,6 @@ def run(
 
         x_scaled, x_train_scaled, x_test_scaled = preprocess_image_data(x, x_train, x_test, num_qubits)        
 
-        # global variables to store execution and elapsed time
-        global quantum_execution_time, quantum_elapsed_time
-        quantum_execution_time = 0.0
-        quantum_elapsed_time = 0.0
-  
         global x_batch, y_batch
    
         if method == 1:
@@ -1471,18 +1465,20 @@ def run(
 
         # loop over all instance files according to max_circuits given
         # instance_num index starts from 1
-#        for instance_num in range(1, max_circuits + 1):
- 
-        # get the file identifier (path) for the problem at this width, radius, and instance
-        # DEVNOTE: this identifier should NOT be the filepath, use another method
+        # for instance_num in range(1, max_circuits + 1):
 
         instance_num = 1
 
-        if verbose:
-            print(f"... executing problem num_qubits={num_qubits}")
-
+        # global variables to store execution and elapsed time
+        global quantum_execution_time, quantum_elapsed_time
+        quantum_execution_time = 0.0
+        quantum_elapsed_time = 0.0
+        
+        #####################
         # define the objective and the callback functions
-        def objective_function(thetas_array, return_accuracy=False, test_pass=False, train_pass=False):
+        # NOTE: this is called twice for the SPSA optimizer
+        def objective_function(thetas_array, return_accuracy=False,
+                    test_pass=False, train_pass=False):
             """
             Objective function that calculates the expected energy for the given parameterized circuit
 
@@ -1499,8 +1495,9 @@ def run(
             # variables used to aggregate metrics for all terms
             result_array = []
 
-            # create ansatz from the operator, in multiple circuits, one for each measured basis
-            # Create the ImageRegonition ansatz to generate a parameterized hamiltonian
+            #####################
+            # loop over each of the circuits that are generated from a batch and execute
+            # create the ImageRecognition ansatz to generate a parameterized hamiltonian
             ts = time.time()
             for data_point in x_batch:
                 if verbose and comfort:
@@ -1515,6 +1512,10 @@ def run(
                     x_data=data_point
                     )
 
+                # bind parameters to circuit before execution
+                # if parameterized:
+                #     qc.bind_parameters(params)
+            
                 # submit circuit for execution on target with the current parameters
                 ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
 
@@ -1523,9 +1524,9 @@ def run(
                 ex.finalize_execution(None, report_end=False)
 
                 # after first execution and thereafter, no need for transpilation if parameterized
-                # DEVNOTE: this can be removed, not used currently
+                # DEVNOTE: this can be removed or commented, not used currently
                 if parameterized:
-                    # DEVNOTE: since Hydro uses 3 circuits inside this loop, and execute.py can only
+                    # DEVNOTE: since we gen multipl circuits in this loop, and execute.py can only
                     # cache 1 at a time, we cannot yet implement caching.  Transpile every time.
                     cached_circuits = False
                     if cached_circuits:
@@ -1536,7 +1537,7 @@ def run(
                 global saved_result
                 result_array.append(saved_result)
 
-                # Aggregate execution and elapsed time for running all circuits, but only when the training
+                # Aggregate execution and elapsed time for all circuits, but only when the training
                 # corresponding to different feature maps
                 global quantum_execution_time, quantum_elapsed_time
                 if not (train_pass):
@@ -1560,22 +1561,14 @@ def run(
                     )
                     
             # end of loop over data points
-            
-            if verbose and comfort:
-                print('')
-            
             # store the time it took to create the circuit
+            # DEVNOTE: not correct; instead, accumulate time wrapped around ImageRecognition() 
             metrics.store_metric(num_qubits, unique_id, "create_time", time.time() - ts)
 
-            #####################
-            # loop over each of the circuits that are generated with basis measurements and execute
-
             if verbose:
+                if comfort: print('')
                 print(f"... compute loss and accuracy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params},\n  thetas_array={thetas_array}")
          
-            # bind parameters to circuit before execution
-            # if parameterized:
-            #     qc.bind_parameters(params)
 
             #####################
             # classical processing of results
@@ -1604,7 +1597,8 @@ def run(
             tc1 = time.time()
 
             # compute the loss for the image data batch
-            loss, accuracy = loss_function(result=result_array, y_data=y_batch, num_qubits= num_qubits, formatted_observables= frmt_obs)
+            loss, accuracy = loss_function(result=result_array, y_data=y_batch,
+                    num_qubits= num_qubits, formatted_observables=frmt_obs)
 
             # calculate std error from the variance -- identically zero if using statevector simulator
             # if backend_id.lower() != "statevector_simulator":
@@ -1615,12 +1609,12 @@ def run(
             if verbose:
                 print(f"   ... loss, accuracy = {loss}, {accuracy}")
 
-            # # append the most recent accuracy value to the list
+            # append the most recent accuracy value to the list
             accuracy_values.append(accuracy)
-
+            
             # store the metrics for the current iteration
             if test_pass:
-                metrics.store_metric(num_qubits, unique_id, "test_accuracy", accuracy)                      
+                metrics.store_metric(num_qubits, unique_id, "test_accuracy", accuracy)
 
             if train_pass:
                 metrics.store_metric(num_qubits, unique_id, "train_loss", loss)
@@ -1665,14 +1659,18 @@ def run(
             '''
             This function called for every iteration of optimizer
             '''
+            global quantum_execution_time, quantum_elapsed_time
+            global x_batch, y_batch
+            global minimizer_loop_index
+            
             if verbose:
-                print("... calling callback_thetas_array")
+                print(f"... in callback_thetas_array, batch index {minimizer_loop_index}")
                 
             #loss, accuracy =objective_function(thetas_array, return_accuracy=True, train_pass=True)
             #loss_history.append(loss)
             #accuracy_history.append(accuracy)
 
-            #Get mean loss and accuracy on this iteration and store it in the metrics
+            # compute mean loss and accuracy on this iteration and store it in metrics table
             loss = np.mean(loss_this_iter)
             accuracy = np.mean(accuracy_this_iter)
             
@@ -1681,64 +1679,37 @@ def run(
 
             loss_this_iter.clear()
             accuracy_this_iter.clear()
-            
-            global x_batch, y_batch
-            #global batch_index
-            global minimizer_loop_index
 
-            # whenerver minimizer_loop_index is divisible by factor, save the minimizer_loop_index and thetas_array to a json file
+            # whenerver minimizer_loop_index is divisible by factor,
+            # save the thetas_array at this minimizer_loop_index so we can file save later
             factor = np.ceil(max_iter/test_pass_count)
             if minimizer_loop_index % factor == 0:
-                # save the minimizer_loop_index and thetas_array to a json file
-                thetas_array_batch[minimizer_loop_index + 1] = thetas_array.tolist()                    
-                
-                print(f"Saved batch index {minimizer_loop_index + 1} and thetas_array to a json file")
-
-            # # add testing pass if method == 3 and batch index is a multiple of 10
-            # factor = np.ceil(max_iter/test_pass_count)
-            # if method == 3 and (batch_index % factor == 0):
-            #     # change the backend 
-            #     ex.set_execution_target(
-            #         backend_id, provider_backend=provider_backend, hub=hub, group=group, project=project, exec_options=exec_options
-            #         )
-                
-            #     # change the x_batch and y_batch
-            #     x_batch = x_test_scaled
-            #     y_batch = y_test
-            #     loss, accuracy =objective_function(thetas_array, return_accuracy=True, test_pass=True)
-            #     test_accuracy_history.append(accuracy)
-            #     print(f"Test accuracy: {accuracy} calculated after batch {batch_index + 1}")
+                thetas_array_batch[minimizer_loop_index + 1] = thetas_array.tolist()               
+                print(f"... -> saved thetas_array at batch index {minimizer_loop_index + 1}")
 
             # reset the backend to the training backend
             ex.set_execution_target(
                 backend_id_train, provider_backend=provider_backend, hub=hub, group=group, project=project, exec_options=exec_options
                 )
 
-            #Calculate the accuracy on test data
-            # test_predictions=calculate_predictions(x_scaled_test, theta, num_qubits, num_shots, reps=reps)
-            # test_accuracy=calculate_accuracy(y_test, test_predictions)
-            # test_accuracy_history.append(test_accuracy)
-
+            # generate a random set of indices that define the next batch
             indices = np.random.choice(len(x_train_scaled), size=batch_size, replace=False)
             x_batch = x_train_scaled[indices]
             y_batch = y_train[indices]
 
-            # increment the index
-            #batch_index=batch_index+1
+            # increment the loop index
             minimizer_loop_index += 1
-            
-            # reset the quantum_execution_time and quantum_elapsed_time
-            global quantum_execution_time, quantum_elapsed_time
-            
+ 
+            # print out execution time, and the loss and accuracy statistics
             if verbose:
                 print(f"... exec, elapsed time = {quantum_execution_time}, {quantum_elapsed_time}")
-                
+                print(f"... batch {minimizer_loop_index} loss: {round(loss,4)} accuracy: {round(accuracy,4)}")
+
+            # reset the quantum_execution_time and quantum_elapsed_time
             quantum_execution_time = 0.0
             quantum_elapsed_time = 0.0
-
-            print(f"Batch {minimizer_loop_index} loss: {round(loss,4)} accuracy: {round(accuracy,4)}")
-
-
+            
+            
         ###############
         if method == 1:
         
@@ -1812,11 +1783,9 @@ def run(
             # Always start by enabling transpile ...
             ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
 
-
             # begin timer accumulation
             cumlative_iter_time = [0]
             start_iters_t = time.time()
-
 
             # dictionary to store the thetas_array for each batch
             thetas_array_batch = {} 
@@ -1861,12 +1830,11 @@ def run(
             # remove the last element of metrics arrays, since it is always zero
             metrics.pop_metric(group=num_qubits, circuit = unique_id)
 
-
             # update the thetas_array_dict with the thetas_array_batch
             thetas_array_dict[num_qubits] = thetas_array_batch
 
-
             # write the thetas_array_dict to a json file
+            # NOTE: the size of this file grows each time we increment num_qubits
             write_dict_to_json(thetas_array_dict, thetas_array_path + "precomputed_thetas.json")
 
             # if verbose:
@@ -1912,9 +1880,8 @@ def run(
 
             ###### End of instance processing
 
-        # for method 2, need to aggregate the detail metrics appropriately for each group
+        # for method , need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
-
 
         elif method == 3:
 
@@ -1942,7 +1909,6 @@ def run(
             # Set iteration loss and accuracy to empty lists
             loss_this_iter = []
             accuracy_this_iter = []
-
 
             # begin timer accumulation
             cumlative_iter_time = [0]
@@ -1979,8 +1945,7 @@ def run(
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
-
-        
+       
     elif method == 3:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
