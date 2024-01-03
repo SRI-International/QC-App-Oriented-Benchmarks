@@ -1662,7 +1662,12 @@ def run(
                 return loss, accuracy
             
         def callback_thetas_array(thetas_array):
-            print("DEBUG calling callback_thetas_array")
+            '''
+            This function called for every iteration of optimizer
+            '''
+            if verbose:
+                print("... calling callback_thetas_array")
+                
             #loss, accuracy =objective_function(thetas_array, return_accuracy=True, train_pass=True)
             #loss_history.append(loss)
             #accuracy_history.append(accuracy)
@@ -1731,7 +1736,7 @@ def run(
             quantum_execution_time = 0.0
             quantum_elapsed_time = 0.0
 
-            print(f"Batch {minimizer_loop_index} loss: {loss} accuracy: {accuracy}")
+            print(f"Batch {minimizer_loop_index} loss: {round(loss,4)} accuracy: {round(accuracy,4)}")
 
 
         ###############
@@ -1743,8 +1748,7 @@ def run(
             # set x_batch and y_batch to the test data
             x_batch = x_test_scaled
             y_batch = y_test
-
-            
+          
             # create an intial thetas_array, given the circuit width and user input
             thetas_array_0 = get_initial_parameters(num_qubits=num_qubits, thetas_array=thetas_array, ansatz_type=ansatz_type, reps=reps)
 
@@ -1774,7 +1778,6 @@ def run(
             if do_compute_expectation:
                 logger.info("Computing expectation")
 
-                
                 # pass parameters as they are used during execution
                 compute_expectation(qc, num_qubits, instance_num, params=params)
 
@@ -1951,10 +1954,6 @@ def run(
                 thetas_array = np.array(thetas_array_batch[iteration_count])
                 loss, accuracy = objective_function(thetas_array, return_accuracy=True, test_pass=True)
 
-            
-
-
-
         if method == 2 or method == 3:
             metrics.process_circuit_metrics_2_level(num_qubits)
         
@@ -1986,11 +1985,7 @@ def run(
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
-        
-
-
-
-
+    
 def get_final_results():
     """
     Return the energy and dict of key metrics of the last run().
