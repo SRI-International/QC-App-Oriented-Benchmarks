@@ -46,10 +46,16 @@ def constant_oracle (input_size, num_qubits):
 # Perform CNOTs with each input qubit as a control and the output bit as the target.
 # Vary the input states that give 0 or 1 by wrapping some of the controls in X-gates.
 def balanced_oracle (input_size, num_qubits):
+
     #Initialize first n qubits and single ancilla qubit
     qc = QuantumCircuit(num_qubits, name=f"Uf")
 
-    b_str = "10101010101010101010"              # permit input_string up to 20 chars
+    # permit input_string up to num_qubits chars
+    # e.g. b_str = "10101010101010101010"
+    b_str = ""
+    for i in range(input_size): b_str += '1' if i % 2 == 0 else '0'
+    
+    # map 1's to X gates
     for qubit in range(input_size):
         if b_str[qubit] == '1':
             qc.x(qubit)
