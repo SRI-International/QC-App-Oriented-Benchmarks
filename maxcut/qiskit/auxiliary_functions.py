@@ -277,7 +277,7 @@ def plot_from_data(gen_prop, radar_plot_data):
             ars = arranged_AR_arr.flatten()  # approximation ratios
             radii_plt = radii_arr.flatten()
             restart_dots = ax.scatter(angles, radii_plt, c=ars, s=100, cmap='YlGn',
-                                      marker='o', alpha=0.8, label=r'Converged Angles'.format(0+1), linewidths=0)
+                                      marker='o', alpha=0.8, label=r'Converged Angles'.format(), linewidths=0)
 
             # Plot the fixed angles
             if ind < rounds:
