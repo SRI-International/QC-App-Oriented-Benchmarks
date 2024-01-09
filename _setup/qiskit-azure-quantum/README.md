@@ -18,8 +18,8 @@ The conda environment is now ready for you to install the Qiskit package.
 
 Enter the following commands to install the latest version of the Azure Quantum Qiskit SDK and the other required packages.
 
-    pip install -U azure-quantum
-    pip install -U azure-quantum[qiskit]
+    pip install -U numpy matplotlib
+    pip install -U azure-quantum azure-quantum[qiskit]
 
 You are now ready to run the benchmark programs.
 
