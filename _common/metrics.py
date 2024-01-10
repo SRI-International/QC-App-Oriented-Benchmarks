@@ -912,6 +912,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if "depth" not in filters: do_depths = False
         if "2q" not in filters: do_2qs = False
         if "vbplot" not in filters: do_vbplot = False
+        
+        # this is a way to turn these on, if aq_mode not used
+        if "hf_fidelity" in filters: do_hf_fidelities = True
+        if "2q" in filters: do_2qs = True
     
     # generate one-column figure with multiple bar charts, with shared X axis
     cols = 1
