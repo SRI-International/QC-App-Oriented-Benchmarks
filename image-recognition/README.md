@@ -8,6 +8,14 @@ This benchmark measures the performance characteristics of quantum computing sys
 
 The remainder of this README offers a brief summary of the benchmark and how to run it.  
 
+## Requirements
+
+This benchmark program requires that the Scikit-learn python package is installed in your environment prior to execution. The Scikit-learn package provides a number of unsupervised and supervised learning algorithms, as well as tools for loading various test databases.
+
+To install the Scikit-learn package, execute the following commands:
+
+    pip install scikit-learn noisyopt
+
 
 ## Current flow of implementation
 
