@@ -141,7 +141,8 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
-        backend_id='qasm_simulator', method = 1, provider_backend=None,
+        backend_id='qasm_simulator', method=1, input_value=None,
+        provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 
@@ -205,6 +206,11 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 
         # loop over limited # of secret strings for this
         for s_int in s_range:
+        
+            # if user specifies input_value, use it instead
+            if input_value is not None:
+                s_int = input_value
+                
             # If mid circuit, then add 2 to new qubit group since the circuit only uses 2 qubits
             if method == 2:
                 mid_circuit_qubit_group.append(2)
