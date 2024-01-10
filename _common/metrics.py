@@ -3457,7 +3457,8 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
 
 
     # add colorbar to right of plot (scale if normalize function installed)    
-    cbar = plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+    cbar = plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), cax=None, ax=ax,
+            shrink=0.6, label=score_label, panchor=(0.0, 0.7))
     if score_label == 'Accuracy Volume':
         cbar.ax.invert_yaxis()
         
