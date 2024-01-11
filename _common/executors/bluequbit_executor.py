@@ -5,7 +5,6 @@
 #
 #
 
-import bluequbit
 
 verbose = False
 

@@ -6,7 +6,6 @@ import numpy as np
 
 from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
-from qiskit.opflow import I, Z
 from qiskit.opflow.primitive_ops import PauliSumOp
 
 

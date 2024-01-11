@@ -32,7 +32,7 @@ Uf_ = None
 def create_oracle(num_qubits, input_size, secret_int):
     # Initialize first n qubits and single ancilla qubit
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name=f"Uf")
+    qc = QuantumCircuit(qr, name="Uf")
 
     # perform CX for each qubit that matches a bit in secret string
     s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
@@ -48,7 +48,7 @@ def BersteinVazirani (num_qubits, secret_int, method = 1):
 
     if method == 1:
         # allocate qubits
-        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size);
+        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size)
         qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")
 
         # put ancilla in |1> state

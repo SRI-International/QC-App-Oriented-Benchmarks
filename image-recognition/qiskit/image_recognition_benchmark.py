@@ -9,19 +9,14 @@ import os
 import re
 import sys
 import time
-from collections import namedtuple
-from typing import Optional
 
 import numpy as np
-from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 
 from qiskit import Aer, QuantumCircuit, execute
 from qiskit.circuit import ParameterVector
-from qiskit.exceptions import QiskitError
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
-from qiskit.algorithms.optimizers import SPSA
 from qiskit.opflow.primitive_ops import PauliSumOp
 from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
 from qiskit.quantum_info import SparsePauliOp
@@ -31,7 +26,7 @@ from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler, normalize
-from sklearn.metrics import accuracy_score, log_loss, mean_squared_error
+from sklearn.metrics import accuracy_score, mean_squared_error
 from noisyopt import minimizeSPSA
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
@@ -1555,7 +1550,7 @@ def run(
                     cached_circuits = False
                     if cached_circuits:
                         ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                        logger.info(f"  **** First execution complete, disabling transpile")
+                        logger.info("  **** First execution complete, disabling transpile")
 
                 # result array stores the multiple results we measure along different Pauli basis.
                 global saved_result
@@ -1773,7 +1768,7 @@ def run(
 
         ###############
         elif method == 2:
-            logger.info(f"===============  Begin method 2 loop, enabling transpile")
+            logger.info("===============  Begin method 2 loop, enabling transpile")
 
             # create batch from scaled data
             indices = np.random.choice(len(x_train_scaled), size=batch_size, replace=False)
