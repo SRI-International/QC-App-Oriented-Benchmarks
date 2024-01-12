@@ -8,10 +8,8 @@ sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common",
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 import math
-from math import gcd
 from fractions import Fraction
 import time
-import random
 import numpy as np
 np.random.seed(0)
 import execute as ex
@@ -19,7 +17,6 @@ import metrics as metrics
 from qft_benchmark import inv_qft_gate
 from qft_benchmark import qft_gate
 
-import copy
 from utils import getAngles, getAngle, modinv, generate_numbers, choose_random_base, determine_factors
 
 verbose = True
@@ -71,9 +68,9 @@ def ccphiADDmodN(num_qubits, a, N):
     cphiaddN_gate = cphiADD(num_qubits + 1, N)
 
     # Create relevant temporary qubit lists
-    ctl_main_qubits = [i for i in qr_ctl];
+    ctl_main_qubits = [i for i in qr_ctl]
     ctl_main_qubits.extend([i for i in qr_main])
-    anc_main_qubits = [qr_ancilla[0]];
+    anc_main_qubits = [qr_ancilla[0]]
     anc_main_qubits.extend([i for i in qr_main])
 
     # Create circuit
@@ -127,9 +124,9 @@ def cMULTamodN(n, a, N):
         ccphiADDmodN_gate = ccphiADDmodN(n, (2 ** i) * a % N, N)
 
         # Create relevant temporary qubit list
-        qubits = [qr_ctl[0]];
+        qubits = [qr_ctl[0]]
         qubits.extend([qr_x[i]])
-        qubits.extend([i for i in qr_main]);
+        qubits.extend([i for i in qr_main])
         qubits.extend([qr_ancilla[0]])
 
         qc.append(ccphiADDmodN_gate, qubits)
@@ -159,8 +156,8 @@ def controlled_Ua(n, a, exponent, N):
     cMULTamodN_inv_gate = cMULTamodN(n, a_inv, N).inverse()
 
     # Create relevant temporary qubit list
-    qubits = [i for i in qr_ctl];
-    qubits.extend([i for i in qr_x]);
+    qubits = [i for i in qr_ctl]
+    qubits.extend([i for i in qr_x])
     qubits.extend([i for i in qr_main])
     qubits.extend([i for i in qr_ancilla])
 
@@ -215,8 +212,8 @@ def ShorsAlgorithm(number, base, method, verbose=verbose):
             cUa_gate = controlled_Ua(n, int(base), 2 ** i, number)
 
             # Create relevant temporary qubit list
-            qubits = [qr_up[i]];
-            qubits.extend([i for i in qr_down]);
+            qubits = [qr_up[i]]
+            qubits.extend([i for i in qr_down])
             qubits.extend([i for i in qr_aux])
 
             qc.append(cUa_gate, qubits)
@@ -348,7 +345,7 @@ def attempt_factoring(input_size, number, verbose):
             failures += 1
             if verbose:
                 print(f"  ==> Bad luck: Found {f1} and {f2} which are not the factors")
-                print(f"  ... trying again ...")
+                print("  ... trying again ...")
 
     return failures
 
@@ -399,7 +396,7 @@ def run(min_qubits=5, max_circuits=3, max_qubits=10, num_shots=100,
 
     if interactive:
         do_interactive_test(verbose=verbose)
-        return;
+        return
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete

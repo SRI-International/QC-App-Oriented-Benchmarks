@@ -9,8 +9,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-from qiskit import QuantumCircuit, Aer, transpile,execute
-from qiskit.circuit.library import RealAmplitudes
+from qiskit import QuantumCircuit, Aer
 from sklearn.metrics import accuracy_score,log_loss
 from qiskit.circuit import ParameterVector
 import expectation_calc

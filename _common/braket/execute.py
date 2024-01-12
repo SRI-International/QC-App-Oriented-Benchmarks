@@ -26,11 +26,10 @@
 import time
 import copy
 import metrics
-import importlib
 import os
 
 # AWS imports: Import Braket SDK modules
-from braket.aws import AwsDevice, AwsQuantumTask
+from braket.aws import AwsDevice
 from braket.devices import LocalSimulator
 
 # Enter the S3 bucket you created during onboarding in the environment variables queried here
@@ -117,7 +116,7 @@ def submit_circuit(qc, group_id, circuit_id, shots=100):
     batched_circuits.append(
         { "qc": qc, "group": str(group_id), "circuit": str(circuit_id),
             "submit_time": time.time(), "shots": shots }
-    );
+    )
     # print("... submit circuit - ", str(batched_circuits[len(batched_circuits)-1]))
 
 
@@ -244,12 +243,12 @@ def braket_execute(qc, shots=100):
             
             if status == "FAILED":
                 result = None   
-                print(f"... circuit execution failed")
+                print("... circuit execution failed")
                 break
                 
             if status == "CANCELLED":
                 result = None   
-                print(f"... circuit execution cancelled")
+                print("... circuit execution cancelled")
                 break
             
             elif status == "COMPLETED":
