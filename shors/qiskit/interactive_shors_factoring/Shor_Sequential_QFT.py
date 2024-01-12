@@ -10,22 +10,17 @@ because implements the QFT sequentially, uses less qubits then when using a "nor
 
 """ Imports from qiskit"""
 from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister
-from qiskit import execute, IBMQ
+from qiskit import execute
 from qiskit import BasicAer
 
-import sys
 
 """ Imports to Python functions """
 import math
-import array
-import fractions
-import numpy as np
 import time
 
 """ Local Imports """
 from cfunctions import check_if_power, get_value_a
 from cfunctions import get_factors
-from qfunctions import create_QFT, create_inverse_QFT
 from qfunctions import getAngle, cMULTmodN
 
 

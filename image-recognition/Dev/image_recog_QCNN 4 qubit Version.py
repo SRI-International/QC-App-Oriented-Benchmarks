@@ -1,23 +1,18 @@
 
 # Importing the required libraries for the project
 
-import pandas as pd
 import numpy as np
-import sys
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-from qiskit import QuantumCircuit, Aer, transpile,execute
-from qiskit.circuit.library import RealAmplitudes
+from qiskit import QuantumCircuit, Aer
 from sklearn.metrics import accuracy_score,log_loss
 from qiskit.circuit import ParameterVector
-from qiskit.opflow.primitive_ops import PauliSumOp
 from qiskit.quantum_info import SparsePauliOp
 
-import expectation_calc_qcnn
 
 global expectation_calc_method
 

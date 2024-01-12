@@ -8,8 +8,6 @@ from pathlib import Path
 import numpy as np
 from qiskit.opflow.primitive_ops import PauliSumOp
 import matplotlib.pyplot as plt
-import ansatz
-import simulator
 from ansatz import PUCCD
 from simulator import Simulator
 import os

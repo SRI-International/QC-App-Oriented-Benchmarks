@@ -3,9 +3,7 @@ Keysight TrueQ - Randomized Compilation
 '''
 
 import trueq as tq
-import numpy as np
 import trueq.compilation as tqc
-import qiskit as qs
 
 # The following option applies randomized compilation through the True-Q software. This compilation technique allocates the total shot budget over randomized implementations of the circuit, which typically results in suppressing the effect of coherent noise processes.
 

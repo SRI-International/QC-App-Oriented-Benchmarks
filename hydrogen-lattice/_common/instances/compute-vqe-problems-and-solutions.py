@@ -16,7 +16,6 @@ from qiskit_nature_pyscf import PySCFGroundStateSolver
 
 import time 
 
-import qiskit_nature
 
 import pyscf
 from pyscf.doci import doci_slow
