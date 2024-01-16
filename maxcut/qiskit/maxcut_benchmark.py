@@ -1285,8 +1285,14 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                 opt_ts = time.time()
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
                 ##res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
-
-                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter})
+                
+                # if using fixed angles in method 2, need to access first element
+                # DEVNOTE: eliminate differences between method 1 and 2 and handling of thetas_array
+                thetas_array_0 = thetas_array
+                if use_fixed_angles:
+                    thetas_array_0 = thetas_array[0]
+                    
+                res = minimize(expectation, thetas_array_0, method='COBYLA', options = { 'maxiter': max_iter})
                 # To-do: Set bounds for the minimizer
                 
                 unique_id = restart_ind * 1000 + 0
