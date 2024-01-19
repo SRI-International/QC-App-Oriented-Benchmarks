@@ -23,9 +23,10 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
 
 # QED-C benchmark-specific imports
-sys.path[1:1] = ["_common", "_common/qiskit", "hydrogen-lattice/_common"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/"]
+root_repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path[1:1] = [root_repo + i for i in ["", "/_common", "/_common/qiskit", "/hydrogen-lattice/_common/"]]
 
+import _common.qiskit.lib as _common_lib
 import common
 import execute as ex
 import metrics as metrics
@@ -553,27 +554,6 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id="statevector_simu
     expectations[id] = counts
     
     #print(f"  ... time to execute statevector simulator: {time.time() - ts}")
-    
-# Return expected measurement array scaled to number of shots executed
-def get_expectation(num_qubits, secret_int, num_shots):
-
-    # find expectation counts for the given circuit 
-    id = f"_{num_qubits}_{secret_int}"
-
-    if id in expectations:
-        counts = expectations[id]
-
-        # scale probabilities to number of shots to obtain counts
-        for k, v in counts.items():
-            counts[k] = round(v * num_shots)
-
-        # delete from the dictionary
-        del expectations[id]
-
-        return counts
-
-    else:
-        return None
 
 
 #################################################
@@ -590,7 +570,7 @@ def analyze_and_print_result(qc, result, num_qubits, secret_int, num_shots):
     counts = result.get_counts(qc)
 
     # retrieve pre-computed expectation values for the circuit that just completed
-    expected_dist = get_expectation(num_qubits, secret_int, num_shots)
+    expected_dist = _common_lib.get_expectation(num_qubits, secret_int, num_shots)
 
     # if the expectation is not being calculated (only need if we want to compute fidelity)
     # assume that the expectation is the same as measured counts, yielding fidelity = 1
