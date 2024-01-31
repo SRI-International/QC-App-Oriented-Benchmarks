@@ -1251,7 +1251,9 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
             axs[axi].bar(groups, group_metrics["avg_depths"], 0.8, zorder = 3)
             
             # use width = 0 to make it invisible
-            axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.0, color='C9', zorder = 3) 
+            yy0 = [0.0 for y in group_metrics["avg_tr_depths"]]
+            axs[axi].bar(groups, yy0, 0.0, color='C9', zorder = 3) 
+            #axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.0, color='C9', zorder = 3)
             
             # plot normalized on second axis
             if max(group_metrics["avg_tr_depths"]) < 20:
