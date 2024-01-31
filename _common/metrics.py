@@ -95,6 +95,9 @@ initial_elapsed_time_multiplier = 1.1
 # this seems to remove queue time in some cases (IBM machines only)
 remove_creating_time_from_elapsed = True
 
+# For depth plots, show algorithmic and normalized plots on separate axes
+use_two_depth_axes = False
+
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
 
@@ -1211,18 +1214,53 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
         
     if do_depths:
-    
+        
         # set ticks specially if we had non-unique group names
         if xlabels is not None:
             axs[axi].set_xticks(groups)
             axs[axi].set_xticklabels(xlabels)
+        
+        # using one axis for circuit depth
+        if not use_two_depth_axes:
+        
+            if max(group_metrics["avg_tr_depths"]) < 20:
+                axs[axi].set_ylim([0, 20])  
+            axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
             
-        if max(group_metrics["avg_tr_depths"]) < 20:
-            axs[axi].set_ylim([0, 20])  
-        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(groups, group_metrics["avg_depths"], 0.8, zorder = 3)
-        axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
-        axs[axi].set_ylabel('Circuit Depth')
+            axs[axi].bar(groups, group_metrics["avg_depths"], 0.8, zorder = 3)
+            axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
+            axs[axi].set_ylabel('Circuit Depth')      
+        
+        # using two axes for circuit depth
+        else:
+        
+            ax2 = axs[axi].twinx()
+            
+            if max(group_metrics["avg_depths"]) < 20:
+                axs[axi].set_ylim([0, 2 * 20]) 
+            else:
+                axs[axi].set_ylim([0, 2 * max(group_metrics["avg_depths"])])
+                
+            if max(group_metrics["avg_tr_depths"]) < 20:
+                axs[axi].set_ylim([0, 20])
+            
+            # plot algo and normalized depth on same axis, but norm is invisible
+            axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+            axs[axi].set_ylabel('Algorithmic Circuit Depth')
+            
+            axs[axi].bar(groups, group_metrics["avg_depths"], 0.8, zorder = 3)
+            
+            # use width = 0 to make it invisible
+            axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.0, color='C9', zorder = 3) 
+            
+            # plot normalized on second axis
+            if max(group_metrics["avg_tr_depths"]) < 20:
+                ax2.set_ylim([0, 20])
+                
+            ax2.grid(True, axis = 'y', color='silver', ls='dashed', zorder = 0)
+            ax2.set_ylabel('Normalized Circuit Depth')
+            
+            ax2.bar(groups, group_metrics["avg_tr_depths"], 0.45, color='C9', zorder = 3)
         
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
