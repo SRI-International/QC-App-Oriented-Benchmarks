@@ -822,8 +822,11 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
                 
                 #print(qc)
                 
+                # collapse the sub-circuits used in this benchmark (for qiskit)
+                qc2 = qc.decompose()
+                
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
+                ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
         
             # Wait for some active circuits to complete; report metrics when groups complete
             ex.throttle_execution(metrics.finalize_group)
