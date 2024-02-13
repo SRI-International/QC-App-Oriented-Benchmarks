@@ -47,15 +47,15 @@ QFTI_ = None
 def MonteCarloSampling(target_dist, f, num_state_qubits, num_counting_qubits, epsilon=0.05, degree=2, method=2):
     
     A_qr = QuantumRegister(num_state_qubits+1)
-    A = QuantumCircuit(A_qr, name=f"A")
+    A = QuantumCircuit(A_qr, name="A")
 
     num_qubits = num_state_qubits + 1 + num_counting_qubits
     
     # initialize R and F circuits
     R_qr = QuantumRegister(num_state_qubits+1)
     F_qr = QuantumRegister(num_state_qubits+1)
-    R = QuantumCircuit(R_qr, name=f"R")
-    F = QuantumCircuit(F_qr, name=f"F")
+    R = QuantumCircuit(R_qr, name="R")
+    F = QuantumCircuit(F_qr, name="F")
     
     # method 1 takes in the abitrary function f and arbitrary dist
     if method == 1:
@@ -217,7 +217,7 @@ def AE_Subroutine(num_state_qubits, num_counting_qubits, A_circuit, method):
 def Ctrl_Q(num_state_qubits, A_circ):
 
     # index n is the objective qubit, and indexes 0 through n-1 are state qubits
-    qc = QuantumCircuit(num_state_qubits+1, name=f"Q")
+    qc = QuantumCircuit(num_state_qubits+1, name="Q")
     
     temp_A = copy.copy(A_circ)
     A_gate = temp_A.to_gate()

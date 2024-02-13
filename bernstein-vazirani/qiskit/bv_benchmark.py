@@ -32,7 +32,7 @@ Uf_ = None
 def create_oracle(num_qubits, input_size, secret_int):
     # Initialize first n qubits and single ancilla qubit
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name=f"Uf")
+    qc = QuantumCircuit(qr, name="Uf")
 
     # perform CX for each qubit that matches a bit in secret string
     s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
@@ -48,7 +48,7 @@ def BersteinVazirani (num_qubits, secret_int, method = 1):
 
     if method == 1:
         # allocate qubits
-        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size);
+        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size)
         qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")
 
         # put ancilla in |1> state
@@ -141,7 +141,8 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
-        backend_id='qasm_simulator', method = 1, provider_backend=None,
+        backend_id='qasm_simulator', method=1, input_value=None,
+        provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 
@@ -205,6 +206,12 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 
         # loop over limited # of secret strings for this
         for s_int in s_range:
+        
+            # if user specifies input_value, use it instead
+            # DEVNOTE: if max_circuits used, this will generate multiple bars per width
+            if input_value is not None:
+                s_int = input_value
+                
             # If mid circuit, then add 2 to new qubit group since the circuit only uses 2 qubits
             if method == 2:
                 mid_circuit_qubit_group.append(2)

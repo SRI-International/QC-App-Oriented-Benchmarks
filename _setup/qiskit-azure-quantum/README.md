@@ -18,8 +18,8 @@ The conda environment is now ready for you to install the Qiskit package.
 
 Enter the following commands to install the latest version of the Azure Quantum Qiskit SDK and the other required packages.
 
-    pip install -U azure-quantum
-    pip install -U azure-quantum[qiskit]
+    pip install -U numpy matplotlib notebook
+    pip install -U azure-quantum azure-quantum[qiskit]
 
 You are now ready to run the benchmark programs.
 
@@ -37,7 +37,7 @@ Using the Jupyter notebook described below makes this easy.
 
 Before running in either a Jupyter notebook or from the command line, you will need to set the Azure Quantum resource_id and location information in the following environment variables:
  
-    set AZURE_QUANTUM_RESOUCE_ID="<YOUR_RESOURCE_ID>"
+    set AZURE_QUANTUM_RESOURCE_ID="<YOUR_RESOURCE_ID>"
     set AZURE_QUANTUM_LOCATION="<YOUR_LOCATION>"
 
 You can find this information in the Azure portal under your workspace > Overview > "Resource ID" and "Location". To create an Azure Quantum workspace, you can read documentation at

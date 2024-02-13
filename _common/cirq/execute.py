@@ -106,7 +106,7 @@ def submit_circuit (qc, group_id, circuit_id, shots=100):
     batched_circuits.append(
         { "qc": qc, "group": str(group_id), "circuit": str(circuit_id),
             "submit_time": time.time(), "shots": shots }
-    );
+    )
     #print("... submit circuit - ", str(batched_circuits[len(batched_circuits)-1]))
     
     

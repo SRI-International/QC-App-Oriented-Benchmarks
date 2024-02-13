@@ -15,8 +15,7 @@ from collections import namedtuple
 import numpy as np
 from scipy.optimize import minimize
 
-from qiskit import (Aer, ClassicalRegister,  # for computing expectation tables
-                    QuantumCircuit, QuantumRegister, execute, transpile)
+from qiskit import (Aer, QuantumCircuit, execute)
 from qiskit.circuit import ParameterVector
 
 sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
@@ -1138,7 +1137,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
         
         # if the file does not exist, we are done with this number of qubits
         if nodes == None:
-            print(f"  ... problem not found.")
+            print("  ... problem not found.")
             break
         
         for restart_ind in range(1, max_circuits + 1):
@@ -1177,7 +1176,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                 # Always start by enabling transpile ...
                 ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
                     
-                logger.info(f'===============  Begin method 2 loop, enabling transpile')
+                logger.info('===============  Begin method 2 loop, enabling transpile')
                 
                 def expectation(thetas_array):
                     
@@ -1217,7 +1216,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                     # after first execution and thereafter, no need for transpilation if parameterized
                     if parameterized:
                         ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                        logger.info(f'**** First execution complete, disabling transpile')
+                        logger.info('**** First execution complete, disabling transpile')
                     #************************************************
                     
                     global saved_result
@@ -1286,8 +1285,14 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                 opt_ts = time.time()
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
                 ##res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
-
-                res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter})
+                
+                # if using fixed angles in method 2, need to access first element
+                # DEVNOTE: eliminate differences between method 1 and 2 and handling of thetas_array
+                thetas_array_0 = thetas_array
+                if use_fixed_angles:
+                    thetas_array_0 = thetas_array[0]
+                    
+                res = minimize(expectation, thetas_array_0, method='COBYLA', options = { 'maxiter': max_iter})
                 # To-do: Set bounds for the minimizer
                 
                 unique_id = restart_ind * 1000 + 0

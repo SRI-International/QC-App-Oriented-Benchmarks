@@ -2,7 +2,6 @@ from pytket.extensions.qiskit import qiskit_to_tk, tk_to_qiskit
 from pytket.passes import (  # type: ignore
     auto_rebase_pass,
     RemoveRedundancies,
-    SequencePass,
     SynthesiseTket,
     CXMappingPass,
     DecomposeBoxes,
@@ -12,8 +11,6 @@ from pytket.passes import (  # type: ignore
     KAKDecomposition,
     PauliSimp,
     RemoveBarriers,
-    RemoveImplicitQubitPermutation,
-    RebaseTket,
 )
 from pytket.architecture import Architecture
 from pytket.placement import NoiseAwarePlacement
@@ -23,7 +20,6 @@ from pytket.extensions.qiskit.qiskit_convert import (
 )
 from pytket import OpType
 from qiskit.circuit.quantumcircuit import QuantumCircuit
-from pytket.circuit.display import render_circuit_jupyter
 
 
 def rebase_pass():

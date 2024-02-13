@@ -95,6 +95,9 @@ initial_elapsed_time_multiplier = 1.1
 # this seems to remove queue time in some cases (IBM machines only)
 remove_creating_time_from_elapsed = True
 
+# For depth plots, show algorithmic and normalized plots on separate axes
+use_two_depth_axes = False
+
 # Option to generate volumetric positioning charts
 do_volumetric_plots = True
 
@@ -619,7 +622,7 @@ def print_all_circuit_metrics():
 
     dump_json("  ==> all circuit_metrics", circuit_metrics)
     
-    print(f"  ==> all detail 2 circuit_metrics:")
+    print("  ==> all detail 2 circuit_metrics:")
     for group in circuit_metrics_detail_2:
         for circuit_id in circuit_metrics_detail_2[group]:
             print(f"    group {group} circuit {circuit_id}")
@@ -645,7 +648,7 @@ def uniform_dist(num_state_qubits):
     return dist                
 
 ### Analysis methods to be expanded and eventually compiled into a separate analysis.py file
-import math, functools
+import math
 import numpy as np
 
 # Compute the fidelity based on Hellinger distance between two discrete probability distributions
@@ -683,7 +686,7 @@ def hellinger_fidelity_with_expected(p, q):
     
     # in some situations (error mitigation) this can go negative, use abs value
     if total < 0:
-        print(f"WARNING: using absolute value in fidelity calculation")
+        print("WARNING: using absolute value in fidelity calculation")
         total = abs(total)
         
     dist = np.sqrt(total)/np.sqrt(2)
@@ -878,7 +881,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         
     if len(group_metrics["groups"]) == 0:
         print(f"\n{suptitle}")
-        print(f"     ****** NO RESULTS ****** ")
+        print("     ****** NO RESULTS ****** ")
         return
     
     # sort the group metrics (in case they weren't sorted when collected)
@@ -912,6 +915,10 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         if "depth" not in filters: do_depths = False
         if "2q" not in filters: do_2qs = False
         if "vbplot" not in filters: do_vbplot = False
+        
+        # this is a way to turn these on, if aq_mode not used
+        if "hf_fidelity" in filters: do_hf_fidelities = True
+        if "2q" in filters: do_2qs = True
     
     # generate one-column figure with multiple bar charts, with shared X axis
     cols = 1
@@ -1207,18 +1214,55 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         axi += 1
         
     if do_depths:
-    
+        
         # set ticks specially if we had non-unique group names
         if xlabels is not None:
             axs[axi].set_xticks(groups)
             axs[axi].set_xticklabels(xlabels)
+        
+        # using one axis for circuit depth
+        if not use_two_depth_axes:
+        
+            if max(group_metrics["avg_tr_depths"]) < 20:
+                axs[axi].set_ylim([0, 20])  
+            axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
             
-        if max(group_metrics["avg_tr_depths"]) < 20:
-            axs[axi].set_ylim([0, 20])  
-        axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
-        axs[axi].bar(groups, group_metrics["avg_depths"], 0.8, zorder = 3)
-        axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
-        axs[axi].set_ylabel('Circuit Depth')
+            axs[axi].bar(groups, group_metrics["avg_depths"], 0.8, zorder = 3)
+            axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.5, color='C9', zorder = 3) 
+            axs[axi].set_ylabel('Circuit Depth')      
+        
+        # using two axes for circuit depth
+        else:
+        
+            ax2 = axs[axi].twinx()
+            
+            if max(group_metrics["avg_depths"]) < 20:
+                axs[axi].set_ylim([0, 2 * 20]) 
+            else:
+                axs[axi].set_ylim([0, 2 * max(group_metrics["avg_depths"])])
+                
+            if max(group_metrics["avg_tr_depths"]) < 20:
+                axs[axi].set_ylim([0, 20])
+            
+            # plot algo and normalized depth on same axis, but norm is invisible
+            axs[axi].grid(True, axis = 'y', color='silver', zorder = 0)
+            axs[axi].set_ylabel('Algorithmic Circuit Depth')
+            
+            axs[axi].bar(groups, group_metrics["avg_depths"], 0.8, zorder = 3)
+            
+            # use width = 0 to make it invisible
+            yy0 = [0.0 for y in group_metrics["avg_tr_depths"]]
+            axs[axi].bar(groups, yy0, 0.0, color='C9', zorder = 3) 
+            #axs[axi].bar(groups, group_metrics["avg_tr_depths"], 0.0, color='C9', zorder = 3)
+            
+            # plot normalized on second axis
+            if max(group_metrics["avg_tr_depths"]) < 20:
+                ax2.set_ylim([0, 20])
+                
+            ax2.grid(True, axis = 'y', color='silver', ls='dashed', zorder = 0)
+            ax2.set_ylabel('Normalized Circuit Depth')
+            
+            ax2.bar(groups, group_metrics["avg_tr_depths"], 0.45, color='C9', zorder = 3)
         
         if rows > 0 and not xaxis_set:
             axs[axi].sharex(axs[rows-1])
@@ -1320,7 +1364,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
                 label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
         
         except Exception as e:
-            print(f'ERROR: plot_metrics(), failure when creating volumetric positioning chart')
+            print('ERROR: plot_metrics(), failure when creating volumetric positioning chart')
             print(f"... exception = {e}")
             if verbose:
                 print(traceback.format_exc())
@@ -1366,7 +1410,7 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
                 label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
         
         except Exception as e:
-            print(f'ERROR: plot_metrics(), failure when creating volumetric positioning chart')
+            print('ERROR: plot_metrics(), failure when creating volumetric positioning chart')
             print(f"... exception = {e}")
             if verbose:
                 print(traceback.format_exc())
@@ -1396,7 +1440,7 @@ def modify_elapsed_times(avg_elapsed_times, avg_exec_creating_times, avg_exec_ti
     # The flaw in this is that it also removes the compilation time, which is small
     # for small circuits, but could be larger for large circuits.
     # Thus, we've added the variable to enable/disable this.
-    if remove_creating_time_from_elapsed and len(avg_exec_creating_times) > 0:
+    if remove_creating_time_from_elapsed and len(avg_exec_creating_times) >= len(avg_elapsed_times):
         for i in range(len(avg_elapsed_times)):
             avg_elapsed_times[i] = round(avg_elapsed_times[i] - avg_exec_creating_times[i], 3) 
 
@@ -1483,7 +1527,7 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
     
     except Exception as e:
-        print(f'ERROR: plot_metrics_all_overlaid(), failure when creating volumetric positioning chart')
+        print('ERROR: plot_metrics_all_overlaid(), failure when creating volumetric positioning chart')
         print(f"... exception = {e}")
         if verbose:
             print(traceback.format_exc())
@@ -1561,7 +1605,7 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
         
         # Note: the following loop is required, as it creates the array of annotation points
         # In this merged version of plottig, we suppress the border as it is already drawn
-        appname = None;
+        appname = None
         for app in shared_data:
         
             # Extract shorter app name from the title passed in by user
@@ -1605,7 +1649,7 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
                    label=appname, labelpos=(0.4, 0.6), labelrot=15, type=1, fill=False)
     
     except Exception as e:
-        print(f'ERROR: plot_metrics_all_merged(), failure when creating volumetric positioning chart')
+        print('ERROR: plot_metrics_all_merged(), failure when creating volumetric positioning chart')
         print(f"... exception = {e}")
         if verbose:
             print(traceback.format_exc())
@@ -1673,7 +1717,7 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
             
             if max_depth > 0 and d_tr_data[i] > max_depth:
                 print(f"... excessive depth, skipped; w={y} d={d_tr_data[i]}")
-                break;
+                break
                     
             # reject cells with low fidelity
             if suppress_low_fidelity and f < suppress_low_fidelity_level:
@@ -1690,7 +1734,7 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
             
             if x > max_depth_log - 1:
                 print(f"... data out of chart range, skipped; w={y} d={d_tr_data[i]}")
-                break;
+                break
                 
             for grad in range(num_grads):
                 e = depth_values_merged[int(w_data[i])][int(xp + grad)]
@@ -1747,6 +1791,7 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
 def plot_all_app_metrics(backend_id, do_all_plots=False,
         include_apps=None, exclude_apps=None, suffix="", avail_qubits=0,
         is_individual=False, score_metric=None,
+        filters=None, options=None,
         max_depth=0, suppress_low_fidelity=False):
 
     global circuit_metrics
@@ -1800,7 +1845,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
         '''
 
         # draw the volumetric plot and append the circuit metrics subtitle to the title
-        suptitle = f"Volumetric Positioning - All Applications (Merged)"
+        suptitle = "Volumetric Positioning - All Applications (Merged)"
         fulltitle = suptitle + get_backend_title()
         
         plot_metrics_all_merged(shared_data, backend_id, suptitle=fulltitle, 
@@ -1814,7 +1859,7 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
             #print("")
             #print(app)
             group_metrics = shared_data[app]["group_metrics"]
-            plot_metrics(app)
+            plot_metrics(app, filters=filters, options=options)
 
 
 ### Plot Metrics for a specific application
@@ -2195,10 +2240,10 @@ def linearize_axis(values, gap=2, outer=2, fill=True):
     gaps_exist = False
     
     # add labels at beginning
-    basis = [None] * outer;
+    basis = [None] * outer
 
     # loop over values and generate new values that are separated by the gap value
-    newvalues = [];
+    newvalues = []
     for i in range(len(values)):
         newvalues.append(values[i])
         
@@ -2386,7 +2431,7 @@ def plot_cutsize_distribution_single_width(width, suptitle, options, group_metri
         dist = group_metrics_optgaps['cutsize_ratio_dist']
         axs.plot(dist['ratios'][indx], dist['frequencies'][indx], marker='o',
                  ls='-', c='k', ms=2, mec='k', mew=0.4, lw=1,
-                 label=f"Circuit Sampling")  # " degree={deg}") # lw=1,
+                 label="Circuit Sampling")  # " degree={deg}") # lw=1,
 
         # Also plot the distribution obtained from uniform random sampling
         dist = group_metrics_optgaps['random_cutsize_ratio_dist']
@@ -2863,7 +2908,7 @@ import math
 from matplotlib.patches import Rectangle
 from matplotlib.patches import Circle
 import matplotlib.cm as cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap, Normalize
+from matplotlib.colors import ListedColormap, Normalize
 
 ############### Color Map functions
  
@@ -3371,7 +3416,8 @@ def plot_volumetric_background_aq(max_qubits=11, AQ=12, depth_base=2, suptitle=N
                 bbox=dict(boxstyle="square,pad=0.3", fc=(.9,.9,.9), ec="grey", lw=1))
                 
     # add colorbar to right of plot
-    plt.colorbar(cm.ScalarMappable(cmap=cmap), shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
+    plt.colorbar(cm.ScalarMappable(cmap=cmap), cax=None, ax=ax,
+                shrink=0.6, label=colorbar_label, panchor=(0.0, 0.7))
             
     return ax
 
@@ -3450,9 +3496,9 @@ def plot_metrics_background(suptitle, ylabel, x_label, score_label,
     else:
         cmap = cmap_orig
 
-
     # add colorbar to right of plot (scale if normalize function installed)    
-    cbar = plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), shrink=0.6, label=score_label, panchor=(0.0, 0.7))
+    cbar = plt.colorbar(cm.ScalarMappable(cmap=cmap, norm=cmap_norm), cax=None, ax=ax,
+            shrink=0.6, label=score_label, panchor=(0.0, 0.7))
     if score_label == 'Accuracy Volume':
         cbar.ax.invert_yaxis()
         
@@ -3506,14 +3552,14 @@ def plot_volumetric_data(ax, w_data, d_data, f_data, depth_base=2, label='Depth'
         # DEVNOTE: this is highly specialized for the QA area plots, where there are 8 bars
         # that represent time starting from 0 secs.  We offset by one pixel each and center the group
         if y != last_y:
-            last_y = y;
+            last_y = y
             k = 3              # hardcoded for 8 cells, offset by 3
         
         #print(f"{i = } {x = } {y = }")
         
         if max_depth > 0 and d_data[i] > max_depth:
             #print(f"... excessive depth (2), skipped; w={y} d={d_data[i]}")
-            break;
+            break
             
         # reject cells with low fidelity
         if suppress_low_fidelity and f < suppress_low_fidelity_level:
@@ -3605,7 +3651,7 @@ def plot_volumetric_data_aq(ax, w_data, d_data, f_data, depth_base=2, label='Dep
         
         if max_depth > 0 and d_data[i] > max_depth:
             #print(f"... excessive depth (2), skipped; w={y} d={d_data[i]}")
-            break;
+            break
         
         # reject cells with low fidelity
         if suppress_low_fidelity and f < suppress_low_fidelity_level:
