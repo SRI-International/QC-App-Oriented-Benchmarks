@@ -198,7 +198,7 @@ def execute_circuit(circuit):
             # mimic the annealing operation
             ts = time.time() 
             
-            num_sweeps = math.log(annealing_time, 2)
+            num_sweeps = int(math.log(annealing_time, 2))
             
             sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, num_sweeps=num_sweeps, annealing_time=annealing_time)
             sampleset.resolve()
