@@ -163,7 +163,7 @@ if min_qubits == max_qubits == 0:
     # read all json file names in the instance folder
     instance_filepath_list = [file \
         for file in glob.glob(os.path.join(os.path.dirname(__file__), "..", \
-        common.INSTANCE_DIR, f"h*_*_*_*.json"))]
+        common.INSTANCE_DIR, "h*_*_*_*.json"))]
     
     # get all file names from the instnacefilepath list
     filename_list = [os.path.basename(file) for file in instance_filepath_list]

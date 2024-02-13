@@ -54,7 +54,7 @@ def HamiltonianSimulation(n_spins, K, t, w, h_x, h_z):
     secret_int = f"{K}-{t}"
     
     # allocate qubits
-    qr = QuantumRegister(n_spins); cr = ClassicalRegister(n_spins);
+    qr = QuantumRegister(n_spins); cr = ClassicalRegister(n_spins)
     qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{secret_int}")
     tau = t / K
 

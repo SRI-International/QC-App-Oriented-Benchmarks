@@ -25,9 +25,7 @@
 #
 
 import os
-import json
-import traceback
-import matplotlib, matplotlib.pyplot as plt, matplotlib.cm as cm
+import matplotlib, matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Patch
 
 import numpy as np
@@ -796,7 +794,7 @@ def plot_all_cumulative_metrics(suptitle=None,
     
     # since all subplots share the same header, give user and indication of the grouping
     if individual:
-        print(f"----- Cumulative Plots for all qubit groups -----")
+        print("----- Cumulative Plots for all qubit groups -----")
     
     # draw the average execution time plots
     if "average_exec_times" in bar_y_metrics:
@@ -931,7 +929,7 @@ def plot_cumulative_metrics(suptitle="",
                 
     # save the plot image
     if save_plot_images:
-        metrics.save_plot_image(plt, os.path.join(f"Image-Recognition-(2)" +
+        metrics.save_plot_image(plt, os.path.join("Image-Recognition-(2)" +
                                             "-" + suffix),
                                             backend_id)
     # show the plot(s)
@@ -1075,7 +1073,7 @@ def plot_exec_time_metrics(suptitle="",
                 
     # save the plot image
     if save_plot_images:
-        metrics.save_plot_image(plt, os.path.join(f"Image-Recognition-(2)" +
+        metrics.save_plot_image(plt, os.path.join("Image-Recognition-(2)" +
                                             "-" + suffix),
                                             backend_id)
     # show the plot(s)

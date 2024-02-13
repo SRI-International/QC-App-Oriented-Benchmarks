@@ -10,7 +10,6 @@ import os
 import re
 import sys
 import time
-from collections import namedtuple
 
 import numpy as np
 
@@ -890,7 +889,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
         
         # if the file does not exist, we are done with this number of qubits
         if nodes == None:
-            print(f"  ... problem not found.")
+            print("  ... problem not found.")
             break
 
         for restart_ind in range(1, max_circuits + 1):
@@ -919,7 +918,7 @@ def run (min_qubits=3, max_qubits=6, max_circuits=1, num_shots=100,
                 ex.set_embedding_flag(embedding_flag=True)
                 
                 if verbose:
-                    print(f'===============  Begin method 2 loop, enabling embed')
+                    print('===============  Begin method 2 loop, enabling embed')
 
                 annealing_time = min_annealing_time
                 while annealing_time <= max_annealing_time:

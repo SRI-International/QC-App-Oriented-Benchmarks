@@ -5,7 +5,7 @@
 #
 #
 
-from qiskit import QuantumCircuit, transpile, Aer
+from qiskit import transpile, Aer
 import time
 
 import sys
@@ -51,7 +51,7 @@ def run(qc, backend_name, backend, shots=100, device='cpu'):
     # first time, create the simulator backend
     if simulator is None:
         if verbose:
-            print(f"... create aer_simulator_statevector backend")
+            print("... create aer_simulator_statevector backend")
 
         simulator = Aer.get_backend('aer_simulator_statevector')
 

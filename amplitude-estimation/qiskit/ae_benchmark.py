@@ -90,7 +90,7 @@ def A_gen(num_state_qubits, a, psi_zero=None, psi_one=None):
         
     theta = 2 * np.arcsin(np.sqrt(a))
     # Let the objective be qubit index n; state is on qubits 0 through n-1
-    qc_A = QuantumCircuit(num_state_qubits+1, name=f"A")
+    qc_A = QuantumCircuit(num_state_qubits+1, name="A")
     
     # takes state to |0>_{n} (sqrt(1-a) |0> + sqrt(a) |1>)
     qc_A.ry(theta, num_state_qubits)
@@ -113,7 +113,7 @@ def A_gen(num_state_qubits, a, psi_zero=None, psi_one=None):
 def Ctrl_Q(num_state_qubits, A_circ):
 
     # index n is the objective qubit, and indexes 0 through n-1 are state qubits
-    qc = QuantumCircuit(num_state_qubits+1, name=f"Q")
+    qc = QuantumCircuit(num_state_qubits+1, name="Q")
     
     temp_A = copy.copy(A_circ)
     A_gate = temp_A.to_gate()

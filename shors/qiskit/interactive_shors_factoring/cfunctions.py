@@ -5,9 +5,7 @@
 import math
 import array
 import fractions
-import numpy as np
 
-import sys
 
 
 """ ******** Pre-Quantum *** """

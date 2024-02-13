@@ -13,7 +13,7 @@ sys.path[1:1] = ["_common", "_common/qiskit", "shors/_common", "quantum-fourier-
 sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common", "../../quantum-fourier-transform/qiskit"]
 import execute as ex
 import metrics as metrics
-from shors_utils import getAngles, getAngle, modinv, generate_base, verify_order
+from shors_utils import getAngles, getAngle, modinv, generate_base
 from qft_benchmark import inv_qft_gate
 from qft_benchmark import qft_gate
 

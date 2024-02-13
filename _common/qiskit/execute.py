@@ -23,7 +23,6 @@
 # execution, so they can be aggregated and presented to the user.
 #
 
-import sys
 import os
 import time
 import copy
@@ -591,7 +590,7 @@ def execute_circuit(circuit):
     qc_tr_depth = qc_depth
     qc_tr_size = qc_size
     qc_tr_count_ops = qc_count_ops
-    qc_tr_xi = qc_xi; 
+    qc_tr_xi = qc_xi 
     qc_tr_n2q = qc_n2q
     #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
     
@@ -816,7 +815,7 @@ def wait_on_job_result(job, active_circuit):
             result = job.result()
             break
                          
-        except Exception as e:
+        except Exception:
             print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
             if verbose: print(traceback.format_exc())
             time.sleep(15)
@@ -841,7 +840,7 @@ def get_job_status(job, active_circuit):
             status = job.status()
             break
                          
-        except Exception as e:
+        except Exception:
             print(f'... error occurred during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
             if verbose: print(traceback.format_exc())
             time.sleep(15)
@@ -899,9 +898,9 @@ def transpile_for_metrics(qc):
         logger.info(f"End transpile with {basis_selector = }")
     else:
         basis_gates = basis_gates_array[basis_selector]
-        logger.info(f"Start transpile with basis_selector != 0")
+        logger.info("Start transpile with basis_selector != 0")
         qc = transpile(qc, basis_gates=basis_gates, seed_transpiler=0)
-        logger.info(f"End transpile with basis_selector != 0")
+        logger.info("End transpile with basis_selector != 0")
     
     #print(qc)
         
@@ -935,7 +934,7 @@ def transpile_for_metrics(qc):
 def transpile_and_bind_circuit(circuit, params, backend,
                 optimization_level=None, layout_method=None, routing_method=None):
                 
-    logger.info(f'transpile_and_bind_circuit()')
+    logger.info('transpile_and_bind_circuit()')
     st = time.time()
         
     if do_transpile_for_execute:
@@ -948,7 +947,7 @@ def transpile_and_bind_circuit(circuit, params, backend,
     
     else:
         logger.info('use cached transpiled circuit for execute')
-        if verbose_time: print(f"  ... using cached circuit, no transpile")
+        if verbose_time: print("  ... using cached circuit, no transpile")
 
         ##trans_qc = circuit["qc"]
         
@@ -966,7 +965,7 @@ def transpile_and_bind_circuit(circuit, params, backend,
         # Note: some loggers cannot handle unicode in param names, so only show the values
         #logger.info(f"Binding parameters to circuit: {str(params)}")
         logger.info(f"Binding parameters to circuit: {[param[1] for param in params.items()]}")
-        if verbose_time: print(f"  ... binding parameters")
+        if verbose_time: print("  ... binding parameters")
         
         trans_qc = trans_qc.bind_parameters(params)
         #print(trans_qc)
@@ -1185,7 +1184,7 @@ def job_complete(job):
     
         # invoke a result processor if specified in exec_options
         if result_processor:
-            logger.info(f'result_processor(...)')
+            logger.info('result_processor(...)')
             result = result_processor(result)
     
         # The following computes the counts by summing them up, allowing for the case where
@@ -1489,10 +1488,10 @@ def check_jobs(completion_handler=None):
 
         # when complete, canceled, or failed, process the job
         if status == JobStatus.CANCELLED:
-            print(f"... circuit execution cancelled.")
+            print("... circuit execution cancelled.")
 
         if status == JobStatus.ERROR:
-            print(f"... circuit execution failed.")
+            print("... circuit execution failed.")
             if hasattr(job, "error_message"):
                 print(f"    job = {job.job_id()}  {job.error_message()}")
 
@@ -1631,10 +1630,10 @@ def job_wait_for_completion(job):
     #if verbose: print("Job status is ", job.status() )
     
     if job.status() == JobStatus.CANCELLED:
-        print(f"\n... circuit execution cancelled.")
+        print("\n... circuit execution cancelled.")
             
     if job.status() == JobStatus.ERROR:
-        print(f"\n... circuit execution failed.")
+        print("\n... circuit execution failed.")
 
 
 

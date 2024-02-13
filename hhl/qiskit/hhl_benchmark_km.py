@@ -123,7 +123,7 @@ def QFT(qc, qreg):
 def inv_qft_gate(input_size, method=1):
 #def qft_gate(input_size):
     #global QFT_
-    qr = QuantumRegister(input_size);
+    qr = QuantumRegister(input_size)
     #qc = QuantumCircuit(qr, name="qft")
     qc = QuantumCircuit(qr, name="QFT†")
     
@@ -142,7 +142,7 @@ def inv_qft_gate(input_size, method=1):
                     divisor = 2 ** (num_crzs - j)
                     #qc.crz( math.pi / divisor , qr[hidx], qr[input_size - j - 1])
                     ##qc.crz( -np.pi / divisor , qr[hidx], qr[input_size - j - 1])
-                    qc.cu1(-np.pi / divisor, qr[hidx], qr[input_size - j - 1]);
+                    qc.cu1(-np.pi / divisor, qr[hidx], qr[input_size - j - 1])
                 
             # followed by an H gate (applied to all qubits)
             qc.h(qr[hidx])
@@ -165,7 +165,7 @@ def inv_qft_gate(input_size, method=1):
 def qft_gate(input_size, method=1):
 #def inv_qft_gate(input_size):
     #global QFTI_
-    qr = QuantumRegister(input_size);
+    qr = QuantumRegister(input_size)
     #qc = QuantumCircuit(qr, name="inv_qft")
     qc = QuantumCircuit(qr, name="QFT")
     
@@ -211,7 +211,7 @@ def ctrl_u(exponent):
     for i in range(exponent):
         #qc.u(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, target);
         #qc.cu(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, control, target);
-        qc.u(np.pi/2, -np.pi/2, np.pi/2, 0);
+        qc.u(np.pi/2, -np.pi/2, np.pi/2, 0)
     
     cu_gate = qc.to_gate().control(1)
 
@@ -225,7 +225,7 @@ def ctrl_ui(exponent):
     for i in range(exponent):
         #qc.u(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, target);
         #qc.cu(np.pi/2, -np.pi/2, np.pi/2, 3*np.pi/4, control, target);
-        qc.u(np.pi/2, np.pi/2, -np.pi/2, 0);
+        qc.u(np.pi/2, np.pi/2, -np.pi/2, 0)
     
     cu_gate = qc.to_gate().control(1)
 
@@ -273,7 +273,7 @@ def qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1):
             for k in range(repeat):
             
                 # this global phase is applied to clock qubit
-                qc.u1(3*np.pi/4, clock[j]);
+                qc.u1(3*np.pi/4, clock[j])
                 
                 # apply the rest of U controlled by clock qubit
                 #cp, _ = ctrl_u(repeat)
@@ -282,7 +282,7 @@ def qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1):
             
             repeat *= 2
             
-            qc.barrier();
+            qc.barrier()
     
         #Define global U operator as the phase operator (for printing later)
         _, U_ = ctrl_u(1)
@@ -339,7 +339,7 @@ def inv_qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1
             for k in range(repeat):
     
                 # this global phase is applied to clock qubit
-                qc.u1(-3*np.pi/4, clock[j]);
+                qc.u1(-3*np.pi/4, clock[j])
                 
                 # apply the rest of U controlled by clock qubit
                 #cp, _ = ctrl_u(repeat)
@@ -348,7 +348,7 @@ def inv_qpe(qc, clock, target, extra_qubits=None, ancilla=None, A=None, method=1
             
             repeat = int(repeat / 2)
             
-            qc.barrier();
+            qc.barrier()
     
         #Define global U operator as the phase operator (for printing later)
         _, UI_ = ctrl_ui(1)

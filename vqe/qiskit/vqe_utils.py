@@ -1,5 +1,4 @@
-from qiskit_nature.drivers import PySCFDriver, UnitsType, Molecule
-from qiskit_nature.circuit.library import HartreeFock as HF
+from qiskit_nature.drivers import PySCFDriver, UnitsType
 from qiskit_nature.problems.second_quantization.electronic import ElectronicStructureProblem
 from qiskit_nature.mappers.second_quantization import JordanWignerMapper
 from qiskit_nature.converters.second_quantization import QubitConverter

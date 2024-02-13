@@ -2,13 +2,10 @@ from typing import Dict, List, Optional
 
 from qiskit import Aer, execute
 from qiskit.circuit.quantumcircuit import QuantumCircuit
-from qiskit.exceptions import QiskitError
 from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
-from qiskit.quantum_info import Statevector
 from qiskit.result import sampled_expectation_value
 from qiskit.opflow.primitive_ops import PauliSumOp
 from qiskit.quantum_info import SparsePauliOp
-from enum import Enum
 
 debug = True
 qasm_backend = Aer.get_backend("qasm_simulator")

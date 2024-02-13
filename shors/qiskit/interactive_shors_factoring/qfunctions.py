@@ -2,9 +2,7 @@
 """
 
 """ Imports from qiskit"""
-from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister
 
-import sys
 import math
 import numpy as np
 

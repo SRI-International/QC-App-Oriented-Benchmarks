@@ -31,7 +31,7 @@ Ug_ = None
 def Uf_oracle(num_qubits, secret_int):
     # Initialize qubits qubits
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name=f"Uf")
+    qc = QuantumCircuit(qr, name="Uf")
 
     # Perform X on each qubit that matches a bit in secret string
     s = ('{0:0'+str(num_qubits)+'b}').format(secret_int)
@@ -54,7 +54,7 @@ def Uf_oracle(num_qubits, secret_int):
 def Ug_oracle(num_qubits):
     # Initialize first n qubits
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name=f"Ug")
+    qc = QuantumCircuit(qr, name="Ug")
 
     for i_qubit in range(0,num_qubits-1,2):
         qc.cz(qr[i_qubit], qr[i_qubit+1])
@@ -64,7 +64,7 @@ def Ug_oracle(num_qubits):
 def HiddenShift (num_qubits, secret_int):
     
     # allocate qubits
-    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits);
+    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits)
     qc = QuantumCircuit(qr, cr, name=f"hs-{num_qubits}-{secret_int}")
     
     # Start with Hadamard on all input qubits

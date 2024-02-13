@@ -8,12 +8,10 @@ sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 import time
-import math
 import numpy as np
 np.random.seed(0)
 import execute as ex
 import metrics as metrics
-from collections import defaultdict
 
 verbose = False
 

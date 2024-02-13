@@ -38,7 +38,7 @@ def QuantumFourierTransform (num_qubits, secret_int, method=1):
     depth = 0
     
     # allocate qubits
-    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits);
+    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits)
     qc = QuantumCircuit(qr, cr, name=f"qft({method})-{num_qubits}-{secret_int}")
 
     if method==1:

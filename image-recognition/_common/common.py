@@ -4,7 +4,6 @@
 # This file contains code that can be shared by all API instances of this benchmark,
 # e.g. loading of problem instances and expected solution
 
-import os
 import json
 import numpy as np
 

@@ -30,7 +30,7 @@ B_ORACLE_ = None
 # Create a constant oracle, appending gates to given circuit
 def constant_oracle (input_size, num_qubits):
     #Initialize first n qubits and single ancilla qubit
-    qc = QuantumCircuit(num_qubits, name=f"Uf")
+    qc = QuantumCircuit(num_qubits, name="Uf")
 
     output = np.random.randint(2)
     if output == 1:
@@ -48,7 +48,7 @@ def constant_oracle (input_size, num_qubits):
 def balanced_oracle (input_size, num_qubits):
 
     #Initialize first n qubits and single ancilla qubit
-    qc = QuantumCircuit(num_qubits, name=f"Uf")
+    qc = QuantumCircuit(num_qubits, name="Uf")
 
     # permit input_string up to num_qubits chars
     # e.g. b_str = "10101010101010101010"
@@ -84,7 +84,7 @@ def DeutschJozsa (num_qubits, type):
     input_size = num_qubits - 1
 
     # allocate qubits
-    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size);
+    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size)
     qc = QuantumCircuit(qr, cr, name=f"dj-{num_qubits}-{type}")
 
     for qubit in range(input_size):

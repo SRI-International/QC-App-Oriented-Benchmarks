@@ -13,7 +13,6 @@ sys.path[1:1] = [ "_common", "_common/Dev", "hydrogen-lattice/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
 
 import numpy as np
-import ansatz, simulator
 from ansatz import PUCCD
 from simulator import Simulator
 from pathlib import Path
