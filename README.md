@@ -8,13 +8,17 @@ The repository is maintained by members of the Quantum Economic Development Cons
 
 A variety of "reference applications" are provided. At the current stage in the evolution of quantum computing hardware, some applications will perform better on one hardware target, while a completely different set may execute better on another target. They are designed to provide users a quantum "jump start", so to speak, eliminating the need to develop for themselves uniform code patterns that facilitate quick development, deployment, and experimentation. 
 
-The QED-C committee that developed these benchmarks released (Oct 2021) a pre-print of a paper describing the theory and methodology supporting this work at
+The QED-C committee that developed these benchmarks released (Oct 2021) a paper describing the theory and methodology supporting this work at
 
 &nbsp;&nbsp;&nbsp;&nbsp;[Application-Oriented Performance Benchmarks for Quantum Computing](https://arxiv.org/abs/2110.03137)
 
-The QED-C committee released (Feb 2023) a second pre-print of a paper describing the addition of combinatorial optimization problems as advanced application-oriented benchmarks at:
+The QED-C committee released (Feb 2023) a second paper describing the addition of combinatorial optimization problems as advanced application-oriented benchmarks at
 
 &nbsp;&nbsp;&nbsp;&nbsp;[Optimization Applications as Quantum Performance Benchmarks](https://arxiv.org/abs/2302.02278)
+
+Recently, the group recently another paper (Feb 2024) with additional benchmark programs and improvements to the framework at
+
+&nbsp;&nbsp;&nbsp;&nbsp;[Quantum Algorithm Exploration using Application-Oriented Performance Benchmarks](https://arxiv.org/abs/2402.08985)
 
 See the [Implementation Status](#implementation-status) section below for the latest report on benchmarks implemented to date.
 
