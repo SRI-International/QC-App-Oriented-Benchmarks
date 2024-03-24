@@ -9,7 +9,6 @@ import numpy as np
 from sympy.combinatorics.graycode import GrayCode
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
-#from qiskit import Aer, execute
 from qiskit_aer import Aer
 
 

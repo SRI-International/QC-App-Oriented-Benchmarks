@@ -15,9 +15,11 @@ from collections import namedtuple
 import numpy as np
 from scipy.optimize import minimize
 
-from qiskit import (Aer, QuantumCircuit, execute)
+from qiskit_aer import Aer
+from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
 
+# QED-C imports
 sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
 import common
@@ -258,7 +260,7 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simu
     
     #execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
-    sv_result = execute(qc, sv_backend).result()
+    sv_result = sv_backend.run(qc).result()
 
     # get the probability distribution
     counts = sv_result.get_counts()
