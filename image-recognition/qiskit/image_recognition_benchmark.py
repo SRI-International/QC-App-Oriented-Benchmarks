@@ -722,7 +722,7 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id="statevector_simu
     qc = qc.remove_final_measurements(inplace=False)
 
     if params is not None:
-        qc = qc.bind_parameters(params)
+        qc = qc.assign_parameters(params)
 
     # execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
@@ -1533,7 +1533,7 @@ def run(
 
                 # bind parameters to circuit before execution
                 # if parameterized:
-                #     qc.bind_parameters(params)
+                #     qc.assign_parameters(params)
             
                 # submit circuit for execution on target with the current parameters
                 ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
@@ -1747,7 +1747,7 @@ def run(
             # for testing and debugging ...
             #if using parameter objects, bind before printing
             if verbose:
-                print(qc.bind_parameters(params) if parameterized else qc)
+                print(qc.assign_parameters(params) if parameterized else qc)
             """
             # store the creation time for these circuits
             metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)

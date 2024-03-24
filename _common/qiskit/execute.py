@@ -962,7 +962,7 @@ def transpile_and_bind_circuit(circuit, params, backend, basis_gates=None,
         logger.info(f"Binding parameters to circuit: {[param[1] for param in params.items()]}")
         if verbose_time: print("  ... binding parameters")
         
-        trans_qc = trans_qc.bind_parameters(params)
+        trans_qc = trans_qc.assign_parameters(params)
         #print(trans_qc)
         
         # store original name in parameterized circuit, so it can be found with get_result()

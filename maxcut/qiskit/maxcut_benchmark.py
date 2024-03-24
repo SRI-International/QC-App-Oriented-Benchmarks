@@ -256,7 +256,7 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id='statevector_simu
     
     #ts = time.time()
     if params != None:
-        qc = qc.bind_parameters(params)
+        qc = qc.assign_parameters(params)
     
     #execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
