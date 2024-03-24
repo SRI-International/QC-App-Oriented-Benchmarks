@@ -33,16 +33,16 @@ import logging
 import numpy as np
 
 from datetime import datetime, timedelta
-from qiskit import execute, Aer, transpile
+from qiskit import transpile
+from qiskit_aer import Aer
 from qiskit.providers.jobstatus import JobStatus
+
+# Noise Model imports
+from qiskit_aer.noise import NoiseModel, ReadoutError
+from qiskit_aer.noise import depolarizing_error, reset_error
 
 # QED-C modules
 import metrics
-
-# Noise
-from qiskit.providers.aer.noise import NoiseModel, ReadoutError
-from qiskit.providers.aer.noise import depolarizing_error, reset_error
-
 
 ##########################
 # JOB MANAGEMENT VARIABLES 
@@ -75,7 +75,7 @@ session_count = 0
 session = None
 sampler = None
 
-# Use the IBM Quantum Platform system; default is to use the new IBM Cloud
+# Use the IBM Quantum Platform system; default is to use the IBM Cloud
 use_ibm_quantum_platform = False
 
 # IBM Quantum Service save here if created
@@ -685,7 +685,7 @@ def execute_circuit(circuit):
                 dummy = backend_exec_options_copy.pop("noise_model", None)
                         
                 # transpile and bind circuit with parameters; use cache if flagged   
-                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
+                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend, basis_gates=this_noise.basis_gates)
                 simulation_circuits = trans_qc
                         
                 # apply transformer pass if provided
@@ -698,17 +698,12 @@ def execute_circuit(circuit):
                 if width_processor:
                     width_processor(qc)
                 
-                # for noisy simulator, use execute() which works; 
+                # for noisy simulator, use backend.run() which can take noise model; 
                 # no need for transpile above unless there are options like transformer
                 logger.info(f'Running circuit on noisy simulator, shots={shots}')
                 st = time.time()
                 
-                ''' some circuits, like Grover's behave incorrectly if we use run()
                 job = backend.run(simulation_circuits, shots=shots,
-                    noise_model=this_noise, basis_gates=this_noise.basis_gates,
-                    **backend_exec_options_copy)
-                '''   
-                job = execute(simulation_circuits, backend, shots=shots,
                     noise_model=this_noise, basis_gates=this_noise.basis_gates,
                     **backend_exec_options_copy)
                     
@@ -931,7 +926,7 @@ def transpile_for_metrics(qc):
 # Cache the transpiled circuit, and use it if do_transpile_for_execute not set
 # DEVNOTE: this approach does not permit passing of untranspiled circuit through
 # DEVNOTE: currently this only caches a single circuit
-def transpile_and_bind_circuit(circuit, params, backend,
+def transpile_and_bind_circuit(circuit, params, backend, basis_gates=None,
                 optimization_level=None, layout_method=None, routing_method=None):
                 
     logger.info('transpile_and_bind_circuit()')
@@ -939,7 +934,7 @@ def transpile_and_bind_circuit(circuit, params, backend,
         
     if do_transpile_for_execute:
         logger.info('transpiling for execute')
-        trans_qc = transpile(circuit, backend, 
+        trans_qc = transpile(circuit, backend, basis_gates=basis_gates,
                 optimization_level=optimization_level, layout_method=layout_method, routing_method=routing_method) 
         
         # cache this transpiled circuit
