@@ -9,8 +9,7 @@ import numpy as np
 from scipy.linalg import expm
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
-from qiskit import Aer, execute
-
+from qiskit_aer import Aer
 
 def Ham_sim(H, t):
     """
@@ -193,7 +192,7 @@ def W_gate(qc, q0, q1):
 def qc_unitary(qc):
     
     simulator = Aer.get_backend('unitary_simulator')
-    result = execute(qc, simulator).result()
+    result = simulator.run(qc).result()
     U = np.array(result.get_unitary(qc))
     
     return U
@@ -201,7 +200,7 @@ def qc_unitary(qc):
 def sim_circuit(qc, shots):
     
     simulator = Aer.get_backend('qasm_simulator')
-    result = execute(qc, simulator, shots=shots).result()
+    result = simulator.run(qc, shots=shots).result()
     outcomes = result.get_counts(qc)
     
     return outcomes

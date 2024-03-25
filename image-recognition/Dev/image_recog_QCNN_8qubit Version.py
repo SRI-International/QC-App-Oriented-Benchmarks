@@ -311,7 +311,7 @@ def loss_function(theta, x_batch, y_batch, is_draw_circ=False, is_print=False):
     for data_point, label in zip(x_batch, y_batch):
         # Create the quantum circuit for the data point
         qc = qcnn_model(data_point, num_qubits)
-        qc_upd = qc.bind_parameters(theta)
+        qc_upd = qc.assign_parameters(theta)
         
         if i_draw==0 and is_draw_circ:
             print(qc_upd)
@@ -415,7 +415,7 @@ test_accuracy_history = []
 for data_point in x_final_test:
     qc = qcnn_model(data_point, num_qubits)
     
-    qc_upd = qc.bind_parameters(theta.x)
+    qc_upd = qc.assign_parameters(theta.x)
     # Simulate the quantum circuit and get the result
     
     # qc = qc.assign_parameters(theta.x)

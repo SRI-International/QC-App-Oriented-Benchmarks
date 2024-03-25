@@ -99,13 +99,13 @@ def A_gen(num_state_qubits, a, psi_zero=None, psi_one=None):
     qc_A.x(num_state_qubits)
     for i in range(num_state_qubits):
         if psi_zero[i]=='1':
-            qc_A.cnot(num_state_qubits,i)
+            qc_A.cx(num_state_qubits,i)
     qc_A.x(num_state_qubits)
     
     # takes state to sqrt(1-a) |psi_0>|0> + sqrt(a) |psi_1>|1>
     for i in range(num_state_qubits):
         if psi_one[i]=='1':
-            qc_A.cnot(num_state_qubits,i)
+            qc_A.cx(num_state_qubits,i)
     
     return qc_A
 
