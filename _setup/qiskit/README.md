@@ -5,6 +5,8 @@
 This directory describes the requirements and operational conventions for using Qiskit as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
 In particular, this document explains how to set up the tools needed to run the Qiskit implementation of these benchmarks.
 
+**NOTE** This repository now requires Qiskit version 1.0 or greater.  A branch named **__master-240322-works-0.46** has been preserved for use with earlier versions of Qiskit. 
+
 ## Configure a Qiskit Environment
 If you are using Anaconda environments, create an environment named "qiskit" and then "activate" it using the following commands:
 
