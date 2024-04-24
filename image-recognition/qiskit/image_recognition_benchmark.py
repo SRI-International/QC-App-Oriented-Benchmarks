@@ -525,13 +525,10 @@ def pauli_string_to_circuit(pauli_string: str):
     Given a string representing a pauli (like "XXXI"), construct a QuantumCircuit containing the corresponding quantum gates.
     """
 
-    print(pauli_string)
-    print(type(pauli_string))
-
     qc = QuantumCircuit(len(pauli_string))
 
-    for i, pauli_char in enumerate(pauli_string):
-        print("pauli char", pauli_char)
+    # go in reverse to account for qiskit ordering- most significant is on the left
+    for i, pauli_char in enumerate(pauli_string[::-1]):
         if pauli_char == "I":
             continue
         elif pauli_char == "X":
@@ -685,9 +682,7 @@ def calculate_expectation_values(probabilities, observables):
         probabilities = [probabilities]
     expectation_values = list()
     for idx, op in enumerate(observables):
-        expectation_value = sampled_expectation_value(
-            probabilities[idx], op[0].primitive
-        )
+        expectation_value = sampled_expectation_value(probabilities[idx], op)
         expectation_values.append(expectation_value)
 
     return expectation_values
