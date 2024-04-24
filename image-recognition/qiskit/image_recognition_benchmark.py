@@ -13,12 +13,11 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-from qiskit import Aer, QuantumCircuit, execute
+from qiskit_aer import Aer
+from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
-from qiskit.opflow.primitive_ops import PauliSumOp
-from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
 from qiskit.quantum_info import SparsePauliOp
 
 # machine learning libraries
@@ -30,7 +29,11 @@ from sklearn.metrics import accuracy_score, mean_squared_error
 from noisyopt import minimizeSPSA
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", '../../image-recognition/_common/']
+sys.path[1:1] = [
+    "../../_common",
+    "../../_common/qiskit",
+    "../../image-recognition/_common/",
+]
 
 # benchmark-specific imports
 import execute as ex
@@ -45,6 +48,7 @@ log_to_file = False
 # supress deprecation warnings
 # TODO update warning filters
 import warnings
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # set path for saving the thetas_array
@@ -63,10 +67,13 @@ try:
     else:
         logging.basicConfig(
             level=logging.WARNING,
-            format='%(asctime)s %(name)s - %(levelname)s:%(message)s')
-        
+            format="%(asctime)s %(name)s - %(levelname)s:%(message)s",
+        )
+
 except Exception as e:
-    print(f"Exception {e} occured while configuring logger: bypassing logger config to prevent data loss")
+    print(
+        f"Exception {e} occured while configuring logger: bypassing logger config to prevent data loss"
+    )
     pass
 
 # Image Recognition inputs  ( Here input is Hamiltonian matrix --- Need to change)
@@ -78,10 +85,10 @@ print_sample_circuit = True
 do_compute_expectation = True
 
 # Array of energy values collected during iterations of VQE
-#lowest_energy_values = []
+# lowest_energy_values = []
 
 # Key metrics collected on last iteration of VQE
-#key_metrics = {}
+# key_metrics = {}
 
 # saved circuits for display
 QC_ = None
@@ -94,18 +101,15 @@ if len(sys.argv) > 1:
 else:
     DEBUG = False
 
+
 # Add custom metric names to metrics module
 def add_custom_metric_names():
-    metrics.known_x_labels.update(
-        {
-            "iteration_count": "Iterations"
-        }
-    )
+    metrics.known_x_labels.update({"iteration_count": "Iterations"})
     metrics.known_score_labels.update(
         {
-            "train_accuracy" : "Training Accuracy",
-            "test_accuracy" : "Test Accuracy",
-            "train_loss" : "Training Loss",
+            "train_accuracy": "Training Accuracy",
+            "test_accuracy": "Test Accuracy",
+            "train_loss": "Training Loss",
             "solution_quality": "Solution Quality",
             "accuracy_volume": "Accuracy Volume",
             "accuracy_ratio": "Accuracy Ratio",
@@ -115,9 +119,9 @@ def add_custom_metric_names():
     )
     metrics.score_label_save_str.update(
         {
-            "train_accuracy" : "train_accuracy",
-            "test_accuracy" : "test_accuracy",
-            "train_loss" : "train_loss",
+            "train_accuracy": "train_accuracy",
+            "test_accuracy": "test_accuracy",
+            "train_loss": "train_loss",
             "solution_quality": "solution_quality",
             "accuracy_volume": "accuracy_volume",
             "accuracy_ratio": "accuracy_ratio",
@@ -125,24 +129,34 @@ def add_custom_metric_names():
         }
     )
 
+
 ###################################
 # fetch mnist data
 
-def fetch_mnist_data(int1=7, int2=9, test_size=50, train_size=200,
-            random_state=42, verbose=False, normalize=True):
-    
+
+def fetch_mnist_data(
+    int1=7,
+    int2=9,
+    test_size=50,
+    train_size=200,
+    random_state=42,
+    verbose=False,
+    normalize=True,
+):
     if verbose:
-        print(f"... fetching MNIST data, train_size={train_size}, test_size={test_size}")
-        
+        print(
+            f"... fetching MNIST data, train_size={train_size}, test_size={test_size}"
+        )
+
     # Load the image data from MNIST database
-    mnist = fetch_openml('mnist_784', version=1, as_frame=False)
-    
+    mnist = fetch_openml("mnist_784", version=1, as_frame=False)
+
     # x has all the pixel values of image and has Data shape of (70000, 784)  here 784 is 28*28
     x = mnist.data
-    
+
     # y has all the labels of the images and has Target shape of (70000,)
     y = mnist.target
-    
+
     if verbose:
         print(f"    shape of x, y: {x.shape}, {y.shape}")
 
@@ -160,58 +174,67 @@ def fetch_mnist_data(int1=7, int2=9, test_size=50, train_size=200,
     y = (y == int2).astype(int)
 
     # split the data into train and test data
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size, train_size=train_size, random_state=random_state)
-    
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=test_size, train_size=train_size, random_state=random_state
+    )
+
     if verbose:
-        print(f"    sizes: x_train={len(x_train)}, x_test={len(x_test)}, y_train={len(y_train)}, y_test={len(y_test)}")
-    
+        print(
+            f"    sizes: x_train={len(x_train)}, x_test={len(x_test)}, y_train={len(y_train)}, y_test={len(y_test)}"
+        )
+
     return x, x_train, x_test, y, y_train, y_test
 
-def preprocess_image_data(x, x_train, x_test, num_qubits, norm=True):
 
+def preprocess_image_data(x, x_train, x_test, num_qubits, norm=True):
     if verbose:
-        print(f"... preprocessing image data for num_qubits={num_qubits}") 
-        
+        print(f"... preprocessing image data for num_qubits={num_qubits}")
+
     # normalize the data between 0 and 1
     if norm:
         if verbose:
             print("  ... normalizing data")
-            
+
         # normalize the data between 0 and 1
-        x = normalize(x, norm='max', axis=1)
-        x_train = normalize(x_train, norm='max', axis=1)
-        x_test = normalize(x_test, norm='max', axis=1)
-        
+        x = normalize(x, norm="max", axis=1)
+        x_train = normalize(x_train, norm="max", axis=1)
+        x_test = normalize(x_test, norm="max", axis=1)
+
     # apply pca
     pca = PCA(n_components=num_qubits).fit(x)
     x_pca = pca.transform(x)
     x_train_pca = pca.transform(x_train)
     x_test_pca = pca.transform(x_test)
 
-    # To visualize if prinicipal components are enough and to decide the number of principal components to keep 
-    pca_check = False 
+    # To visualize if prinicipal components are enough and to decide the number of principal components to keep
+    pca_check = False
     if pca_check == True:
         cumulative_variance_ratio = np.cumsum(pca.explained_variance_ratio_)
 
-        plt.plot(range(1, len(cumulative_variance_ratio) + 1), cumulative_variance_ratio)
-        plt.xlabel('Number of Principal Components')
-        plt.ylabel('Cumulative Explained Variance Ratio')
+        plt.plot(
+            range(1, len(cumulative_variance_ratio) + 1), cumulative_variance_ratio
+        )
+        plt.xlabel("Number of Principal Components")
+        plt.ylabel("Cumulative Explained Variance Ratio")
         plt.show()
 
-    #scale the data between 0 and pi
+    # scale the data between 0 and pi
     scaler = MinMaxScaler(feature_range=(0, np.pi)).fit(x_pca)
     x_scaled = scaler.transform(x_pca)
     x_train_scaled = scaler.transform(x_train_pca)
     x_test_scaled = scaler.transform(x_test_pca)
 
     if verbose:
-        print(f"    scaled sizes: x_scaled={len(x_scaled)}, x_train_scaled={len(x_train_scaled)}, x_test_scaled={len(x_test_scaled)}")
-        
+        print(
+            f"    scaled sizes: x_scaled={len(x_scaled)}, x_train_scaled={len(x_train_scaled)}, x_test_scaled={len(x_test_scaled)}"
+        )
+
     return x_scaled, x_train_scaled, x_test_scaled
 
 
 ###################################
 # Data handling methods
+
 
 def read_dict_from_json(instance_filepath):
     """
@@ -226,16 +249,18 @@ def read_dict_from_json(instance_filepath):
         instance_dict = None
     return instance_dict
 
+
 def write_dict_to_json(instance_dict, instance_filepath):
     """
     Write a dictionary to a json file.
     """
     try:
         with open(instance_filepath, "w") as f:
-            json.dump(instance_dict, f, indent='\t')
+            json.dump(instance_dict, f, indent="\t")
     except Exception as e:
         print(f"Exception {e} occured while writing instance file {instance_filepath}")
         logger.error(e)
+
 
 def update_dict_in_json(instance_dict, instance_filepath):
     """
@@ -263,7 +288,14 @@ def update_dict_in_json(instance_dict, instance_filepath):
 # 2 - length N, where N is number of excitation pairs
 saved_parameter_mode = 1
 
-def get_initial_parameters(num_qubits: int, ansatz_type:str='qcnn uniform', thetas_array=None, reps=1, verbose=False):
+
+def get_initial_parameters(
+    num_qubits: int,
+    ansatz_type: str = "qcnn uniform",
+    thetas_array=None,
+    reps=1,
+    verbose=False,
+):
     """
     Generate an initial set of parameters given the number of qubits and user-provided thetas_array.
     If thetas_array is None, generate random array of parameters based on the parameter_mode
@@ -285,19 +317,20 @@ def get_initial_parameters(num_qubits: int, ansatz_type:str='qcnn uniform', thet
 
     # calculate number of parameters based on type of ansatz
     # Initialize the weights for the QNN model
-    if ansatz_type == 'block':
-        num_parameters= num_qubits * reps * 2
-    elif ansatz_type == 'qcnn uniform':
-        num_parameters_per_layer=15*reps
+    if ansatz_type == "block":
+        num_parameters = num_qubits * reps * 2
+    elif ansatz_type == "qcnn uniform":
+        num_parameters_per_layer = 15 * reps
         num_layers = int(np.ceil(np.log2(num_qubits)))
-        num_parameters = num_parameters_per_layer*num_layers
-    elif ansatz_type == 'qcnn unique':
-        num_parameters_per_conv=15*reps
-        num_parameters = num_parameters_per_conv*(2*num_qubits-2-int(np.ceil(np.log2(num_qubits))))
+        num_parameters = num_parameters_per_layer * num_layers
+    elif ansatz_type == "qcnn unique":
+        num_parameters_per_conv = 15 * reps
+        num_parameters = num_parameters_per_conv * (
+            2 * num_qubits - 2 - int(np.ceil(np.log2(num_qubits)))
+        )
     else:
         print("Invalid ansatz_type " + str(ansatz_type))
 
-    
     size = num_parameters
 
     # if None passed in, create array of random values
@@ -311,24 +344,28 @@ def get_initial_parameters(num_qubits: int, ansatz_type:str='qcnn uniform', thet
     # otherwise, use what user provided
     else:
         if len(thetas_array) != size:
-            print(f"WARNING: length of thetas_array {len(thetas_array)} does not equal required length {size}")
+            print(
+                f"WARNING: length of thetas_array {len(thetas_array)} does not equal required length {size}"
+            )
             print("         Generating random values instead.")
             initial_parameters = get_initial_parameters(num_qubits, None)
         else:
             initial_parameters = np.array(thetas_array)
 
     if verbose:
-        print(f"... get_initial_parameters(num_qubits={num_qubits}, mode={saved_parameter_mode})")
+        print(
+            f"... get_initial_parameters(num_qubits={num_qubits}, mode={saved_parameter_mode})"
+        )
         print(f"    --> initial_parameter[{size}]={initial_parameters}")
 
     return initial_parameters
 
+
 # create the qcnn ansatz
 # Variational circuit ansatzes
 def parametrized_block(thetas, num_qubits, reps):
-    
     # reps is Number of times ry and cx gates are repeated
-    qc = QuantumCircuit(num_qubits)    
+    qc = QuantumCircuit(num_qubits)
     # print("parameter_vector",parameter_vector)
     counter = 0
     for rep in range(reps):
@@ -336,17 +373,18 @@ def parametrized_block(thetas, num_qubits, reps):
             theta = thetas[counter]
             qc.ry(theta, i)
             counter += 1
-        
+
         for i in range(num_qubits):
             theta = thetas[counter]
             qc.rx(theta, i)
             counter += 1
-    
+
         for j in range(0, num_qubits - 1, 1):
-            if rep<reps-1:
+            if rep < reps - 1:
                 qc.cx(j, j + 1)
     # print("counter",counter)
     return qc
+
 
 # Ansatz from paper https://arxiv.org/pdf/2108.00661.pdf
 def parameterized_2q_gate_1(thetas, num_reps=1):
@@ -355,104 +393,124 @@ def parameterized_2q_gate_1(thetas, num_reps=1):
     conv_circ = QuantumCircuit(2)
 
     for i in range(num_reps):
-        conv_circ.rx(thetas[12*i+0], 0)
-        conv_circ.rx(thetas[12*i+1], 1)
-        conv_circ.rz(thetas[12*i+2], 0)
-        conv_circ.rz(thetas[12*i+3], 1)
+        conv_circ.rx(thetas[12 * i + 0], 0)
+        conv_circ.rx(thetas[12 * i + 1], 1)
+        conv_circ.rz(thetas[12 * i + 2], 0)
+        conv_circ.rz(thetas[12 * i + 3], 1)
 
+        conv_circ.crx(thetas[12 * i + 4], 0, 1)
+        conv_circ.crx(thetas[12 * i + 5], 1, 0)
 
-        conv_circ.crx(thetas[12*i+4], 0, 1)  
-        conv_circ.crx(thetas[12*i+5], 1, 0)
+        conv_circ.rx(thetas[12 * i + 6], 0)
+        conv_circ.rx(thetas[12 * i + 7], 1)
+        conv_circ.rz(thetas[12 * i + 8], 0)
+        conv_circ.rz(thetas[12 * i + 9], 1)
 
-        conv_circ.rx(thetas[12*i+6], 0)
-        conv_circ.rx(thetas[12*i+7], 1)
-        conv_circ.rz(thetas[12*i+8], 0)
-        conv_circ.rz(thetas[12*i+9], 1)
-
-        conv_circ.crz(thetas[12*i+10], 1, 0)  
+        conv_circ.crz(thetas[12 * i + 10], 1, 0)
         conv_circ.x(1)
-        conv_circ.crx(thetas[12*i+11], 1, 0)
+        conv_circ.crx(thetas[12 * i + 11], 1, 0)
         conv_circ.x(1)
 
-    #conv_circ = QuantumCircuit(2)
-    #conv_circ.crx(thetas[0], 0, 1)
+    # conv_circ = QuantumCircuit(2)
+    # conv_circ.crx(thetas[0], 0, 1)
 
     # print(conv_circ)
     return conv_circ
 
-#Most general two qubit gate ansatz
-def parameterized_2q_gate_2(thetas, num_reps=1):
 
+# Most general two qubit gate ansatz
+def parameterized_2q_gate_2(thetas, num_reps=1):
     conv_circ = QuantumCircuit(2)
 
     for i in range(num_reps):
-        conv_circ.rx(thetas[15*i+0], 0)
-        conv_circ.rz(thetas[15*i+1], 0)
-        conv_circ.rx(thetas[15*i+2], 0)
-    
-        conv_circ.rx(thetas[15*i+3], 1)
-        conv_circ.rz(thetas[15*i+4], 1)
-        conv_circ.rx(thetas[15*i+5], 1)
-    
+        conv_circ.rx(thetas[15 * i + 0], 0)
+        conv_circ.rz(thetas[15 * i + 1], 0)
+        conv_circ.rx(thetas[15 * i + 2], 0)
+
+        conv_circ.rx(thetas[15 * i + 3], 1)
+        conv_circ.rz(thetas[15 * i + 4], 1)
+        conv_circ.rx(thetas[15 * i + 5], 1)
+
         conv_circ.cx(1, 0)
-        conv_circ.rz(thetas[15*i+6], 0)
-        conv_circ.ry(thetas[15*i+7], 1)
+        conv_circ.rz(thetas[15 * i + 6], 0)
+        conv_circ.ry(thetas[15 * i + 7], 1)
         conv_circ.cx(0, 1)
-        conv_circ.ry(thetas[15*i+8], 1)
+        conv_circ.ry(thetas[15 * i + 8], 1)
         conv_circ.cx(1, 0)
-    
-        conv_circ.rx(thetas[15*i+9], 0)
-        conv_circ.rz(thetas[15*i+10], 0)
-        conv_circ.rx(thetas[15*i+11], 0)
-    
-        conv_circ.rx(thetas[15*i+12], 1)
-        conv_circ.rz(thetas[15*i+13], 1)
-        conv_circ.rx(thetas[15*i+14], 1)
+
+        conv_circ.rx(thetas[15 * i + 9], 0)
+        conv_circ.rz(thetas[15 * i + 10], 0)
+        conv_circ.rx(thetas[15 * i + 11], 0)
+
+        conv_circ.rx(thetas[15 * i + 12], 1)
+        conv_circ.rz(thetas[15 * i + 13], 1)
+        conv_circ.rx(thetas[15 * i + 14], 1)
 
     return conv_circ
 
-def ansatz(ansatz_type,num_qubits, num_reps=1):
 
-    qc = QuantumCircuit(num_qubits) 
+def ansatz(ansatz_type, num_qubits, num_reps=1):
+    qc = QuantumCircuit(num_qubits)
 
     if ansatz_type == "block":
-        parameter_vector = ParameterVector("t", length=num_qubits*num_reps*2)
-        qc=qc.compose(parametrized_block(parameter_vector,num_qubits, num_reps), qubits=range(num_qubits))
+        parameter_vector = ParameterVector("t", length=num_qubits * num_reps * 2)
+        qc = qc.compose(
+            parametrized_block(parameter_vector, num_qubits, num_reps),
+            qubits=range(num_qubits),
+        )
     elif ansatz_type == "qcnn uniform":
         num_layers = int(np.ceil(np.log2(num_qubits)))
         num_parameters_per_layer = 15 * num_reps
-        num_parameters=num_layers*num_parameters_per_layer
-        parameter_vector = ParameterVector("t", length=num_parameters)  
-        qc = QuantumCircuit(num_qubits)  
+        num_parameters = num_layers * num_parameters_per_layer
+        parameter_vector = ParameterVector("t", length=num_parameters)
+        qc = QuantumCircuit(num_qubits)
         for i_layer in range(num_layers):
-            for i_sub_layer in [0 , 2**i_layer]:            
-                for i_q1 in range(i_sub_layer, num_qubits, 2**(i_layer+1)):
-                    i_q2=2**i_layer+i_q1
-                    if i_q2<num_qubits:
-                        qc=qc.compose(parameterized_2q_gate_2(parameter_vector[num_parameters_per_layer*i_layer:num_parameters_per_layer*(i_layer+1)], num_reps=num_reps), qubits=(i_q1,i_q2))  
-                        #print("i_q1",i_q1,"i_q2",i_q2)
+            for i_sub_layer in [0, 2**i_layer]:
+                for i_q1 in range(i_sub_layer, num_qubits, 2 ** (i_layer + 1)):
+                    i_q2 = 2**i_layer + i_q1
+                    if i_q2 < num_qubits:
+                        qc = qc.compose(
+                            parameterized_2q_gate_2(
+                                parameter_vector[
+                                    num_parameters_per_layer
+                                    * i_layer : num_parameters_per_layer * (i_layer + 1)
+                                ],
+                                num_reps=num_reps,
+                            ),
+                            qubits=(i_q1, i_q2),
+                        )
+                        # print("i_q1",i_q1,"i_q2",i_q2)
     elif ansatz_type == "qcnn unique":
         num_layers = int(np.ceil(np.log2(num_qubits)))
         num_parameters_per_conv = 15 * num_reps
-        parameter_vector = ParameterVector("t", length=0)  
-        qc = QuantumCircuit(num_qubits)  
-        i_conv=0
+        parameter_vector = ParameterVector("t", length=0)
+        qc = QuantumCircuit(num_qubits)
+        i_conv = 0
         for i_layer in range(num_layers):
-            for i_sub_layer in [0 , 2**i_layer]:            
-                for i_q1 in range(i_sub_layer, num_qubits, 2**(i_layer+1)):
-                    i_q2=2**i_layer+i_q1
-                    if i_q2<num_qubits:
-                        parameter_vector.resize((i_conv+1)*num_parameters_per_conv)
-                        qc=qc.compose(parameterized_2q_gate_2(parameter_vector[num_parameters_per_conv*i_conv:num_parameters_per_conv*(i_conv+1)], num_reps=num_reps), qubits=(i_q1,i_q2)) 
-                        i_conv+=1
+            for i_sub_layer in [0, 2**i_layer]:
+                for i_q1 in range(i_sub_layer, num_qubits, 2 ** (i_layer + 1)):
+                    i_q2 = 2**i_layer + i_q1
+                    if i_q2 < num_qubits:
+                        parameter_vector.resize((i_conv + 1) * num_parameters_per_conv)
+                        qc = qc.compose(
+                            parameterized_2q_gate_2(
+                                parameter_vector[
+                                    num_parameters_per_conv
+                                    * i_conv : num_parameters_per_conv * (i_conv + 1)
+                                ],
+                                num_reps=num_reps,
+                            ),
+                            qubits=(i_q1, i_q2),
+                        )
+                        i_conv += 1
     else:
         print("ansatz_type not recognized")
-    
-    #print(qc)
+
+    # print(qc)
     return qc, parameter_vector
 
 
-def feature_map(num_qubits = 8, x_data=None):
+def feature_map(num_qubits=8, x_data=None):
     qc = QuantumCircuit(num_qubits)
 
     # create feature map
@@ -461,42 +519,69 @@ def feature_map(num_qubits = 8, x_data=None):
 
     return qc
 
-def prepare_circuit(base_circuit:QuantumCircuit, total_operator=None):
+
+def pauli_string_to_circuit(pauli_string: str):
+    """
+    Given a string representing a pauli (like "XXXI"), construct a QuantumCircuit containing the corresponding quantum gates.
+    """
+
+    print(pauli_string)
+    print(type(pauli_string))
+
+    qc = QuantumCircuit(len(pauli_string))
+
+    for i, pauli_char in enumerate(pauli_string):
+        print("pauli char", pauli_char)
+        if pauli_char == "I":
+            continue
+        elif pauli_char == "X":
+            qc.x(i)
+        elif pauli_char == "Y":
+            qc.y(i)
+        elif pauli_char == "Z":
+            qc.z(i)
+        else:
+            raise ValueError("Pauli string contains character that is not I, X, Y, Z.")
+
+    return qc
+
+
+def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
     # find total qubits from the given base circuit
     num_qubits = base_circuit.num_qubits
 
     # define the default operator if none provided
-    x_operator = PauliSumOp(SparsePauliOp("X" * num_qubits))
-    z_operator = PauliSumOp(SparsePauliOp("I"*(num_qubits-1)+"Z"))
+    # x_operator = SparsePauliOp("X" * num_qubits)
+    z_operator = SparsePauliOp("I" * (num_qubits - 1) + "Z")
 
     if total_operator is None:
         # default is the z operator
+
         total_operator = z_operator
-    
-    measurable_expression = StateFn(total_operator, is_measurement=True)
-    observables = PauliExpectation().convert(measurable_expression)
+    # NOTE: I think eventually we want to return this list, but I am guessing since the total operator is just one Z there is only one circuit anyways?
+    circuits = []
 
-    
-    if isinstance(observables, ComposedOp):
-        observables = SummedOp([observables])    
-    circuits = list()
-
-    for obs in observables:
+    # to_list returns a list of (label, coef): just want the label
+    for pauli_label, _ in total_operator.to_list():
         circuit = base_circuit.copy()
-        circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
+
+        circuit.compose(pauli_string_to_circuit(pauli_label), inplace=True)
         circuit.measure_all()
-        circuits.append(circuit) 
-    return circuit, observables
+        circuits.append(circuit)
+    return circuit, total_operator
 
 
-def ImageRecognition(num_qubits: int,
-                    thetas_array,
-                    parameterized,
-                    ansatz_type: str = "qcnn uniform",
-                    x_data=None,
-                    reps: int = 1,
-                    verbose: bool = False,
-                    *args, **kwargs) -> QuantumCircuit:
+def ImageRecognition(
+    num_qubits: int,
+    thetas_array,
+    parameterized,
+    ansatz_type: str = "qcnn uniform",
+    x_data=None,
+    reps: int = 1,
+    verbose: bool = False,
+    *args,
+    **kwargs,
+) -> QuantumCircuit:
     """
     Create the ansatz quantum circuit for the QCNN algorithm.
 
@@ -514,7 +599,9 @@ def ImageRecognition(num_qubits: int,
         verbose flag
     """
     if verbose:
-        print(f"... ImageRecognition_ansatz(num_qubits={num_qubits}, ansatz_type={ansatz_type}, thetas_array={thetas_array}")
+        print(
+            f"... ImageRecognition_ansatz(num_qubits={num_qubits}, ansatz_type={ansatz_type}, thetas_array={thetas_array}"
+        )
 
     # create the feature map circuit
     _feature_map_circuit = feature_map(num_qubits, x_data)
@@ -538,7 +625,7 @@ def ImageRecognition(num_qubits: int,
     if QC_ is None or num_qubits <= 4:
         if num_qubits <= 8:
             QC_ = qc
-            
+
     return qc, observables, params
 
 
@@ -557,10 +644,12 @@ def loss_function(result, y_data, num_qubits, formatted_observables, verbose=Fal
         _counts = _res.get_counts()
         _probs = normalize_counts(_counts, num_qubits=num_qubits)
 
-        _expectation_values = calculate_expectation_values(_probs, formatted_observables)
+        _expectation_values = calculate_expectation_values(
+            _probs, formatted_observables
+        )
         value = sum(_expectation_values)
 
-        # # now get <H^2>, assuming Cov[si,si'] = 0
+        # # now get <H^2>, assuming Cov[si,si'] = e
         # formatted_observables_sq = [(obs @ obs).simplify(atol=0) for obs in formatted_observables]
         # _expectation_values_sq = calculate_expectation_values(_probabilities, formatted_observables_sq)
 
@@ -568,24 +657,25 @@ def loss_function(result, y_data, num_qubits, formatted_observables, verbose=Fal
         # # see Eq 5, e.g. in https://arxiv.org/abs/2004.06252
         # variance = sum([exp_sq - exp**2 for exp_sq, exp in zip(_expectation_values_sq, _expectation_values)])
 
-        value = (value + 1)*0.5
+        value = (value + 1) * 0.5
         _predictions.append(value)
 
         # calculate accuracy
-        
+
         if value > 0.5:
             _prediction_labels.append(1)
         else:
             _prediction_labels.append(0)
 
     accuracy = accuracy_score(y_data, _prediction_labels)
-    
+
     loss = mean_squared_error(y_data, _predictions)
-    
+
     return loss, accuracy
 
 
 ##########################################################
+
 
 def calculate_expectation_values(probabilities, observables):
     """
@@ -595,10 +685,13 @@ def calculate_expectation_values(probabilities, observables):
         probabilities = [probabilities]
     expectation_values = list()
     for idx, op in enumerate(observables):
-        expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
+        expectation_value = sampled_expectation_value(
+            probabilities[idx], op[0].primitive
+        )
         expectation_values.append(expectation_value)
 
     return expectation_values
+
 
 def normalize_counts(counts, num_qubits=None):
     """
@@ -619,7 +712,9 @@ def normalize_counts(counts, num_qubits=None):
     assert abs(sum(probabilities.values()) - 1) < 1e-9
     return probabilities
 
+
 ############### Prepare Circuits for Execution
+
 
 def get_operator_for_problem(instance_filepath):
     """
@@ -636,9 +731,11 @@ def get_operator_for_problem(instance_filepath):
     operator = SparsePauliOp.from_list(list(zip(ops, coefs)))
     return operator
 
+
 # A dictionary of random energy filename, obtained once
 random_energies_dict = None
- 
+
+
 def get_random_energy(instance_filepath):
     """
     Get the 'random_energy' associated with the problem
@@ -654,7 +751,9 @@ def get_random_energy(instance_filepath):
             random_energies_dict = common.get_random_energies_dict()
         except ValueError as err:
             logger.error(err)
-            print("Error reading precomputed random energies json file. Please create the file by running the script 'compute_random_energies.py' in the _common/random_sampler directory")
+            print(
+                "Error reading precomputed random energies json file. Please create the file by running the script 'compute_random_energies.py' in the _common/random_sampler directory"
+            )
             raise
 
     # get the filename from the instance_filepath and get the random energy from the dictionary
@@ -663,7 +762,8 @@ def get_random_energy(instance_filepath):
     random_energy = random_energies_dict[filename]
 
     return random_energy
-    
+
+
 def get_classical_solutions(instance_filepath):
     """
     Get a list of the classical solutions for this problem
@@ -674,9 +774,9 @@ def get_classical_solutions(instance_filepath):
     solution = list(zip(method_names, values))
     return solution
 
+
 # Return the file identifier (path) for the problem at this width, radius, and instance
 def get_problem_identifier(num_qubits, radius, instance_num):
-    
     # if radius is given we should do same radius for max_circuits times
     if radius is not None:
         try:
@@ -715,7 +815,9 @@ expectations = {}
 
 # Compute array of expectation values in range 0.0 to 1.0
 # Use statevector_simulator to obtain exact expectation
-def compute_expectation(qc, num_qubits, secret_int, backend_id="statevector_simulator", params=None):
+def compute_expectation(
+    qc, num_qubits, secret_int, backend_id="statevector_simulator", params=None
+):
     # ts = time.time()
 
     # to execute on Aer state vector simulator, need to remove measurements
@@ -726,7 +828,7 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id="statevector_simu
 
     # execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
-    sv_result = execute(qc, sv_backend, params=params).result()
+    sv_result = sv_backend.run(qc, params=params).result()
 
     # get the probability distribution
     counts = sv_result.get_counts()
@@ -736,13 +838,13 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id="statevector_simu
     # store in table until circuit execution is complete
     id = f"_{num_qubits}_{secret_int}"
     expectations[id] = counts
-    
-    #print(f"  ... time to execute statevector simulator: {time.time() - ts}")
-    
+
+    # print(f"  ... time to execute statevector simulator: {time.time() - ts}")
+
+
 # Return expected measurement array scaled to number of shots executed
 def get_expectation(num_qubits, secret_int, num_shots):
-
-    # find expectation counts for the given circuit 
+    # find expectation counts for the given circuit
     id = f"_{num_qubits}_{secret_int}"
 
     if id in expectations:
@@ -783,7 +885,9 @@ def analyze_and_print_result(qc, result, num_qubits, secret_int, num_shots):
         expected_dist = counts
 
     if verbose:
-        print(f"For width {num_qubits}   measured: {counts}\n  expected: {expected_dist}")
+        print(
+            f"For width {num_qubits}   measured: {counts}\n  expected: {expected_dist}"
+        )
     # if verbose: print(f"For width {num_qubits} problem {secret_int}\n  measured: {counts}\n  expected: {expected_dist}")
 
     # use our polarization fidelity rescaling
@@ -793,13 +897,13 @@ def analyze_and_print_result(qc, result, num_qubits, secret_int, num_shots):
 
     return counts, fidelity
 
+
 ##### METHOD 2 function to compute application-specific figures of merit
 
-def calculate_quality_metric(energy=None,
-            fci_energy=0,
-            random_energy=0, 
-            precision = 4,
-            num_electrons = 2):
+
+def calculate_quality_metric(
+    energy=None, fci_energy=0, random_energy=0, precision=4, num_electrons=2
+):
     """
     Returns the quality metrics, namely solution quality, accuracy volume, and accuracy ratio.
     Solution quality is a value between zero and one. The other two metrics can take any value.
@@ -822,45 +926,35 @@ def calculate_quality_metric(energy=None,
     num_electrons : int
         number of electrons in the problem
     """
-    
-    _delta_energy_fci = np.absolute(np.subtract( np.array(energy), fci_energy))
-    _delta_random_fci = np.absolute(np.subtract( np.array(random_energy), fci_energy))
-    
+
+    _delta_energy_fci = np.absolute(np.subtract(np.array(energy), fci_energy))
+    _delta_random_fci = np.absolute(np.subtract(np.array(random_energy), fci_energy))
+
     _relative_energy = np.absolute(
-                            np.divide(
-                                np.subtract( np.array(energy), fci_energy),
-                                fci_energy)
-                            )
-    
-    
-    #scale the solution quality to 0 to 1 using arctan 
+        np.divide(np.subtract(np.array(energy), fci_energy), fci_energy)
+    )
+
+    # scale the solution quality to 0 to 1 using arctan
     _solution_quality = np.subtract(
-                            1,
-                            np.divide(
-                                np.arctan(
-                                    np.multiply(precision,_relative_energy)
-                                    ),
-                                np.pi/2)
-                            )
+        1, np.divide(np.arctan(np.multiply(precision, _relative_energy)), np.pi / 2)
+    )
 
     # define accuracy volume as the absolute energy difference between the FCI energy and the energy of the solution normalized per electron
     _accuracy_volume = np.divide(
-                            np.absolute(
-                                np.subtract( np.array(energy), fci_energy)
-                            ),
-                            num_electrons
-                            )
+        np.absolute(np.subtract(np.array(energy), fci_energy)), num_electrons
+    )
 
     # define accuracy ratio as 1.0 minus the error in energy over the error in random energy:
     #       accuracy_ratio = 1.0 - abs(energy - FCI) ) / abs(random - FCI)
 
-    _accuracy_ratio = np.subtract(1.0, np.divide(_delta_energy_fci,_delta_random_fci))
-    
+    _accuracy_ratio = np.subtract(1.0, np.divide(_delta_energy_fci, _delta_random_fci))
+
     return _solution_quality, _accuracy_volume, _accuracy_ratio
 
 
 #################################################
 # DATA SAVE FUNCTIONS
+
 
 # Create a folder where the results will be saved.
 # For every circuit width, metrics will be stored the moment the results are obtained
@@ -872,7 +966,9 @@ def create_data_folder(save_res_to_file, detailed_save_names, backend_id):
     # if detailed filenames requested, use directory name with timestamp
     if detailed_save_names:
         start_time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        parent_folder_save = os.path.join("__data", f"{backend_id}", f"run_start_{start_time_str}")
+        parent_folder_save = os.path.join(
+            "__data", f"{backend_id}", f"run_start_{start_time_str}"
+        )
 
     # otherwise, just put all json files under __data/backend_id
     else:
@@ -881,7 +977,8 @@ def create_data_folder(save_res_to_file, detailed_save_names, backend_id):
     # create the folder if it doesn't exist already
     if save_res_to_file and not os.path.exists(parent_folder_save):
         os.makedirs(os.path.join(parent_folder_save))
-        
+
+
 # Function to save final iteration data to file
 def store_final_iter_to_metrics_json(
     backend_id,
@@ -906,14 +1003,15 @@ def store_final_iter_to_metrics_json(
 
     # Store properties of the final iteration, the converged theta values,
     # as well as the known optimal value for the current problem,
-    # in metrics.circuit_metrics_final_iter. 
+    # in metrics.circuit_metrics_final_iter.
     metrics.store_props_final_iter(num_qubits, instance_num, "train_accuracy", accuracy)
-    metrics.store_props_final_iter(num_qubits, instance_num, "converged_thetas_list", converged_thetas_list)
+    metrics.store_props_final_iter(
+        num_qubits, instance_num, "converged_thetas_list", converged_thetas_list
+    )
 
     # Save final iteration data to metrics.circuit_metrics_final_iter
     # This data includes final counts, cuts, etc.
     if save_res_to_file:
-    
         # Save data to a json file
         dump_to_json(
             parent_folder_save,
@@ -925,6 +1023,7 @@ def store_final_iter_to_metrics_json(
             accuracy,
             save_final_counts=save_final_counts,
         )
+
 
 def dump_to_json(
     parent_folder_save,
@@ -946,12 +1045,19 @@ def dump_to_json(
     # print(f"... saving data for width={num_qubits} radius={radius} instance={instance_num}")
     if not os.path.exists(parent_folder_save):
         os.makedirs(parent_folder_save)
-    store_loc = os.path.join(parent_folder_save, "width_{}_instance_{}.json".format(num_qubits, instance_num))
+    store_loc = os.path.join(
+        parent_folder_save, "width_{}_instance_{}.json".format(num_qubits, instance_num)
+    )
 
     # Obtain dictionary with iterations data corresponding to given instance_num
     all_restart_ids = list(metrics.circuit_metrics[str(num_qubits)].keys())
-    ids_this_restart = [r_id for r_id in all_restart_ids if int(r_id) // 1000 == instance_num]
-    iterations_dict_this_restart = {r_id: metrics.circuit_metrics[str(num_qubits)][r_id] for r_id in ids_this_restart}
+    ids_this_restart = [
+        r_id for r_id in all_restart_ids if int(r_id) // 1000 == instance_num
+    ]
+    iterations_dict_this_restart = {
+        r_id: metrics.circuit_metrics[str(num_qubits)][r_id]
+        for r_id in ids_this_restart
+    }
 
     # Values to be stored in json file
     dict_to_store = {"iterations": iterations_dict_this_restart}
@@ -971,10 +1077,12 @@ def dump_to_json(
     with open(store_loc, "w") as outfile:
         json.dump(dict_to_store, outfile)
 
+
 #################################################
 # DATA LOAD FUNCTIONS
 
 # %% Loading saved data (from json files)
+
 
 def load_data_and_plot(folder, backend_id=None, **kwargs):
     """
@@ -990,6 +1098,7 @@ def load_data_and_plot(folder, backend_id=None, **kwargs):
     if _gen_prop is not None:
         gen_prop = {**_gen_prop, **kwargs}
         plot_results_from_data(**gen_prop)
+
 
 def load_all_metrics(folder, backend_id=None):
     """
@@ -1022,9 +1131,14 @@ def load_all_metrics(folder, backend_id=None):
     ]
 
     # sort first by width, and then by restartInd
-    width_restart_file_tuples = sorted(width_restart_file_tuples, key=lambda x: (x[0], x[1]))
+    width_restart_file_tuples = sorted(
+        width_restart_file_tuples, key=lambda x: (x[0], x[1])
+    )
     distinct_widths = list(set(it[0] for it in width_restart_file_tuples))
-    list_of_files = [[tup[2] for tup in width_restart_file_tuples if tup[0] == width] for width in distinct_widths]
+    list_of_files = [
+        [tup[2] for tup in width_restart_file_tuples if tup[0] == width]
+        for width in distinct_widths
+    ]
 
     # connot continue without at least one dataset
     if len(list_of_files) < 1:
@@ -1052,6 +1166,7 @@ def load_all_metrics(folder, backend_id=None):
 
 # # load data from a specific file
 
+
 def load_from_width_restart_file(folder, fileName):
     """
     Given a folder name and a file in it, load all the stored data and store the values in metrics.circuit_metrics.
@@ -1072,7 +1187,9 @@ def load_from_width_restart_file(folder, fileName):
 
     # Extract num_qubits and s from file name
     num_qubits, restart_ind = get_width_restart_tuple_from_filename(fileName)
-    print(f"Loading from {fileName}, corresponding to {num_qubits} qubits and restart index {restart_ind}")
+    print(
+        f"Loading from {fileName}, corresponding to {num_qubits} qubits and restart index {restart_ind}"
+    )
     with open(os.path.join(folder, fileName), "r") as json_file:
         data = json.load(json_file)
         gen_prop = data["general_properties"]
@@ -1094,12 +1211,17 @@ def load_from_width_restart_file(folder, fileName):
         method = gen_prop["method"]
         if method == 2:
             metrics.store_props_final_iter(num_qubits, restart_ind, "energy", energy)
-            metrics.store_props_final_iter(num_qubits, restart_ind, "converged_thetas_list", converged_thetas_list)
+            metrics.store_props_final_iter(
+                num_qubits, restart_ind, "converged_thetas_list", converged_thetas_list
+            )
             if gen_prop["save_final_counts"]:
-                metrics.store_props_final_iter(num_qubits, restart_ind, None, final_counts)
+                metrics.store_props_final_iter(
+                    num_qubits, restart_ind, None, final_counts
+                )
 
     return gen_prop
-    
+
+
 def get_width_restart_tuple_from_filename(fileName):
     """
     Given a filename, extract the corresponding width and degree it corresponds to
@@ -1131,6 +1253,7 @@ def get_width_restart_tuple_from_filename(fileName):
 ################################################
 # PLOT METHODS
 
+
 def plot_results_from_data(
     num_shots=100,
     radius=0.75,
@@ -1154,7 +1277,7 @@ def plot_results_from_data(
     x_min=None,
     x_max=None,
     detailed_save_names=False,
-    ansatz_type:str = 'qcnn uniform',
+    ansatz_type: str = "qcnn uniform",
     **kwargs,
 ):
     """
@@ -1182,7 +1305,6 @@ def plot_results_from_data(
     suptitle = f"Benchmark Results - Image Recognition ({method}) - Qiskit"
     backend_id = metrics.get_backend_id()
     options = {"shots": num_shots, "radius": radius, "restarts": max_circuits}
-
 
     # plot all line metrics, including solution quality and accuracy ratio
     # vs iteration count and cumulative execution time
@@ -1235,12 +1357,23 @@ def plot_results_from_data(
 
 MAX_QUBITS = 16
 
+
 def run(
-    min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
+    min_qubits=2,
+    max_qubits=4,
+    skip_qubits=2,
+    max_circuits=3,
+    num_shots=100,
     method=2,
-    radius=None, thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
+    radius=None,
+    thetas_array=None,
+    parameterized=False,
+    parameter_mode=1,
+    do_fidelities=True,
     minimizer_function=None,
-    minimizer_tolerance=1e-3, max_iter=300, comfort=False,
+    minimizer_tolerance=1e-3,
+    max_iter=300,
+    comfort=False,
     line_x_metrics=["iteration_count", "cumulative_exec_time", "iteration_count"],
     line_y_metrics=["train_loss", "train_accuracy", "test_accuracy"],
     bar_y_metrics=["average_exec_times", "train_accuracy", "test_accuracy"],
@@ -1257,18 +1390,23 @@ def run(
     plot_layout_style="grid",
     show_elapsed_times=True,
     use_logscale_for_times=False,
-    save_res_to_file=True, save_final_counts=False, detailed_save_names=False,
+    save_res_to_file=True,
+    save_final_counts=False,
+    detailed_save_names=False,
     backend_id="qasm_simulator",
-    provider_backend=None, hub="ibm-q", group="open", project="main",
+    provider_backend=None,
+    hub="ibm-q",
+    group="open",
+    project="main",
     exec_options=None,
     _instances=None,
-    ansatz_type:str = 'qcnn uniform',
-    reps:int = 1,
-    batch_size:int = 50,
-    backend_id_train:str = 'statevector_simulator',
-    test_pass_count:int = 30,
-    test_size:int  = 50,
-    train_size:int = 200
+    ansatz_type: str = "qcnn uniform",
+    reps: int = 1,
+    batch_size: int = 50,
+    backend_id_train: str = "statevector_simulator",
+    test_pass_count: int = 30,
+    test_size: int = 50,
+    train_size: int = 200,
 ):
     """
     Parameters
@@ -1357,15 +1495,25 @@ def run(
     thetas = []  # a default empty list of thetas
 
     # Update the dictionary of inputs
-    dict_of_inputs = {**dict_of_inputs, **{"thetas_array": thetas, "max_circuits": max_circuits}}
+    dict_of_inputs = {
+        **dict_of_inputs,
+        **{"thetas_array": thetas, "max_circuits": max_circuits},
+    }
 
     # Delete some entries from the dictionary; they may contain secrets or function pointers
-    for key in ["hub", "group", "project", "provider_backend", "exec_options", "minimizer_function"]:
+    for key in [
+        "hub",
+        "group",
+        "project",
+        "provider_backend",
+        "exec_options",
+        "minimizer_function",
+    ]:
         dict_of_inputs.pop(key)
 
     global image_recognition_inputs
     image_recognition_inputs = dict_of_inputs
-    
+
     ###########################
     # Benchmark Initializeation
 
@@ -1425,7 +1573,9 @@ def run(
     def execution_handler(qc, result, num_qubits, s_int, num_shots):
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
+        counts, fidelity = analyze_and_print_result(
+            qc, result, num_qubits, int(s_int), num_shots
+        )
         metrics.store_metric(num_qubits, s_int, "solution_quality", fidelity)
 
     def execution_handler2(qc, result, num_qubits, s_int, num_shots):
@@ -1443,7 +1593,12 @@ def run(
 
     # initialize the execution module with target information
     ex.set_execution_target(
-        backend_id_train, provider_backend=provider_backend, hub=hub, group=group, project=project, exec_options=exec_options
+        backend_id_train,
+        provider_backend=provider_backend,
+        hub=hub,
+        group=group,
+        project=project,
+        exec_options=exec_options,
     )
 
     # create a data folder for the results
@@ -1454,44 +1609,49 @@ def run(
 
     # Fetch MNIST data
     x, x_train, x_test, y, y_train, y_test = fetch_mnist_data(
-            test_size=test_size, train_size=train_size, verbose=verbose)
+        test_size=test_size, train_size=train_size, verbose=verbose
+    )
 
     # dictionary to store the thetas_array for each qubit size
     thetas_array_dict = {}
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 for efficiency
 
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
-
         np.random.seed(0)
 
         if method == 1:
             print(f"************\nExecuting [1] circuit for num_qubits = {num_qubits}")
         else:
-            print(f"************\nExecuting [{ansatz_type}] circuit for num_qubits = {num_qubits}")
+            print(
+                f"************\nExecuting [{ansatz_type}] circuit for num_qubits = {num_qubits}"
+            )
 
         # loop over all instance files according to max_circuits given
         # instance_num index starts from 1
         # for instance_num in range(1, max_circuits + 1):
 
-        x_scaled, x_train_scaled, x_test_scaled = preprocess_image_data(x, x_train, x_test, num_qubits)        
+        x_scaled, x_train_scaled, x_test_scaled = preprocess_image_data(
+            x, x_train, x_test, num_qubits
+        )
 
         global x_batch, y_batch
-        
+
         instance_num = 1
 
         # global variables to store execution and elapsed time
         global quantum_execution_time, quantum_elapsed_time
         quantum_execution_time = 0.0
-        quantum_elapsed_time = 0.0   
-         
+        quantum_elapsed_time = 0.0
+
         #####################
         # define the objective and the callback functions
         # NOTE: this is called twice for the SPSA optimizer
-        def objective_function(thetas_array, return_accuracy=False,
-                    test_pass=False, train_pass=False):
+        def objective_function(
+            thetas_array, return_accuracy=False, test_pass=False, train_pass=False
+        ):
             """
             Objective function that calculates the expected energy for the given parameterized circuit
 
@@ -1506,37 +1666,42 @@ def run(
             unique_id = instance_num * 1000 + minimizer_loop_index
 
             if verbose:
-                print(f"--> begin batch: instance={instance_num}, index={minimizer_loop_index}")
-                
+                print(
+                    f"--> begin batch: instance={instance_num}, index={minimizer_loop_index}"
+                )
+
             # variables used to aggregate metrics for all terms
             result_array = []
 
             #####################
             # loop over each of the circuits that are generated from a batch and execute
             # create the ImageRecognition ansatz to generate a parameterized hamiltonian
-            
-            if verbose and comfort: print("  ", end='')
-                
+
+            if verbose and comfort:
+                print("  ", end="")
+
             ts = time.time()
             for data_point in x_batch:
-            
-                if verbose and comfort: print('+', end='')
-                    
+                if verbose and comfort:
+                    print("+", end="")
+
                 qc, frmt_obs, params = ImageRecognition(
                     num_qubits=num_qubits,
                     thetas_array=thetas_array,
                     ansatz_type=ansatz_type,
                     parameterized=parameterized,
                     reps=reps,
-                    x_data=data_point
-                    )
+                    x_data=data_point,
+                )
 
                 # bind parameters to circuit before execution
                 # if parameterized:
                 #     qc.assign_parameters(params)
-            
+
                 # submit circuit for execution on target with the current parameters
-                ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
+                ex.submit_circuit(
+                    qc, num_qubits, unique_id, shots=num_shots, params=params
+                )
 
                 # wait for circuit to complete by calling finalize  ...
                 # finalize execution of group (each circuit in loop accumulates metrics)
@@ -1549,8 +1714,12 @@ def run(
                     # cache 1 at a time, we cannot yet implement caching.  Transpile every time.
                     cached_circuits = False
                     if cached_circuits:
-                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                        logger.info("  **** First execution complete, disabling transpile")
+                        ex.set_tranpilation_flags(
+                            do_transpile_metrics=False, do_transpile_for_execute=False
+                        )
+                        logger.info(
+                            "  **** First execution complete, disabling transpile"
+                        )
 
                 # result array stores the multiple results we measure along different Pauli basis.
                 global saved_result
@@ -1564,41 +1733,41 @@ def run(
                         quantum_execution_time
                         + metrics.get_metric(num_qubits, unique_id, "exec_time")
                     )
-                    quantum_elapsed_time = (
-                        quantum_elapsed_time
-                        + metrics.get_metric(num_qubits, unique_id, "elapsed_time")
+                    quantum_elapsed_time = quantum_elapsed_time + metrics.get_metric(
+                        num_qubits, unique_id, "elapsed_time"
                     )
 
                 else:
-                    quantum_execution_time = (
-                        quantum_execution_time
-                        + 0.0
-                    )
-                    quantum_elapsed_time = (
-                        quantum_elapsed_time
-                        + 0.0
-                    )
-                    
+                    quantum_execution_time = quantum_execution_time + 0.0
+                    quantum_elapsed_time = quantum_elapsed_time + 0.0
+
             # end of loop over data points
-            
+
             # store the time it took to create the circuit
-            # DEVNOTE: not correct; instead, accumulate time wrapped around ImageRecognition() 
+            # DEVNOTE: not correct; instead, accumulate time wrapped around ImageRecognition()
             metrics.store_metric(num_qubits, unique_id, "create_time", time.time() - ts)
 
             global opt_ts
 
             # store the new exec time and elapsed time back to metrics
-            metrics.store_metric(num_qubits, unique_id, "exec_time", quantum_execution_time)
-            metrics.store_metric(num_qubits, unique_id, "elapsed_time", quantum_elapsed_time)
-    
+            metrics.store_metric(
+                num_qubits, unique_id, "exec_time", quantum_execution_time
+            )
+            metrics.store_metric(
+                num_qubits, unique_id, "elapsed_time", quantum_elapsed_time
+            )
+
             #####################
             # classical processing of results
-            
+
             if verbose:
-                if comfort: print('')
-                thetas_array_round = [round(th,3) for th in thetas_array]
-                print(f"  ... compute loss and accuracy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params},\n  thetas_array={thetas_array_round}")
-                
+                if comfort:
+                    print("")
+                thetas_array_round = [round(th, 3) for th in thetas_array]
+                print(
+                    f"  ... compute loss and accuracy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params},\n  thetas_array={thetas_array_round}"
+                )
+
             # increment the minimizer loop index, the index is increased by one
             # for the group of three circuits created ( three measurement basis circuits)
 
@@ -1614,8 +1783,12 @@ def run(
             tc1 = time.time()
 
             # compute the loss for the image data batch
-            loss, accuracy = loss_function(result=result_array, y_data=y_batch,
-                    num_qubits= num_qubits, formatted_observables=frmt_obs)
+            loss, accuracy = loss_function(
+                result=result_array,
+                y_data=y_batch,
+                num_qubits=num_qubits,
+                formatted_observables=frmt_obs,
+            )
 
             # calculate std error from the variance -- identically zero if using statevector simulator
             # if backend_id.lower() != "statevector_simulator":
@@ -1628,7 +1801,7 @@ def run(
 
             # append the most recent accuracy value to the list
             accuracy_values.append(accuracy)
-            
+
             # store the metrics for the current iteration
             if test_pass:
                 metrics.store_metric(num_qubits, unique_id, "test_accuracy", accuracy)
@@ -1636,101 +1809,121 @@ def run(
             if train_pass:
                 metrics.store_metric(num_qubits, unique_id, "train_loss", loss)
                 metrics.store_metric(num_qubits, unique_id, "train_accuracy", accuracy)
-            
+
             loss_this_iter.append(loss)
             accuracy_this_iter.append(accuracy)
-            
+
             # store metrics (not needed, done above, but may need more analysis
             # metrics.store_metric(num_qubits, unique_id, "loss", loss)
             # metrics.store_metric(num_qubits, unique_id, "accuracy", accuracy)
             # metrics.store_metric(num_qubits, unique_id, "standard_error", standard_error)
-            metrics.store_metric(num_qubits, unique_id, "iteration_count", minimizer_loop_index + 1)
+            metrics.store_metric(
+                num_qubits, unique_id, "iteration_count", minimizer_loop_index + 1
+            )
 
-            # store most recent metrics for export          
+            # store most recent metrics for export
             # key_metrics["energy"] = loss
             # key_metrics["accuracy"] = accuracy
             # key_metrics["variance"] = variance
             # key_metrics["standard_error"] = standard_error
             # key_metrics["iteration_count"] = minimizer_loop_index
-            
+
             if not return_accuracy:
                 return loss
             else:
                 return loss, accuracy
-       
+
         ##############
         def callback_thetas_array(thetas_array):
-            '''
+            """
             This function called for every iteration of optimizer
             (in case of SPSA, this is called after two calls to objective_function)
-            '''
+            """
             global quantum_execution_time, quantum_elapsed_time
             global x_batch, y_batch
             global minimizer_loop_index
-            
+
             if verbose:
-                print(f"==> in callback_thetas_array, minimizer loop index {minimizer_loop_index}")
-                
+                print(
+                    f"==> in callback_thetas_array, minimizer loop index {minimizer_loop_index}"
+                )
+
             ######
             # print out execution time metrics for this iteration
             if verbose:
-                print(f"  ... iteration exec, elapsed time = {quantum_execution_time}, {quantum_elapsed_time}")
+                print(
+                    f"  ... iteration exec, elapsed time = {quantum_execution_time}, {quantum_elapsed_time}"
+                )
 
             # reset the quantum_execution_time and quantum_elapsed_time
             # (done after all circuits of a batch and all calls to objective_function complete)
             quantum_execution_time = 0.0
             quantum_elapsed_time = 0.0
-            
+
             ######
             # compute mean loss and accuracy on this iteration and store it in metrics table
             loss = np.mean(loss_this_iter)
             accuracy = np.mean(accuracy_this_iter)
-            
+
             metrics.store_metric(num_qubits, unique_id, "train_loss", loss)
-            metrics.store_metric(num_qubits, unique_id, "train_accuracy", accuracy) 
+            metrics.store_metric(num_qubits, unique_id, "train_accuracy", accuracy)
 
             # print out loss and accuracy metrics
             if verbose:
-                print(f"  ... batch {minimizer_loop_index + 1} loss: {round(loss,4)} accuracy: {round(accuracy,4)}")
-                
+                print(
+                    f"  ... batch {minimizer_loop_index + 1} loss: {round(loss,4)} accuracy: {round(accuracy,4)}"
+                )
+
             loss_this_iter.clear()
             accuracy_this_iter.clear()
 
             ######
             # whenerver minimizer_loop_index is divisible by factor,
             # save the thetas_array at this minimizer_loop_index so we can save to file later
-            factor = np.ceil(max_iter/test_pass_count)
+            factor = np.ceil(max_iter / test_pass_count)
             if minimizer_loop_index % factor == 0:
-                thetas_array_batch[minimizer_loop_index + 1] = thetas_array.tolist() 
+                thetas_array_batch[minimizer_loop_index + 1] = thetas_array.tolist()
                 if verbose:
-                    print(f"  ... saved thetas_array at batch index {minimizer_loop_index + 1}")
+                    print(
+                        f"  ... saved thetas_array at batch index {minimizer_loop_index + 1}"
+                    )
 
             # reset the backend to the training backend
             ex.set_execution_target(
-                backend_id_train, provider_backend=provider_backend, hub=hub, group=group, project=project, exec_options=exec_options
-                )
+                backend_id_train,
+                provider_backend=provider_backend,
+                hub=hub,
+                group=group,
+                project=project,
+                exec_options=exec_options,
+            )
 
             # generate a random set of indices that define the next batch
-            indices = np.random.choice(len(x_train_scaled), size=batch_size, replace=False)
+            indices = np.random.choice(
+                len(x_train_scaled), size=batch_size, replace=False
+            )
             x_batch = x_train_scaled[indices]
             y_batch = y_train[indices]
-   
+
             # increment the loop index
             minimizer_loop_index += 1
-            
-   
+
         ###############
         if method == 1:
-        
             # create the circuit(s) for given qubit size and secret string, store time metric
             ts = time.time()
 
             # set x_batch and y_batch to the test data
             x_batch = x_test_scaled
             y_batch = y_test
-          
+
             # create an intial thetas_array, given the circuit width and user input
-            thetas_array_0 = get_initial_parameters(num_qubits=num_qubits, thetas_array=thetas_array, ansatz_type=ansatz_type, reps=reps)
+            thetas_array_0 = get_initial_parameters(
+                num_qubits=num_qubits,
+                thetas_array=thetas_array,
+                ansatz_type=ansatz_type,
+                reps=reps,
+            )
 
             # create one circuit with one data point
             data_point = x_batch[0]
@@ -1741,8 +1934,8 @@ def run(
                 ansatz_type=ansatz_type,
                 parameterized=parameterized,
                 reps=reps,
-                x_data=data_point
-                )
+                x_data=data_point,
+            )
             """ TMI ...
             # for testing and debugging ...
             #if using parameter objects, bind before printing
@@ -1750,7 +1943,9 @@ def run(
                 print(qc.assign_parameters(params) if parameterized else qc)
             """
             # store the creation time for these circuits
-            metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
+            metrics.store_metric(
+                num_qubits, instance_num, "create_time", time.time() - ts
+            )
 
             # classically pre-compute and cache an array of expected measurement counts
             # for comparison against actual measured counts for fidelity calc (in analysis)
@@ -1762,16 +1957,19 @@ def run(
                 compute_expectation(qc, num_qubits, instance_num, params=params)
 
             # submit circuit for execution on target, with parameters
-            ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
+            ex.submit_circuit(
+                qc, num_qubits, instance_num, shots=num_shots, params=params
+            )
             ex.finalize_execution(None, report_end=False)
-        
 
         ###############
         elif method == 2:
             logger.info("===============  Begin method 2 loop, enabling transpile")
 
             # create batch from scaled data
-            indices = np.random.choice(len(x_train_scaled), size=batch_size, replace=False)
+            indices = np.random.choice(
+                len(x_train_scaled), size=batch_size, replace=False
+            )
             x_batch = x_train_scaled[indices]
             y_batch = y_train[indices]
 
@@ -1779,7 +1977,12 @@ def run(
             accuracy_values = []
 
             # create an intial thetas_array, given the circuit width and user input
-            thetas_array_0 = get_initial_parameters(num_qubits=num_qubits, thetas_array=thetas_array, ansatz_type=ansatz_type, reps=reps)
+            thetas_array_0 = get_initial_parameters(
+                num_qubits=num_qubits,
+                thetas_array=thetas_array,
+                ansatz_type=ansatz_type,
+                reps=reps,
+            )
 
             # a unique circuit index used inside the inner minimizer loop as identifier
             # Value of 0 corresponds to the 0th iteration of the minimizer
@@ -1790,13 +1993,17 @@ def run(
             accuracy_this_iter = []
 
             # Always start by enabling transpile ...
-            ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+            ex.set_tranpilation_flags(
+                do_transpile_metrics=True, do_transpile_for_execute=True
+            )
 
             # dictionary to store the thetas_array for each batch
-            thetas_array_batch = {} 
-            
+            thetas_array_batch = {}
+
             if verbose:
-                print(f"==> Launch optimizer, batch_size={batch_size}, max_iter={max_iter}")
+                print(
+                    f"==> Launch optimizer, batch_size={batch_size}, max_iter={max_iter}"
+                )
 
             # minimize loss returned from objective function to find best theta values
 
@@ -1804,7 +2011,15 @@ def run(
             # objective function is called repeatedly with varying parameters
             # until the max_iter are run
             if minimizer_function is None:
-                ret = minimizeSPSA(objective_function, x0=thetas_array_0, a=0.3, c=0.3, niter=max_iter, callback=callback_thetas_array, paired=False)
+                ret = minimizeSPSA(
+                    objective_function,
+                    x0=thetas_array_0,
+                    a=0.3,
+                    c=0.3,
+                    niter=max_iter,
+                    callback=callback_thetas_array,
+                    paired=False,
+                )
 
             # or, execute a custom minimizer
             else:
@@ -1815,18 +2030,20 @@ def run(
                 )
 
             if comfort:
-                print("!") 
-                
+                print("!")
+
             # remove the last element of metrics arrays, since it is always zero
-            metrics.pop_metric(group=num_qubits, circuit = unique_id)
+            metrics.pop_metric(group=num_qubits, circuit=unique_id)
 
             # update the thetas_array_dict with the thetas_array_batch
             thetas_array_dict[num_qubits] = thetas_array_batch
 
             # write the thetas_array_dict to a json file
             # NOTE: the size of this file grows each time we increment num_qubits
-            write_dict_to_json(thetas_array_dict, thetas_array_path + "precomputed_thetas.json")
-          
+            write_dict_to_json(
+                thetas_array_dict, thetas_array_path + "precomputed_thetas.json"
+            )
+
             # save the data for this qubit width, and instance number
             store_final_iter_to_metrics_json(
                 backend_id=backend_id_train,
@@ -1846,24 +2063,29 @@ def run(
 
             ###### End of instance processing
 
-
         ##############
         # for method 3, need to aggregate the detail metrics appropriately for each group
         # Note that this assumes that all iterations of the circuit have completed by this point
 
         elif method == 3:
-
             # set exectution target
             ex.set_execution_target(
-                backend_id, provider_backend=provider_backend, hub=hub, group=group, project=project, exec_options=exec_options
-                )
+                backend_id,
+                provider_backend=provider_backend,
+                hub=hub,
+                group=group,
+                project=project,
+                exec_options=exec_options,
+            )
 
             # set x_batch and y_batch to the test data
             x_batch = x_test_scaled
             y_batch = y_test
 
             #  read the dictionary of thetas_array from the json file
-            thetas_array_dict = read_dict_from_json(thetas_array_path + "precomputed_thetas.json")
+            thetas_array_dict = read_dict_from_json(
+                thetas_array_path + "precomputed_thetas.json"
+            )
 
             # get the thetas_array_batch for the current qubit size
             thetas_array_batch = thetas_array_dict[str(num_qubits)]
@@ -1883,17 +2105,18 @@ def run(
             for iteration_count in iteration_list:
                 minimizer_loop_index = int(iteration_count) - 1
                 thetas_array = np.array(thetas_array_batch[iteration_count])
-                loss, accuracy = objective_function(thetas_array, return_accuracy=True, test_pass=True)
+                loss, accuracy = objective_function(
+                    thetas_array, return_accuracy=True, test_pass=True
+                )
 
             if comfort and not verbose:
                 print("!")
-                
+
         if method == 2 or method == 3:
             metrics.process_circuit_metrics_2_level(num_qubits)
-        
+
         metrics.finalize_group(num_qubits)
-      
-         
+
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
 
@@ -1908,76 +2131,83 @@ def run(
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - Image Recognition ({method}) - Qiskit",
-                options=dict(shots=num_shots))
-                
+        metrics.plot_metrics(
+            f"Benchmark Results - Image Recognition ({method}) - Qiskit",
+            options=dict(shots=num_shots),
+        )
+
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
-       
+
     elif method == 3:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
 
-    
+
 def get_final_results():
     """
     Return the energy and dict of key metrics of the last run().
     """
-    
+
     # find the final energy value and return it
-    energy=lowest_energy_values[-1] if len(lowest_energy_values) > 0 else None
-    
+    energy = lowest_energy_values[-1] if len(lowest_energy_values) > 0 else None
+
     return energy, key_metrics
-    
+
+
 ###################################
 
 # DEVNOTE: This function should be re-implemented as just the objective function
 # as it is defined in the run loop above with the necessary parameters
+
 
 def run_objective_function(**kwargs):
     """
     Define a function to perform one iteration of the objective function.
     These argruments are preset to single execution: method=2, max_circuits=1, max+iter=1
     """
-    
+
     # Fix arguments required to execute of single instance
     hl_single_args = dict(
-
-        method=2,                   # method 2 defines the objective function
-        max_circuits=1,             # only one repetition
-        max_iter=1,                 # maximum minimizer iterations to perform, set to 1
-        
+        method=2,  # method 2 defines the objective function
+        max_circuits=1,  # only one repetition
+        max_iter=1,  # maximum minimizer iterations to perform, set to 1
         # disable display options for line plots
         line_y_metrics=None,
         line_x_metrics=None,
-        
         # disable display options for bar plots
         bar_y_metrics=None,
         bar_x_metrics=None,
-
         # disable display options for area plots
         score_metric=None,
         x_metric=None,
     )
     # get the num_qubits are so we can force min and max to it.
     num_qubits = kwargs.pop("num_qubits")
-      
+
     # Run the benchmark in method 2 at just one qubit size
-    run(min_qubits=num_qubits, max_qubits=num_qubits,
-            **kwargs, **hl_single_args)
+    run(min_qubits=num_qubits, max_qubits=num_qubits, **kwargs, **hl_single_args)
 
     # find the final energy value and return it
-    energy=lowest_energy_values[-1] if len(lowest_energy_values) > 0 else None
-    
+    energy = lowest_energy_values[-1] if len(lowest_energy_values) > 0 else None
+
     return energy, key_metrics
+
 
 #################################
 # MAIN
 
 # # if main, execute method
 if __name__ == "__main__":
-    run(min_qubits=6, max_qubits=8, num_shots=1000, max_iter=3, method=2, test_pass_count=30)
+    run(
+        min_qubits=6,
+        max_qubits=8,
+        num_shots=1000,
+        max_iter=3,
+        method=2,
+        test_pass_count=30,
+    )
 
 # # %%
 
