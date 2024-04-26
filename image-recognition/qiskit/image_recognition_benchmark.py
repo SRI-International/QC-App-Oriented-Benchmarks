@@ -520,23 +520,27 @@ def feature_map(num_qubits=8, x_data=None):
     return qc
 
 
-def pauli_string_to_circuit(pauli_string: str):
+def diagonalizing_pauli_circuit(pauli_string: str):
     """
-    Given a string representing a pauli (like "XXXI"), construct a QuantumCircuit containing the corresponding quantum gates.
-    """
+    Given a string representing a pauli (like "XXXI"), construct a QuantumCircuit that would diagonalize that pauli string."""
 
     qc = QuantumCircuit(len(pauli_string))
 
     # go in reverse to account for qiskit ordering- most significant is on the left
     for i, pauli_char in enumerate(pauli_string[::-1]):
         if pauli_char == "I":
+            # Measurements on this qubit don't matter
             continue
         elif pauli_char == "X":
-            qc.x(i)
+            # H X -> Z
+            qc.h(i)
         elif pauli_char == "Y":
-            qc.y(i)
+            # H SDG X -> Z
+            qc.sdg(i)
+            qc.h(i)
         elif pauli_char == "Z":
-            qc.z(i)
+            # Z -> Z
+            continue
         else:
             raise ValueError("Pauli string contains character that is not I, X, Y, Z.")
 
@@ -549,20 +553,21 @@ def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
 
     # define the default operator if none provided
     # x_operator = SparsePauliOp("X" * num_qubits)
-    z_operator = SparsePauliOp("I" * (num_qubits - 1) + "Z")
+    z_operator = SparsePauliOp("X" * (num_qubits - 3) + "IYZ")
 
     if total_operator is None:
         # default is the z operator
 
         total_operator = z_operator
     # NOTE: I think eventually we want to return this list, but I am guessing since the total operator is just one Z there is only one circuit anyways?
+
     circuits = []
 
     # to_list returns a list of (label, coef): just want the label
     for pauli_label, _ in total_operator.to_list():
         circuit = base_circuit.copy()
 
-        circuit.compose(pauli_string_to_circuit(pauli_label), inplace=True)
+        circuit.compose(diagonalizing_pauli_circuit(pauli_label), inplace=True)
         circuit.measure_all()
         circuits.append(circuit)
     return circuit, total_operator
@@ -674,6 +679,23 @@ def loss_function(result, y_data, num_qubits, formatted_observables, verbose=Fal
 ##########################################################
 
 
+def post_diagonalization_op_converter(op: SparsePauliOp):
+    """
+    Return a pauli string with X and Y replaced with Z. This is useful if we have diaganalized that pauli string  to the Z basis and now need to pass that into the sampled_expectation_value function.
+    """
+
+    # Get the labels from the original SparsePauliOp
+    labels = [label for label, coeff in op.to_list()]
+
+    # Replace 'X' and 'Y' with 'Z' in each label
+    new_labels = ["".join("Z" if p in "XY" else p for p in label) for label in labels]
+
+    # Create a new SparsePauliOp with the modified labels
+    new_pauli_op = SparsePauliOp(new_labels, coeffs=op.coeffs)
+
+    return new_pauli_op
+
+
 def calculate_expectation_values(probabilities, observables):
     """
     Return the expectation values for an operator given the probabilities.
@@ -682,7 +704,11 @@ def calculate_expectation_values(probabilities, observables):
         probabilities = [probabilities]
     expectation_values = list()
     for idx, op in enumerate(observables):
-        expectation_value = sampled_expectation_value(probabilities[idx], op)
+        # in the code above, we measure post-diagonalization. so replace all non-identity paulis with Z
+        #
+        expectation_value = sampled_expectation_value(
+            probabilities[idx], post_diagonalization_op_converter(op)
+        )
         expectation_values.append(expectation_value)
 
     return expectation_values
