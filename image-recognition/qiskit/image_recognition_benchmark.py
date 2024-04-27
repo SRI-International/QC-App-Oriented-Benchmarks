@@ -465,15 +465,16 @@ def ansatz(ansatz_type, num_qubits, num_reps=1):
         parameter_vector = ParameterVector("t", length=num_parameters)
         qc = QuantumCircuit(num_qubits)
         for i_layer in range(num_layers):
-            for i_sub_layer in [0, 2**i_layer]:
+            for i_sub_layer in [0, 2 ** i_layer]:
                 for i_q1 in range(i_sub_layer, num_qubits, 2 ** (i_layer + 1)):
-                    i_q2 = 2**i_layer + i_q1
+                    i_q2 = 2 ** i_layer + i_q1
                     if i_q2 < num_qubits:
                         qc = qc.compose(
                             parameterized_2q_gate_2(
                                 parameter_vector[
                                     num_parameters_per_layer
-                                    * i_layer : num_parameters_per_layer * (i_layer + 1)
+                                    * i_layer : num_parameters_per_layer
+                                    * (i_layer + 1)
                                 ],
                                 num_reps=num_reps,
                             ),
@@ -487,16 +488,17 @@ def ansatz(ansatz_type, num_qubits, num_reps=1):
         qc = QuantumCircuit(num_qubits)
         i_conv = 0
         for i_layer in range(num_layers):
-            for i_sub_layer in [0, 2**i_layer]:
+            for i_sub_layer in [0, 2 ** i_layer]:
                 for i_q1 in range(i_sub_layer, num_qubits, 2 ** (i_layer + 1)):
-                    i_q2 = 2**i_layer + i_q1
+                    i_q2 = 2 ** i_layer + i_q1
                     if i_q2 < num_qubits:
                         parameter_vector.resize((i_conv + 1) * num_parameters_per_conv)
                         qc = qc.compose(
                             parameterized_2q_gate_2(
                                 parameter_vector[
                                     num_parameters_per_conv
-                                    * i_conv : num_parameters_per_conv * (i_conv + 1)
+                                    * i_conv : num_parameters_per_conv
+                                    * (i_conv + 1)
                                 ],
                                 num_reps=num_reps,
                             ),
