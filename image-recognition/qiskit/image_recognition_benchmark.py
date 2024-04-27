@@ -458,31 +458,6 @@ def feature_map(num_qubits = 8, x_data=None):
 
     return qc
 
-def diagonalizing_pauli_instructions(pauli_string: str):
-    """
-    Given a string representing a Pauli (like "XXXI"), construct a list of instructions
-    (gate, [qubits]) that would diagonalize that Pauli string.
-    """
-    instructions = []
-    # Go in reverse to account for Qiskit ordering- most significant qubit is on the left
-    for i, pauli_char in enumerate(pauli_string[::-1]):
-        if pauli_char == 'X':
-            instructions.append(('h', [i]))
-        elif pauli_char == 'Y':
-            instructions.append(('sdg', [i]))
-            instructions.append(('h', [i]))
-        elif pauli_char == 'Z':
-            # No change needed to diagonalize Z
-            continue
-        elif pauli_char == 'I':
-            # No gate needed, identity does not affect the state
-            continue
-        else:
-            raise ValueError("Pauli string contains character that is not I, X, Y, Z.")
-    print(instructions)
-    
-    return instructions
-
 def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
     num_qubits = base_circuit.num_qubits
 
@@ -562,8 +537,6 @@ def ImageRecognition(num_qubits: int,
     _circuit = _feature_map_circuit.compose(_variational_circuit)
 
     # prepare the circuit for execution
-    qc, observables = prepare_circuit(_circuit)
-
     params = {_parameter_vector: thetas_array} if parameterized else None
 
     # save small circuit example for display
