@@ -470,8 +470,7 @@ def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
     num_qubits = base_circuit.num_qubits
 
     # Define the default operator if none provided
-    # NOTE: Assuming IIIZ was just a placeholder, I made a slightly more complicated placeholder to test diagonalization 
-    z_operator = SparsePauliOp("I" * (num_qubits) + "Z")
+    z_operator = SparsePauliOp("I" * (num_qubits-1) + "Z")
 
     if total_operator is None:
         total_operator = z_operator
