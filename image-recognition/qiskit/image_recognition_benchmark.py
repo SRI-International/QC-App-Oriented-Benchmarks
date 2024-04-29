@@ -439,8 +439,8 @@ def ansatz(ansatz_type,num_qubits, num_reps=1):
             for i_sub_layer in [0 , 2**i_layer]:            
                 for i_q1 in range(i_sub_layer, num_qubits, 2**(i_layer+1)):
                     i_q2=2**i_layer+i_q1
-                    if i_q2<num_qubits:
                         parameter_vector.resize((i_conv+1)*num_parameters_per_conv)
+                    if i_q2<num_qubits:
                         qc=qc.compose(parameterized_2q_gate_2(parameter_vector[num_parameters_per_conv*i_conv:num_parameters_per_conv*(i_conv+1)], num_reps=num_reps), qubits=(i_q1,i_q2)) 
                         i_conv+=1
     else:
@@ -471,7 +471,7 @@ def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
 
     # Define the default operator if none provided
     # NOTE: Assuming IIIZ was just a placeholder, I made a slightly more complicated placeholder to test diagonalization 
-    z_operator = SparsePauliOp("X" * (num_qubits - 3) + "IYZ")
+    z_operator = SparsePauliOp("I" * (num_qubits) + "Z")
 
     if total_operator is None:
         total_operator = z_operator
@@ -572,7 +572,7 @@ def loss_function(result, y_data, num_qubits, formatted_observables, verbose=Fal
         _counts = _res.get_counts()
         _probs = normalize_counts(_counts, num_qubits=num_qubits)
 
-        _expectation_values = calculate_expectation_values(_probs, formatted_observables)
+        _expectation_values = calculate_diagonalized_expectation_values(_probs, formatted_observables)
         value = sum(_expectation_values)
 
         # # now get <H^2>, assuming Cov[si,si'] = 0
