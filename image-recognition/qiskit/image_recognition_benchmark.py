@@ -480,14 +480,11 @@ def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
 
     for pauli_label, _ in total_operator.to_list():
         circuit = base_circuit.copy()
-        qubits = circuit.qubits
-        circuit.barrier(qubits)
 
         # Apply gates that diagonalize the pauli string with respect to the computational (Z) basis. 
         # This is done as later in the code we sample from the circuit to find the expectation value.
         # Go in reverse to account for Qiskit ordering- most significant qubit is on the left
         for i, pauli_char in enumerate(pauli_label[::-1]):
-            circuit.sdg(i)
             if pauli_char == 'X':
                 circuit.h(i)
             elif pauli_char == 'Y':
