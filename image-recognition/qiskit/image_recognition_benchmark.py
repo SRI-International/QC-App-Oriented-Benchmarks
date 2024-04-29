@@ -13,7 +13,8 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-from qiskit import Aer, QuantumCircuit, execute
+from qiskit_aer import Aer
+from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
@@ -459,9 +460,17 @@ def feature_map(num_qubits = 8, x_data=None):
     return qc
 
 def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
+    """
+    Return the circuit and operator to be used in the image recognition. 
+
+    base_circuit has diagonalizing gates appended to it and is returned in that state to be measured. 
+
+    total_operator is returned is if it not None, otherwise return a default operator. 
+    """
     num_qubits = base_circuit.num_qubits
 
     # Define the default operator if none provided
+    # NOTE: Assuming IIIZ was just a placeholder, I made a slightly more complicated placeholder to test diagonalization 
     z_operator = SparsePauliOp("X" * (num_qubits - 3) + "IYZ")
 
     if total_operator is None:
@@ -469,20 +478,21 @@ def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
 
     circuits = []
 
-    # Apply the diagonalizing gates directly to the base circuit
-    #
-    #
     for pauli_label, _ in total_operator.to_list():
         circuit = base_circuit.copy()
         qubits = circuit.qubits
-        print(qubits)
+        circuit.barrier(qubits)
+
+        # Apply gates that diagonalize the pauli string with respect to the computational (Z) basis. 
+        # This is done as later in the code we sample from the circuit to find the expectation value.
         # Go in reverse to account for Qiskit ordering- most significant qubit is on the left
         for i, pauli_char in enumerate(pauli_label[::-1]):
+            circuit.sdg(i)
             if pauli_char == 'X':
-                circuit.h(qubits[i])
+                circuit.h(i)
             elif pauli_char == 'Y':
-                circuit.sdg(qubits[i])
-                circuit.h(qubits[i])
+                circuit.sdg(i)
+                circuit.h(i)
             elif pauli_char == 'Z':
                 # Z -> Z, no operation needed for diagonalization
                 continue
@@ -491,10 +501,10 @@ def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
                 continue
             else:
                 raise ValueError("Pauli string contains character that is not I, X, Y, Z.")
+
         circuit.measure_all()  # Add measurement to all qubits
         circuits.append(circuit)
 
-    print(circuits)
     return circuit, total_operator
 
 def ImageRecognition(num_qubits: int,
@@ -537,6 +547,8 @@ def ImageRecognition(num_qubits: int,
     _circuit = _feature_map_circuit.compose(_variational_circuit)
 
     # prepare the circuit for execution
+    qc, observables = prepare_circuit(_circuit)
+
     params = {_parameter_vector: thetas_array} if parameterized else None
 
     # save small circuit example for display
@@ -610,16 +622,18 @@ def post_diagonalization_op_converter(op: SparsePauliOp):
     return new_pauli_op
 
 
-def calculate_expectation_values(probabilities, observables):
+def calculate_diagonalized_expectation_values(probabilities, observables):
     """
     Return the expectation values for an operator given the probabilities.
+
+    Note that this function assumes the probabilities are from a post-diagonalized (to the computational Z basis) circuit. 
     """
     if not isinstance(probabilities, list):
         probabilities = [probabilities]
     expectation_values = list()
     for idx, op in enumerate(observables):
-        # in the code above, we measure post-diagonalization. so replace all non-identity paulis with Z
-        #
+        # in the context of our code 
+
         expectation_value = sampled_expectation_value(
             probabilities[idx], post_diagonalization_op_converter(op)
         )
@@ -753,7 +767,7 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id="statevector_simu
 
     # execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
-    sv_result = execute(qc, sv_backend, params=params).result()
+    sv_result = sv_backend.run(qc, params=params).result()
 
     # get the probability distribution
     counts = sv_result.get_counts()
@@ -2004,7 +2018,7 @@ def run_objective_function(**kwargs):
 
 # # if main, execute method
 if __name__ == "__main__":
-    run(min_qubits=6, max_qubits=8, num_shots=1000, max_iter=3, method=2, test_pass_count=30)
+    run(min_qubits=4, max_qubits=6, num_shots=1000, max_iter=3, method=1, test_pass_count=30)
 
 # # %%
 
