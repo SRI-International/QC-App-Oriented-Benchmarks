@@ -2014,7 +2014,7 @@ def run_objective_function(**kwargs):
 
 # # if main, execute method
 if __name__ == "__main__":
-    run(min_qubits=6, max_qubits=8, num_shots=1000, max_iter=3, method=1, test_pass_count=30)
+    run(min_qubits=6, max_qubits=8, num_shots=1000, max_iter=3, method=2, test_pass_count=30)
 
 # # %%
 
