@@ -439,8 +439,8 @@ def ansatz(ansatz_type,num_qubits, num_reps=1):
             for i_sub_layer in [0 , 2**i_layer]:            
                 for i_q1 in range(i_sub_layer, num_qubits, 2**(i_layer+1)):
                     i_q2=2**i_layer+i_q1
-                        parameter_vector.resize((i_conv+1)*num_parameters_per_conv)
                     if i_q2<num_qubits:
+                        parameter_vector.resize((i_conv+1)*num_parameters_per_conv)
                         qc=qc.compose(parameterized_2q_gate_2(parameter_vector[num_parameters_per_conv*i_conv:num_parameters_per_conv*(i_conv+1)], num_reps=num_reps), qubits=(i_q1,i_q2)) 
                         i_conv+=1
     else:
@@ -629,7 +629,6 @@ def calculate_diagonalized_expectation_values(probabilities, observables):
         probabilities = [probabilities]
     expectation_values = list()
     for idx, op in enumerate(observables):
-        # in the context of our code 
 
         expectation_value = sampled_expectation_value(
             probabilities[idx], post_diagonalization_op_converter(op)
@@ -2015,7 +2014,7 @@ def run_objective_function(**kwargs):
 
 # # if main, execute method
 if __name__ == "__main__":
-    run(min_qubits=4, max_qubits=6, num_shots=1000, max_iter=3, method=1, test_pass_count=30)
+    run(min_qubits=6, max_qubits=8, num_shots=1000, max_iter=3, method=1, test_pass_count=30)
 
 # # %%
 
