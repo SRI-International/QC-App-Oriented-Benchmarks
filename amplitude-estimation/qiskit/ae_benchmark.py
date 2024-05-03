@@ -15,6 +15,9 @@ import execute as ex
 import metrics as metrics
 from qft_benchmark import inv_qft_gate
 
+# Benchmark Name
+benchmark_name = "Amplitude Estimation"
+
 np.random.seed(0)
 
 verbose = False
@@ -29,13 +32,14 @@ QFTI_ = None
 ############### Circuit Definition
 
 def AmplitudeEstimation(num_state_qubits, num_counting_qubits, a, psi_zero=None, psi_one=None):
+
+    num_qubits = num_state_qubits + 1 + num_counting_qubits
+    
     qr_state = QuantumRegister(num_state_qubits+1)
     qr_counting = QuantumRegister(num_counting_qubits)
     cr = ClassicalRegister(num_counting_qubits)
-    qc = QuantumCircuit(qr_counting, qr_state, cr)
+    qc = QuantumCircuit(qr_counting, qr_state, cr, name=f"qae-{num_qubits}-{a}")
     
-    num_qubits = num_state_qubits + 1 + num_counting_qubits
-
     # create the Amplitude Generator circuit
     A = A_gen(num_state_qubits, a, psi_zero, psi_one)
 
@@ -87,7 +91,7 @@ def A_gen(num_state_qubits, a, psi_zero=None, psi_one=None):
         
     theta = 2 * np.arcsin(np.sqrt(a))
     # Let the objective be qubit index n; state is on qubits 0 through n-1
-    qc_A = QuantumCircuit(num_state_qubits+1, name=f"A")
+    qc_A = QuantumCircuit(num_state_qubits+1, name="A")
     
     # takes state to |0>_{n} (sqrt(1-a) |0> + sqrt(a) |1>)
     qc_A.ry(theta, num_state_qubits)
@@ -96,13 +100,13 @@ def A_gen(num_state_qubits, a, psi_zero=None, psi_one=None):
     qc_A.x(num_state_qubits)
     for i in range(num_state_qubits):
         if psi_zero[i]=='1':
-            qc_A.cnot(num_state_qubits,i)
+            qc_A.cx(num_state_qubits,i)
     qc_A.x(num_state_qubits)
     
     # takes state to sqrt(1-a) |psi_0>|0> + sqrt(a) |psi_1>|1>
     for i in range(num_state_qubits):
         if psi_one[i]=='1':
-            qc_A.cnot(num_state_qubits,i)
+            qc_A.cx(num_state_qubits,i)
     
     return qc_A
 
@@ -110,7 +114,7 @@ def A_gen(num_state_qubits, a, psi_zero=None, psi_one=None):
 def Ctrl_Q(num_state_qubits, A_circ):
 
     # index n is the objective qubit, and indexes 0 through n-1 are state qubits
-    qc = QuantumCircuit(num_state_qubits+1, name=f"Q")
+    qc = QuantumCircuit(num_state_qubits+1, name="Q")
     
     temp_A = copy.copy(A_circ)
     A_gate = temp_A.to_gate()
@@ -228,16 +232,17 @@ def a_from_s_int(s_int, num_counting_qubits):
 MAX_QUBITS=8
 
 # Execute program with default parameters
-def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
+def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
         num_state_qubits=1, # default, not exposed to users
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Amplitude Estimation Benchmark Program - Qiskit")
+    print(f"{benchmark_name} Benchmark Program - Qiskit")
 
     # Clamp the maximum number of qubits
     if max_qubits > MAX_QUBITS:
-        print(f"INFO: Amplitude Estimation benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
+        print(f"INFO: {benchmark_name} benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
         max_qubits = MAX_QUBITS
         
     # validate parameters (smallest circuit is 3 qubits)
@@ -246,8 +251,14 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
         print(f"ERROR: AE Benchmark needs at least {num_state_qubits + 2} qubits to run")
         return
     min_qubits = max(max(3, min_qubits), num_state_qubits + 2)
+    skip_qubits = max(1, skip_qubits)
     #print(f"min, max, state = {min_qubits} {max_qubits} {num_state_qubits}")
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
+    ##########
+    
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -262,11 +273,14 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
 
         # reset random seed
         np.random.seed(0)
@@ -310,6 +324,8 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nControlled Quantum Operator 'cQ' ="); print(cQ_ if cQ_ != None else " ... too large!")
@@ -318,7 +334,7 @@ def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
     print("\nInverse QFT Circuit ="); print(QFTI_ if QC_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Amplitude Estimation - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 
 # if main, execute method

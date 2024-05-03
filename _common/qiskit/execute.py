@@ -23,9 +23,9 @@
 # execution, so they can be aggregated and presented to the user.
 #
 
+import os
 import time
 import copy
-import metrics
 import importlib
 import traceback
 from collections import Counter
@@ -33,14 +33,16 @@ import logging
 import numpy as np
 
 from datetime import datetime, timedelta
-from qiskit import execute, Aer, transpile
-from qiskit import IBMQ
+from qiskit import transpile
+from qiskit_aer import Aer
 from qiskit.providers.jobstatus import JobStatus
 
-# Noise
-from qiskit.providers.aer.noise import NoiseModel, ReadoutError
-from qiskit.providers.aer.noise import depolarizing_error, reset_error
+# Noise Model imports
+from qiskit_aer.noise import NoiseModel, ReadoutError
+from qiskit_aer.noise import depolarizing_error, reset_error
 
+# QED-C modules
+import metrics
 
 ##########################
 # JOB MANAGEMENT VARIABLES 
@@ -50,7 +52,7 @@ from qiskit.providers.aer.noise import depolarizing_error, reset_error
 #### these variables are currently accessed as globals from user code
 
 # maximum number of active jobs
-max_jobs_active = 5
+max_jobs_active = 3
 
 # job mode: False = wait, True = submit multiple jobs
 job_mode = False
@@ -63,13 +65,24 @@ verbose_time = False
 
 #### the following variables are accessed only through functions ...
 
-# specify whether to execute using sessions (and currently using Sampler only)
+# Specify whether to execute using sessions (and currently using Sampler only)
 use_sessions = False
 
+# Session counter for use in creating session name
+session_count = 0
+
 # internal session variables: users do not access
-service = None
 session = None
 sampler = None
+
+# Use the IBM Quantum Platform system; default is to use the IBM Cloud
+use_ibm_quantum_platform = False
+
+# IBM Quantum Service save here if created
+service = None
+
+# Azure Quantum Provider saved here if created
+azure_provider = None
 
 # logger for this module
 logger = logging.getLogger(__name__)
@@ -91,10 +104,15 @@ cached_circuits = {}
 # user-supplied result handler
 result_handler = None
 
+# Option to compute normalized depth during execution (can disable to reduce overhead in large circuits)
+use_normalized_depth = True
+
 # Option to perform explicit transpile to collect depth metrics
+# (disabled after first circuit in iterative algorithms)
 do_transpile_metrics = True
 
-# Option to perform transpilation prior to execution (disable to execute unmodified circuit)
+# Option to perform transpilation prior to execution
+# (disabled after first circuit in iterative algorithms)
 do_transpile_for_execute = True
 
 # Intercept function to post-process results
@@ -134,7 +152,25 @@ class BenchmarkResult(object):
             counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])        
         return counts
 
-
+# Special Job object class to hold job information for custom executors
+class Job:
+    local_job = True
+    unique_job_id = 1001
+    executor_result = None
+    
+    def __init__(self):
+        Job.unique_job_id = Job.unique_job_id + 1
+        self.this_job_id = Job.unique_job_id      
+        
+    def job_id(self):
+        return self.this_job_id
+    
+    def status(self):
+        return JobStatus.DONE
+        
+    def result(self):
+        return self.executor_result
+       
 #####################
 # DEFAULT NOISE MODEL 
 
@@ -195,34 +231,63 @@ def init_execution(handler):
 # Set the backend for execution
 def set_execution_target(backend_id='qasm_simulator',
                 provider_module_name=None, provider_name=None, provider_backend=None,
-                hub=None, group=None, project=None, exec_options=None):
+                hub=None, group=None, project=None, exec_options=None,
+                context=None):
     """
     Used to run jobs on a real hardware
     :param backend_id:  device name. List of available devices depends on the provider
-    :param group: used to load IBMQ accounts.
-    :param project: used to load IBMQ accounts.
-    :param provider_module_name: If using a provider other than IBMQ, the string of the module that contains the
-    Provider class.  For example, for honeywell, this would be 'qiskit.providers.honeywell'
+    :param hub: hub identifier, currently "ibm-q" for IBM Quantum, "azure-quantum" for Azure Quantum 
+    :param group: group identifier, used with IBM-Q accounts.
+    :param project: project identifier, used with IBM-Q accounts.
+    :param provider_module_name: If using a provider other than IBM-Q, the string of the module that contains the Provider class.  For example, for Quantinuum, this would be 'qiskit.providers.quantinuum'
     :param provider_name:  If using a provider other than IBMQ, the name of the provider class.
-    For example, for Honeywell, this would be 'Honeywell'.
+    :param context: context for execution, used to create session names
+    For example, for Quantinuum, this would be 'Quantinuum'.
     :provider_backend: a custom backend object created and passed in, use backend_id as identifier
     example usage.
 
-    set_execution_target(backend_id='honeywell_device_1', provider_module_name='qiskit.providers.honeywell',
-                        provider_name='Honeywell')
+    set_execution_target(backend_id='quantinuum_device_1', provider_module_name='qiskit.providers.quantinuum',
+                        provider_name='Quantinuum')
     """
     global backend
+    global session
+    global use_sessions
+    global session_count
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
 
     # if a custom provider backend is given, use it ...
-    # in this case, the backend_id is an arbitrary identifier that shows up in plots
+    # Note: in this case, the backend_id is an identifier that shows up in plots
     if provider_backend != None:
         backend = provider_backend
-    
+        
+        # The hub variable is used to identify an Azure Quantum backend
+        if hub == "azure-quantum":
+            from azure.quantum.job.session import Session, SessionJobFailurePolicy 
+            
+            # increment session counter
+            session_count += 1
+            
+            # create session name
+            if context is not None: session_name = context
+            else: session_name = f"QED-C Benchmark Session {session_count}"
+            
+            if verbose:
+                print(f"... creating session {session_name} on Azure backend {backend_id}")
+                
+            # open a session on the backend
+            session = backend.open_session(name=session_name,
+                    job_failure_policy=SessionJobFailurePolicy.CONTINUE)
+                    
+            backend.latest_session = session
+            
     # handle QASM simulator specially
     elif backend_id == 'qasm_simulator':
         backend = Aer.get_backend("qasm_simulator") 
 
+    # handle Statevector simulator specially
+    elif backend_id == 'statevector_simulator':
+        backend = Aer.get_backend("statevector_simulator")
+        
     # handle 'fake' backends here
     elif 'fake' in backend_id:
         backend = getattr(
@@ -234,8 +299,10 @@ def set_execution_target(backend_id='qasm_simulator',
         backend = backend()
         logger.info(f'Set {backend = }')   
 
-    # otherwise use the given provider and backend_id to find the backend
+    # otherwise use the given providername or backend_id to find the backend
     else:
+        global service
+        global sampler
     
         # if provider_module name and provider_name are provided, obtain a custom provider
         if provider_module_name and provider_name:  
@@ -246,32 +313,170 @@ def set_execution_target(backend_id='qasm_simulator',
                 backend = provider.get_backend(backend_id)
             except:
                 print(authentication_error_msg.format(provider_name))
+        
+        # If hub variable indicates an Azure Quantum backend
+        elif hub == "azure-quantum":
+            global azure_provider
+            from azure.quantum.qiskit import AzureQuantumProvider
+            from azure.quantum.job.session import Session, SessionJobFailurePolicy
+            
+            # create an Azure Provider only the first time it is needed
+            if azure_provider is None:
+                if verbose:
+                    print("... creating Azure provider")
+                azure_provider = AzureQuantumProvider(
+                     resource_id = os.getenv("AZURE_QUANTUM_RESOURCE_ID"),
+                     location = os.getenv("AZURE_QUANTUM_LOCATION") 
+                )  
+                # List the available backends in the workspace
+                if verbose:
+                    print("    Available backends:")
+                    for backend in azure_provider.backends():
+                        print(f"      {backend}")
+
+            # increment session counter
+            session_count += 1
+            
+            # create session name
+            if context is not None: session_name = context
+            else: session_name = f"QED-C Benchmark Session {session_count}"
+            
+            if verbose:
+                print(f"... creating Azure backend {backend_id} and session {session_name}")
                 
-        # otherwise, assume the backend_id is given and assume it is IBMQ device
-        else:
+            # then find backend from the backend_id
+            # we should cache this and only change if backend_id changes
+            backend = azure_provider.get_backend(backend_id)
+ 
+            # open a session on the backend
+            session = backend.open_session(name=session_name,
+                    job_failure_policy=SessionJobFailurePolicy.CONTINUE)
+                    
+            backend.latest_session = session
+            
+        ###############################
+        # if using IBM Quantum Platform, assume the backend_id is given only
+        elif use_ibm_quantum_platform: 
+        
+            from qiskit import IBMQ
             if IBMQ.stored_account():
             
                 # load a stored account
                 IBMQ.load_account()
+                
+                # set use_sessions in provided by user - NOTE: this will modify the global setting
+                this_use_sessions = exec_options.get("use_sessions", None)
+                if this_use_sessions != None:
+                    use_sessions = this_use_sessions
 
                 # if use sessions, setup runtime service, Session, and Sampler
                 if use_sessions:
-                    from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session
-                    global service
+                    from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session, Options
+                    
                     service = QiskitRuntimeService()
-                    global session
-                    global sampler
+                    session_count += 1
+                    
                     backend = service.backend(backend_id)
-                    session= Session(service=service, backend=backend_id)
-                    sampler = Sampler(session=session)
+                    session = Session(service=service, backend=backend_id)
+                    
+                    # get Sampler resilience level and transpiler optimization level from exec_options
+                    options = Options()
+                    options.resilience_level = exec_options.get("resilience_level", 1)
+                    options.optimization_level = exec_options.get("optimization_level", 3)
+                    
+                    # special handling for ibmq_qasm_simulator to set noise model
+                    if backend_id == "ibmq_qasm_simulator":
+                        this_noise = noise
+                        # get noise model from options; used only in simulator for now
+                        if "noise_model" in exec_options:
+                            this_noise = exec_options.get("noise_model", None)
+                            if verbose:
+                                print(f"... using custom noise model: {this_noise}")
+                        # attach to backend if not None
+                        if this_noise != None:
+                            options.simulator = {"noise_model": this_noise}
+                            metrics.QV = this_noise.QV
+                            if verbose:
+                                print(f"... setting noise model, QV={this_noise.QV} on {backend_id}")
+                        
+                    if verbose:
+                        print(f"... execute using Sampler on backend_id {backend_id} with options = {options}")
+                    
+                    # create the Qiskit Sampler with these options
+                    sampler = Sampler(session=session, options=options)
                     
                 # otherwise, use provider and old style backend
                 # for IBM, create backend from IBMQ provider and given backend_id
                 else: 
+                    if verbose:
+                        print(f"... execute using Circuit Runner on backend_id {backend_id}")
+                        
                     provider = IBMQ.get_provider(hub=hub, group=group, project=project)
                     backend = provider.get_backend(backend_id)
             else:
                 print(authentication_error_msg.format("IBMQ"))
+
+        ###############################
+        # otherwise, assume the backend_id is given only and assume it is IBM Cloud device
+        else:
+            from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session, Options
+            
+            # create the Runtime Service object
+            service = QiskitRuntimeService()
+            
+            # obtain a backend from the service
+            backend = service.backend(backend_id)
+               
+            # DEVNOTE: here we assume if the sessions flag is set, we use Sampler
+            # however, we may want to add a use_sampler option so that we can separate these
+            
+            # set use_sessions if provided by user - NOTE: this will modify the global setting
+            this_use_sessions = exec_options.get("use_sessions", None)
+            if this_use_sessions != None:
+                use_sessions = this_use_sessions
+
+            # if use sessions, setup runtime service, Session, and Sampler
+            if use_sessions:
+            
+                if verbose:
+                    print("... using sessions")
+                
+                session = Session(service=service, backend=backend_id)
+                
+                # get Sampler resilience level and transpiler optimization level from exec_options
+                options = Options()
+                options.resilience_level = exec_options.get("resilience_level", 1)
+                options.optimization_level = exec_options.get("optimization_level", 3)
+                
+                # special handling for ibmq_qasm_simulator to set noise model
+                if backend_id == "ibmq_qasm_simulator":
+                    this_noise = noise
+                    
+                    # get noise model from options; used only in simulators for now
+                    if "noise_model" in exec_options:
+                        this_noise = exec_options.get("noise_model", None)
+                        if verbose:
+                            print(f"... using custom noise model: {this_noise}")
+                            
+                    # attach to backend if not None
+                    if this_noise != None:
+                        options.simulator = {"noise_model": this_noise}
+                        metrics.QV = this_noise.QV
+                        if verbose:
+                            print(f"... setting noise model, QV={this_noise.QV} on {backend_id}")
+                    
+                if verbose:
+                    print(f"... execute using Sampler on backend_id {backend_id} with options = {options}")
+                
+                # create the Qiskit Sampler with these options
+                sampler = Sampler(session=session, options=options)
+                
+            # otherwise, use the circuit runner in the submit_circuit method, without sessions
+            else: 
+                if verbose:
+                    print("... not using sessions")
+                    print(f"... execute using Circuit Runner on backend_id {backend_id}")
+
 
     # create an informative device name for plots
     device_name = backend_id
@@ -385,14 +590,19 @@ def execute_circuit(circuit):
     qc_tr_depth = qc_depth
     qc_tr_size = qc_size
     qc_tr_count_ops = qc_count_ops
-    qc_tr_xi = qc_xi; 
+    qc_tr_xi = qc_xi 
     qc_tr_n2q = qc_n2q
     #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
     
+    backend_name = get_backend_name(backend)
+    
     try:    
         # transpile the circuit to obtain size metrics using normalized basis
-        if do_transpile_metrics:
+        if do_transpile_metrics and use_normalized_depth:
             qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q = transpile_for_metrics(qc)
+            
+            # we want to ignore elapsed time contribution of transpile for metrics (normalized depth)
+            active_circuit["launch_time"] = time.time()
             
         # use noise model from execution options if given for simulator
         this_noise = noise
@@ -400,19 +610,6 @@ def execute_circuit(circuit):
         # make a clone of the backend options so we can remove elements that we use, then pass to .run()
         global backend_exec_options
         backend_exec_options_copy = copy.copy(backend_exec_options)
-
-        '''
-        # if 'executor' provided, perform all execution there and return
-        if backend_exec_options_copy != None:
-            executor = backend_exec_options_copy.pop("executor", None)     
-            if executor:
-                st = time.time()
-                executor(circuit["qc"], shots=shots, backend=backend, result_handler=result_handler, **backend_exec_options_copy)            
-                if verbose_time:
-                    print(f"  *** executor() time = {time.time() - st}")   
-                    
-                continue with job
-        '''
         
         # get noise model from options; used only in simulator for now
         if backend_exec_options_copy != None and "noise_model" in backend_exec_options_copy:
@@ -422,109 +619,141 @@ def execute_circuit(circuit):
         # extract execution options if set
         if backend_exec_options_copy == None: backend_exec_options_copy = {}
         
+        # used in Sampler setup, here remove it for execution
+        this_use_sessions = backend_exec_options_copy.pop("use_sessions", None)
+        resilience_level = backend_exec_options_copy.pop("resilience_level", None)
+        
+        # standard Qiskit transpiler options
         optimization_level = backend_exec_options_copy.pop("optimization_level", None)
         layout_method = backend_exec_options_copy.pop("layout_method", None)
         routing_method = backend_exec_options_copy.pop("routing_method", None)
+        
+        # option to transpile multiple times to find best one
         transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
+        
+        # gneeralized transformer method, custom to user
         transformer = backend_exec_options_copy.pop("transformer", None)
         
         global result_processor, width_processor
         postprocessors = backend_exec_options_copy.pop("postprocessor", None)
         if postprocessors:
             result_processor, width_processor = postprocessors
-
-        if use_sessions:
-            logger.info(f"Executing on backend: {backend.name}")
-        else:
-            logger.info(f"Executing on backend: {backend.name()}")
-
-        #************************************************
-        # Initiate execution (with noise if specified and this is a simulator backend)
-        if this_noise is not None and not use_sessions and backend.name().endswith("qasm_simulator"):
-
-            logger.info(f"Performing noisy simulation, shots = {shots}")
-            
-            # if the noise model has associated QV value, copy it to metrics module for plotting
-            if hasattr(this_noise, "QV"):
-                metrics.QV = this_noise.QV
-                   
-            simulation_circuits = circuit["qc"]
-
-            # we already have the noise model, just need to remove it from the options
-            # (only for simulator;  for other backends, it is treaded like keyword arg)
-            dummy = backend_exec_options_copy.pop("noise_model", None)
-                    
-            # transpile and bind circuit with parameters; use cache if flagged   
-            trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend)
-            simulation_circuits = trans_qc
-                    
-            # apply transformer pass if provided
-            if transformer:
-                logger.info("applying transformer to noisy simulator")
-                simulation_circuits, shots = invoke_transformer(transformer,
-                                    trans_qc, backend=backend, shots=shots)
-
-            # Indicate number of qubits about to be executed
-            if width_processor:
-                width_processor(qc)
-            
-            # for noisy simulator, use execute() which works; 
-            # no need for transpile above unless there are options like transformer
-            logger.info(f'Running circuit on noisy simulator, shots={shots}')
+        
+        ##############
+        # if 'executor' is provided, perform all execution there and return
+        # the executor returns a result object that implements get_counts(qc)
+        executor = None
+        if backend_exec_options_copy != None:
+            executor = backend_exec_options_copy.pop("executor", None) 
+        
+        # NOTE: the executor does not perform any other optional processing
+        # Also, the result_handler is called before elapsed_time processing which is not correct
+        if executor:
             st = time.time()
             
-            ''' some circuits, like Grover's behave incorrectly if we use run()
-            job = backend.run(simulation_circuits, shots=shots,
-                noise_model=this_noise, basis_gates=this_noise.basis_gates,
-                **backend_exec_options_copy)
-            '''   
-            job = execute(simulation_circuits, backend, shots=shots,
-                noise_model=this_noise, basis_gates=this_noise.basis_gates,
-                **backend_exec_options_copy)
-                
-            logger.info(f'Finished Running on noisy simulator - {round(time.time() - st, 5)} (ms)')
-            if verbose_time: print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
+            # invoke custom executor function with backend options
+            qc = circuit["qc"]
+            result = executor(qc, backend_name, backend, shots=shots, **backend_exec_options_copy)
+            
+            if verbose_time:
+                print(f"  *** executor() time = {round(time.time() - st,4)}")
+            
+            # create a pseudo-job to perform metrics processing upon return
+            job = Job()
+            
+            # store the result object on the job for processing in job_complete
+            job.executor_result = result  
         
-        #************************************************
-        # Initiate execution for all other backends and noiseless simulator
-        else:            
- 
-            # if set, transpile many times and pick shortest circuit
-            # DEVNOTE: this does not handle parameters yet, or optimizations
-            if transpile_attempt_count:
-                trans_qc = transpile_multiple_times(circuit["qc"], circuit["params"], backend,
-                        transpile_attempt_count, 
-                        optimization_level=None, layout_method=None, routing_method=None)
+        ##############        
+        # normal execution processing is performed here
+        else:       
+            logger.info(f"Executing on backend: {backend_name}")
+
+            #************************************************
+            # Initiate execution (with noise if specified and this is a simulator backend)
+            if this_noise is not None and not use_sessions and backend_name.endswith("qasm_simulator"):
+                logger.info(f"Performing noisy simulation, shots = {shots}")
+                
+                # if the noise model has associated QV value, copy it to metrics module for plotting
+                if hasattr(this_noise, "QV"):
+                    metrics.QV = this_noise.QV
+                       
+                simulation_circuits = circuit["qc"]
+
+                # we already have the noise model, just need to remove it from the options
+                # (only for simulator;  for other backends, it is treaded like keyword arg)
+                dummy = backend_exec_options_copy.pop("noise_model", None)
                         
-            # transpile and bind circuit with parameters; use cache if flagged                       
-            else:
-                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend,
-                        optimization_level=optimization_level,
-                        layout_method=layout_method,
-                        routing_method=routing_method)
-            
-            # apply transformer pass if provided
-            if transformer:
-                trans_qc, shots = invoke_transformer(transformer,
-                        trans_qc, backend=backend, shots=shots)
-            
-            # Indicate number of qubits about to be executed
-            if width_processor:
-                width_processor(qc)
+                # transpile and bind circuit with parameters; use cache if flagged   
+                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend, basis_gates=this_noise.basis_gates)
+                simulation_circuits = trans_qc
+                        
+                # apply transformer pass if provided
+                if transformer:
+                    logger.info("applying transformer to noisy simulator")
+                    simulation_circuits, shots = invoke_transformer(transformer,
+                                        trans_qc, backend=backend, shots=shots)
 
-            #*************************************
-            # perform circuit execution on backend
-            logger.info(f'Running trans_qc, shots={shots}')
-            st = time.time() 
-
-            if use_sessions:
-                job = sampler.run(trans_qc, shots=shots, **backend_exec_options_copy)
-            else:
-                job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
-
-            logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
-            if verbose_time: print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
+                # Indicate number of qubits about to be executed
+                if width_processor:
+                    width_processor(qc)
+                
+                # for noisy simulator, use backend.run() which can take noise model; 
+                # no need for transpile above unless there are options like transformer
+                logger.info(f'Running circuit on noisy simulator, shots={shots}')
+                st = time.time()
+                
+                job = backend.run(simulation_circuits, shots=shots,
+                    noise_model=this_noise, basis_gates=this_noise.basis_gates,
+                    **backend_exec_options_copy)
+                    
+                logger.info(f'Finished Running on noisy simulator - {round(time.time() - st, 5)} (ms)')
+                if verbose_time: print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
             
+            #************************************************
+            # Initiate execution for all other backends and noiseless simulator
+            else:            
+     
+                # if set, transpile many times and pick shortest circuit
+                # DEVNOTE: this does not handle parameters yet, or optimizations
+                if transpile_attempt_count:
+                    trans_qc = transpile_multiple_times(circuit["qc"], circuit["params"], backend,
+                            transpile_attempt_count, 
+                            optimization_level=None, layout_method=None, routing_method=None)
+                            
+                # transpile and bind circuit with parameters; use cache if flagged                       
+                else:
+                    trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend,
+                            optimization_level=optimization_level,
+                            layout_method=layout_method,
+                            routing_method=routing_method)
+                
+                # apply transformer pass if provided
+                if transformer:
+                    trans_qc, shots = invoke_transformer(transformer,
+                            trans_qc, backend=backend, shots=shots)
+                
+                # Indicate number of qubits about to be executed
+                if width_processor:
+                    width_processor(qc)
+
+                # to execute on Aer state vector simulator, need to remove measurements
+                if backend_name.lower() == "statevector_simulator":
+                    trans_qc = trans_qc.remove_final_measurements(inplace=False)
+                            
+                #*************************************
+                # perform circuit execution on backend
+                logger.info(f'Running trans_qc, shots={shots}')
+                st = time.time() 
+
+                if use_sessions:
+                    job = sampler.run(trans_qc, shots=shots, **backend_exec_options_copy)
+                else:
+                    job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
+
+                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
+                if verbose_time: print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
+                
     except Exception as e:
         print(f'ERROR: Failed to execute circuit {active_circuit["group"]} {active_circuit["circuit"]}')
         print(f"... exception = {e}")
@@ -552,7 +781,7 @@ def execute_circuit(circuit):
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'job_id', job.job_id())
     
     if verbose:
-        print(f"... executing job {job.job_id()}")
+        print(f"  ... executing job {job.job_id()}")
     
     # special handling when only runnng one job at a time: wait for result here
     # so the status check called later immediately returns done and avoids polling
@@ -560,6 +789,15 @@ def execute_circuit(circuit):
         wait_on_job_result(job, active_circuit)
 
     # return, so caller can do other things while waiting for jobs to complete    
+
+# Utility function to obtain name of backend
+# This is needed because some backends support backend.name and others backend.name()
+def get_backend_name(backend):
+    if callable(backend.name):
+        name = backend.name()
+    else:
+        name = backend.name
+    return name
 
 # block and wait for the job result to be returned
 # handle network timeouts by doing up to 40 retries once every 15 seconds
@@ -569,12 +807,12 @@ def wait_on_job_result(job, active_circuit):
     while retry_count < 40:
         try:
             retry_count += 1
-            #print(f"... calling job.result()")
             result = job.result()
             break
                          
-        except Exception as e:
+        except Exception:
             print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
+            if verbose: print(traceback.format_exc())
             time.sleep(15)
             continue
     
@@ -584,7 +822,7 @@ def wait_on_job_result(job, active_circuit):
     else:
         #print(f"... job.result() is done, with result data, continuing")
         pass
-
+    
 # Check and return job_status
 # handle network timeouts by doing up to 40 retries once every 15 seconds
 def get_job_status(job, active_circuit):
@@ -597,8 +835,9 @@ def get_job_status(job, active_circuit):
             status = job.status()
             break
                          
-        except Exception as e:
+        except Exception:
             print(f'... error occurred during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
+            if verbose: print(traceback.format_exc())
             time.sleep(15)
             continue
     
@@ -654,9 +893,9 @@ def transpile_for_metrics(qc):
         logger.info(f"End transpile with {basis_selector = }")
     else:
         basis_gates = basis_gates_array[basis_selector]
-        logger.info(f"Start transpile with basis_selector != 0")
+        logger.info("Start transpile with basis_selector != 0")
         qc = transpile(qc, basis_gates=basis_gates, seed_transpiler=0)
-        logger.info(f"End transpile with basis_selector != 0")
+        logger.info("End transpile with basis_selector != 0")
     
     #print(qc)
         
@@ -684,18 +923,18 @@ def transpile_for_metrics(qc):
 
            
 # Return a transpiled and bound circuit
-# Cache the transpiled, and use it if do_transpile_for_execute not set
+# Cache the transpiled circuit, and use it if do_transpile_for_execute not set
 # DEVNOTE: this approach does not permit passing of untranspiled circuit through
 # DEVNOTE: currently this only caches a single circuit
-def transpile_and_bind_circuit(circuit, params, backend,
+def transpile_and_bind_circuit(circuit, params, backend, basis_gates=None,
                 optimization_level=None, layout_method=None, routing_method=None):
                 
-    logger.info(f'transpile_and_bind_circuit()')
+    logger.info('transpile_and_bind_circuit()')
     st = time.time()
         
     if do_transpile_for_execute:
         logger.info('transpiling for execute')
-        trans_qc = transpile(circuit, backend, 
+        trans_qc = transpile(circuit, backend, basis_gates=basis_gates,
                 optimization_level=optimization_level, layout_method=layout_method, routing_method=routing_method) 
         
         # cache this transpiled circuit
@@ -703,7 +942,7 @@ def transpile_and_bind_circuit(circuit, params, backend,
     
     else:
         logger.info('use cached transpiled circuit for execute')
-        if verbose_time: print(f"  ... using cached circuit, no transpile")
+        if verbose_time: print("  ... using cached circuit, no transpile")
 
         ##trans_qc = circuit["qc"]
         
@@ -721,9 +960,9 @@ def transpile_and_bind_circuit(circuit, params, backend,
         # Note: some loggers cannot handle unicode in param names, so only show the values
         #logger.info(f"Binding parameters to circuit: {str(params)}")
         logger.info(f"Binding parameters to circuit: {[param[1] for param in params.items()]}")
-        if verbose_time: print(f"  ... binding parameters")
+        if verbose_time: print("  ... binding parameters")
         
-        trans_qc = trans_qc.bind_parameters(params)
+        trans_qc = trans_qc.assign_parameters(params)
         #print(trans_qc)
         
         # store original name in parameterized circuit, so it can be found with get_result()
@@ -822,6 +1061,44 @@ def job_complete(job):
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'elapsed_time', elapsed_time)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
 
+    ###### executor completion
+    
+    # If job has the 'local_job' attr, execution was done by the executor, and all work is done
+    # we process it here, as the subsequent processing has too much time-specific detail
+    if hasattr(job, 'local_job'):
+    
+        # get the result object directly from the pseudo-job object
+        result = job.result()
+        
+        if hasattr(result, 'exec_time'):
+            exec_time = result.exec_time
+            
+        # assume the exec time is the elapsed time, since we don't have more detail
+        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
+        
+        # invoke the result handler with the result object
+        if result != None and result_handler:
+            try:
+                result_handler(active_circuit["qc"],
+                                result,
+                                active_circuit["group"],
+                                active_circuit["circuit"],
+                                active_circuit["shots"]
+                                )
+                            
+            except Exception as e:
+                print(f'ERROR: failed to execute result_handler for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+                print(f"... exception = {e}")
+                if verbose:
+                    print(traceback.format_exc()) 
+        
+        # remove from list of active circuits
+        del active_circuits[job]
+    
+        return      
+    
+    ###### normal completion
+    
     # get job result (DEVNOTE: this might be different for diff targets)
     result = None
         
@@ -829,6 +1106,18 @@ def job_complete(job):
         result = job.result()
         # print("... result = ", str(result))
 
+        # for Azure Quantum, need to obtain execution time from sessions object
+        # Since there may be multiple jobs, need to find the one that matches the current job_id
+        if azure_provider is not None and session is not None:
+            details = job._azure_job.details
+            
+            # print("... session_job.details = ", details)
+            exec_time = (details.end_execution_time - details.begin_execution_time).total_seconds()
+            
+            # DEVNOTE: startup time is not currently used or stored
+            # it seesm to include queue time, so it has no added value over the elapsed time we currently store
+            startup_time = (details.begin_execution_time - details.creation_time).total_seconds()
+            
         # counts = result.get_counts(qc)
         # print("Total counts are:", counts)
         
@@ -890,7 +1179,7 @@ def job_complete(job):
     
         # invoke a result processor if specified in exec_options
         if result_processor:
-            logger.info(f'result_processor(...)')
+            logger.info('result_processor(...)')
             result = result_processor(result)
     
         # The following computes the counts by summing them up, allowing for the case where
@@ -974,32 +1263,51 @@ def process_step_times(job, result, active_circuit):
 
     # when sessions and sampler used, we obtain metrics differently
     if use_sessions:
-        job_timestamps= job.metrics()['timestamps']
+        job_timestamps = job.metrics()['timestamps']
+        job_metrics = job.metrics()
+        # print(f"... usage = {job_metrics['usage']} {job_metrics['executions']}")
+        
         if verbose:
             print(f"... job.metrics() = {job.metrics()}")
             print(f"... job.result().metadata[0] = {result.metadata[0]}")
 
-        created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
-        created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
-        finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
-        finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
-        running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
-        running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
+        # occasionally, these metrics come back as None, so try to use them
+        try:
+            created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
+            created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
+            finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
+            finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
+            running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
+            running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
+            
+            # compute the total seconds for creating and running the circuit
+            exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
+            exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
+            
+            # these do not seem to be avaiable
+            exec_validating_time = 0.001
+            exec_queued_time = 0.001
+            
+            # when using sessions, the 'running_time' is the 'quantum exec time' - override it here.
+            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
+            
+            # use the data in usage field if it is returned, usually by hardware
+            # here we use the executions field to indicate we are on hardware
+            if "usage" in job_metrics and "executions" in job_metrics:
+                if job_metrics['executions'] > 0:
+                    exec_time = job_metrics['usage']['quantum_seconds'] 
+                    
+                    # and use this one as it seems to be valid for this case
+                    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
+            
+            # DEVNOTE: we do not compute this yet
+            # exec_quantum_classical_time = job.metrics()['bss']
+            # metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)     
         
-        # compute the total seconds for creating and running the circuit
-        exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
-        exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
-        
-        # these do not seem to be avaiable
-        exec_validating_time = 0.001
-        exec_queued_time = 0.001
-        
-        # DEVNOTE: we do not compute this yet
-        # exec_quantum_classical_time = job.metrics()['bss']
-        #metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
-        
-        # when using sessions, the 'running_time' is the 'quantum exec time' - override it.
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
+        except Exception as e:
+            if verbose:
+                print(f'WARNING: incomplete time metrics for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+                print(f"... job = {job.job_id()}  exception = {e}")
 
     # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
     exec_creating_time = max(0.001, exec_creating_time)
@@ -1121,9 +1429,9 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
         
     # also, close any active session at end of the app
     global session
-    if report_end and use_sessions and session != None:
+    if report_end and session != None:
         if verbose:
-            print("... closing active session!\n")
+            print(f"... closing active session: {session_count}\n")
         
         session.close()
         session = None
@@ -1175,10 +1483,10 @@ def check_jobs(completion_handler=None):
 
         # when complete, canceled, or failed, process the job
         if status == JobStatus.CANCELLED:
-            print(f"... circuit execution cancelled.")
+            print("... circuit execution cancelled.")
 
         if status == JobStatus.ERROR:
-            print(f"... circuit execution failed.")
+            print("... circuit execution failed.")
             if hasattr(job, "error_message"):
                 print(f"    job = {job.job_id()}  {job.error_message()}")
 
@@ -1317,10 +1625,10 @@ def job_wait_for_completion(job):
     #if verbose: print("Job status is ", job.status() )
     
     if job.status() == JobStatus.CANCELLED:
-        print(f"\n... circuit execution cancelled.")
+        print("\n... circuit execution cancelled.")
             
     if job.status() == JobStatus.ERROR:
-        print(f"\n... circuit execution failed.")
+        print("\n... circuit execution failed.")
 
 
 

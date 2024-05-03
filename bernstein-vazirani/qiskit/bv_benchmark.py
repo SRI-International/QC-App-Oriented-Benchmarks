@@ -13,6 +13,9 @@ sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
 import execute as ex
 import metrics as metrics
 
+# Benchmark Name
+benchmark_name = "Bernstein-Vazirani"
+
 np.random.seed(0)
 
 verbose = False
@@ -29,7 +32,7 @@ Uf_ = None
 def create_oracle(num_qubits, input_size, secret_int):
     # Initialize first n qubits and single ancilla qubit
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name=f"Uf")
+    qc = QuantumCircuit(qr, name="Uf")
 
     # perform CX for each qubit that matches a bit in secret string
     s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
@@ -45,7 +48,8 @@ def BersteinVazirani (num_qubits, secret_int, method = 1):
 
     if method == 1:
         # allocate qubits
-        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size); qc = QuantumCircuit(qr, cr, name="main")
+        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size)
+        qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")
 
         # put ancilla in |1> state
         qc.x(qr[input_size])
@@ -136,17 +140,25 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
-        backend_id='qasm_simulator', method = 1, provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
+        backend_id='qasm_simulator', method=1, input_value=None,
+        provider_backend=None,
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Bernstein-Vazirani Benchmark Program - Qiskit")
+    print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
     # validate parameters (smallest circuit is 3 qubits)
     max_qubits = max(3, max_qubits)
     min_qubits = min(max(3, min_qubits), max_qubits)
+    skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    
+    ##########
+    
     # Variable for new qubit group ordering if using mid_circuit measurements
     mid_circuit_qubit_group = []
 
@@ -167,14 +179,17 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
     # for noiseless simulation, set noise model to be None
     # ex.set_noise_model(None)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
     
         input_size = num_qubits - 1
         
@@ -191,6 +206,12 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
 
         # loop over limited # of secret strings for this
         for s_int in s_range:
+        
+            # if user specifies input_value, use it instead
+            # DEVNOTE: if max_circuits used, this will generate multiple bars per width
+            if input_value is not None:
+                s_int = input_value
+                
             # If mid circuit, then add 2 to new qubit group since the circuit only uses 2 qubits
             if method == 2:
                 mid_circuit_qubit_group.append(2)
@@ -212,12 +233,14 @@ def run (min_qubits=3, max_qubits=6, max_circuits=3, num_shots=100,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Bernstein-Vazirani ({method}) - Qiskit",
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
                          transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
 # if main, execute method

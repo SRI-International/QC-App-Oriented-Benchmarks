@@ -26,22 +26,14 @@
 import time
 import copy
 import metrics
-import importlib
 import traceback
-from collections import Counter
 import logging
-import numpy as np
-import csv
-from itertools import count
 import json
 import math
 
-from dwave.system.samplers import DWaveSampler
-from dwave.system import DWaveSampler, EmbeddingComposite, FixedEmbeddingComposite
-from neal import SimulatedAnnealingSampler
+from dwave.system import EmbeddingComposite, FixedEmbeddingComposite
 
 # this seems to be required for embedding to work
-import dwave.inspector
 
 import HamiltonianCircuitProxy
 
@@ -158,7 +150,7 @@ def submit_circuit(qc:HamiltonianCircuitProxy, group_id, circuit_id, shots=100, 
     if backend != None:
         execute_circuit(circuit)
     else:
-        print(f"ERROR: No provider_backend specified, cannot execute program")
+        print("ERROR: No provider_backend specified, cannot execute program")
 
     return
     
@@ -206,7 +198,7 @@ def execute_circuit(circuit):
             # mimic the annealing operation
             ts = time.time() 
             
-            num_sweeps = math.log(annealing_time, 2)
+            num_sweeps = int(math.log(annealing_time, 2))
             
             sampleset = sampler.sample_ising(qc.h, qc.J, num_reads=shots, num_sweeps=num_sweeps, annealing_time=annealing_time)
             sampleset.resolve()

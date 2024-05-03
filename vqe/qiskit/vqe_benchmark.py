@@ -9,13 +9,17 @@ import time
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister
-from qiskit.opflow import PauliTrotterEvolution, Suzuki
-from qiskit.opflow.primitive_ops import PauliSumOp
+from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.quantum_info import SparsePauliOp
+from qiskit.synthesis import LieTrotter
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 import execute as ex
 import metrics as metrics
+
+# Benchmark Name
+benchmark_name = "VQE Simulation"
 
 verbose= False
 
@@ -41,7 +45,7 @@ def VQEEnergy(n_spin_orbs, na, nb, circuit_id=0, method=1):
     num_qubits = n_spin_orbs
 
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name = 'main')
+    qc = QuantumCircuit(qr, name=f"vqe-ansatz({method})-{num_qubits}-{circuit_id}")
 
     # initialize the HF state
     Hf = HartreeFock(num_qubits, na, nb)
@@ -127,15 +131,15 @@ def VQEEnergy(n_spin_orbs, na, nb, circuit_id=0, method=1):
 
 # Function that constructs the circuit for a given cluster operator
 def ClusterOperatorCircuit(pauli_op, excitationIndex):
+
+    num_qubits = pauli_op.num_qubits
+
+    # compute exp(-iP) with 1st order Trotter step
+    qc_op = PauliEvolutionGate(pauli_op, synthesis=LieTrotter())
+    qc = QuantumCircuit(num_qubits)
+    qc.append(qc_op, range(num_qubits))
+    qc.name = f'Cluster Op {excitationIndex}'
     
-    # compute exp(-iP)
-    exp_ip = pauli_op.exp_i()
-
-    # Trotter approximation
-    qc_op = PauliTrotterEvolution(trotter_mode=Suzuki(order=1, reps=1)).convert(exp_ip)
-
-    # convert to circuit
-    qc = qc_op.to_circuit(); qc.name = f'Cluster Op {excitationIndex}'
     global CO_
     if CO_ == None or qc.num_qubits <= 4:
         if qc.num_qubits < 7: CO_ = qc
@@ -154,7 +158,7 @@ def ExpectationCircuit(qc, pauli, nqubit, method=2):
     is_diag = True
 
     # primitive Pauli string
-    PauliString = pauli.primitive.to_list()[0][0]
+    PauliString = pauli.to_list()[0][0]
 
     # coefficient
     coeff = pauli.coeffs[0]
@@ -233,14 +237,14 @@ def readPauliExcitation(norb, circuit_id=0):
             cur_coeff = ansatz_dict[ext]
             cur_list = [(ext, ansatz_dict[ext])]
         elif abs(abs(ansatz_dict[ext]) - abs(cur_coeff)) > 1e-4:
-            pauli_list.append(PauliSumOp.from_list(cur_list))
+            pauli_list.append(SparsePauliOp.from_list(cur_list))
             cur_coeff = ansatz_dict[ext]
             cur_list = [(ext, ansatz_dict[ext])]
         else:
             cur_list.append((ext, ansatz_dict[ext]))
         
     # add the last term
-    pauli_list.append(PauliSumOp.from_list(cur_list))
+    pauli_list.append(SparsePauliOp.from_list(cur_list))
 
     # return Pauli list
     return pauli_list
@@ -260,7 +264,7 @@ def ReadHamiltonian(nqubit):
         pauli_list.append( (p, ham_dict[p]) )
 
     # build Hamiltonian
-    ham = PauliSumOp.from_list(pauli_list)
+    ham = SparsePauliOp.from_list(pauli_list)
 
     # return Hamiltonian
     return ham
@@ -298,16 +302,17 @@ def analyze_and_print_result(qc, result, num_qubits, references, num_shots):
 
 ################ Benchmark Loop
 
+# Max qubits must be 12 since the referenced files only go to 12 qubits
+MAX_QUBITS = 12
+    
 # Execute program with default parameters
-def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
+def run(min_qubits=4, max_qubits=8, skip_qubits=1,
+        max_circuits=3, num_shots=4092, method=1,
         backend_id="qasm_simulator", provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Variational Quantum Eigensolver Benchmark Program - Qiskit")
-    print(f"... using circuit method {method}")
-
-    # Max qubits must be 10 since the referenced files only go to 12 qubits
-    MAX_QUBITS = 10
+    print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit") 
 
     max_qubits = max(max_qubits, min_qubits)        # max must be >= min
 
@@ -315,12 +320,19 @@ def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
     max_qubits = min(max_qubits, MAX_QUBITS)
     min_qubits = min(max(4, min_qubits), max_qubits)
     if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even
+    skip_qubits = max(1, skip_qubits)
+    
     if method == 2: max_circuits = 1
 
     if max_qubits < 4:
         print(f"Max number of qubits {max_qubits} is too low to run method {method} of VQE algorithm")
         return
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    
+    ##########
+    
     # Initialize the metrics module
     metrics.init_metrics()
 
@@ -349,8 +361,11 @@ def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for input_size in range(min_qubits, max_qubits + 1, 2):
@@ -418,13 +433,15 @@ def run(min_qubits=4, max_qubits=10, max_circuits=3, num_shots=4092, method=1,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nHartree Fock Generator 'Hf' ="); print(Hf_ if Hf_ != None else " ... too large!")
     print("\nCluster Operator Example 'Cluster Op' ="); print(CO_ if CO_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - VQE Simulation ({method}) - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
 
 # if main, execute methods     
 if __name__ == "__main__": run()

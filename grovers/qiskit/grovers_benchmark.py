@@ -13,6 +13,9 @@ sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 import execute as ex
 import metrics as metrics
 
+# Benchmark Name
+benchmark_name = "Grover's Search"
+
 np.random.seed(0)
 
 verbose = False
@@ -30,9 +33,9 @@ _use_mcx_shim = False
 def GroversSearch(num_qubits, marked_item, n_iterations):
 
     # allocate qubits
-    qr = QuantumRegister(num_qubits);
-    cr = ClassicalRegister(num_qubits);
-    qc = QuantumCircuit(qr, cr, name="main")
+    qr = QuantumRegister(num_qubits)
+    cr = ClassicalRegister(num_qubits)
+    qc = QuantumCircuit(qr, cr, name=f"grovers-{num_qubits}-{marked_item}")
 
     # Start with Hadamard on all qubits
     for i_qubit in range(num_qubits):
@@ -218,29 +221,36 @@ def grovers_dist(num_qubits, marked_item):
 MAX_QUBITS=8
 
 # Execute program with default parameters
-def run(min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
+def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
         use_mcx_shim=False,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Grover's Search Benchmark Program - Qiskit")
+    print(f"{benchmark_name} Benchmark Program - Qiskit")
 
     # Clamp the maximum number of qubits
     if max_qubits > MAX_QUBITS:
-        print(f"INFO: Grover's Search benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
+        print(f"INFO: {benchmark_name} benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
         max_qubits = MAX_QUBITS
         
     # validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
+    skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
-        
+    
+    # create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
     # set the flag to use an mcx shim if given
     global _use_mcx_shim
     _use_mcx_shim = use_mcx_shim
     if _use_mcx_shim:
         print("... using MCX shim")
-        
+    
+    ##########
+    
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -255,11 +265,14 @@ def run(min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
         
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_qubits), max_circuits)
@@ -293,14 +306,16 @@ def run(min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
     
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-        
+    
+    ##########
+    
     # print a sample circuit created (if not too large)
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nOracle ="); print(grover_oracle if grover_oracle!= None else "  ... too large!")
     print("\nDiffuser ="); print(diffusion_operator )
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Grover's Search - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 
 # if main, execute method

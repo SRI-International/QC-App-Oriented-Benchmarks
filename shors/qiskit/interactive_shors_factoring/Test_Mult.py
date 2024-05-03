@@ -20,14 +20,13 @@ qubits to the size of the QFTs that are going to be used in Shor's Algorithm bec
 
 """ Imports from qiskit"""
 from qiskit import QuantumCircuit, ClassicalRegister, QuantumRegister
-from qiskit import execute, IBMQ, BasicAer
+from qiskit import execute, BasicAer
 
 """ Imports to Python functions """
 import math
 import time
 
 """ Local Imports """
-from qfunctions import create_QFT, create_inverse_QFT
 from qfunctions import cMULTmodN
 
 

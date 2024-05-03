@@ -20,6 +20,9 @@ import mc_utils as mc_utils
 import metrics as metrics
 from qft_benchmark import inv_qft_gate
 
+# Benchmark Name
+benchmark_name = "Monte Carlo Sampling"
+
 np.random.seed(0)
 
 # default function is f(x) = x^2
@@ -44,15 +47,15 @@ QFTI_ = None
 def MonteCarloSampling(target_dist, f, num_state_qubits, num_counting_qubits, epsilon=0.05, degree=2, method=2):
     
     A_qr = QuantumRegister(num_state_qubits+1)
-    A = QuantumCircuit(A_qr, name=f"A")
+    A = QuantumCircuit(A_qr, name="A")
 
     num_qubits = num_state_qubits + 1 + num_counting_qubits
     
     # initialize R and F circuits
     R_qr = QuantumRegister(num_state_qubits+1)
     F_qr = QuantumRegister(num_state_qubits+1)
-    R = QuantumCircuit(R_qr, name=f"R")
-    F = QuantumCircuit(F_qr, name=f"F")
+    R = QuantumCircuit(R_qr, name="R")
+    F = QuantumCircuit(F_qr, name="F")
     
     # method 1 takes in the abitrary function f and arbitrary dist
     if method == 1:
@@ -68,7 +71,7 @@ def MonteCarloSampling(target_dist, f, num_state_qubits, num_counting_qubits, ep
     A.append(F.to_gate(), A_qr)
 
     # run AE subroutine given our A composed of R and F
-    qc = AE_Subroutine(num_state_qubits, num_counting_qubits, A)
+    qc = AE_Subroutine(num_state_qubits, num_counting_qubits, A, method)
 
     # save smaller circuit example for display
     global QC_, R_, F_
@@ -164,11 +167,14 @@ def uniform_prep(qc, qr, num_state_qubits):
     for i in range(num_state_qubits):
         qc.h(i)
             
-def AE_Subroutine(num_state_qubits, num_counting_qubits, A_circuit):
+def AE_Subroutine(num_state_qubits, num_counting_qubits, A_circuit, method):
+
+    num_qubits = num_state_qubits + num_counting_qubits
+    
     qr_state = QuantumRegister(num_state_qubits+1)
     qr_counting = QuantumRegister(num_counting_qubits)
     cr = ClassicalRegister(num_counting_qubits)
-    qc = QuantumCircuit(qr_state, qr_counting, cr)
+    qc = QuantumCircuit(qr_state, qr_counting, cr, name=f"qmc({method})-{num_qubits}-{0}")
 
     A = A_circuit
     cQ, Q = Ctrl_Q(num_state_qubits, A)
@@ -211,7 +217,7 @@ def AE_Subroutine(num_state_qubits, num_counting_qubits, A_circuit):
 def Ctrl_Q(num_state_qubits, A_circ):
 
     # index n is the objective qubit, and indexes 0 through n-1 are state qubits
-    qc = QuantumCircuit(num_state_qubits+1, name=f"Q")
+    qc = QuantumCircuit(num_state_qubits+1, name="Q")
     
     temp_A = copy.copy(A_circ)
     A_gate = temp_A.to_gate()
@@ -354,38 +360,44 @@ MIN_STATE_QUBITS_M1 = 2
 MAX_QUBITS=10
 
 # Execute program with default parameters
-def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
+def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num_shots=100,
         epsilon=0.05, degree=2, num_state_qubits=MIN_STATE_QUBITS, method = 2, # default, not exposed to users
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Monte Carlo Sampling Benchmark Program - Qiskit")
-    print(f"... using circuit method {method}")
+    print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
     # Clamp the maximum number of qubits
     if max_qubits > MAX_QUBITS:
-        print(f"INFO: Monte Carlo Sampling benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
+        print(f"INFO: {benchmark_name} benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
         max_qubits = MAX_QUBITS
     
     if (method == 2):
         if max_qubits < MIN_QUBITS:
-            print(f"INFO: Monte Carlo Simulation benchmark method ({method}) requires a minimum of {MIN_QUBITS} qubits.")
+            print(f"INFO: {benchmark_name} benchmark method ({method}) requires a minimum of {MIN_QUBITS} qubits.")
             return
         if min_qubits < MIN_QUBITS:
             min_qubits = MIN_QUBITS
     
     elif (method == 1):
         if max_qubits < MIN_QUBITS_M1:
-            print(f"INFO: Monte Carlo Simulation benchmark method ({method}) requires a minimum of {MIN_QUBITS_M1} qubits.")
+            print(f"INFO: {benchmark_name} benchmark method ({method}) requires a minimum of {MIN_QUBITS_M1} qubits.")
             return
         if min_qubits < MIN_QUBITS_M1:
             min_qubits = MIN_QUBITS_M1
 
     if (method == 1) and (num_state_qubits == MIN_STATE_QUBITS):
         num_state_qubits = MIN_STATE_QUBITS_M1
-        
+    
+    skip_qubits = max(1, skip_qubits)
     ### TODO: need to do more validation of arguments, e.g. min_state_qubits and min_qubits
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    
+    ##########
+    
     # Initialize metrics module
     metrics.init_metrics()
     
@@ -402,11 +414,14 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
 
         # reset random seed
         np.random.seed(0)
@@ -459,6 +474,8 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nControlled Quantum Operator 'cQ' ="); print(cQ_ if cQ_ != None else " ... too large!")
@@ -469,9 +486,8 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
     print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Monte Carlo Sampling ({method}) - Qiskit")
-    
-    
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
+       
         
 # if main, execute method
 if __name__ == '__main__': run()

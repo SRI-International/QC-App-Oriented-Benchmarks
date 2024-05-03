@@ -13,10 +13,12 @@ sys.path[1:1] = ["_common", "_common/qiskit", "shors/_common", "quantum-fourier-
 sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common", "../../quantum-fourier-transform/qiskit"]
 import execute as ex
 import metrics as metrics
-from shors_utils import getAngles, getAngle, modinv, generate_base, verify_order
+from shors_utils import getAngles, getAngle, modinv, generate_base
 from qft_benchmark import inv_qft_gate
 from qft_benchmark import qft_gate
 
+# Benchmark Name
+benchmark_name = "Shor's Order Finding"
 
 np.random.seed(0)
 
@@ -193,7 +195,8 @@ def ShorsAlgorithm(number, base, method, verbose=verbose):
         qr_mult = QuantumRegister(n)        # Register for multiplications
         qr_aux = QuantumRegister(n+2)       # Register for addition and multiplication
         cr_data = ClassicalRegister(2*n)  # Register for measured values of QFT
-        qc = QuantumCircuit(qr_counting, qr_mult, qr_aux, cr_data, name="main")
+        qc = QuantumCircuit(qr_counting, qr_mult, qr_aux, cr_data,
+                name=f"qmc({method})-{num_qubits}-{number}")
 
         # Initialize multiplication register to 1 and counting register to superposition state
         qc.h(qr_counting)
@@ -336,10 +339,10 @@ def analyze_and_print_result(qc, result, num_qubits, order, num_shots, method):
 # Execute program with default parameters
 def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
         verbose=verbose, backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Shor's Order Finding Algorithm Benchmark - Qiskit")
-    print(f"... using circuit method {method}")
+    print(f"{benchmark_name} ({method}) Benchmark - Qiskit")
 
     # Each method has a different minimum amount of qubits to run and a certain multiple of qubits that can be run
     qubit_multiple = 2                  #Standard for Method 2 and 3
@@ -354,10 +357,17 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     elif method == 3:
         min_qubits = max(min_qubits,6)              # need min of 6
 
+    #skip_qubits = max(1, skip_qubits)
+    
     if max_qubits < min_qubits:
-        print(f"Max number of qubits {max_qubits} is too low to run method {method} of Shor's Order Finding")
+        print(f"Max number of qubits {max_qubits} is too low to run method {method} of {benchmark_name}")
         return
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    
+    ##########
+    
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -369,13 +379,15 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
         order = eval(number_order)[1]
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, order, num_shots, method)
         metrics.store_metric(num_qubits, number_order, 'fidelity', fidelity)
-
-
+    
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
  
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1, qubit_multiple):
@@ -425,6 +437,8 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print the last circuit created
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nControlled Ua Operator 'cUa' ="); print(CUA_ if CUA_ != None else " ... too large!")
@@ -434,7 +448,7 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - Shor's Order Finding ({method}) - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
 
     
 # if main, execute method

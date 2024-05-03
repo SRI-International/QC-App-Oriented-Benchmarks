@@ -13,6 +13,9 @@ sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
 import execute as ex
 import metrics as metrics
 
+# Benchmark Name
+benchmark_name = "Hidden Shift"
+
 np.random.seed(0)
 
 verbose = False
@@ -21,13 +24,14 @@ verbose = False
 QC_ = None
 Uf_ = None
 Ug_ = None
+
 ############### Circuit Definition
 
 # Uf oracle where Uf|x> = f(x)|x>, f(x) = {-1,1}
 def Uf_oracle(num_qubits, secret_int):
     # Initialize qubits qubits
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name=f"Uf")
+    qc = QuantumCircuit(qr, name="Uf")
 
     # Perform X on each qubit that matches a bit in secret string
     s = ('{0:0'+str(num_qubits)+'b}').format(secret_int)
@@ -50,7 +54,7 @@ def Uf_oracle(num_qubits, secret_int):
 def Ug_oracle(num_qubits):
     # Initialize first n qubits
     qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name=f"Ug")
+    qc = QuantumCircuit(qr, name="Ug")
 
     for i_qubit in range(0,num_qubits-1,2):
         qc.cz(qr[i_qubit], qr[i_qubit+1])
@@ -60,7 +64,8 @@ def Ug_oracle(num_qubits):
 def HiddenShift (num_qubits, secret_int):
     
     # allocate qubits
-    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits); qc = QuantumCircuit(qr, cr, name="main")
+    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits)
+    qc = QuantumCircuit(qr, cr, name=f"hs-{num_qubits}-{secret_int}")
     
     # Start with Hadamard on all input qubits
     for i_qubit in range(num_qubits):
@@ -131,17 +136,24 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run (min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
+def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=100,
         backend_id='qasm_simulator', provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None):
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None):
 
-    print("Hidden Shift Benchmark Program - Qiskit")
+    print(f"{benchmark_name} Benchmark Program - Qiskit")
 
     # validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
     if min_qubits % 2 == 1: min_qubits += 1   # min_qubits must be even
+    skip_qubits = max(2, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
+    
+    # create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
+    ##########
     
     # Initialize metrics module
     metrics.init_metrics()
@@ -157,8 +169,11 @@ def run (min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options)
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
+    ##########
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
@@ -194,13 +209,15 @@ def run (min_qubits=2, max_qubits=6, max_circuits=3, num_shots=100,
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
+    ##########
+    
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
     print("\nQuantum Oracle 'Ug' ="); print(Ug_ if Ug_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics("Benchmark Results - Hidden Shift - Qiskit")
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 # if main, execute method
 if __name__ == '__main__': run()
