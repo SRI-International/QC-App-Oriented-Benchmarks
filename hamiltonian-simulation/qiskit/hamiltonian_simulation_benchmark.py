@@ -56,7 +56,7 @@ def Hamiltonian_Simulation_Exact(n_spins):
     # state with initial state of GHZ state: 1/sqrt(2) ( |00...> + |11...> )
     qc.h(qr[0])
     for k in range(1, n_spins):
-        qc.cnot(qr[k-1], qr[k])
+        qc.cx(qr[k-1], qr[k])
     
     psi = Statevector(qc)
 
@@ -86,7 +86,7 @@ def Hamiltonian_Simulation_Exact(n_spins):
 
     qr3 = QuantumRegister(n_spins); cr3 = ClassicalRegister(n_spins); qc3 = QuantumCircuit(qr3, cr3, name="main")
     for k in reversed(range(1, n_spins)):
-        qc3.cnot(qr3[k-1], qr3[k])
+        qc3.cx(qr3[k-1], qr3[k])
     qc3.h(qr3[0])
 
     psi.evolve(qc3)
@@ -169,7 +169,7 @@ def HamiltonianSimulation(n_spins, K, t, method = 1, measure_x = False):
         # state with initial state of GHZ state: 1/sqrt(2) ( |00...> + |11...> )
         qc.h(qr[0])
         for k in range(1, n_spins):
-            qc.cnot(qr[k-1], qr[k])
+            qc.cx(qr[k-1], qr[k])
 
         qc.barrier()
 
@@ -191,7 +191,7 @@ def HamiltonianSimulation(n_spins, K, t, method = 1, measure_x = False):
 
         # reversed tranformation from GHZ state
         for k in reversed(range(1, n_spins)):
-            qc.cnot(qr[k-1], qr[k])
+            qc.cx(qr[k-1], qr[k])
         qc.h(qr[0])
         qc.barrier()
 
