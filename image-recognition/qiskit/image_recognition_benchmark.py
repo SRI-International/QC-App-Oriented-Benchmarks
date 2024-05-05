@@ -13,13 +13,11 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-from qiskit import Aer, QuantumCircuit, execute
+from qiskit_aer import Aer
+from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
-from qiskit.opflow.primitive_ops import PauliSumOp
-from qiskit.opflow import ComposedOp, PauliExpectation, StateFn, SummedOp
-from qiskit.quantum_info import SparsePauliOp
 
 # machine learning libraries
 from sklearn.datasets import fetch_openml
@@ -461,33 +459,49 @@ def feature_map(num_qubits = 8, x_data=None):
 
     return qc
 
-def prepare_circuit(base_circuit:QuantumCircuit, total_operator=None):
-    # find total qubits from the given base circuit
+def prepare_circuit(base_circuit: QuantumCircuit, total_operator=None):
+    """
+    Return the circuit and operator to be used in the image recognition. 
+
+    base_circuit has diagonalizing gates appended to it and is returned in that state to be measured. 
+
+    total_operator is returned is if it not None, otherwise return a default operator. 
+    """
     num_qubits = base_circuit.num_qubits
 
-    # define the default operator if none provided
-    x_operator = PauliSumOp(SparsePauliOp("X" * num_qubits))
-    z_operator = PauliSumOp(SparsePauliOp("I"*(num_qubits-1)+"Z"))
+    # Define the default operator if none provided
+    z_operator = SparsePauliOp("I" * (num_qubits-1) + "Z")
 
     if total_operator is None:
-        # default is the z operator
         total_operator = z_operator
-    
-    measurable_expression = StateFn(total_operator, is_measurement=True)
-    observables = PauliExpectation().convert(measurable_expression)
 
-    
-    if isinstance(observables, ComposedOp):
-        observables = SummedOp([observables])    
-    circuits = list()
+    circuits = []
 
-    for obs in observables:
+    for pauli_label, _ in total_operator.to_list():
         circuit = base_circuit.copy()
-        circuit.append(obs[1], qargs=list(range(base_circuit.num_qubits)))
-        circuit.measure_all()
-        circuits.append(circuit) 
-    return circuit, observables
 
+        # Apply gates that diagonalize the pauli string with respect to the computational (Z) basis. 
+        # This is done as later in the code we sample from the circuit to find the expectation value.
+        # Go in reverse to account for Qiskit ordering- most significant qubit is on the left
+        for i, pauli_char in enumerate(pauli_label[::-1]):
+            if pauli_char == 'X':
+                circuit.h(i)
+            elif pauli_char == 'Y':
+                circuit.sdg(i)
+                circuit.h(i)
+            elif pauli_char == 'Z':
+                # Z -> Z, no operation needed for diagonalization
+                continue
+            elif pauli_char == 'I':
+                # I -> I, no operation needed
+                continue
+            else:
+                raise ValueError("Pauli string contains character that is not I, X, Y, Z.")
+
+        circuit.measure_all()  # Add measurement to all qubits
+        circuits.append(circuit)
+
+    return circuit, total_operator
 
 def ImageRecognition(num_qubits: int,
                     thetas_array,
@@ -557,7 +571,7 @@ def loss_function(result, y_data, num_qubits, formatted_observables, verbose=Fal
         _counts = _res.get_counts()
         _probs = normalize_counts(_counts, num_qubits=num_qubits)
 
-        _expectation_values = calculate_expectation_values(_probs, formatted_observables)
+        _expectation_values = calculate_diagonalized_expectation_values(_probs, formatted_observables)
         value = sum(_expectation_values)
 
         # # now get <H^2>, assuming Cov[si,si'] = 0
@@ -587,15 +601,37 @@ def loss_function(result, y_data, num_qubits, formatted_observables, verbose=Fal
 
 ##########################################################
 
-def calculate_expectation_values(probabilities, observables):
+def post_diagonalization_op_converter(op: SparsePauliOp):
+    """
+    Return a pauli string with X and Y replaced with Z. This is useful if we have diaganalized that pauli string  to the Z basis and now need to pass that into the sampled_expectation_value function.
+    """
+
+    # Get the labels from the original SparsePauliOp
+    labels = [label for label, coeff in op.to_list()]
+
+    # Replace 'X' and 'Y' with 'Z' in each label
+    new_labels = ["".join("Z" if p in "XY" else p for p in label) for label in labels]
+
+    # Create a new SparsePauliOp with the modified labels
+    new_pauli_op = SparsePauliOp(new_labels, coeffs=op.coeffs)
+
+    return new_pauli_op
+
+
+def calculate_diagonalized_expectation_values(probabilities, observables):
     """
     Return the expectation values for an operator given the probabilities.
+
+    Note that this function assumes the probabilities are from a post-diagonalized (to the computational Z basis) circuit. 
     """
     if not isinstance(probabilities, list):
         probabilities = [probabilities]
     expectation_values = list()
     for idx, op in enumerate(observables):
-        expectation_value = sampled_expectation_value(probabilities[idx], op[0].primitive)
+
+        expectation_value = sampled_expectation_value(
+            probabilities[idx], post_diagonalization_op_converter(op)
+        )
         expectation_values.append(expectation_value)
 
     return expectation_values
@@ -722,11 +758,11 @@ def compute_expectation(qc, num_qubits, secret_int, backend_id="statevector_simu
     qc = qc.remove_final_measurements(inplace=False)
 
     if params is not None:
-        qc = qc.bind_parameters(params)
+        qc = qc.assign_parameters(params)
 
     # execute statevector simulation
     sv_backend = Aer.get_backend(backend_id)
-    sv_result = execute(qc, sv_backend, params=params).result()
+    sv_result = sv_backend.run(qc, params=params).result()
 
     # get the probability distribution
     counts = sv_result.get_counts()
@@ -1533,7 +1569,7 @@ def run(
 
                 # bind parameters to circuit before execution
                 # if parameterized:
-                #     qc.bind_parameters(params)
+                #     qc.assign_parameters(params)
             
                 # submit circuit for execution on target with the current parameters
                 ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
@@ -1747,7 +1783,7 @@ def run(
             # for testing and debugging ...
             #if using parameter objects, bind before printing
             if verbose:
-                print(qc.bind_parameters(params) if parameterized else qc)
+                print(qc.assign_parameters(params) if parameterized else qc)
             """
             # store the creation time for these circuits
             metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
