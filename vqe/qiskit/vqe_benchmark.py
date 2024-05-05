@@ -9,8 +9,9 @@ import time
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister
-from qiskit.opflow import PauliTrotterEvolution, Suzuki
-from qiskit.opflow.primitive_ops import PauliSumOp
+from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.quantum_info import SparsePauliOp
+from qiskit.synthesis import LieTrotter
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
@@ -130,15 +131,15 @@ def VQEEnergy(n_spin_orbs, na, nb, circuit_id=0, method=1):
 
 # Function that constructs the circuit for a given cluster operator
 def ClusterOperatorCircuit(pauli_op, excitationIndex):
+
+    num_qubits = pauli_op.num_qubits
+
+    # compute exp(-iP) with 1st order Trotter step
+    qc_op = PauliEvolutionGate(pauli_op, synthesis=LieTrotter())
+    qc = QuantumCircuit(num_qubits)
+    qc.append(qc_op, range(num_qubits))
+    qc.name = f'Cluster Op {excitationIndex}'
     
-    # compute exp(-iP)
-    exp_ip = pauli_op.exp_i()
-
-    # Trotter approximation
-    qc_op = PauliTrotterEvolution(trotter_mode=Suzuki(order=1, reps=1)).convert(exp_ip)
-
-    # convert to circuit
-    qc = qc_op.to_circuit(); qc.name = f'Cluster Op {excitationIndex}'
     global CO_
     if CO_ == None or qc.num_qubits <= 4:
         if qc.num_qubits < 7: CO_ = qc
@@ -157,7 +158,7 @@ def ExpectationCircuit(qc, pauli, nqubit, method=2):
     is_diag = True
 
     # primitive Pauli string
-    PauliString = pauli.primitive.to_list()[0][0]
+    PauliString = pauli.to_list()[0][0]
 
     # coefficient
     coeff = pauli.coeffs[0]
@@ -236,14 +237,14 @@ def readPauliExcitation(norb, circuit_id=0):
             cur_coeff = ansatz_dict[ext]
             cur_list = [(ext, ansatz_dict[ext])]
         elif abs(abs(ansatz_dict[ext]) - abs(cur_coeff)) > 1e-4:
-            pauli_list.append(PauliSumOp.from_list(cur_list))
+            pauli_list.append(SparsePauliOp.from_list(cur_list))
             cur_coeff = ansatz_dict[ext]
             cur_list = [(ext, ansatz_dict[ext])]
         else:
             cur_list.append((ext, ansatz_dict[ext]))
         
     # add the last term
-    pauli_list.append(PauliSumOp.from_list(cur_list))
+    pauli_list.append(SparsePauliOp.from_list(cur_list))
 
     # return Pauli list
     return pauli_list
@@ -263,7 +264,7 @@ def ReadHamiltonian(nqubit):
         pauli_list.append( (p, ham_dict[p]) )
 
     # build Hamiltonian
-    ham = PauliSumOp.from_list(pauli_list)
+    ham = SparsePauliOp.from_list(pauli_list)
 
     # return Hamiltonian
     return ham

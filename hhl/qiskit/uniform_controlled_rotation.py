@@ -9,7 +9,7 @@ import numpy as np
 from sympy.combinatorics.graycode import GrayCode
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
-from qiskit import Aer, execute
+from qiskit_aer import Aer
 
 
 def dot_product(str1, str2):
@@ -148,7 +148,7 @@ def test_circuit(n):
 def sim_circuit(qc, shots):
     
     simulator = Aer.get_backend('qasm_simulator')
-    result = execute(qc, simulator, shots=shots).result()
+    result = simulator.run(qc, shots=shots).result()
     outcomes = result.get_counts(qc)
     
     

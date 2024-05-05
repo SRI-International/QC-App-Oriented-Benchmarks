@@ -1,5 +1,7 @@
 # Image Recognition - Benchmark Program
 
+**NOTE:** This benchmark program will not function with Qiskit 1.0, as the opflow package has been completely removed.  However, it will execute with Qiskit <= 0.46. This is an active issue and the benchmark will be updated soon.
+
 NOTE: This entire README is a WORK-IN-PROGRESS
 
 This benchmark uses Quantum neural networks & Quantum Machine Learning  [[1]](#references) as an example of a quantum application that can classify images from mnist data set using classical optimizer

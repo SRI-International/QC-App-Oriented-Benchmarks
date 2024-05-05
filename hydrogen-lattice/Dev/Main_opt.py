@@ -43,7 +43,7 @@ lowest_energy_values = []
 def compute_energy(circuit, operator, shots, parameters): 
     
     # Bind the parameters to the circuit
-    bound_circuit = circuit.bind_parameters(parameters)
+    bound_circuit = circuit.assign_parameters(parameters)
     
     # Compute the expectation value of the circuit with respect to the Hamiltonian for optimization
     energy = ideal_backend.compute_expectation(bound_circuit, operator=operator, shots=shots)

@@ -338,7 +338,7 @@ def loss_function(theta, is_draw_circ=True, is_print=True):
         # Create the quantum circuit for the data point
         qc = qcnn_model( data_point, num_qubits)
         
-        qc_upd = qc.bind_parameters(theta)
+        qc_upd = qc.assign_parameters(theta)
         
         if i_draw==0 and is_draw_circ:
             print(qc_upd)
