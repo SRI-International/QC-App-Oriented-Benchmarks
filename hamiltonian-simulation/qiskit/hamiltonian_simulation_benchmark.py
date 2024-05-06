@@ -471,4 +471,4 @@ if __name__ == '__main__':
                 exec_options={ "optimization_level": 0, "layout_method":'sabre', "routing_method":'sabre', "transformer": high_optimisation }
             else:
                 exec_options= None
-            run(min_qubits=10, max_qubits=13, method=method_num, exec_options=exec_options)
+            run(min_qubits=2, max_qubits=14, method=method_num, exec_options=exec_options)
