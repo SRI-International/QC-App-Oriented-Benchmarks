@@ -15,7 +15,8 @@ from qiskit.primitives import Estimator
 from qiskit.quantum_info import Statevector
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../_common/transformers"]
+import tket_optimiser as tket_optimiser  
 import execute as ex
 import metrics as metrics
 
@@ -442,4 +443,32 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
 
 
 # if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__':
+
+    from qiskit_aer.noise import NoiseModel, depolarizing_error
+
+    def create_noise_model(fidelity):
+        p = 15/4 * (1 - fidelity)
+        noise_model = NoiseModel()
+        depolarizing_err = depolarizing_error(p, 2)  # 2-qubit depolarizing error
+        noise_model.add_all_qubit_quantum_error(depolarizing_err, ['cx'])  # Apply to CNOT gates
+        return noise_model 
+
+    method_num = 1 
+    fidelities = [.95,.995]
+
+    for f in fidelities:
+        for use_pytket in [False, True]:
+
+            noise = create_noise_model(f)
+            ex.set_noise_model(noise)
+
+            print(f"Starting to run benchmarks with {method_num}, use_pytket: {use_pytket}, 2Q error rate set to {f}")
+        
+            # not really sure how tket optimiser works, so just use default settings 
+            high_optimisation = tket_optimiser.tket_transformer_generator(cx_fidelity=f) 
+            if use_pytket:
+                exec_options={ "optimization_level": 0, "layout_method":'sabre', "routing_method":'sabre', "transformer": high_optimisation }
+            else:
+                exec_options= None
+            run(min_qubits=10, max_qubits=14, method=method_num, exec_options=exec_options)
