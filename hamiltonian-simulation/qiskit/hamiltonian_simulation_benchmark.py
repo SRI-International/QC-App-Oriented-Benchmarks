@@ -82,7 +82,7 @@ def Hamiltonian_Simulation_Exact(n_spins):
     #x_values = job.result().values
     # print(x_values)
     # print(np.mean(x_values))
-
+    print("pauli list", pauli_list)
     psi.evolve(pauli_list)
 
     qr3 = QuantumRegister(n_spins); cr3 = ClassicalRegister(n_spins); qc3 = QuantumCircuit(qr3, cr3, name="main")
@@ -410,7 +410,7 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
             ts = time.time()
             h_x = precalculated_data['h_x'][:num_qubits] # precalculated random numbers between [-1, 1]
             h_z = precalculated_data['h_z'][:num_qubits]
-            qc = HamiltonianSimulation(num_qubits, K=k, t=3, method=method, measure_x= False) 
+            qc = HamiltonianSimulation(num_qubits, K=k, t=t, method=method, measure_x= False) 
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
             
@@ -445,6 +445,9 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
 # if main, execute method
 if __name__ == '__main__':
 
+    # Go through 2Q fidelities .95 and .995, through method 1 (Heisenburg) & method 2 (TFIM)
+    # and go through using pytket (or compiling) in the loop below. 
+
     from qiskit_aer.noise import NoiseModel, depolarizing_error
 
     def create_noise_model(fidelity):
@@ -454,21 +457,21 @@ if __name__ == '__main__':
         noise_model.add_all_qubit_quantum_error(depolarizing_err, ['cx'])  # Apply to CNOT gates
         return noise_model 
 
-    method_num = 1 
     fidelities = [.95,.995]
 
-    for f in fidelities:
-        for use_pytket in [False, True]:
+    for method in (1,2): 
+        for f in fidelities:
+            for use_pytket in [False, True]:
 
-            noise = create_noise_model(f)
-            ex.set_noise_model(noise)
+                noise = create_noise_model(f)
+                ex.set_noise_model(noise)
 
-            print(f"Starting to run benchmarks with {method_num}, use_pytket: {use_pytket}, 2Q error rate set to {f}")
-        
-            # not really sure how tket optimiser works, so just use default settings 
-            high_optimisation = tket_optimiser.tket_transformer_generator(cx_fidelity=f) 
-            if use_pytket:
-                exec_options={ "optimization_level": 0, "layout_method":'sabre', "routing_method":'sabre', "transformer": high_optimisation }
-            else:
-                exec_options= None
-            run(min_qubits=2, max_qubits=14, method=method_num, exec_options=exec_options)
+                print(f"Starting to run benchmarks with {method}, use_pytket: {use_pytket}, 2Q error rate set to {f}")
+            
+                # not really sure how tket optimiser works, so just use default settings 
+                high_optimisation = tket_optimiser.tket_transformer_generator(cx_fidelity=f) 
+                if use_pytket:
+                    exec_options={ "optimization_level": 0, "layout_method":'sabre', "routing_method":'sabre', "transformer": high_optimisation }
+                else:
+                    exec_options= None
+                run(min_qubits=2, max_qubits=13, method=method, exec_options=exec_options)
