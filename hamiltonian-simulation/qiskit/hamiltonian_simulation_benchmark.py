@@ -11,12 +11,10 @@ import numpy as np
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 from qiskit.quantum_info import SparsePauliOp
-from qiskit.primitives import Estimator
 from qiskit.quantum_info import Statevector
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../_common/transformers"]
-import tket_optimiser as tket_optimiser  
 import execute as ex
 import metrics as metrics
 
@@ -24,7 +22,6 @@ import metrics as metrics
 benchmark_name = "Hamiltonian Simulation"
 
 np.random.seed(0)
-estimator = Estimator()
 
 
 verbose = False
@@ -76,12 +73,6 @@ def Hamiltonian_Simulation_Exact(n_spins):
 
     pauli_list= SparsePauliOp.from_list(pauli_list)
 
-    #psi.expectation_value(pauli_list)
-
-    #job = estimator.run([qc], pauli_list, shots = num_shots)
-    #x_values = job.result().values
-    # print(x_values)
-    # print(np.mean(x_values))
     print("pauli list", pauli_list)
     psi.evolve(pauli_list)
 
@@ -95,13 +86,8 @@ def Hamiltonian_Simulation_Exact(n_spins):
     counts = psi.sample_counts(shots = num_shots)
  
 
-    # x_str = "X"*n_spins
-    # x_list = SparsePauliOp.from_list([(x_str, 1)])
-    # print(psi.expectation_value(x_list))
-    
-    
 
-def HamiltonianSimulation(n_spins, K, t, method = 1, measure_x = False):
+def HamiltonianSimulation(n_spins, K, t, method = 1):
     '''
     Construct a Qiskit circuit for Hamiltonian Simulation
     :param n_spins:The number of spins to simulate
@@ -206,16 +192,6 @@ def HamiltonianSimulation(n_spins, K, t, method = 1, measure_x = False):
         #             qc.append(-zz_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
 
 
-
-    if measure_x:
-        x_str = "X"*n_spins
-        x_list = SparsePauliOp.from_list([(x_str, 1)])
-        psi = Statevector(qc)
-        print(psi.expectation_value(x_list))
-        job = estimator.run([qc], [x_list])
-        x_values = job.result().values
-        print(x_values)
-        print(np.mean(x_values))
 
     # measure all the qubits used in the circuit
     for i_qubit in range(n_spins):
@@ -410,7 +386,7 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
             ts = time.time()
             h_x = precalculated_data['h_x'][:num_qubits] # precalculated random numbers between [-1, 1]
             h_z = precalculated_data['h_z'][:num_qubits]
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t, method=method, measure_x= False) 
+            qc = HamiltonianSimulation(num_qubits, K=k, t=t, method=method) 
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
             
