@@ -14,7 +14,7 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.quantum_info import Statevector
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../_common/transformers"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 import execute as ex
 import metrics as metrics
 
@@ -22,7 +22,6 @@ import metrics as metrics
 benchmark_name = "Hamiltonian Simulation"
 
 np.random.seed(0)
-
 
 verbose = False
 
@@ -314,7 +313,7 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
         use_XX_YY_ZZ_gates = False,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, method=2):
+        context=None, method=1):
 
     print(f"{benchmark_name} Benchmark Program - Qiskit")
     
