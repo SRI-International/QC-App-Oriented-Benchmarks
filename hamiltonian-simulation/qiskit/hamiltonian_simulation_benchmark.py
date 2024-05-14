@@ -291,12 +291,11 @@ def analyze_and_print_result(qc, result, num_qubits, type, num_shots, method):
     # it is stored in the json file we import at the top of the code
 
     if method == 1:
+        # use the perfect quantum computer distribution for the heisenburg circuit
         correct_dist = precalculated_data[f"Qubits - {num_qubits}"]
     else:
-        correct_dist = precalculated_data[f"Qubits2 - {num_qubits}"]
-
-    print(counts)
-    print(correct_dist)
+        # use the perfect quantum computer distribution for the TFIM circuit 
+        correct_dist = precalculated_data[f"Qubits3 - {num_qubits}"]
 
     if verbose: print(f"Correct dist: {correct_dist}")
 
