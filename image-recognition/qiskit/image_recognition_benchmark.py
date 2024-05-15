@@ -133,7 +133,7 @@ def fetch_mnist_data(int1=7, int2=9, test_size=50, train_size=200,
         print(f"... fetching MNIST data, train_size={train_size}, test_size={test_size}")
         
     # Load the image data from MNIST database
-    mnist = fetch_openml('mnist_784', version=1, as_frame=False)
+    mnist = fetch_openml('mnist_784', version=1, as_frame=False, parser='liac-arff')
     
     # x has all the pixel values of image and has Data shape of (70000, 784)  here 784 is 28*28
     x = mnist.data
