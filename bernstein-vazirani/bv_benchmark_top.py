@@ -29,7 +29,7 @@ benchmark_name = "Bernstein-Vazirani Top"
 
 np.random.seed(0)
 
-verbose = True
+verbose = False
 
 # Variable for number of resets to perform after mid circuit measurements
 num_resets = 1
@@ -71,14 +71,10 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # correct distribution is measuring the key 100% of the time
     correct_dist = {key: 1.0}
-    
-    print(key)
 
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
-    
-    print(fidelity)
-    
+        
     return counts, fidelity
 
 ################ Benchmark Loop
@@ -180,12 +176,7 @@ def run (min_qubits=3, max_qubits=4, skip_qubits=1, max_circuits=3, num_shots=10
             
             #qc = BersteinVazirani(num_qubits, bitset, method)
             qc = [BersteinVazirani, num_qubits, bitset, method]
-            '''
-            if qc:
-                print(f"got QC")
-            else:
-                print("no QC")
-            '''
+
             # save smaller circuit example for display
             global QC_
             if QC_ == None or num_qubits <= 6:
