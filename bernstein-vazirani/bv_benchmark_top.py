@@ -4,13 +4,21 @@ Bernstein-Vazirani Benchmark Program - Qiskit
 
 import sys
 import time
+import random
 
 import numpy as np
-#from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
+'''
 sys.path[1:1] = [ "_common", "_common/qiskit" ]
 #sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
 sys.path[1:1] = [ "../_common", "../_common/qiskit" ]
+'''
+
+sys.path[1:1] = [ "cudaq" ]
+sys.path[1:1] = [ "_common", "_common/cudaq" ]
+sys.path[1:1] = [ "../_common", "../_common/cudaq" ]
+
+
 import execute as ex
 import metrics as metrics
 
@@ -21,7 +29,7 @@ benchmark_name = "Bernstein-Vazirani Top"
 
 np.random.seed(0)
 
-verbose = False
+verbose = True
 
 # Variable for number of resets to perform after mid circuit measurements
 num_resets = 1
@@ -30,6 +38,20 @@ num_resets = 1
 QC_ = None
 Uf_ = None
 
+# Routine to generate random oracle bitstring for execution
+def random_bits(length: int):
+    bitset = []
+    for _ in range(length):
+        bitset.append(random.randint(0, 1))
+    return bitset
+    
+# Routine to generate random oracle bitstring for execution
+def str_to_ivec(s_int: str):
+    bitset = []
+    for i, c in s_int:
+        print(f"... {i} = {c}")
+        bitset.append(random.randint(0, 1))
+    return bitset
 
 ############### Result Data Analysis
 
@@ -49,16 +71,20 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # correct distribution is measuring the key 100% of the time
     correct_dist = {key: 1.0}
+    
+    print(key)
 
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
-        
+    
+    print(fidelity)
+    
     return counts, fidelity
 
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
+def run (min_qubits=3, max_qubits=4, skip_qubits=1, max_circuits=3, num_shots=100,
         backend_id='qasm_simulator', method=1, input_value=None,
         provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
@@ -136,8 +162,30 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = BersteinVazirani(num_qubits, s_int, method)
             
+            print(s_int)
+            # perform CX for each qubit that matches a bit in secret string
+            s = ('{0:0' + str(input_size) + 'b}').format(s_int)
+            bitset = []
+            print(s)
+            for i in range(input_size):
+                ###print(f"... {i} = {s[i]}")
+                if s[input_size - 1 - i] == '1':
+                    bitset.append(1)
+                else:
+                    bitset.append(0)
+            
+            print(bitset)
+            #str_to_ivec(s_int)
+            
+            #qc = BersteinVazirani(num_qubits, bitset, method)
+            qc = [BersteinVazirani, num_qubits, bitset, method]
+            '''
+            if qc:
+                print(f"got QC")
+            else:
+                print("no QC")
+            '''
             # save smaller circuit example for display
             global QC_
             if QC_ == None or num_qubits <= 6:
@@ -146,17 +194,27 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
             # collapse the sub-circuit levels used in this benchmark (for qiskit)
+            '''
             qc2 = qc.decompose()
-
+            '''
+            qc2 = qc
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
+         
+        # execute all circuits for this group, aggregate and report metrics when complete
+        '''
+        ADDED THIS
+        '''
+        print("about to execute quantum circuit")
+        ex.execute_circuits()
         
         # Wait for some active circuits to complete; report metrics when groups complete
-        ex.throttle_execution(metrics.finalize_group)
+        ex.throttle_execution(metrics.finalize_group)  
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-
+    
+    
     ##########
     
     # print a sample circuit
@@ -168,5 +226,5 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
                          transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
 # if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__': run(min_qubits=6, max_qubits=6, max_circuits=1, num_shots = 100)
    
