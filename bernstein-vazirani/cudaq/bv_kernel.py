@@ -29,7 +29,7 @@ def oracle(register: cudaq.qview, auxillary_qubit: cudaq.qubit,
             x.ctrl(register[input_size - index - 1], auxillary_qubit)
 
 @cudaq.kernel           
-def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
+def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
     
     # size of input is one less than available qubits
     input_size = num_qubits - 1
@@ -139,8 +139,8 @@ def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
     # return a handle on the circuit
     #return qc
  
-''' 
-def BersteinVazirani (num_qubits: int, secret_int: str, method: int = 1):
+ 
+def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
 
-    return BersteinVazirani_0
-'''  
+    return [bv_kernel, num_qubits, hidden_bits, method]
+  

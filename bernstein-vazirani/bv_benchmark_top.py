@@ -4,7 +4,6 @@ Bernstein-Vazirani Benchmark Program - Qiskit
 
 import sys
 import time
-import random
 
 import numpy as np
 
@@ -37,13 +36,6 @@ num_resets = 1
 # saved circuits for display
 QC_ = None
 Uf_ = None
-
-# Routine to generate random oracle bitstring for execution
-def random_bits(length: int):
-    bitset = []
-    for _ in range(length):
-        bitset.append(random.randint(0, 1))
-    return bitset
     
 # Routine to generate random oracle bitstring for execution
 def str_to_ivec(s_int: str):
@@ -80,7 +72,7 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=4, skip_qubits=1, max_circuits=3, num_shots=100,
+def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
         backend_id='qasm_simulator', method=1, input_value=None,
         provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
@@ -174,8 +166,10 @@ def run (min_qubits=3, max_qubits=4, skip_qubits=1, max_circuits=3, num_shots=10
             print(bitset)
             #str_to_ivec(s_int)
             
-            #qc = BersteinVazirani(num_qubits, bitset, method)
-            qc = [BersteinVazirani, num_qubits, bitset, method]
+            qc = BersteinVazirani(num_qubits, bitset, method)
+            #qc = [BersteinVazirani, num_qubits, bitset, method]
+            print("... created qc = ")
+            print(qc)
 
             # save smaller circuit example for display
             global QC_
