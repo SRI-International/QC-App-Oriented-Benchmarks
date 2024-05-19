@@ -37,14 +37,37 @@ num_resets = 1
 QC_ = None
 Uf_ = None
     
-# Routine to generate random oracle bitstring for execution
-def str_to_ivec(s_int: str):
+# Routine to convert the secret integer into an array of integers, each representing one bit
+# DEVNOTE: do we need to converto to string?
+def str_to_ivec(input_size: int, s_int: int):
+    '''
     bitset = []
     for i, c in s_int:
         print(f"... {i} = {c}")
         bitset.append(random.randint(0, 1))
     return bitset
-
+    '''
+    #input_size = len(s_int)
+    print(type(s_int))
+    print(s_int)
+    # perform CX for each qubit that matches a bit in secret string
+    s = ('{0:0' + str(input_size) + 'b}').format(s_int)
+    bitset = []
+    print(s)
+    
+    # assign bits in reverse order of characters in string 
+    for i in range(input_size):
+        ###print(f"... {i} = {s[i]}")
+        if s[input_size - 1 - i] == '1':
+            bitset.append(1)
+        else:
+            bitset.append(0)
+    
+    print(bitset)
+    
+    return bitset       
+            
+            
 ############### Result Data Analysis
 
 # Analyze and print measured results
@@ -150,7 +173,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            
+            '''
             print(s_int)
             # perform CX for each qubit that matches a bit in secret string
             s = ('{0:0' + str(input_size) + 'b}').format(s_int)
@@ -164,7 +187,10 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
                     bitset.append(0)
             
             print(bitset)
-            #str_to_ivec(s_int)
+            '''
+            print(type(s_int))
+            # convert the secret int string to array of integers, each representing one bit
+            bitset = str_to_ivec(input_size, s_int)
             
             qc = BersteinVazirani(num_qubits, bitset, method)
             #qc = [BersteinVazirani, num_qubits, bitset, method]
