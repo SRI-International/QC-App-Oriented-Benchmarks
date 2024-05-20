@@ -1,21 +1,23 @@
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-############### BV Circuit Definition
+from typing import List
 
-def create_oracle(num_qubits, input_size, secret_int):
+############### BV Circuit Definition
+  
+def create_oracle(num_qubits: int, input_size: int, hidden_bits: List[int]):
     # Initialize first n qubits and single ancilla qubit
     qr = QuantumRegister(num_qubits)
     qc = QuantumCircuit(qr, name="Uf")
 
-    # perform CX for each qubit that matches a bit in secret string
-    s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
+    # perform CX for each qubit that matches a bit in secret integer's bits
     for i_qubit in range(input_size):
-        if s[input_size - 1 - i_qubit] == '1':
+        #if hidden_bits[input_size - 1 - i_qubit] == 1:             # DEVNOTE:
+        if hidden_bits[i_qubit] == 1:
             qc.cx(qr[i_qubit], qr[input_size])
     return qc
 
-def BersteinVazirani (num_qubits, secret_int, method = 1):
+def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
     
     # size of input is one less than available qubits
     input_size = num_qubits - 1
@@ -23,8 +25,9 @@ def BersteinVazirani (num_qubits, secret_int, method = 1):
     if method == 1:
         # allocate qubits
         qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size)
-        qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")
-
+        #qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")    # DEVNOTE
+        qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-X")
+        
         # put ancilla in |1> state
         qc.x(qr[input_size])
 
@@ -35,7 +38,7 @@ def BersteinVazirani (num_qubits, secret_int, method = 1):
         qc.barrier()
 
         #generate Uf oracle
-        Uf = create_oracle(num_qubits, input_size, secret_int)
+        Uf = create_oracle(num_qubits, input_size, hidden_bits)
         qc.append(Uf,qr)
 
         qc.barrier()
@@ -52,7 +55,7 @@ def BersteinVazirani (num_qubits, secret_int, method = 1):
         # measure all data qubits
         for i in range(input_size):
             qc.measure(i, i)
-        '''
+        '''                                         # DEVNOTE
         global Uf_
         if Uf_ == None or num_qubits <= 6:
             if num_qubits < 9: Uf_ = Uf

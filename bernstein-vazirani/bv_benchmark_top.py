@@ -7,15 +7,17 @@ import time
 
 import numpy as np
 
+api = "cudaq"
+
 '''
 sys.path[1:1] = [ "_common", "_common/qiskit" ]
 #sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
 sys.path[1:1] = [ "../_common", "../_common/qiskit" ]
 '''
 
-sys.path[1:1] = [ "cudaq" ]
-sys.path[1:1] = [ "_common", "_common/cudaq" ]
-sys.path[1:1] = [ "../_common", "../_common/cudaq" ]
+sys.path[1:1] = [ f"{api}" ]
+sys.path[1:1] = [ "_common", f"_common/{api}" ]
+sys.path[1:1] = [ "../_common", f"../_common/{api}" ]
 
 
 import execute as ex

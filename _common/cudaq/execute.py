@@ -50,10 +50,7 @@ device=None
 #######################
 # SUPPORTING CLASSES
 
-# class BenchmarkResult is made for sessions runs. This is because
-# qiskit primitive job result instances don't have a get_counts method 
-# like backend results do. As such, a get counts method is calculated
-# from the quasi distributions and shots taken.
+# class BenchmarkResult is used as a compatible return object from execution
 class BenchmarkResult(object):
 
     def __init__(self, cq_result):
@@ -61,12 +58,6 @@ class BenchmarkResult(object):
         self.cq_result = cq_result
 
     def get_counts(self, qc=0):
-        #counts = None
-        '''
-        self.qiskit_result.quasi_dists[0].binary_probabilities()
-        for key in counts.keys():
-            counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots']) 
-        '''
         counts = self.cq_result
         return counts
 
