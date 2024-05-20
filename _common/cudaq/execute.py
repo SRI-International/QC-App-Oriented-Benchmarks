@@ -29,6 +29,8 @@ import metrics
 
 import cudaq
 
+verbose = False
+
 ###import cirq
 ###backend = cirq.Simulator()      # Use Cirq Simulator by default
 
@@ -163,6 +165,8 @@ def execute_circuits ():
     
 # Launch execution of one batched circuit
 def execute_circuit (batched_circuit):
+    if verbose:
+        print(f'... execute_circuit({batched_circuit["group"]}, {batched_circuit["circuit"]})')
 
     active_circuit = copy.copy(batched_circuit)
     active_circuit["launch_time"] = time.time()
@@ -201,8 +205,12 @@ def execute_circuit (batched_circuit):
     job.executor_result = result 
     job.exec_time = exec_time
     
-    print(f"... result = {result}")
-    
+    if verbose:
+        print(f"... result = {len(result)} {result}")
+        ''' for debugging, a better way to see the counts, as the type of result is something Quake
+        for key, val in result.items():
+            print(f"... {key}:{val}")
+        '''
     # put job into the active circuits with circuit info
     active_circuits[job] = active_circuit
     #print("... active_circuit = ", str(active_circuit))
@@ -220,21 +228,14 @@ def job_complete (job):
         
     # get job result (DEVNOTE: this might be different for diff targets)
     cq_result = job.result()
-    print("... result2 = ", str(cq_result))
     
+    # create a compatible Result object to return to the caller
     result = BenchmarkResult(cq_result)
     
     # counts = result.get_counts(qc)
     # print("Total counts are:", counts)
-    '''
-    # get measurement array and shot count
-    measurements = result.measurements['result']
-    actual_shots = len(measurements)
-    #print(f"actual_shots = {actual_shots}")
-    
-    if actual_shots != active_circuit["shots"]:
-        print(f"WARNING: requested shots not equal to actual shots: {actual_shots}")
-    '''   
+
+    # store time metrics
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'elapsed_time',
         time.time() - active_circuit["submit_time"])
        
@@ -246,7 +247,7 @@ def job_complete (job):
         result_handler(active_circuit["qc"],
             result, active_circuit["group"], active_circuit["circuit"], active_circuit["shots"])
     
-
+    # DEVNOTE: a hack to store the last group identifier for use in the job management functions
     group = active_circuit["group"]
     global last_group
     last_group = group
@@ -272,8 +273,11 @@ def job_complete (job):
 def throttle_execution(completion_handler=metrics.finalize_group):
     #logger.info('Entering throttle_execution')
 
-    #if verbose:
-        #print(f"... throttling execution, active={len(active_circuits)}, batched={len(batched_circuits)}")
+    if verbose:
+        print(f"... throttling execution, active={len(active_circuits)}, batched={len(batched_circuits)}")
+    
+    # DEVNOTE: execution is currently synchronous, so force execution of any batched circuits
+    execute_circuits()
 
     global last_group
     group = last_group
@@ -317,8 +321,12 @@ def throttle_execution(completion_handler=metrics.finalize_group):
 
 def finalize_execution(completion_handler=metrics.finalize_group, report_end=True):
 
-    #if verbose:
-        #print("... finalize_execution")
+    if verbose:
+        print("... finalize_execution")
+        
+    # DEVNOTE: execution is currently synchronous, so force execution of any batched circuits
+    execute_circuits()
+    
     '''
     # check and sleep if not complete
     done = False

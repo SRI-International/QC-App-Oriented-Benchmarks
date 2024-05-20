@@ -69,12 +69,11 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    if verbose: print(f"For secret int {secret_int} measured: {counts}")
+    if verbose: print(f"For secret int {secret_int} measured: {counts}")   
     
     # create the key that is expected to have all the measurements (for this circuit)
     key = format(secret_int, f"0{input_size}b")
-    if verbose:
-        print(f"... key = {key}")
+    if verbose: print(f"... key = {key}")
     
     # correct distribution is measuring the key 100% of the time
     correct_dist = {key: 1.0}
@@ -161,8 +160,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
                 
             # convert the secret int string to array of integers, each representing one bit
             bitset = str_to_ivec(input_size, s_int)
-            if verbose:
-                print(f"... s_int={s_int} bitset={bitset}")
+            if verbose: print(f"... s_int={s_int} bitset={bitset}")
                 
             # If mid circuit, then add 2 to new qubit group since the circuit only uses 2 qubits
             if method == 2:
@@ -184,23 +182,16 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             qc2 = qc.decompose()
             '''
             qc2 = qc
+            
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
-         
-        # execute all circuits for this group, aggregate and report metrics when complete
-        '''
-        ADDED THIS
-        '''
-        print("about to execute quantum circuit")
-        ex.execute_circuits()
-        
+              
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)  
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-    
-    
+       
     ##########
     
     # print a sample circuit
@@ -227,5 +218,6 @@ if __name__ == '__main__':
     args = get_args()
     
     verbose = args.verbose
-    run(min_qubits=args.num_qubits, max_qubits=args.num_qubits, max_circuits=1, num_shots = args.num_shots)
+    ex.verbose = args.verbose
+    run(min_qubits=args.num_qubits, max_qubits=args.num_qubits, max_circuits=2, num_shots = args.num_shots)
    
