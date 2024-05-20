@@ -4,19 +4,6 @@ import cudaq
 from typing import List
 
 ############### BV Circuit Definition
-'''
-def create_oracle(num_qubits, input_size, secret_int):
-    # Initialize first n qubits and single ancilla qubit
-    qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name="Uf")
-
-    # perform CX for each qubit that matches a bit in secret string
-    s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
-    for i_qubit in range(input_size):
-        if s[input_size - 1 - i_qubit] == '1':
-            qc.cx(qr[i_qubit], qr[input_size])
-    return qc
-'''
 
 @cudaq.kernel
 def oracle(register: cudaq.qview, auxillary_qubit: cudaq.qubit,
@@ -33,12 +20,7 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
     
     # size of input is one less than available qubits
     input_size = num_qubits - 1
-    '''
-    hidden_bits = [0]*input_size
-    for index, bit in secret_int:
-        if bit == '1':
-            hidden_bits[index] = 1
-    '''   
+  
     if method == 1:
     
         # Allocate the specified number of qubits - this
