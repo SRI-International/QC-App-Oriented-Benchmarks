@@ -167,7 +167,7 @@ def execute_circuit (batched_circuit):
     active_circuit = copy.copy(batched_circuit)
     active_circuit["launch_time"] = time.time()
     
-    shots = batched_circuit["shots"]
+    num_shots = batched_circuit["shots"]
     
     # Initiate execution 
     circuit = batched_circuit["qc"]
@@ -191,10 +191,10 @@ def execute_circuit (batched_circuit):
     # create a pseudo-job to perform metrics processing upon return
     job = Job()
     
-    print(cudaq.draw(circuit[0], circuit[1], circuit[2], circuit[3]))
+    #print(cudaq.draw(circuit[0], circuit[1], circuit[2], circuit[3]))
     
     ts = time.time()
-    result = cudaq.sample(circuit[0], circuit[1], circuit[2], circuit[3])
+    result = cudaq.sample(circuit[0], circuit[1], circuit[2], circuit[3], shots_count=num_shots)
     exec_time = time.time() - ts
     
     # store the result object on the job for processing in job_complete

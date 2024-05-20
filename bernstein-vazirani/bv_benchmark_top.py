@@ -38,32 +38,22 @@ QC_ = None
 Uf_ = None
     
 # Routine to convert the secret integer into an array of integers, each representing one bit
-# DEVNOTE: do we need to converto to string?
+# DEVNOTE: do we need to converto to string, or can we just keep shifting?
 def str_to_ivec(input_size: int, s_int: int):
-    '''
-    bitset = []
-    for i, c in s_int:
-        print(f"... {i} = {c}")
-        bitset.append(random.randint(0, 1))
-    return bitset
-    '''
-    #input_size = len(s_int)
-    print(type(s_int))
-    print(s_int)
-    # perform CX for each qubit that matches a bit in secret string
+
+    # convert the secret integer into a string so we can scan the characters
     s = ('{0:0' + str(input_size) + 'b}').format(s_int)
-    bitset = []
-    print(s)
+    
+    # create an array to hold one integer per bit
+    bitset = [] 
     
     # assign bits in reverse order of characters in string 
     for i in range(input_size):
-        ###print(f"... {i} = {s[i]}")
+
         if s[input_size - 1 - i] == '1':
             bitset.append(1)
         else:
             bitset.append(0)
-    
-    print(bitset)
     
     return bitset       
             
@@ -83,6 +73,8 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # create the key that is expected to have all the measurements (for this circuit)
     key = format(secret_int, f"0{input_size}b")
+    if verbose:
+        print(f"... key = {key}")
     
     # correct distribution is measuring the key 100% of the time
     correct_dist = {key: 1.0}
@@ -167,35 +159,18 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             if input_value is not None:
                 s_int = input_value
                 
+            # convert the secret int string to array of integers, each representing one bit
+            bitset = str_to_ivec(input_size, s_int)
+            if verbose:
+                print(f"... s_int={s_int} bitset={bitset}")
+                
             # If mid circuit, then add 2 to new qubit group since the circuit only uses 2 qubits
             if method == 2:
                 mid_circuit_qubit_group.append(2)
 
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            '''
-            print(s_int)
-            # perform CX for each qubit that matches a bit in secret string
-            s = ('{0:0' + str(input_size) + 'b}').format(s_int)
-            bitset = []
-            print(s)
-            for i in range(input_size):
-                ###print(f"... {i} = {s[i]}")
-                if s[input_size - 1 - i] == '1':
-                    bitset.append(1)
-                else:
-                    bitset.append(0)
-            
-            print(bitset)
-            '''
-            print(type(s_int))
-            # convert the secret int string to array of integers, each representing one bit
-            bitset = str_to_ivec(input_size, s_int)
-            
             qc = BersteinVazirani(num_qubits, bitset, method)
-            #qc = [BersteinVazirani, num_qubits, bitset, method]
-            print("... created qc = ")
-            print(qc)
 
             # save smaller circuit example for display
             global QC_
@@ -236,6 +211,21 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
                          transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
+#######################
+# MAIN
+
+import argparse
+def get_args():
+    parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
+    parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
+    parser.add_argument("--num_qubits", "-q", default=8, help="Number of qubits", type=int)
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    return parser.parse_args()
+    
 # if main, execute method
-if __name__ == '__main__': run(min_qubits=6, max_qubits=6, max_circuits=1, num_shots = 100)
+if __name__ == '__main__': 
+    args = get_args()
+    
+    verbose = args.verbose
+    run(min_qubits=args.num_qubits, max_qubits=args.num_qubits, max_circuits=1, num_shots = args.num_shots)
    
