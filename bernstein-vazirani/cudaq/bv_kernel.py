@@ -124,5 +124,5 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
  
 def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
 
-    return [bv_kernel, num_qubits, hidden_bits, method]
+    return [bv_kernel, [num_qubits, hidden_bits, method]]
   

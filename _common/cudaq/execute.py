@@ -186,10 +186,12 @@ def execute_circuit (batched_circuit):
     # create a pseudo-job to perform metrics processing upon return
     job = Job()
     
-    #print(cudaq.draw(circuit[0], circuit[1], circuit[2], circuit[3]))
+    # draw the circuit, but only for debugging
+    #print(cudaq.draw(circuit[0], *circuit[1]))
     
     ts = time.time()
-    result = cudaq.sample(circuit[0], circuit[1], circuit[2], circuit[3], shots_count=num_shots)
+    # call sample() on circuit with its list of arguments
+    result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
     exec_time = time.time() - ts
     
     # store the result object on the job for processing in job_complete
