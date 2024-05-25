@@ -8,6 +8,7 @@ import sys
 import time
 import numpy as np
 
+# DEVNOTE: hardcoded for now; set to "qiskit" for Qiskit.  Need to pass in as argument
 api = "cudaq"
 
 sys.path[1:1] = [ f"{api}" ]
@@ -166,7 +167,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             ts = time.time()
             qc = BersteinVazirani(num_qubits, bitset, method)
 
-            # save smaller circuit example for display
+            # save smaller circuit example for display (DEVNOTE: in earlier versions, this was in kernel code)
             global QC_
             if QC_ == None or num_qubits <= 6:
                 if num_qubits < 9: QC_ = qc
@@ -174,6 +175,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
             # collapse the sub-circuit levels used in this benchmark (for qiskit)
+            # DEVNOTE: still need to find solution to this for generality
             '''
             qc2 = qc.decompose()
             '''
@@ -204,8 +206,13 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 import argparse
 def get_args():
     parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
+    parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
     parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
-    parser.add_argument("--num_qubits", "-q", default=8, help="Number of qubits", type=int)
+    parser.add_argument("--num_qubits", "-q", default=0, help="Number of qubits", type=int)
+    parser.add_argument("--min_qubits", default=3, help="Minimum number of qubits", type=int)
+    parser.add_argument("--max_qubits", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("--max_circuits", default=3, help="Maximum circuit repetitions", type=int)  
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
     
@@ -215,5 +222,11 @@ if __name__ == '__main__':
     
     verbose = args.verbose
     ex.verbose = args.verbose
-    run(min_qubits=args.num_qubits, max_qubits=args.num_qubits, max_circuits=2, num_shots = args.num_shots)
+    if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
+        
+    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
+        max_circuits=args.max_circuits,
+        num_shots = args.num_shots, 
+        backend_id="simulator"              #DEVNOTE: this should reflect the api
+        )
    

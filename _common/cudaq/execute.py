@@ -147,6 +147,9 @@ def submit_circuit (qc, group_id, circuit_id, shots=100):
     )
     #print("... submit circuit - ", str(batched_circuits[len(batched_circuits)-1]))
     
+    # DEVNOTE: execute immediately for now, so that we don't accumulate elapsed time while in queue
+    execute_circuits()
+    
     
 # Launch execution of all batched circuits
 def execute_circuits ():
@@ -187,7 +190,7 @@ def execute_circuit (batched_circuit):
     job = Job()
     
     # draw the circuit, but only for debugging
-    #print(cudaq.draw(circuit[0], *circuit[1]))
+    # print(cudaq.draw(circuit[0], *circuit[1]))
     
     ts = time.time()
     # call sample() on circuit with its list of arguments

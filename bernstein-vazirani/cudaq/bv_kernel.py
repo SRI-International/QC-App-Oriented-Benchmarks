@@ -20,16 +20,20 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
     
     # size of input is one less than available qubits
     input_size = num_qubits - 1
-  
-    if method == 1:
     
-        # Allocate the specified number of qubits - this
-        # corresponds to the length of the hidden bitstring.
-        #qubits = cudaq.qvector(len(hidden_bits))
-        qubits = cudaq.qvector(input_size)
+    # for method 2, we only use a single qubit for primary register
+    if method == 2:
+        input_size = 1
         
-        # Allocate an extra auxillary qubit.
-        auxillary_qubit = cudaq.qubit()
+    # Allocate the specified number of qubits - this
+    # corresponds to the length of the hidden bitstring.
+    qubits = cudaq.qvector(input_size)
+    
+    # Allocate an extra auxillary qubit.
+    auxillary_qubit = cudaq.qubit()
+    
+    # method 1 is the traditional algorithm with oracle consuming all but one qubit
+    if method == 1:
 
         # Prepare the auxillary qubit.
         h(auxillary_qubit)
@@ -87,6 +91,8 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
         if Uf_ == None or num_qubits <= 6:
             if num_qubits < 9: Uf_ = Uf
         '''
+        
+    # method 2 uses mid-circuit measurement to create circuits with only 2 qubits
     elif method == 2:
         '''
         # allocate qubits
@@ -118,9 +124,6 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
     if QC_ == None or num_qubits <= 6:
         if num_qubits < 9: QC_ = qc
     '''
-    # return a handle on the circuit
-    #return qc
- 
  
 def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
 
