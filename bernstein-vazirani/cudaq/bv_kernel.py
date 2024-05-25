@@ -3,6 +3,10 @@ import cudaq
 
 from typing import List
 
+# saved circuits for display
+QC_ = None
+Uf_ = None
+
 ############### BV Circuit Definition
 
 @cudaq.kernel
@@ -47,50 +51,12 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
 
         # Apply another set of Hadamards to the register.
         h(qubits)
+        
+        # DEVNOTE: compare to Qiskit version - do we need to flip the aux bit back? and measure all?
 
         # Apply measurement gates to just the `qubits`
         # (excludes the auxillary qubit).
         mz(qubits)
-    
-        '''
-        # allocate qubits
-        qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size)
-        qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")
-
-        # put ancilla in |1> state
-        qc.x(qr[input_size])
-
-        # start with Hadamard on all qubits, including ancilla
-        for i_qubit in range(num_qubits):
-             qc.h(qr[i_qubit])
-
-        qc.barrier()
-
-        #generate Uf oracle
-        Uf = create_oracle(num_qubits, input_size, secret_int)
-        qc.append(Uf,qr)
-
-        qc.barrier()
-
-        # start with Hadamard on all qubits, including ancilla
-        for i_qubit in range(num_qubits):
-             qc.h(qr[i_qubit])
-
-        # uncompute ancilla qubit, not necessary for algorithm
-        qc.x(qr[input_size])
-
-        qc.barrier()
-
-        # measure all data qubits
-        for i in range(input_size):
-            qc.measure(i, i)
-        '''
-        
-        '''
-        global Uf_
-        if Uf_ == None or num_qubits <= 6:
-            if num_qubits < 9: Uf_ = Uf
-        '''
         
     # method 2 uses mid-circuit measurement to create circuits with only 2 qubits
     elif method == 2:
@@ -118,14 +84,25 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
         '''
         pass
         
-    '''
-    # save smaller circuit example for display
-    global QC_
-    if QC_ == None or num_qubits <= 6:
-        if num_qubits < 9: QC_ = qc
-    '''
  
 def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
 
-    return [bv_kernel, [num_qubits, hidden_bits, method]]
-  
+    qc = [bv_kernel, [num_qubits, hidden_bits, method]]
+    
+    global QC_
+    if num_qubits <= 9:
+        QC_ = qc
+
+    return qc
+
+############### BV Circuit Drawer
+
+# Draw the circuits of this benchmark program
+def kernel_draw():
+    print("Sample Circuit:");
+    if QC_ != None:
+        print(cudaq.draw(QC_[0], *QC_[1]))
+    else:
+        print("  ... too large!")
+    
+     

@@ -18,7 +18,7 @@ sys.path[1:1] = [ "../_common", f"../_common/{api}" ]
 import execute as ex
 import metrics as metrics
 
-from bv_kernel import BersteinVazirani
+from bv_kernel import BersteinVazirani, kernel_draw
 
 # Benchmark Name
 benchmark_name = "Bernstein-Vazirani Top"
@@ -29,13 +29,9 @@ verbose = False
 
 # Variable for number of resets to perform after mid circuit measurements
 num_resets = 1
-
-# saved circuits for display
-QC_ = None
-Uf_ = None
     
 # Routine to convert the secret integer into an array of integers, each representing one bit
-# DEVNOTE: do we need to converto to string, or can we just keep shifting?
+# DEVNOTE: do we need to convert to string, or can we just keep shifting?
 def str_to_ivec(input_size: int, s_int: int):
 
     # convert the secret integer into a string so we can scan the characters
@@ -165,24 +161,11 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = BersteinVazirani(num_qubits, bitset, method)
-
-            # save smaller circuit example for display (DEVNOTE: in earlier versions, this was in kernel code)
-            global QC_
-            if QC_ == None or num_qubits <= 6:
-                if num_qubits < 9: QC_ = qc
-        
+            qc = BersteinVazirani(num_qubits, bitset, method)       
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
-
-            # collapse the sub-circuit levels used in this benchmark (for qiskit)
-            # DEVNOTE: still need to find solution to this for generality
-            '''
-            qc2 = qc.decompose()
-            '''
-            qc2 = qc
             
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
+            ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
               
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)  
@@ -192,9 +175,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
        
     ##########
     
-    # print a sample circuit
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
+    # draw a sample circuit
+    kernel_draw()
 
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
@@ -212,6 +194,7 @@ def get_args():
     parser.add_argument("--num_qubits", "-q", default=0, help="Number of qubits", type=int)
     parser.add_argument("--min_qubits", default=3, help="Minimum number of qubits", type=int)
     parser.add_argument("--max_qubits", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", default=3, help="Maximum circuit repetitions", type=int)  
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
@@ -225,8 +208,8 @@ if __name__ == '__main__':
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
         
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
-        max_circuits=args.max_circuits,
+        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots = args.num_shots, 
-        backend_id="simulator"              #DEVNOTE: this should reflect the api
+        backend_id="qasm_simulator"              #DEVNOTE: this should reflect the api
         )
    

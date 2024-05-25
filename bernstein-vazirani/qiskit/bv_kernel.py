@@ -3,6 +3,10 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 from typing import List
 
+# saved circuits for display
+QC_ = None
+Uf_ = None
+
 ############### BV Circuit Definition
   
 def create_oracle(num_qubits: int, input_size: int, hidden_bits: List[int]):
@@ -22,6 +26,7 @@ def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
     # size of input is one less than available qubits
     input_size = num_qubits - 1
 
+    # method 1 is the traditional algorithm with oracle consuming all but one qubit
     if method == 1:
         # allocate qubits
         qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size)
@@ -55,14 +60,12 @@ def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
         # measure all data qubits
         for i in range(input_size):
             qc.measure(i, i)
-        '''                                         # DEVNOTE
-        global Uf_
-        if Uf_ == None or num_qubits <= 6:
-            if num_qubits < 9: Uf_ = Uf
-        '''
+    
+    # method 2 uses mid-circuit measurement to create circuits with only 2 qubits    
     elif method == 2:
         # allocate qubits
-        qr = QuantumRegister(2); cr = ClassicalRegister(input_size); qc = QuantumCircuit(qr, cr, name="main")
+        qr = QuantumRegister(2); cr = ClassicalRegister(input_size);
+        qc = QuantumCircuit(qr, cr, name="main")
 
         # put ancilla in |-> state
         qc.x(qr[1])
@@ -70,6 +73,8 @@ def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
 
         qc.barrier()
 
+        Uf = None
+        
         # perform CX for each qubit that matches a bit in secret string
         s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
         for i in range(input_size):
@@ -81,12 +86,28 @@ def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
 
             # Perform num_resets reset operations
             qc.reset([0]*num_resets)
-    '''
-    # save smaller circuit example for display
-    global QC_
+            
+    # save circuit examples for display
+    global QC_, Uf_
     if QC_ == None or num_qubits <= 6:
         if num_qubits < 9: QC_ = qc
-    '''
+    if Uf_ == None or num_qubits <= 6:
+        if num_qubits < 9: Uf_ = Uf
+            
+    # collapse the sub-circuit levels used in this benchmark (for qiskit)
+    qc2 = qc.decompose()
+            
     # return a handle on the circuit
-    return qc
+    return qc2
+
+############### BV Circuit Drawer
+
+# Draw the circuits of this benchmark program
+def kernel_draw():
+    print("Sample Circuit:");
+    print(QC_ if QC_ != None else "  ... too large!")
+    #if method == 1:
+    if Uf_ != None:
+        print("\nQuantum Oracle 'Uf' =");
+        print(Uf_ if Uf_ != None else " ... too large!")
     
