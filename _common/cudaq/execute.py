@@ -97,11 +97,11 @@ def init_execution (handler):
 
 
 # Set the backend for execution
-def set_execution_target(backend_id='simulator', provider_backend=None,
+def set_execution_target(backend_id='cudaq_simulator', provider_backend=None,
         hub=None, group=None, project=None, exec_options=None,
         context=None):
     """
-    Used to run jobs on a real hardware
+    Set the backend execution target.
     :param backend_id:  device name. List of available devices depends on the provider
     :provider_backend: a custom backend object created and passed in, use backend_id as identifier
     
@@ -111,6 +111,10 @@ def set_execution_target(backend_id='simulator', provider_backend=None,
     """
     global backend   
     
+    # default to cudaq_simulator if None passed in
+    if backend_id == None:
+        backend_id="cudaq_simulator"
+        
     # if a custom provider backend is given, use it ...
     if provider_backend != None:
         backend = provider_backend

@@ -9,6 +9,7 @@ import time
 import numpy as np
 
 # DEVNOTE: hardcoded for now; set to "qiskit" for Qiskit.  Need to pass in as argument
+#api = "qiskit"
 api = "cudaq"
 
 sys.path[1:1] = [ f"{api}" ]
@@ -80,8 +81,8 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
-        backend_id='qasm_simulator', method=1, input_value=None,
-        provider_backend=None,
+        method=1, input_value=None,
+        backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 
@@ -141,8 +142,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
         if 2**(input_size) <= max_circuits:
             s_range = list(range(num_circuits))
         else:
-            #s_range = np.random.choice(2**(input_size), num_circuits, False)    # DEVNOTE: very slow!
-            # instead, create selection array larger than needed, and remove duplicates
+            # create selection larger than needed and remove duplicates (faster than random.choice())
             s_range = np.random.randint(1, 2**(input_size), num_circuits + 10)
             s_range = list(set(s_range))[0:max_circuits]
             
@@ -199,6 +199,8 @@ def get_args():
     parser.add_argument("--max_qubits", default=8, help="Maximum number of qubits", type=int)
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", default=3, help="Maximum circuit repetitions", type=int)  
+    parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
+    parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
     
@@ -212,7 +214,9 @@ if __name__ == '__main__':
         
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
-        num_shots = args.num_shots, 
-        backend_id="qasm_simulator"              #DEVNOTE: this should reflect the api
+        num_shots=args.num_shots,
+        method=args.method,
+        input_value=args.input_value,
+        backend_id=args.backend_id
         )
    

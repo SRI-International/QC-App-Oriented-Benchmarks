@@ -255,6 +255,10 @@ def set_execution_target(backend_id='qasm_simulator',
     global session_count
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
 
+    # default to qasm_simulator if None passed in
+    if backend_id == None:
+        backend_id="qasm_simulator"
+        
     # if a custom provider backend is given, use it ...
     # Note: in this case, the backend_id is an identifier that shows up in plots
     if provider_backend != None:
