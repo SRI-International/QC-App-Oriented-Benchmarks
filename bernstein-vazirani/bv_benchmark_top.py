@@ -141,8 +141,11 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
         if 2**(input_size) <= max_circuits:
             s_range = list(range(num_circuits))
         else:
-            s_range = np.random.choice(2**(input_size), num_circuits, False)
-
+            #s_range = np.random.choice(2**(input_size), num_circuits, False)    # DEVNOTE: very slow!
+            # instead, create selection array larger than needed, and remove duplicates
+            s_range = np.random.randint(1, 2**(input_size), num_circuits + 10)
+            s_range = list(set(s_range))[0:max_circuits]
+            
         # loop over limited # of secret strings for this
         for s_int in s_range:
         
@@ -158,7 +161,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             # If mid circuit, then add 2 to new qubit group since the circuit only uses 2 qubits
             if method == 2:
                 mid_circuit_qubit_group.append(2)
-
+            
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
             qc = BersteinVazirani(num_qubits, bitset, method)       
