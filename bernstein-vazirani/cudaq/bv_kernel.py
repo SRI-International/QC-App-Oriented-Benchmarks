@@ -82,8 +82,45 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
             # Perform num_resets reset operations
             qc.reset([0]*num_resets)
         '''
-        pass
         
+        # put ancilla in |-> state
+        x(auxillary_qubit)
+        h(auxillary_qubit)
+        '''
+        # perform CX for each qubit that matches a bit in secret integer's bits
+        for i_qubit in range(input_size):
+            #if hidden_bits[input_size - 1 - i_qubit] == 1:             # DEVNOTE:
+            if hidden_bits[i_qubit] == 1:
+                #qc.cx(qr[i_qubit], qr[input_size])
+                qc.h(qr[0])
+                qc.cx(qr[0], qr[1])
+                qc.h(qr[0])
+            qc.measure(qr[0], cr[i_qubit])
+            
+            # Perform num_resets reset operations
+            qc.reset([0]*num_resets)
+        ''' 
+        #ba = [0] * 4
+        ba = [0,1,1,0]
+        for index, bit in enumerate(hidden_bits):
+            if bit == 1:
+                h(qubits)
+                cx(qubits, auxillary_qubit)
+                h(qubits)
+                
+            if index == 0:
+                b0 = mz(qubits)
+            elif index == 1:
+                b1 = mz(qubits)
+            elif index == 2:
+                b2 = mz(qubits)
+            elif index == 3:
+                b3 = mz(qubits)
+            else:
+                b4 = mz(qubits)
+                
+            #ba[index] = b
+            #hidden_bits[index] = b
  
 def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
 

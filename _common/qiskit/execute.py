@@ -234,7 +234,7 @@ def set_execution_target(backend_id='qasm_simulator',
                 hub=None, group=None, project=None, exec_options=None,
                 context=None):
     """
-    Used to run jobs on a real hardware
+    Set the backend execution target.
     :param backend_id:  device name. List of available devices depends on the provider
     :param hub: hub identifier, currently "ibm-q" for IBM Quantum, "azure-quantum" for Azure Quantum 
     :param group: group identifier, used with IBM-Q accounts.
