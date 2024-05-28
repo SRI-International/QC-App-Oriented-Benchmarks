@@ -124,10 +124,11 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    if verbose: print(f"For secret int {secret_int} measured: {counts}")
+    if verbose: print(f"For secret int {secret_int} measured: {counts}")   
     
     # create the key that is expected to have all the measurements (for this circuit)
     key = format(secret_int, f"0{input_size}b")
+    if verbose: print(f"... key = {key}")
     
     # correct distribution is measuring the key 100% of the time
     correct_dist = {key: 1.0}
@@ -202,8 +203,10 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
         if 2**(input_size) <= max_circuits:
             s_range = list(range(num_circuits))
         else:
-            s_range = np.random.choice(2**(input_size), num_circuits, False)
-
+            # create selection larger than needed and remove duplicates (faster than random.choice())
+            s_range = np.random.randint(1, 2**(input_size), num_circuits + 10)
+            s_range = list(set(s_range))[0:max_circuits]
+            
         # loop over limited # of secret strings for this
         for s_int in s_range:
         
