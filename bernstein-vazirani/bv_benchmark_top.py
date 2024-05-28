@@ -1,7 +1,6 @@
 '''
 Bernstein-Vazirani Benchmark Program
 (C) Quantum Economic Development Consortium (QED-C) 2024.
-Technical Advisory Committee on Standards and Benchmarks
 '''
 
 import sys

@@ -1,4 +1,11 @@
+'''
+Bernstein-Vazirani Benchmark Program - CUDA Quantum Kernel
+(C) Quantum Economic Development Consortium (QED-C) 2024.
+'''
 
+# DEVNOTE: Method 2 of this benchmark does not work correctly due to limitations in the ability
+# for the Python version of cudaq to collect and return an array of measured values (Issue #????).
+# Only the final measurements are returned, meaning the fidelity is not determined correctly.
 import cudaq
 
 from typing import List
@@ -60,54 +67,24 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
         
     # method 2 uses mid-circuit measurement to create circuits with only 2 qubits
     elif method == 2:
-        '''
-        # allocate qubits
-        qr = QuantumRegister(2); cr = ClassicalRegister(input_size); qc = QuantumCircuit(qr, cr, name="main")
-
-        # put ancilla in |-> state
-        qc.x(qr[1])
-        qc.h(qr[1])
-
-        qc.barrier()
-
-        # perform CX for each qubit that matches a bit in secret string
-        s = ('{0:0' + str(input_size) + 'b}').format(secret_int)
-        for i in range(input_size):
-            if s[input_size - 1 - i] == '1':
-                qc.h(qr[0])
-                qc.cx(qr[0], qr[1])
-                qc.h(qr[0])
-            qc.measure(qr[0], cr[i])
-
-            # Perform num_resets reset operations
-            qc.reset([0]*num_resets)
-        '''
         
         # put ancilla in |-> state
         x(auxillary_qubit)
         h(auxillary_qubit)
-        '''
-        # perform CX for each qubit that matches a bit in secret integer's bits
-        for i_qubit in range(input_size):
-            #if hidden_bits[input_size - 1 - i_qubit] == 1:             # DEVNOTE:
-            if hidden_bits[i_qubit] == 1:
-                #qc.cx(qr[i_qubit], qr[input_size])
-                qc.h(qr[0])
-                qc.cx(qr[0], qr[1])
-                qc.h(qr[0])
-            qc.measure(qr[0], cr[i_qubit])
-            
-            # Perform num_resets reset operations
-            qc.reset([0]*num_resets)
-        ''' 
+
+        # perform CX for each qubit that matches a bit in secret string
+        # DEVNOTE: the commented code below is an attempt to find a way to capture the mid-crcuit measurements
+        # but it does not work correctly.  CUDA Q does not seem to permit saving measures to an array
         #ba = [0] * 4
-        ba = [0,1,1,0]
+        #ba = [0,1,1,0]
         for index, bit in enumerate(hidden_bits):
             if bit == 1:
                 h(qubits)
                 cx(qubits, auxillary_qubit)
                 h(qubits)
-                
+            
+            mz(qubits)
+            '''
             if index == 0:
                 b0 = mz(qubits)
             elif index == 1:
@@ -119,6 +96,9 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
             else:
                 b4 = mz(qubits)
                 
+            b5 = 1
+            b5 = b4
+            '''
             #ba[index] = b
             #hidden_bits[index] = b
  
