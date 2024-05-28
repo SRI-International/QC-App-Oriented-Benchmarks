@@ -11,7 +11,7 @@ import numpy as np
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 from qiskit.quantum_info import SparsePauliOp
-from qiskit.quantum_info import Statevector
+from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
@@ -43,50 +43,142 @@ precalculated_data = json.loads(data)
 
 ############### Circuit Definition
 
+def initial_state(n_spins, method): 
 
-def Hamiltonian_Simulation_Exact(n_spins):
-    num_shots = 100000
+    if method == 1: 
 
-    qr = QuantumRegister(n_spins); cr = ClassicalRegister(n_spins); qc = QuantumCircuit(qr, cr, name="main")
-    g=0.2 # strength of tranverse field
+        # checkerboard state, or "Neele" state 
 
-    # state with initial state of GHZ state: 1/sqrt(2) ( |00...> + |11...> )
-    qc.h(qr[0])
-    for k in range(1, n_spins):
-        qc.cx(qr[k-1], qr[k])
+        qc = QuantumCircuit(n_spins)
+
+        for k in range(0, n_spins, 2):
+            qc.x([k])
+
+    else:
+
+        # state with initial state of GHZ state: 1/sqrt(2) ( |00...> + |11...> )
+        qc.h(0)
+        for k in range(1, n_spins):
+            qc.cx(k-1, k)
+
+    return qc 
+
+def construct_TFIM_hamiltonian(n_spins):
+
+    pauli_strings = []
+    coefficients = []
+
+    # g is hardcoded for now 
+    g= .2  
+
+    # the Pauli spin vector product
+    for i in range(n_spins):
+        x_term = 'I' * i + 'X' + 'I' * (n_spins - i - 1)
+        pauli_strings.append(x_term)
+        coefficients.append(g)
+
+    identity_string = ['I'] * n_spins 
+
+    # ZZ operation on each pair of qubits in linear chain
+    for j in range(2):
+        for i in range(j%2, n_spins-1, 2):
+
+            zz_term = identity_string.copy()
+
+            zz_term[i] = 'Z'
+            zz_term[(i+1) % n_spins] = 'Z'
+
+            zz_term = ''.join(zz_term)
+
+            pauli_strings.append(zz_term)
+            coefficients.append(1.0)
+
+    # Construct SparsePauliOp
+    sparse_pauli_op = SparsePauliOp.from_list(zip(pauli_strings, coefficients))
+    # remember to remove this print statement before merging into main 
+    print(sparse_pauli_op)
+    return sparse_pauli_op
+
+
+def construct_heisenberg_hamiltonian(n_spins):
+
+    w = precalculated_data['w']  # strength of disorder
+    h_x = precalculated_data['h_x'][:n_spins] # precalculated random numbers between [-1, 1]
+    h_z = precalculated_data['h_z'][:n_spins]
+    # Initialize lists to hold Pauli strings and coefficients
+    pauli_strings = []
+    coefficients = []
+
+    # Disorder terms
+    for i in range(n_spins):
+        x_term = 'I' * i + 'X' + 'I' * (n_spins - i - 1)
+        z_term = 'I' * i + 'Z' + 'I' * (n_spins - i - 1)
+        pauli_strings.append(x_term)
+        coefficients.append(w * h_x[i])
+        pauli_strings.append(z_term)
+        coefficients.append(w * h_z[i])
+
+    identity_string = ['I'] * n_spins 
+
+    # Interaction terms
+
+    for j in range(2):
+        for i in range(j % 2, n_spins - 1, 2):
+
+
+            xx_term = identity_string.copy()
+            yy_term = identity_string.copy() 
+            zz_term = identity_string.copy()
+
+            xx_term[i] = 'X'
+            xx_term[(i+1) % n_spins] = 'X'
+
+            yy_term[i] = 'Y'
+            yy_term[(i+1) % n_spins] = 'Y'
+
+            zz_term[i] = 'Z'
+            zz_term[(i+1) % n_spins] = 'Z'
+
+            xx_term = ''.join(xx_term)
+            yy_term = ''.join(yy_term)
+            zz_term = ''.join(zz_term)
+
+            pauli_strings.append(xx_term)
+            coefficients.append(1.0)
+            pauli_strings.append(yy_term)
+            coefficients.append(1.0)
+            pauli_strings.append(zz_term)
+            coefficients.append(1.0)
+
+    # Construct SparsePauliOp
+    sparse_pauli_op = SparsePauliOp.from_list(zip(pauli_strings, coefficients))
+
+    return sparse_pauli_op
+
+def construct_hamiltonian(n_spins, method):
+
+    if method == 1:
+        return construct_heisenberg_hamiltonian(n_spins)
+    elif method == 2: 
+        return construct_TFIM_hamiltonian(n_spins)
+    else:
+        raise ValueError("Method is not equal to 1 or 2.")
+
+def HamiltonianSimulationExact(n_spins, t, method=1):
+    """
+    Returns the distribution after simulating our hamiltonian simulation circuits using a classically calculated (using SciPy) matrix evolution
+    """
+
+    hamiltonian = construct_hamiltonian(n_spins, method) 
+
+    time_problem = TimeEvolutionProblem(hamiltonian, t, initial_state = initial_state(n_spins, method))
+
+    result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
+
+    return result.evolved_state.probabilities_dict()
     
-    psi = Statevector(qc)
 
-    #qr2 = QuantumRegister(n_spins); cr2 = ClassicalRegister(n_spins); qc2 = QuantumCircuit(qr2, cr2, name="main")
-
-    ##calculate TFIM
-
-    pauli_list = []
-    for i in range(n_spins-2):
-        curr_str = "I"*(i)+"ZZ"+"I"*(n_spins-(i+2))
-        pauli_list.append((curr_str, 1))
-
-
-    x_str = "X"*n_spins
-    pauli_list.append((x_str, g))
-
-    pauli_list= SparsePauliOp.from_list(pauli_list)
-
-    print("pauli list", pauli_list)
-    psi.evolve(pauli_list)
-
-    qr3 = QuantumRegister(n_spins); cr3 = ClassicalRegister(n_spins); qc3 = QuantumCircuit(qr3, cr3, name="main")
-    for k in reversed(range(1, n_spins)):
-        qc3.cx(qr3[k-1], qr3[k])
-    qc3.h(qr3[0])
-
-    psi.evolve(qc3)
-
-    counts = psi.sample_counts(shots = num_shots)
- 
-
-
-def HamiltonianSimulation(n_spins, K, t, method = 1):
+def HamiltonianSimulation(n_spins, K, t, method = 1, measure_x = False):
     '''
     Construct a Qiskit circuit for Hamiltonian Simulation
     :param n_spins:The number of spins to simulate
@@ -109,12 +201,8 @@ def HamiltonianSimulation(n_spins, K, t, method = 1):
 
 
     if method==1:
-        # start with initial state of 1010101...
-        for k in range(0, n_spins, 2):
-            qc.x(qr[k])
-        qc.barrier()
 
-    # loop over each trotter step, adding gates to the circuit defining the hamiltonian
+    # loop over each trotterustep, adding gates to the circuit defining the hamiltonian
         for k in range(K):
             # the Pauli spin vector product
             [qc.rx(2 * tau * w * h_x[i], qr[i]) for i in range(n_spins)]
@@ -148,7 +236,8 @@ def HamiltonianSimulation(n_spins, K, t, method = 1):
                         qc.append(xxyyzz_opt_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
 
             qc.barrier()
-    else:
+
+    elif method==2: 
 
         g=0.2 # strength of tranverse field
 
@@ -182,19 +271,14 @@ def HamiltonianSimulation(n_spins, K, t, method = 1):
         qc.barrier()
 
 
-        #TFIM Hamiltonian simulation
-        # for k in range(K):
-        #     [qc.rx(-2 * tau * w * h_x[i], qr[i]) for i in range(n_spins)]
-        #     # ZZ operation on each pair of qubits in linear chain
-        #     for j in range(2):
-        #         for i in range(j%2, n_spins - 1, 2):
-        #             qc.append(-zz_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+    else: 
 
+        raise ValueError("Invalid method specification.")
 
-
-    # measure all the qubits used in the circuit
+    # measure all qubits 
     for i_qubit in range(n_spins):
         qc.measure(qr[i_qubit], cr[i_qubit])
+
 
     # save smaller circuit example for display
     global QC_    
@@ -277,10 +361,9 @@ def xxyyzz_opt_gate(tau):
 
 
 ############### Result Data Analysis
-
 # Analyze and print measured results
 # Compute the quality of the result based on operator expectation for each state
-def analyze_and_print_result(qc, result, num_qubits, type, num_shots, method):
+def analyze_and_print_result(qc, result, num_qubits, type, num_shots, method, compare_to_exact_results):
 
     counts = result.get_counts(qc)
     if verbose: print(f"For type {type} measured: {counts}")
@@ -290,12 +373,21 @@ def analyze_and_print_result(qc, result, num_qubits, type, num_shots, method):
     # we have precalculated the correct distribution that a perfect quantum computer will return
     # it is stored in the json file we import at the top of the code
 
-    if method == 1:
-        # use the perfect quantum computer distribution for the heisenburg circuit
-        correct_dist = precalculated_data[f"Qubits - {num_qubits}"]
-    else:
-        # use the perfect quantum computer distribution for the TFIM circuit 
-        correct_dist = precalculated_data[f"Qubits3 - {num_qubits}"]
+    if method == 1 and not compare_to_exact_results:
+        # ideal Heisenburg Ham Sim. Circuit results
+        correct_dist = precalculated_data[f"Heisenburg - Qubits{num_qubits}"]
+    elif method == 1 and compare_to_exact_results:
+        # Classically calculated Heisenburg Ham Sim. Results 
+        correct_dist = precalculated_data[f"Exact Heisenburg - Qubits{num_qubits}"]
+    elif method == 2 and not compare_to_exact_results:   
+        # ideal Heisenburg Ham Sim. Circuit results
+        correct_dist = precalculated_data[f"TFIM - Qubits{num_qubits}"]
+    elif method == 2 and compare_to_exact_results:
+        # Classically calculated TFIM Ham Sim. Results 
+        correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
+    else: 
+        raise ValueError("Method 1 is not 1 or 2, or compare_to_exact_results was unexpected type.")
+    
 
     if verbose: print(f"Correct dist: {correct_dist}")
 
@@ -312,6 +404,7 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
         use_XX_YY_ZZ_gates = False,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
+        compare_to_exact_results = False,
         context=None, method=1):
 
     print(f"{benchmark_name} Benchmark Program - Qiskit")
@@ -341,8 +434,8 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
     # Define custom result handler
     def execution_handler(qc, result, num_qubits, type, num_shots):
         # determine fidelity of result set
-        num_qubits = int(num_qubits)
-        counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, method)
+        num_qubts = int(num_qubits)
+        counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, method, compare_to_exact_results)
         metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
 
     # Initialize execution module using the execution result handler above and specified backend_id
@@ -374,6 +467,7 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
                # For ideal or noise-less quantum circuits, k >> 1 gives perfect hamiltonian simulation.
         t = precalculated_data['t']  # time of simulation
         #######################################################################
+
 
         # loop over only 1 circuit
         for circuit_id in range(num_circuits):
@@ -411,10 +505,12 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
     else:
         print("\nXXYYZZ_opt =")
         print(XXYYZZ_)
-        
+       
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 
 # if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__':
+
+    run()
