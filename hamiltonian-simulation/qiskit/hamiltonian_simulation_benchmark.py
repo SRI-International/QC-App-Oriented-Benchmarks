@@ -437,7 +437,7 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, skip_qubits=1, num_shots=100
     # Define custom result handler
     def execution_handler(qc, result, num_qubits, type, num_shots):
         # determine fidelity of result set
-        num_qubts = int(num_qubits)
+        num_qubits = int(num_qubits)
         counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, method, compare_to_exact_results)
         metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
 
