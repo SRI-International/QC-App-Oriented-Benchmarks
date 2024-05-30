@@ -45,11 +45,11 @@ precalculated_data = json.loads(data)
 
 def initial_state(n_spins, method): 
 
+    qc = QuantumCircuit(n_spins)
+
     if method == 1: 
 
         # checkerboard state, or "Neele" state 
-
-        qc = QuantumCircuit(n_spins)
 
         for k in range(0, n_spins, 2):
             qc.x([k])
@@ -95,8 +95,6 @@ def construct_TFIM_hamiltonian(n_spins):
 
     # Construct SparsePauliOp
     sparse_pauli_op = SparsePauliOp.from_list(zip(pauli_strings, coefficients))
-    # remember to remove this print statement before merging into main 
-    print(sparse_pauli_op)
     return sparse_pauli_op
 
 
@@ -178,7 +176,7 @@ def HamiltonianSimulationExact(n_spins, t, method=1):
     return result.evolved_state.probabilities_dict()
     
 
-def HamiltonianSimulation(n_spins, K, t, method = 1, measure_x = False):
+def HamiltonianSimulation(n_spins, K, t, method = 1):
     '''
     Construct a Qiskit circuit for Hamiltonian Simulation
     :param n_spins:The number of spins to simulate
@@ -201,6 +199,11 @@ def HamiltonianSimulation(n_spins, K, t, method = 1, measure_x = False):
 
 
     if method==1:
+
+
+    # checkerboard state, or "Neele" state 
+        for k in range(0, n_spins, 2):
+            qc.x([k])
 
     # loop over each trotterustep, adding gates to the circuit defining the hamiltonian
         for k in range(K):
