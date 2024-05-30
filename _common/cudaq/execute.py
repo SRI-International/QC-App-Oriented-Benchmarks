@@ -211,6 +211,12 @@ def execute_circuit (batched_circuit):
         for key, val in result.items():
             print(f"... {key}:{val}")
         '''
+        print(f"... register names = {result.register_names}")
+        print(result.dump())
+        #print(f"... register dump = {result.get_register_counts('__global__').dump()}")
+        #result.get_register_counts("b1").dump()
+        #print(result.get_sequential_data())
+        
     # put job into the active circuits with circuit info
     active_circuits[job] = active_circuit
     #print("... active_circuit = ", str(active_circuit))

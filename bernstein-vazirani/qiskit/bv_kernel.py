@@ -28,7 +28,7 @@ def create_oracle(num_qubits: int, input_size: int, hidden_bits: List[int]):
             qc.cx(qr[i_qubit], qr[input_size])
     return qc
 
-def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
+def BersteinVazirani (num_qubits: int, secret_int: int, hidden_bits: List[int], method: int = 1):
     
     # size of input is one less than available qubits
     input_size = num_qubits - 1
@@ -37,8 +37,7 @@ def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
     if method == 1:
         # allocate qubits
         qr = QuantumRegister(num_qubits); cr = ClassicalRegister(input_size)
-        #qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")    # DEVNOTE
-        qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-X")
+        qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")
         
         # put ancilla in |1> state
         qc.x(qr[input_size])
@@ -72,7 +71,7 @@ def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
     elif method == 2:
         # allocate qubits
         qr = QuantumRegister(2); cr = ClassicalRegister(input_size);
-        qc = QuantumCircuit(qr, cr, name="main")
+        qc = QuantumCircuit(qr, cr, name=f"bv({method})-{num_qubits}-{secret_int}")
 
         # put ancilla in |-> state
         qc.x(qr[1])

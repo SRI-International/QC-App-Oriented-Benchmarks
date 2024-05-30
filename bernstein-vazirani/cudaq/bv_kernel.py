@@ -27,7 +27,7 @@ def oracle(register: cudaq.qview, auxillary_qubit: cudaq.qubit,
             x.ctrl(register[input_size - index - 1], auxillary_qubit)
 
 @cudaq.kernel           
-def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
+def bv_kernel (num_qubits: int, secret_int: int, hidden_bits: List[int], method: int = 1):
     
     # size of input is one less than available qubits
     input_size = num_qubits - 1
@@ -76,15 +76,15 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
         # DEVNOTE: the commented code below is an attempt to find a way to capture the mid-crcuit measurements
         # but it does not work correctly.  CUDA Q does not seem to permit saving measures to an array
         #ba = [0] * 4
-        #ba = [0,1,1,0]
+        ba = [0,1,1,0]
         for index, bit in enumerate(hidden_bits):
             if bit == 1:
                 h(qubits)
                 cx(qubits, auxillary_qubit)
                 h(qubits)
             
-            mz(qubits)
-            '''
+            #b = mz(qubits)
+            
             if index == 0:
                 b0 = mz(qubits)
             elif index == 1:
@@ -96,15 +96,15 @@ def bv_kernel (num_qubits: int, hidden_bits: List[int], method: int = 1):
             else:
                 b4 = mz(qubits)
                 
-            b5 = 1
-            b5 = b4
-            '''
-            #ba[index] = b
+            #b5 = 1
+            #b5 = b0
+            
+            #ba[index] = mz(qubits)
             #hidden_bits[index] = b
  
-def BersteinVazirani (num_qubits: int, hidden_bits: List[int], method: int = 1):
+def BersteinVazirani (num_qubits: int, secret_int: int, hidden_bits: List[int], method: int = 1):
 
-    qc = [bv_kernel, [num_qubits, hidden_bits, method]]
+    qc = [bv_kernel, [num_qubits, secret_int, hidden_bits, method]]
     
     global QC_
     if num_qubits <= 9:

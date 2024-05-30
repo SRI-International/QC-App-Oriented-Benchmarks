@@ -34,7 +34,7 @@ benchmark_name = "Bernstein-Vazirani Top"
 
 np.random.seed(0)
 
-verbose = True
+verbose = False
 
 # Variable for number of resets to perform after mid circuit measurements
 num_resets = 1
@@ -159,6 +159,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             
         # loop over limited # of secret strings for this
         for s_int in s_range:
+            s_int = int(s_int)
         
             # if user specifies input_value, use it instead
             # DEVNOTE: if max_circuits used, this will generate multiple bars per width
@@ -175,7 +176,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = BersteinVazirani(num_qubits, bitset, method)       
+            qc = BersteinVazirani(num_qubits, s_int, bitset, method)       
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
             
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
