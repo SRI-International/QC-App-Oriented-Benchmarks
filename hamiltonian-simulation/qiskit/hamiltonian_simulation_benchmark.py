@@ -442,90 +442,108 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         compare_to_exact_results: bool = False, context = None, method: int = 1):
     """
-    Run the Hamiltonian Simulation Benchmark.
+    Execute program with default parameters.
 
     Args:
-        min_qubits (int): Minimum number of qubits.
+        min_qubits (int): Minimum number of qubits (smallest circuit is 2 qubits).
         max_qubits (int): Maximum number of qubits.
-        max_circuits (int): Maximum number of circuits.
-        skip_qubits (int): Number of qubits to skip.
-        num_shots (int): Number of shots.
-        use_XX_YY_ZZ_gates (bool): Whether to use unoptimized XX YY ZZ gates.
-        backend_id (str): Backend ID for execution.
-        provider_backend: Provider backend.
+        max_circuits (int): Maximum number of circuits to execute per group.
+        skip_qubits (int): Increment of number of qubits.
+        num_shots (int): Number of shots for each circuit execution.
+        use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
+        backend_id (str): Backend identifier for execution.
+        provider_backend: Provider backend instance.
         hub (str): IBM Quantum hub.
         group (str): IBM Quantum group.
         project (str): IBM Quantum project.
         exec_options: Execution options.
-        compare_to_exact_results (bool): Whether to compare to exact results.
+        compare_to_exact_results (bool): Flag to compare results to exact simulation.
         context: Execution context.
-        method (int): Method of Hamiltonian construction (1 for Heisenberg, 2 for TFIM).
+        method (int): Method for Hamiltonian construction (1 for Heisenberg, 2 for TFIM).
 
     Returns:
         None
     """
     print(f"{benchmark_name} Benchmark Program - Qiskit")
-
-    # Validate parameters
+    
+    # Validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
-    if min_qubits % 2 == 1:
-        min_qubits += 1
+    if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even
     skip_qubits = max(1, skip_qubits)
 
-    if context is None:
-        context = f"{benchmark_name} Benchmark"
-
+    # Create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
+    # Set the flag to use an XX YY ZZ shim if given
     global _use_XX_YY_ZZ_gates
     _use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates
     if _use_XX_YY_ZZ_gates:
         print("... using unoptimized XX YY ZZ gates")
-
+    
     # Initialize metrics module
     metrics.init_metrics()
 
     # Define custom result handler
     def execution_handler(qc, result, num_qubits, type, num_shots):
+        # Determine fidelity of result set
         num_qubits = int(num_qubits)
         counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, method, compare_to_exact_results)
         metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
 
-    # Initialize execution module
+    # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
-    ex.set_execution_target(backend_id, provider_backend=provider_backend, hub=hub, group=group, project=project, exec_options=exec_options, context=context)
+    ex.set_execution_target(backend_id, provider_backend=provider_backend,
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
-    # Execute Benchmark Program
+    # Execute Benchmark Program N times for multiple circuit sizes
+    # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
-        np.random.seed(0)
-        num_circuits = max(1, max_circuits)
 
+        # Reset random seed
+        np.random.seed(0)
+
+        # Determine number of circuits to execute for this group
+        num_circuits = max(1, max_circuits)
+        
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
 
-        w = precalculated_data['w']
-        k = precalculated_data['k']
-        t = precalculated_data['t']
+        # Parameters of simulation
+        #### CANNOT BE MODIFIED W/O ALSO MODIFYING PRECALCULATED DATA #########
+        w = precalculated_data['w']  # Strength of disorder
+        k = precalculated_data['k']   # Trotter error.
+               # A large Trotter order approximates the Hamiltonian evolution better.
+               # But a large Trotter order also means the circuit is deeper.
+               # For ideal or noise-less quantum circuits, k >> 1 gives perfect Hamiltonian simulation.
+        t = precalculated_data['t']  # Time of simulation
+        #######################################################################
 
+        # Loop over only 1 circuit
         for circuit_id in range(num_circuits):
             ts = time.time()
-            h_x = precalculated_data['h_x'][:num_qubits]
+            h_x = precalculated_data['h_x'][:num_qubits]  # Precalculated random numbers between [-1, 1]
             h_z = precalculated_data['h_z'][:num_qubits]
             qc = HamiltonianSimulation(num_qubits, K=k, t=t, method=method)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
-
+            
             # Collapse the sub-circuits used in this benchmark (for Qiskit)
             qc2 = qc.decompose()
 
-            # Submit circuit for execution
+            # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc2, num_qubits, circuit_id, num_shots)
-
+        
+        # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
+    
+    # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
     # Print a sample circuit
     print("Sample Circuit:")
     print(QC_ if QC_ is not None else "  ... too large!")
-
+   
     if _use_XX_YY_ZZ_gates:
         print("\nXX, YY, ZZ =")
         print(XX_)
@@ -534,7 +552,8 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
     else:
         print("\nXXYYZZ_opt =")
         print(XXYYZZ_)
-
+       
+    # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 if __name__ == '__main__': run()
