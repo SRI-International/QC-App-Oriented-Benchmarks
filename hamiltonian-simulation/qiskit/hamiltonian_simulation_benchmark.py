@@ -17,8 +17,6 @@ import time
 import numpy as np
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
-from qiskit.quantum_info import SparsePauliOp
-from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
@@ -75,133 +73,8 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 
     return qc
 
-def construct_TFIM_hamiltonian(n_spins: int) -> SparsePauliOp:
-    """
-    Construct the Transverse Field Ising Model (TFIM) Hamiltonian.
 
-    Args:
-        n_spins (int): Number of spins (qubits).
-
-    Returns:
-        SparsePauliOp: The Hamiltonian represented as a sparse Pauli operator.
-    """
-    pauli_strings = []
-    coefficients = []
-    g = 0.2  # Strength of the transverse field
-
-    # Pauli spin vector product terms
-    for i in range(n_spins):
-        x_term = 'I' * i + 'X' + 'I' * (n_spins - i - 1)
-        pauli_strings.append(x_term)
-        coefficients.append(g)
-
-    identity_string = ['I'] * n_spins
-
-    # ZZ operation on each pair of qubits in a linear chain
-    for j in range(2):
-        for i in range(j % 2, n_spins - 1, 2):
-            zz_term = identity_string.copy()
-            zz_term[i] = 'Z'
-            zz_term[(i + 1) % n_spins] = 'Z'
-            zz_term = ''.join(zz_term)
-            pauli_strings.append(zz_term)
-            coefficients.append(1.0)
-
-    return SparsePauliOp.from_list(zip(pauli_strings, coefficients))
-
-def construct_heisenberg_hamiltonian(n_spins: int) -> SparsePauliOp:
-    """
-    Construct the Heisenberg Hamiltonian with disorder.
-
-    Args:
-        n_spins (int): Number of spins (qubits).
-
-    Returns:
-        SparsePauliOp: The Hamiltonian represented as a sparse Pauli operator.
-    """
-    w = precalculated_data['w']  # Strength of disorder
-    h_x = precalculated_data['h_x'][:n_spins]  # Precalculated random numbers between [-1, 1]
-    h_z = precalculated_data['h_z'][:n_spins]
-
-    pauli_strings = []
-    coefficients = []
-
-    # Disorder terms
-    for i in range(n_spins):
-        x_term = 'I' * i + 'X' + 'I' * (n_spins - i - 1)
-        z_term = 'I' * i + 'Z' + 'I' * (n_spins - i - 1)
-        pauli_strings.append(x_term)
-        coefficients.append(w * h_x[i])
-        pauli_strings.append(z_term)
-        coefficients.append(w * h_z[i])
-
-    identity_string = ['I'] * n_spins
-
-    # Interaction terms
-    for j in range(2):
-        for i in range(j % 2, n_spins - 1, 2):
-            xx_term = identity_string.copy()
-            yy_term = identity_string.copy()
-            zz_term = identity_string.copy()
-
-            xx_term[i] = 'X'
-            xx_term[(i + 1) % n_spins] = 'X'
-
-            yy_term[i] = 'Y'
-            yy_term[(i + 1) % n_spins] = 'Y'
-
-            zz_term[i] = 'Z'
-            zz_term[(i + 1) % n_spins] = 'Z'
-
-            pauli_strings.append(''.join(xx_term))
-            coefficients.append(1.0)
-            pauli_strings.append(''.join(yy_term))
-            coefficients.append(1.0)
-            pauli_strings.append(''.join(zz_term))
-            coefficients.append(1.0)
-
-    return SparsePauliOp.from_list(zip(pauli_strings, coefficients))
-
-def construct_hamiltonian(n_spins: int, hamiltonian: str) -> SparsePauliOp:
-    """
-    Construct the Hamiltonian based on the specified method.
-
-    Args:
-        n_spins (int): Number of spins (qubits).
-        hamiltonian (str): Which hamiltonian to run. "Heisenburg" by default but can also choose "TFIM". 
-
-    Returns:
-        SparsePauliOp: The constructed Hamiltonian.
-    """
-
-    hamiltonian = hamiltonian.strip().lower()
-
-    if hamiltonian == "heisenburg":
-        return construct_heisenberg_hamiltonian(n_spins)
-    elif hamiltonian == "tfim":
-        return construct_TFIM_hamiltonian(n_spins)
-    else:
-        raise ValueError("Invalid Hamiltonian specification.")
-
-def HamiltonianSimulationExact(n_spins: int, t: float, initial_state: str, hamiltonian="heisenburg") -> dict:
-    """
-    Perform exact Hamiltonian simulation using classical matrix evolution.
-
-    Args:
-        n_spins (int): Number of spins (qubits).
-        t (float): Duration of simulation.
-        initial_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
-        hamiltonian (str): Which hamiltonian to run. "Heisenburg" by default but can also choose "TFIM". 
-
-    Returns:
-        dict: The distribution of the evolved state.
-    """
-    hamiltonian_sparse = construct_hamiltonian(n_spins, hamiltonian)
-    time_problem = TimeEvolutionProblem(hamiltonian_sparse, t, initial_state=initial_state(n_spins, initial_state))
-    result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
-    return result.evolved_state.probabilities_dict()
-
-def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str) -> QuantumCircuit:
+def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: float, hx: list[float], hz: list[float]) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 
@@ -210,6 +83,9 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str) -> Q
         K (int): The Trotterization order.
         t (float): Duration of simulation.
         hamiltonian (str): Which hamiltonian to run. "Heisenburg" by default but can also choose "TFIM". 
+        w (float): Strength of two-qubit interactions for heisenburg hamiltonian. 
+        hx (list[float]): Strength of internal disorder parameter for heisenburg hamiltonian. 
+        hz (list[float]): Strength of internal disorder parameter for heisenburg hamiltonian. 
 
     Returns:
         QuantumCircuit: The constructed Qiskit circuit.
@@ -223,9 +99,8 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str) -> Q
     qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{secret_int}")
     tau = t / K
 
-    w = precalculated_data['w']  # Strength of disorder
-    h_x = precalculated_data['h_x'][:n_spins]  # Precalculated random numbers between [-1, 1]
-    h_z = precalculated_data['h_z'][:n_spins]
+    h_x = hx[:n_spins]
+    h_z = hz[:n_spins]
 
     hamiltonian = hamiltonian.strip().lower()
 
@@ -234,7 +109,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str) -> Q
         init_state = "checkerboard"
 
         # apply initial state
-        qc.append(initial_state(n_spins, init_state))
+        qc.append(initial_state(n_spins, init_state), qr)
         qc.barrier()
 
         # Loop over each Trotter step, adding gates to the circuit defining the Hamiltonian
@@ -263,7 +138,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str) -> Q
         init_state = "ghz"
 
         #apply initial state
-        qc.append(initial_state(n_spins, init_state))
+        qc.append(initial_state(n_spins, init_state), qr)
         qc.barrier()
 
         # Calculate TFIM
@@ -278,7 +153,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str) -> Q
             qc.barrier()
 
     else:
-        raise ValueError("Invalid method specification.")
+        raise ValueError("Invalid Hamiltonian specification.")
 
     # Measure all qubits
     for i_qubit in range(n_spins):
@@ -529,10 +404,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
         # Loop over only 1 circuit
         for circuit_id in range(num_circuits):
             ts = time.time()
-            h_x = precalculated_data['h_x'][:num_qubits]  # Precalculated random numbers between [-1, 1]
-            h_z = precalculated_data['h_z'][:num_qubits]
+            hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
+            hz = precalculated_data['hz'][:num_qubits]
 
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian)
+            qc = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian, w=w, hx = hx, hz = hz)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
             
