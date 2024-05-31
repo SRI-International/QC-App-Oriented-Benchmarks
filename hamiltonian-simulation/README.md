@@ -25,7 +25,7 @@ Where <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{whi
 
 The first sum represents the **interaction terms**, wheras the second sum represents the **disordered field terms** (see Fig 1.)
 
-In our benchmarks, both currently both $J=1$ and $w=1$.
+In our benchmarks, currently both $J=1$ and $w=1$.
 
 ### Transverse Field Ising Model (TFIM)
 
