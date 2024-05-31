@@ -133,7 +133,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
                         qc.append(xxyyzz_opt_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
             qc.barrier()
     elif hamiltonian == "tfim":
-        g = 0.2  # Strength of transverse field
+        h = 0.2  # Strength of transverse field
 
         init_state = "ghz"
 
@@ -144,7 +144,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
         # Calculate TFIM
         for k in range(K):
             for i in range(n_spins):
-                qc.rx(2 * tau * g, qr[i])
+                qc.rx(2 * tau * h, qr[i])
             qc.barrier()
 
             for j in range(2):
