@@ -30,7 +30,7 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 
 
 # Benchmark Name
-benchmark_name = "Bernstein-Vazirani Top"
+benchmark_name = "Bernstein-Vazirani"
 
 np.random.seed(0)
 
@@ -47,9 +47,9 @@ def str_to_ivec(input_size: int, s_int: int):
     s = ('{0:0' + str(input_size) + 'b}').format(s_int)
     
     # create an array to hold one integer per bit
-    bitset = [] 
+    bitset = []
     
-    # assign bits in reverse order of characters in string 
+    # assign bits in reverse order of characters in string
     for i in range(input_size):
 
         if s[input_size - 1 - i] == '1':
@@ -57,9 +57,9 @@ def str_to_ivec(input_size: int, s_int: int):
         else:
             bitset.append(0)
     
-    return bitset       
-            
-            
+    return bitset
+    
+    
 ############### Result Data Analysis
 
 # Analyze and print measured results
@@ -114,7 +114,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
     mid_circuit_qubit_group = []
 
     # If using mid_circuit measurements, set transform qubit group to true
-    transform_qubit_group = True if method ==2 else False
+    transform_qubit_group = True if method == 2 else False
     
     # Initialize metrics module
     metrics.init_metrics()
