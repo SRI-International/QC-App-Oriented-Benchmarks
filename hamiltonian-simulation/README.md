@@ -4,7 +4,18 @@ Simulation of quantum systems is one of the most promising applications for quan
 
 ## Problem outline
 
-This benchmark is written as a simulation of a non-trivial Hamiltonian. It is constrained to model a linear chain of interacting bodies with an open boundary condition. Our Hamiltonian of interest is the Heisenberg model with disordered fields and an open boundary condition
+This benchmark is written as a simulation of non-trivial Hamiltonians. It is constrained to model a linear chain of interacting bodies with an open boundary condition. Our Hamiltonians of interest are the **Heisenberg model with disordered fields** and the **Transverse Field Ising Model (TFIM)**, both with open boundary conditions.
+
+**For the Heisenberg Hamiltonian**, we start the system in an easily preparable classical state $|\psi(0)\rangle\equiv|010101\ldots\rangle$. **For the Transverse Field Ising Model (TFIM)**, we start the system in a GHZ state  $|\psi(0)\rangle = \left| \text{GHZ} \right\rangle = \frac{1}{\sqrt{2}} \left( |0\rangle^{\otimes n} + |1\rangle^{\otimes n} \right)$, where $n$ is equivalently the number of spins or qubits. In either case, we aim to evolve the system for $t$ time according to the solution to the Schrödinger equation with $H$ constant,
+
+$$
+|\psi(t)\rangle=e^{-i{H}t}|\psi(0)\rangle
+$$
+
+
+where we set <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\hbar=1"> here and elsewhere.
+
+### Heisenberg Model
 
 <p align="center">
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}H=J\sum_{i=0}^{N-2}(\sigma^x_i\sigma^x_{i+1}+\sigma^y_i\sigma^y_{i+1}+\sigma^z_i\sigma^z_{i+1})+w\sum_{i=0}^{N-1}(h_{x,i}\sigma^x_i+h_{z,i}\sigma^z_i)"/>
@@ -12,22 +23,36 @@ This benchmark is written as a simulation of a non-trivial Hamiltonian. It is co
 
 Where <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}J"/> is the strength of the interaction, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}w"/> is the strength of the disordered fields, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{x,i}"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{z,i}"/> give the strength of the x and z disorded fields at site <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}i"/>, and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^{\{x,y,z\}}_i"/> are the usual Pauli operators acting on site <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}i"/>. We will use the notation <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\{X_i,Y_i,Z_i\}\equiv\sigma^{\{x,y,z\}}_i"/> interchangably throughout this explanation.
 
-We start the system in an easily preparable classical state <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}|\psi(0)\rangle\equiv|010101\ldots\rangle"/> and aim to evolve the system for <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}t"/> time according to the solution to the Schr&ouml;dinger equation with <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}H"/> constant,
+The first sum represents the **interaction terms**, wheras the second sum represents the **disordered field terms** (see Fig 1.)
 
-<p align="center">
-<img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}|\psi(t)\rangle=e^{-i{H}t}|\psi(0)\rangle"/>,
-</p>
+In our benchmarks, currently both $J=1$ and $w=1$.
 
-where we set <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\hbar=1"> here and elsewhere. 
+### Transverse Field Ising Model (TFIM)
+
+The TFIM Hamiltonian is given by:
+
+$$
+H= J\sum_{i=0}^{N-2}\sigma^z_i\sigma^z_{i+1} + h\sum_{i=0}^{N-1}\sigma^x_i
+$$
+
+Where <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}J"/> is the coupling strength between neighboring spins, and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h"/> is the strength of the transverse field.
+
+In our benchmarks, currently both $J=1$ and $h=.2$.
 
 ## Benchmarking
-The Hamiltonian Simulation algorithm is benchmarked by running **just a single circuit**. This circuit is repeated a number of times denoted by `num_shots`. We then run the algorithm circuit for numbers of qubits between `min_qubits` and `max_qubits`, inclusive. The test returns the averages of the circuit creation times, average execution times, fidelities, and circuit depths, like all of the other algorithms. For this algorithm's fidelity calculation, we compare against the results returned from classical simulation using our [noise-normalized fidelity calculation](../_doc/POLARIZATION_FIDELITY.md).
+The Hamiltonian Simulation algorithm is benchmarked by running **just a single circuit**. This circuit is repeated a number of times denoted by `num_shots`. We then run the algorithm circuit for numbers of qubits between `min_qubits` and `max_qubits`, inclusive. The test returns the averages of the circuit creation times, average execution times, fidelities, and circuit depths, like all of the other algorithms. 
 
-We calculate these expected distributions in the jupyter notebook `precalculated_data.ipynb`, which stores the results for up to 20 qubits in the `precalculated_data.json` data file. The python code then imports the distributions from the `json` file. This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in number of qubits.
+After running the Hamiltonian Simulation circuit, there are two options for how to produce the fidelity metric, both of which use a precalculated distribution to compare to the Hamiltonian Simulation results. Method = 1 uses a distribution from a noiseless simulation of the trotterized quantum circuit. For this method, if the benchmark is also run on a noiseless simulation, with a high number of shots, the fidelity should be high. Method = 2 uses a classical matrix technique to simulate the evolution of the hamiltonian directly. Wheras method = 1 more directly tests the hardware, method = 2 also tests the accuracy of the hamiltonian simulation algorithm itself. 
+
+In either case, we compare the resultant distribution using our [noise-normalized fidelity calculation](../_doc/POLARIZATION_FIDELITY.md).
+
+We calculate these expected distributions in the jupyter notebook `precalculated_data.ipynb`, which stores the results for up to 20 qubits in the `precalculated_data.json` data file. The python code then imports the distributions from the `json` file. This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in number of qubits. 
+
+In the `precalculated_data.ipnyb`, we set the trotterization steps (k) to 5 and the time to .2. For the Heisenberg Hamiltonian, $w$ is set to 1 but $J$ is hard-coded to 1. For TFIM, the Hamiltonian variables are both hard-coded to $J=1$ and $h=.2$ respectively. 
 
 ## Classical algorithm
 
-Much effort has been done in the field of many-body physics to understand the approximate behaviors of Hamiltonians like the one we have here. However, to calculate the evolution of an excited state through exact diagonalization scales approximately as <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(2^{3n})"> for <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}n"> qubits, quite poor scaling [[2]](#references). This quickly becomes intractible even utilizing extremely powerful classical supercomputers.
+Much effort has been done in the field of many-body physics to understand the approximate behaviors of Hamiltonians like the ones we have here. However, to calculate the evolution of an excited state through exact diagonalization scales approximately as <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(2^{3n})"> for <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}n"> qubits, quite poor scaling [[2]](#references). This quickly becomes intractible even utilizing extremely powerful classical supercomputers.
 
 ## Quantum algorithm
 
@@ -37,9 +62,7 @@ To run this algorithm on our quantum computer, we need to find a way to apply th
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{-i{\sum_j{H}_j}t}=\lim_{k\rightarrow\infty}\left(\prod_j{e}^{-iH_j{t}/k}\right)^k"/>.
 </p>
 
-If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}k"/> to be finite, this is called Trotterization. This has a gate complexity of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(n^5)"/>, which is an exponential speedup. We can then apply successive layers of by exponentiating the individual terms in the Hamiltonian to approximate the evolution of any state. This makes the simulation easier, as it is much easier to calculate the gates which apply <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta\sigma^x_0\sigma^x_1}"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta\sigma^x_1\sigma^x_2}"/> than to find the gates which apply <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta(\sigma^x_0\sigma^x_1+\sigma^x_1\sigma^x_2)}"/>. This process can be visualized in the circuit diagram below with a single step.
-
-We chose in this benchmark to have the strength of the disorder to be <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}w=10"/>, the total evolution time to be <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}t=0.01"/>, and the number of Trotter steps to be <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}k=3"/>. These parameters are all set in the `precalculated_data.ipynb` file in the Hamiltonian simulation `_common` folder.
+If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}k"/> to be finite, this is called Trotterization. This has a gate complexity of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(n^5)"/>, which is an exponential speedup. We can then apply successive layers of by exponentiating the individual terms in the Hamiltonian to approximate the evolution of any state. This makes the simulation easier, as it is much easier to calculate the gates which apply <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta\sigma^x_0\sigma^x_1}"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta\sigma^x_1\sigma^x_2}"/> than to find the gates which apply <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta(\sigma^x_0\sigma^x_1+\sigma^x_1\sigma^x_2)}"/>. This process can be visualized in the circuit diagram below for the **Heisenberg Hamiltonian** with a single step.
 
 ### General Quantum Circuit
 
