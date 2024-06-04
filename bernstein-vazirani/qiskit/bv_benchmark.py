@@ -3,6 +3,9 @@ Bernstein-Vazirani Benchmark Program
 (C) Quantum Economic Development Consortium (QED-C) 2024.
 '''
 
+# This benchmark program runs at the API-specific level of the named benchmark directory.
+# It will be deprecated in favor of the API-independent version at the top-level.
+
 import sys
 import time
 

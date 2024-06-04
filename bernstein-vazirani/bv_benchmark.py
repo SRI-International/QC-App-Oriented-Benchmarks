@@ -3,6 +3,9 @@ Bernstein-Vazirani Benchmark Program
 (C) Quantum Economic Development Consortium (QED-C) 2024.
 '''
 
+# This benchmark program runs at the top level of the named benchmark directory.
+# It uses the "api" parameter to select the API to be used for kernel construction and execution.
+
 import sys
 import time
 import numpy as np
