@@ -3,20 +3,34 @@ Bernstein-Vazirani Benchmark Program
 (C) Quantum Economic Development Consortium (QED-C) 2024.
 '''
 
-# This benchmark program runs at the API-specific level of the named benchmark directory.
-# It will be deprecated in favor of the API-independent version at the top-level.
+# This benchmark program runs at the top level of the named benchmark directory.
+# It uses the "api" parameter to select the API to be used for kernel construction and execution.
 
 import sys
 import time
-
 import numpy as np
 
-sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
-import execute as ex
-import metrics as metrics
+############### Configure API
+# 
+# Configure the QED-C Benchmark package for use with the given API
+def qedc_benchmarks_init(api: str = "qiskit"):
 
-from bv_kernel import BersteinVazirani, kernel_draw
+    if api == None: api = "qiskit"
+
+    sys.path[1:1] = [ f"{api}" ]
+    sys.path[1:1] = [ "_common", f"_common/{api}" ]
+    sys.path[1:1] = [ "../_common", f"../_common/{api}" ]
+
+    import execute as ex
+    globals()["ex"] = ex
+
+    import metrics as metrics
+    globals()["metrics"] = metrics
+
+    from bv_kernel import BersteinVazirani, kernel_draw
+    
+    return BersteinVazirani, kernel_draw
+
 
 # Benchmark Name
 benchmark_name = "Bernstein-Vazirani"
@@ -81,8 +95,11 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
         method=1, input_value=None,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None):
+        context=None, api=None):
 
+    # configure the QED-C Benchmark package for use with the given API
+    BersteinVazirani, kernel_draw = qedc_benchmarks_init(api)
+    
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
     # validate parameters (smallest circuit is 3 qubits)
@@ -169,11 +186,11 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
               
         # Wait for some active circuits to complete; report metrics when groups complete
-        ex.throttle_execution(metrics.finalize_group)
+        ex.throttle_execution(metrics.finalize_group)  
         
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-
+       
     ##########
     
     # draw a sample circuit
@@ -189,8 +206,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 import argparse
 def get_args():
     parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
-    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
-    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
     parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
     parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
     parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits", type=int)
@@ -209,7 +226,7 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    #BersteinVazirani, kernel_draw = qedc_benchmarks_init(args.api)
+    BersteinVazirani, kernel_draw = qedc_benchmarks_init(args.api)
     
     # special argument handling
     ex.verbose = args.verbose
@@ -222,6 +239,6 @@ if __name__ == '__main__':
         method=args.method,
         input_value=args.input_value,
         backend_id=args.backend_id,
-        #api=args.api
+        api=args.api
         )
    

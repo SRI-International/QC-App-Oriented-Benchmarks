@@ -234,7 +234,7 @@ def set_execution_target(backend_id='qasm_simulator',
                 hub=None, group=None, project=None, exec_options=None,
                 context=None):
     """
-    Used to run jobs on a real hardware
+    Set the backend execution target.
     :param backend_id:  device name. List of available devices depends on the provider
     :param hub: hub identifier, currently "ibm-q" for IBM Quantum, "azure-quantum" for Azure Quantum 
     :param group: group identifier, used with IBM-Q accounts.
@@ -255,6 +255,10 @@ def set_execution_target(backend_id='qasm_simulator',
     global session_count
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
 
+    # default to qasm_simulator if None passed in
+    if backend_id == None:
+        backend_id="qasm_simulator"
+        
     # if a custom provider backend is given, use it ...
     # Note: in this case, the backend_id is an identifier that shows up in plots
     if provider_backend != None:
