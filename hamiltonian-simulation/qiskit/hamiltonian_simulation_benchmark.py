@@ -44,7 +44,7 @@ ZZ_mirror_ = None
 XXYYZZ_mirror_ = None
 
 # For validating the implementation of XXYYZZ operation
-_use_XX_YY_ZZ_gates = False
+_use_XX_YY_ZZ_gates = True
 
 # Import precalculated data to compare against
 filename = os.path.join(os.path.dirname(__file__), os.path.pardir, "_common", "precalculated_data.json")
@@ -98,7 +98,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
     """
     num_qubits = n_spins
     secret_int = f"{K}-{t}"
-    
+
     # Allocate qubits
     qr = QuantumRegister(n_spins)
     cr = ClassicalRegister(n_spins)
@@ -206,7 +206,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
         if n_spins < 9:
             QC_ = qc
 
-    return qc, qc_initial
+    return qc
 
 ############### XX, YY, ZZ Gate Implementations
 
@@ -438,6 +438,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
         tuple: Counts and fidelity.
     """
     counts = result.get_counts(qc)
+
     if verbose:
         print(f"For type {type} measured: {counts}")
 
@@ -452,6 +453,8 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
         correct_dist = precalculated_data[f"TFIM - Qubits{num_qubits}"]
     elif method == 2 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
+    elif method == 3 and hamiltonian == "heisenburg":
+        correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}
     else:
         raise ValueError("Method is not 1 or 2, or hamiltonian is not tfim or heisenburg.")
 
@@ -467,7 +470,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qubits: int = 1, num_shots: int = 100,
         use_XX_YY_ZZ_gates: bool = False, backend_id: str = 'qasm_simulator', provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
-        hamiltonian: str = "heisenburg", method: int = 1, 
+        hamiltonian: str = "heisenburg", method: int = 3, 
         context = None):
     """
     Execute program with default parameters.
@@ -553,7 +556,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
             hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
             hz = precalculated_data['hz'][:num_qubits]
 
-            qc, qc_initial = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian, w=w, hx = hx, hz = hz, method = 1)
+            qc = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian, w=w, hx = hx, hz = hz, method = 3)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
             
