@@ -610,6 +610,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
-if __name__ == '__main__': run(exec_options = {"noise_model" : None})
+if __name__ == '__main__': run()
 
 # if no noise model, put exec_options = {"noise_model" : None} as a parameter for run().
