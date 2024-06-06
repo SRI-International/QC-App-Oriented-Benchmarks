@@ -88,10 +88,10 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
         n_spins (int): Number of spins (qubits).
         K (int): The Trotterization order.
         t (float): Duration of simulation.
-        hamiltonian (str): Which hamiltonian to run. "Heisenburg" by default but can also choose "TFIM". 
-        w (float): Strength of two-qubit interactions for heisenburg hamiltonian. 
-        hx (list[float]): Strength of internal disorder parameter for heisenburg hamiltonian. 
-        hz (list[float]): Strength of internal disorder parameter for heisenburg hamiltonian. 
+        hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
+        w (float): Strength of two-qubit interactions for heisenberg hamiltonian. 
+        hx (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
+        hz (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
 
     Returns:
         QuantumCircuit: The constructed Qiskit circuit.
@@ -110,13 +110,12 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
 
     hamiltonian = hamiltonian.strip().lower()
 
-    if hamiltonian == "heisenburg": 
+    if hamiltonian == "heisenberg": 
 
         init_state = "checkerboard"
 
         # apply initial state
         qc.append(initial_state(n_spins, init_state), qr)
-        qc_initial = qc
         qc.barrier()
 
         # Loop over each Trotter step, adding gates to the circuit defining the Hamiltonian
@@ -128,11 +127,21 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
             
             # Basic implementation of exp(i * t * (XX + YY + ZZ))
             if _use_XX_YY_ZZ_gates:
+                # XX operator on each pair of qubits in linear chain
                 for j in range(2):
-                    for i in range(j % 2, n_spins - 1, 2):
+                    for i in range(j%2, n_spins - 1, 2):
                         qc.append(xx_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+
+                # YY operator on each pair of qubits in linear chain
+                for j in range(2):
+                    for i in range(j%2, n_spins - 1, 2):
                         qc.append(yy_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+
+                # ZZ operation on each pair of qubits in linear chain
+                for j in range(2):
+                    for i in range(j%2, n_spins - 1, 2):
                         qc.append(zz_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+                        
             else:
                 # Optimized XX + YY + ZZ operator on each pair of qubits in linear chain
                 for j in range(2):
@@ -146,10 +155,19 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
                 # Basic implementation of exp(-i * t * (XX + YY + ZZ)):
                 if _use_XX_YY_ZZ_gates:
                     # regular inverse of XX + YY + ZZ operators on each pair of quibts in linear chain
+                    # XX operator on each pair of qubits in linear chain
                     for j in range(2):
-                        for i in range(j % 2, n_spins - 1, 2):
+                        for i in range(j%2, n_spins - 1, 2):
                             qc.append(zz_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+
+                    # YY operator on each pair of qubits in linear chain
+                    for j in range(2):
+                        for i in range(j%2, n_spins - 1, 2):
                             qc.append(yy_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+
+                    # ZZ operation on each pair of qubits in linear chain
+                    for j in range(2):
+                        for i in range(j%2, n_spins - 1, 2):
                             qc.append(xx_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
 
                 else:
@@ -184,7 +202,6 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
         
         if (method == 3):
             for k in range(k):
-
                 for j in range(2):
                     for i in range(j % 2, n_spins - 1, 2):
                         qc.append(zz_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
@@ -404,7 +421,7 @@ def xxyyzz_opt_gate_mirror(tau: float) -> QuantumCircuit:
     beta = tau
     gamma = tau
     qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="xxyyzz_opt_gate_mirror")
+    qc = QuantumCircuit(qr, name="xxyyzz_opt_mirror")
     qc.rz(3.1416 / 2, qr[0])
     qc.cx(qr[1], qr[0])
     qc.ry(-3.1416 * beta + 3.1416 / 2, qr[1])
@@ -431,7 +448,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
         num_qubits (int): Number of qubits.
         type (str): Type of the simulation.
         num_shots (int): Number of shots.
-        hamiltonian (str): Which hamiltonian to run. "Heisenburg" by default but can also choose "TFIM". 
+        hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
         method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical).
 
     Returns:
@@ -445,32 +462,35 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
     hamiltonian = hamiltonian.strip().lower()
 
     # Precalculated correct distribution
-    if method == 1 and hamiltonian == "heisenburg":
-        correct_dist = precalculated_data[f"Heisenburg - Qubits{num_qubits}"]
-    elif method == 2 and hamiltonian == "heisenburg":
-        correct_dist = precalculated_data[f"Exact Heisenburg - Qubits{num_qubits}"]
+    if method == 1 and hamiltonian == "heisenberg":
+        correct_dist = precalculated_data[f"Heisenberg - Qubits{num_qubits}"]
+    elif method == 2 and hamiltonian == "heisenberg":
+        correct_dist = precalculated_data[f"Exact Heisenberg - Qubits{num_qubits}"]
     elif method == 1 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"TFIM - Qubits{num_qubits}"]
     elif method == 2 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
-    elif method == 3 and hamiltonian == "heisenburg":
+    elif method == 3 and hamiltonian == "heisenberg":
         correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}
+    elif method == 3 and hamiltonian == "tfim":
+        raise NotImplemetedError("Not implemeted yet.")
     else:
-        raise ValueError("Method is not 1 or 2, or hamiltonian is not tfim or heisenburg.")
+        raise ValueError("Method is not 1 or 2, or hamiltonian is not tfim or heisenberg.")
 
     if verbose:
         print(f"Correct dist: {correct_dist}")
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+
     return counts, fidelity
 
 ############### Benchmark Loop
 
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qubits: int = 1, num_shots: int = 100,
-        use_XX_YY_ZZ_gates: bool = False, backend_id: str = 'qasm_simulator', provider_backend = None,
+        use_XX_YY_ZZ_gates: bool = True, backend_id: str = 'qasm_simulator', provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
-        hamiltonian: str = "heisenburg", method: int = 3, 
+        hamiltonian: str = "heisenberg", method: int = 3, 
         context = None):
     """
     Execute program with default parameters.
@@ -488,8 +508,8 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
         group (str): IBM Quantum group.
         project (str): IBM Quantum project.
         exec_options: Execution options.
-        hamiltonian (str): Which hamiltonian to run. "Heisenburg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical).
+        hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
+        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
         context: Execution context.
 
     Returns:
@@ -556,7 +576,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
             hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
             hz = precalculated_data['hz'][:num_qubits]
 
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian, w=w, hx = hx, hz = hz, method = 3)
+            qc = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian, w=w, hx = hx, hz = hz, method = method)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
             
@@ -589,3 +609,5 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 if __name__ == '__main__': run()
+
+# if no noise model, put exec_options = {"noise_model" : None} as a parameter for run().
