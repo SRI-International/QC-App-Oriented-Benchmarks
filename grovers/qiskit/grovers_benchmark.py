@@ -1,17 +1,19 @@
-"""
-Grover's Search Benchmark Program - Qiskit
-"""
+'''
+Grover's Search Benchmark Program
+(C) Quantum Economic Development Consortium (QED-C) 2024.
+'''
 
 import sys
 import time
 
 import numpy as np
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 import execute as ex
 import metrics as metrics
+
+from grovers_kernel import GroversSearch, kernel_draw, _use_mcx_shim
 
 # Benchmark Name
 benchmark_name = "Grover's Search"
@@ -19,166 +21,6 @@ benchmark_name = "Grover's Search"
 np.random.seed(0)
 
 verbose = False
-
-# saved circuits for display
-QC_ = None
-grover_oracle = None
-diffusion_operator = None
- 
-# for validating the implementation of an mcx shim  
-_use_mcx_shim = False 
-
-############### Circuit Definition
-
-def GroversSearch(num_qubits, marked_item, n_iterations):
-
-    # allocate qubits
-    qr = QuantumRegister(num_qubits)
-    cr = ClassicalRegister(num_qubits)
-    qc = QuantumCircuit(qr, cr, name=f"grovers-{num_qubits}-{marked_item}")
-
-    # Start with Hadamard on all qubits
-    for i_qubit in range(num_qubits):
-        qc.h(qr[i_qubit])
-
-    # loop over the estimated number of iterations
-    for _ in range(n_iterations):
-
-        qc.barrier()
-    
-        # add the grover oracle
-        qc.append(add_grover_oracle(num_qubits, marked_item).to_instruction(), qr)
-        
-        # add the diffusion operator
-        qc.append(add_diffusion_operator(num_qubits).to_instruction(), qr)
-
-    qc.barrier()
-        
-    # measure all qubits
-    qc.measure(qr, cr)
-
-    # save smaller circuit example for display
-    global QC_    
-    if QC_ == None or num_qubits <= 5:
-        if num_qubits < 9: QC_ = qc
-        
-    # return a handle on the circuit
-    return qc
-
-############## Grover Oracle
-
-def add_grover_oracle(num_qubits, marked_item):
-    global grover_oracle
-    
-    marked_item_bits = format(marked_item, f"0{num_qubits}b")[::-1]
-
-    qr = QuantumRegister(num_qubits); qc = QuantumCircuit(qr, name="oracle")
-
-    for (q, bit) in enumerate(marked_item_bits):
-        if not int(bit):
-            qc.x(q)
-
-    qc.h(num_qubits - 1)
-    
-    if _use_mcx_shim:
-        add_mcx(qc, [x for x in range(num_qubits - 1)], num_qubits - 1)
-    else:
-        qc.mcx([x for x in range(num_qubits - 1)], num_qubits - 1)
-        
-    qc.h(num_qubits - 1)
-
-    qc.barrier()
-
-    for (q, bit) in enumerate(marked_item_bits):
-        if not int(bit):
-            qc.x(q)
-
-    if grover_oracle == None or num_qubits <= 5:
-        if num_qubits < 9: grover_oracle = qc
-        
-    return qc
-
-############## Grover Diffusion Operator
-
-def add_diffusion_operator(num_qubits):
-    global diffusion_operator
-
-    qr = QuantumRegister(num_qubits); qc = QuantumCircuit(qr, name="diffuser")
-
-    for i_qubit in range(num_qubits):
-        qc.h(qr[i_qubit])
-    for i_qubit in range(num_qubits):
-        qc.x(qr[i_qubit])
-    qc.h(num_qubits - 1)
-    
-    if _use_mcx_shim:
-        add_mcx(qc, [x for x in range(num_qubits - 1)], num_qubits - 1)
-    else:
-        qc.mcx([x for x in range(num_qubits - 1)], num_qubits - 1)
-        
-    qc.h(num_qubits - 1)
-
-    qc.barrier()
-
-    for i_qubit in range(num_qubits):
-        qc.x(qr[i_qubit])
-    for i_qubit in range(num_qubits):
-        qc.h(qr[i_qubit])
-        
-    if diffusion_operator == None or num_qubits <= 5:
-        if num_qubits < 9: diffusion_operator = qc
-        
-    return qc
-
-############### MCX shim
-
-# single cx / cu1 unit for mcx implementation
-def add_cx_unit(qc, cxcu1_unit, controls, target):
-    num_controls = len(controls)
-    i_qubit = cxcu1_unit[1]
-    j_qubit = cxcu1_unit[0]
-    theta = cxcu1_unit[2]
-    
-    if j_qubit != None:
-        qc.cx(controls[j_qubit], controls[i_qubit]) 
-    qc.cu1(theta, controls[i_qubit], target)
-        
-    i_qubit = i_qubit - 1
-    if j_qubit == None:
-        j_qubit = i_qubit + 1
-    else:
-        j_qubit = j_qubit - 1
-        
-    if theta < 0:
-        theta = -theta
-    
-    new_units = []
-    if i_qubit >= 0:
-        new_units += [ [ j_qubit, i_qubit, -theta ] ]
-        new_units += [ [ num_controls - 1, i_qubit, theta ] ]
-        
-    return new_units
-
-# mcx recursion loop 
-def add_cxcu1_units(qc, cxcu1_units, controls, target):
-    new_units = []
-    for cxcu1_unit in cxcu1_units:
-        new_units += add_cx_unit(qc, cxcu1_unit, controls, target)
-    cxcu1_units.clear()
-    return new_units
-
-# mcx gate implementation: brute force and inefficent
-# start with a single CU1 on last control and target
-# and recursively expand for each additional control
-def add_mcx(qc, controls, target):
-    num_controls = len(controls)
-    theta = np.pi / 2**num_controls
-    qc.h(target)
-    cxcu1_units = [ [ None, num_controls - 1, theta] ]
-    while len(cxcu1_units) > 0:
-        cxcu1_units += add_cxcu1_units(qc, cxcu1_units, controls, target)
-    qc.h(target)
-
 
 ################ Analysis
   
@@ -223,7 +65,7 @@ MAX_QUBITS=8
 # Execute program with default parameters
 def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
         use_mcx_shim=False,
-        backend_id='qasm_simulator', provider_backend=None,
+        backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 
@@ -244,9 +86,7 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     if context is None: context = f"{benchmark_name} Benchmark"
     
     # set the flag to use an mcx shim if given
-    global _use_mcx_shim
-    _use_mcx_shim = use_mcx_shim
-    if _use_mcx_shim:
+    if use_mcx_shim:
         print("... using MCX shim")
     
     ##########
@@ -283,7 +123,9 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         if 2**(num_qubits) <= max_circuits:
             s_range = list(range(num_circuits))
         else:
-            s_range = np.random.choice(2**(num_qubits), num_circuits, False)
+            # create selection larger than needed and remove duplicates (faster than random.choice())
+            s_range = np.random.randint(1, 2**(num_qubits), num_circuits + 10)
+            s_range = list(set(s_range))[0:max_circuits]
         
         # loop over limited # of secret strings for this
         for s_int in s_range:
@@ -292,14 +134,11 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
 
             n_iterations = int(np.pi * np.sqrt(2 ** num_qubits) / 4)
 
-            qc = GroversSearch(num_qubits, s_int, n_iterations)
+            qc = GroversSearch(num_qubits, s_int, n_iterations, use_mcx_shim)
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time() - ts)
-
-            # collapse the sub-circuits used in this benchmark (for qiskit)
-            qc2 = qc.decompose()
             
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, s_int, num_shots)
+            ex.submit_circuit(qc, num_qubits, s_int, num_shots)
         
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
@@ -309,14 +148,53 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     
     ##########
     
-    # print a sample circuit created (if not too large)
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    print("\nOracle ="); print(grover_oracle if grover_oracle!= None else "  ... too large!")
-    print("\nDiffuser ="); print(diffusion_operator )
+    # draw a sample circuit
+    kernel_draw()
 
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 
+#######################
+# MAIN
+
+import argparse
+def get_args():
+    parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
+    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
+    parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
+    parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits", type=int)
+    parser.add_argument("--min_qubits", "-min", default=2, help="Minimum number of qubits", type=int)
+    parser.add_argument("--max_qubits", "-max", default=6, help="Maximum number of qubits", type=int)
+    parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
+    parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
+    #parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
+    parser.add_argument("--use_mcx_shim", action="store_true", help="Use MCX Shim")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    return parser.parse_args()
+    
 # if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__': 
+    args = get_args()
+    
+    # configure the QED-C Benchmark package for use with the given API
+    # (done here so we can set verbose for now)
+    #HiddenShift, kernel_draw = qedc_benchmarks_init(args.api)
+    
+    # special argument handling
+    ex.verbose = args.verbose
+    if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
+    
+    # execute benchmark program
+    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
+        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
+        num_shots=args.num_shots,
+        #method=args.method,            # not used currently
+        use_mcx_shim=args.use_mcx_shim,
+        backend_id=args.backend_id,
+        #api=args.api
+        )
+ 
