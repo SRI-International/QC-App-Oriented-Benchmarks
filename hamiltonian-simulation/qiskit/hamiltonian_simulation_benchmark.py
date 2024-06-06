@@ -473,7 +473,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
     elif method == 3 and hamiltonian == "heisenberg":
         correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}
     elif method == 3 and hamiltonian == "tfim":
-        raise NotImplemetedError("Not implemeted yet.")
+        correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
     else:
         raise ValueError("Method is not 1 or 2, or hamiltonian is not tfim or heisenberg.")
 
@@ -482,6 +482,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    print(counts, correct_dist)
 
     return counts, fidelity
 
@@ -490,7 +491,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qubits: int = 1, num_shots: int = 100,
         use_XX_YY_ZZ_gates: bool = True, backend_id: str = 'qasm_simulator', provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
-        hamiltonian: str = "heisenberg", method: int = 1, 
+        hamiltonian: str = "tfim", method: int = 3, 
         context = None):
     """
     Execute program with default parameters.
@@ -609,6 +610,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
-if __name__ == '__main__': run()
+if __name__ == '__main__': run(exec_options = {"noise_model" : None})
 
 # if no noise model, put exec_options = {"noise_model" : None} as a parameter for run().
