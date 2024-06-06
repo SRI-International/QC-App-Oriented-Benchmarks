@@ -80,7 +80,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
     return qc
 
 
-def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: float, hx: list[float], hz: list[float]) -> QuantumCircuit:
+def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: float, hx: list[float], hz: list[float], method: int) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 
@@ -104,7 +104,6 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
     cr = ClassicalRegister(n_spins)
     qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{secret_int}")
     tau = t / K
-    method = 1
 
     h_x = hx[:n_spins]
     h_z = hz[:n_spins]
@@ -117,6 +116,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
 
         # apply initial state
         qc.append(initial_state(n_spins, init_state), qr)
+        qc_initial = qc
         qc.barrier()
 
         # Loop over each Trotter step, adding gates to the circuit defining the Hamiltonian
@@ -165,7 +165,6 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
     
     elif hamiltonian == "tfim":
         h = 0.2  # Strength of transverse field
-
         init_state = "ghz"
 
         #apply initial state
@@ -207,7 +206,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
         if n_spins < 9:
             QC_ = qc
 
-    return qc
+    return qc, qc_initial
 
 ############### XX, YY, ZZ Gate Implementations
 
@@ -554,7 +553,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
             hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
             hz = precalculated_data['hz'][:num_qubits]
 
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian, w=w, hx = hx, hz = hz)
+            qc, qc_initial = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian, w=w, hx = hx, hz = hz, method = 1)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
             
