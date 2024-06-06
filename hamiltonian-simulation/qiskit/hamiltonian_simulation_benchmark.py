@@ -88,7 +88,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
         n_spins (int): Number of spins (qubits).
         K (int): The Trotterization order.
         t (float): Duration of simulation.
-        hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
+        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
         w (float): Strength of two-qubit interactions for heisenberg hamiltonian. 
         hx (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
         hz (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
@@ -448,7 +448,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
         num_qubits (int): Number of qubits.
         type (str): Type of the simulation.
         num_shots (int): Number of shots.
-        hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
+        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
         method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical).
 
     Returns:
@@ -490,7 +490,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qubits: int = 1, num_shots: int = 100,
         use_XX_YY_ZZ_gates: bool = True, backend_id: str = 'qasm_simulator', provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
-        hamiltonian: str = "heisenberg", method: int = 3, 
+        hamiltonian: str = "heisenberg", method: int = 1, 
         context = None):
     """
     Execute program with default parameters.
@@ -508,8 +508,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
         group (str): IBM Quantum group.
         project (str): IBM Quantum project.
         exec_options: Execution options.
-        hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
+
+        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
+        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical).
         context: Execution context.
 
     Returns:
