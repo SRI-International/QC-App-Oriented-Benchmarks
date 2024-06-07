@@ -44,7 +44,7 @@ ZZ_mirror_ = None
 XXYYZZ_mirror_ = None
 
 # For validating the implementation of XXYYZZ operation
-_use_XX_YY_ZZ_gates = True
+_use_XX_YY_ZZ_gates = False
 
 # Import precalculated data to compare against
 filename = os.path.join(os.path.dirname(__file__), os.path.pardir, "_common", "precalculated_data.json")
