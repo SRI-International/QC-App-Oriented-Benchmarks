@@ -9,6 +9,7 @@ HamiltonianSimulation forms the trotterized circuit used in the benchmark.
 HamiltonianSimulationExact runs a classical calculation that perfectly simulates hamiltonian evolution, although it does not scale well. 
 """
 
+#This is Anish's branch
 import json
 import os
 import sys
@@ -36,6 +37,11 @@ XX_ = None
 YY_ = None
 ZZ_ = None
 XXYYZZ_ = None
+# Mirror Gates of the previous four gates
+XX_mirror_ = None
+YY_mirror_ = None
+ZZ_mirror_ = None
+XXYYZZ_mirror_ = None
 
 # For validating the implementation of XXYYZZ operation
 _use_XX_YY_ZZ_gates = False
@@ -74,7 +80,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
     return qc
 
 
-def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: float, hx: list[float], hz: list[float]) -> QuantumCircuit:
+def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: float, hx: list[float], hz: list[float], method: int) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 
@@ -92,7 +98,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
     """
     num_qubits = n_spins
     secret_int = f"{K}-{t}"
-    
+
     # Allocate qubits
     qr = QuantumRegister(n_spins)
     cr = ClassicalRegister(n_spins)
@@ -121,20 +127,63 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
             
             # Basic implementation of exp(i * t * (XX + YY + ZZ))
             if _use_XX_YY_ZZ_gates:
+                # XX operator on each pair of qubits in linear chain
                 for j in range(2):
-                    for i in range(j % 2, n_spins - 1, 2):
+                    for i in range(j%2, n_spins - 1, 2):
                         qc.append(xx_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+
+                # YY operator on each pair of qubits in linear chain
+                for j in range(2):
+                    for i in range(j%2, n_spins - 1, 2):
                         qc.append(yy_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+
+                # ZZ operation on each pair of qubits in linear chain
+                for j in range(2):
+                    for i in range(j%2, n_spins - 1, 2):
                         qc.append(zz_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+                        
             else:
                 # Optimized XX + YY + ZZ operator on each pair of qubits in linear chain
                 for j in range(2):
                     for i in range(j % 2, n_spins - 1, 2):
                         qc.append(xxyyzz_opt_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
             qc.barrier()
+
+        if (method == 3):
+            # Add mirror gates for negative time simulation
+            for k in range(K): 
+                # Basic implementation of exp(-i * t * (XX + YY + ZZ)):
+                if _use_XX_YY_ZZ_gates:
+                    # regular inverse of XX + YY + ZZ operators on each pair of quibts in linear chain
+                    # XX operator on each pair of qubits in linear chain
+                    for j in range(2):
+                        for i in range(j%2, n_spins - 1, 2):
+                            qc.append(zz_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+
+                    # YY operator on each pair of qubits in linear chain
+                    for j in range(2):
+                        for i in range(j%2, n_spins - 1, 2):
+                            qc.append(yy_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+
+                    # ZZ operation on each pair of qubits in linear chain
+                    for j in range(2):
+                        for i in range(j%2, n_spins - 1, 2):
+                            qc.append(xx_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+
+                else:
+                    # optimized Inverse of XX + YY + ZZ operator on each pair of qubits in linear chain
+                    for j in range(2):
+                        for i in range(j % 2, n_spins - 1, 2):
+                            qc.append(xxyyzz_opt_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+                qc.barrier()
+
+                # the Pauli spin vector product
+                [qc.rz(-2 * tau * w * h_z[i], qr[i]) for i in range(n_spins)]
+                [qc.rx(-2 * tau * w * h_x[i], qr[i]) for i in range(n_spins)]
+                qc.barrier()
+    
     elif hamiltonian == "tfim":
         h = 0.2  # Strength of transverse field
-
         init_state = "ghz"
 
         #apply initial state
@@ -151,6 +200,16 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
                 for i in range(j % 2, n_spins - 1, 2):
                     qc.append(zz_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
             qc.barrier()
+        
+        if (method == 3):
+            for k in range(k):
+                for j in range(2):
+                    for i in range(j % 2, n_spins - 1, 2):
+                        qc.append(zz_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+                qc.barrier()
+                for i in range(n_spins):
+                    qc.rx(-2 * tau * h, qr[i])
+                qc.barrier()
 
     else:
         raise ValueError("Invalid Hamiltonian specification.")
@@ -273,6 +332,111 @@ def xxyyzz_opt_gate(tau: float) -> QuantumCircuit:
 
     return qc
 
+############### Mirrors of XX, YY, ZZ Gate Implementations   
+def xx_gate_mirror(tau: float) -> QuantumCircuit:
+    """
+    Simple XX mirror gate on q0 and q1 with angle 'tau'.
+
+    Args:
+        tau (float): The rotation angle.
+
+    Returns:
+        QuantumCircuit: The XX_mirror_ gate circuit.
+    """
+    qr = QuantumRegister(2, 'q')
+    qc = QuantumCircuit(qr, name="xx_gate_mirror")
+    qc.h(qr[0])
+    qc.h(qr[1])
+    qc.cx(qr[0], qr[1])
+    qc.rz(-3.1416 * tau, qr[1])
+    qc.cx(qr[0], qr[1])
+    qc.h(qr[0])
+    qc.h(qr[1])
+
+    global XX_mirror_
+    XX_mirror_ = qc
+
+    return qc
+
+def yy_gate_mirror(tau: float) -> QuantumCircuit:
+    """
+    Simple YY mirror gate on q0 and q1 with angle 'tau'.
+
+    Args:
+        tau (float): The rotation angle.
+
+    Returns:
+        QuantumCircuit: The YY_mirror_ gate circuit.
+    """
+    qr = QuantumRegister(2)
+    qc = QuantumCircuit(qr, name="yy_gate_mirror")
+    qc.s(qr[0])
+    qc.s(qr[1])
+    qc.h(qr[0])
+    qc.h(qr[1])
+    qc.cx(qr[0], qr[1])
+    qc.rz(-3.1416 * tau, qr[1])
+    qc.cx(qr[0], qr[1])
+    qc.h(qr[0])
+    qc.h(qr[1])
+    qc.sdg(qr[0])
+    qc.sdg(qr[1])
+
+    global YY_mirror_
+    YY_mirror_ = qc
+
+    return qc   
+
+def zz_gate_mirror(tau: float) -> QuantumCircuit:
+    """
+    Simple ZZ mirror gate on q0 and q1 with angle 'tau'.
+
+    Args:
+        tau (float): The rotation angle.
+
+    Returns:
+        QuantumCircuit: The ZZ_mirror_ gate circuit.
+    """
+    qr = QuantumRegister(2)
+    qc = QuantumCircuit(qr, name="zz_gate_mirror")
+    qc.cx(qr[0], qr[1])
+    qc.rz(-3.1416 * tau, qr[1])
+    qc.cx(qr[0], qr[1])
+
+    global ZZ_mirror_
+    ZZ_mirror_ = qc
+
+    return qc
+
+def xxyyzz_opt_gate_mirror(tau: float) -> QuantumCircuit:
+    """
+    Optimal combined XXYYZZ mirror gate (with double coupling) on q0 and q1 with angle 'tau'.
+
+    Args:
+        tau (float): The rotation angle.
+
+    Returns:
+        QuantumCircuit: The optimal combined XXYYZZ_mirror_ gate circuit.
+    """
+    alpha = tau
+    beta = tau
+    gamma = tau
+    qr = QuantumRegister(2)
+    qc = QuantumCircuit(qr, name="xxyyzz_opt_mirror")
+    qc.rz(3.1416 / 2, qr[0])
+    qc.cx(qr[1], qr[0])
+    qc.ry(-3.1416 * beta + 3.1416 / 2, qr[1])
+    qc.cx(qr[0], qr[1])
+    qc.ry(-3.1416 / 2 + 3.1416 * alpha, qr[1])
+    qc.rz(-3.1416 * gamma + 3.1416 / 2, qr[0])
+    qc.cx(qr[1], qr[0])
+    qc.rz(-3.1416 / 2, qr[1])
+
+    global XXYYZZ_mirror_
+    XXYYZZ_mirror_ = qc
+
+    return qc
+
 ############### Result Data Analysis
 
 def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: str, num_shots: int, hamiltonian: str, method: int) -> tuple:
@@ -286,12 +450,13 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
         type (str): Type of the simulation.
         num_shots (int): Number of shots.
         hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical).
+        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
 
     Returns:
         tuple: Counts and fidelity.
     """
     counts = result.get_counts(qc)
+
     if verbose:
         print(f"For type {type} measured: {counts}")
 
@@ -306,6 +471,10 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
         correct_dist = precalculated_data[f"TFIM - Qubits{num_qubits}"]
     elif method == 2 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
+    elif method == 3 and hamiltonian == "heisenberg":
+        correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}
+    elif method == 3 and hamiltonian == "tfim":
+        correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
     else:
         raise ValueError("Method is not 1 or 2, or hamiltonian is not tfim or heisenberg.")
 
@@ -314,6 +483,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+
     return counts, fidelity
 
 ############### Benchmark Loop
@@ -339,8 +509,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
         group (str): IBM Quantum group.
         project (str): IBM Quantum project.
         exec_options: Execution options.
+
         hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical).
+        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
         context: Execution context.
 
     Returns:
@@ -407,7 +578,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
             hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
             hz = precalculated_data['hz'][:num_qubits]
 
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian, w=w, hx = hx, hz = hz)
+            qc = HamiltonianSimulation(num_qubits, K=k, t=t, hamiltonian=hamiltonian, w=w, hx = hx, hz = hz, method = method)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
             
@@ -440,3 +611,5 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 if __name__ == '__main__': run()
+
+# if no noise model, put exec_options = {"noise_model" : None} as a parameter for run().
