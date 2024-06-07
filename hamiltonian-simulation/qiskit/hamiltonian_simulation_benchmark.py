@@ -175,7 +175,8 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: f
                     for j in range(2):
                         for i in range(j % 2, n_spins - 1, 2):
                             qc.append(xxyyzz_opt_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-                    
+                qc.barrier()
+
                 # the Pauli spin vector product
                 [qc.rz(-2 * tau * w * h_z[i], qr[i]) for i in range(n_spins)]
                 [qc.rx(-2 * tau * w * h_x[i], qr[i]) for i in range(n_spins)]
@@ -449,7 +450,7 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
         type (str): Type of the simulation.
         num_shots (int): Number of shots.
         hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical).
+        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
 
     Returns:
         tuple: Counts and fidelity.
@@ -482,16 +483,15 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
-    print(counts, correct_dist)
 
     return counts, fidelity
 
 ############### Benchmark Loop
 
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qubits: int = 1, num_shots: int = 100,
-        use_XX_YY_ZZ_gates: bool = True, backend_id: str = 'qasm_simulator', provider_backend = None,
+        use_XX_YY_ZZ_gates: bool = False, backend_id: str = 'qasm_simulator', provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
-        hamiltonian: str = "tfim", method: int = 3, 
+        hamiltonian: str = "heisenberg", method: int = 1, 
         context = None):
     """
     Execute program with default parameters.
@@ -511,7 +511,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
         exec_options: Execution options.
 
         hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical).
+        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
         context: Execution context.
 
     Returns:
