@@ -609,9 +609,17 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         print(XX_)
         print(YY_)
         print(ZZ_)
+        if method == 3:
+            print("\nXX, YY, ZZ mirror=")
+            print(XX_mirror_)
+            print(YY_mirror_)
+            print(ZZ_mirror_)
     else:
         print("\nXXYYZZ_opt =")
         print(XXYYZZ_)
+        if method == 3:
+            print("\nXXYYZZ_opt_mirror =")
+            print(XXYYZZ_mirror_)
        
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
