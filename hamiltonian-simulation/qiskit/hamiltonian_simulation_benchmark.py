@@ -1,15 +1,17 @@
-"""
-Hamiltonian-Simulation Benchmark Program - Qiskit
+'''
+Hamiltonian Simulation Benchmark Program - Qiskit
+(C) Quantum Economic Development Consortium (QED-C) 2024.
+'''
 
+'''
 This program benchmarks Hamiltonian simulation using Qiskit. 
 The central function is the `run()` method, which orchestrates the entire benchmarking process.
 
 HamiltonianSimulation forms the trotterized circuit used in the benchmark.
 
 HamiltonianSimulationExact runs a classical calculation that perfectly simulates hamiltonian evolution, although it does not scale well. 
-"""
+'''
 
-#This is Anish's branch
 import json
 import os
 import sys
@@ -80,7 +82,9 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
     return qc
 
 
-def HamiltonianSimulation(n_spins: int, K: int, t: float, hamiltonian: str, w: float, hx: list[float], hz: list[float], method: int) -> QuantumCircuit:
+def HamiltonianSimulation(n_spins: int, K: int, t: float,
+            hamiltonian: str, w: float, hx: list[float], hz: list[float],
+            method: int) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 
@@ -488,11 +492,13 @@ def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int, type: 
 
 ############### Benchmark Loop
 
-def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qubits: int = 1, num_shots: int = 100,
-        use_XX_YY_ZZ_gates: bool = False, backend_id: str = 'qasm_simulator', provider_backend = None,
+def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
+        skip_qubits: int = 1, num_shots: int = 100,
+        hamiltonian: str = "heisenberg", method: int = 1,
+        use_XX_YY_ZZ_gates: bool = False,
+        backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
-        hamiltonian: str = "heisenberg", method: int = 1, 
-        context = None):
+        context = None, api = None):
     """
     Execute program with default parameters.
 
@@ -610,6 +616,54 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3, skip_qu
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
-if __name__ == '__main__': run()
 
-# if no noise model, put exec_options = {"noise_model" : None} as a parameter for run().
+#######################
+# MAIN
+
+import argparse
+def get_args():
+    parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
+    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
+    parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
+    parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits (min = max = N)", type=int)
+    parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
+    parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)     
+    parser.add_argument("--hamiltonian", "-ham", default="heisenberg", help="Name of Hamiltonian", type=str)
+    parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
+    parser.add_argument("--use_XX_YY_ZZ_gates", action="store_true", help="Use explicit XX, YY, ZZ gates")
+    #parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    return parser.parse_args()
+ 
+# if main, execute method
+if __name__ == '__main__':   
+    args = get_args()
+    
+    # configure the QED-C Benchmark package for use with the given API
+    # (done here so we can set verbose for now)
+    #PhaseEstimation, kernel_draw = qedc_benchmarks_init(args.api)
+    
+    # special argument handling
+    ex.verbose = args.verbose
+    verbose = args.verbose
+    
+    if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
+    
+    # execute benchmark program
+    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
+        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
+        num_shots=args.num_shots,
+        hamiltonian=args.hamiltonian,
+        method=args.method,
+        use_XX_YY_ZZ_gates = args.use_XX_YY_ZZ_gates,
+        #theta=args.theta,
+        backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
+        #api=args.api
+        )
+
