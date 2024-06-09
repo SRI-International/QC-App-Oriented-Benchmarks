@@ -72,8 +72,8 @@ def theta_to_bitstring(theta, num_counting_qubits):
 # Convert bitstring to theta representation, useful for debugging
 def bitstring_to_theta(counts, num_counting_qubits):
     theta_counts = {}
-    for key in counts.keys():
-        r = counts[key]
+    for item in counts.items():
+        key, r = item
         theta = int(key,2) / (2**num_counting_qubits)
         if theta not in theta_counts.keys():
             theta_counts[theta] = 0
@@ -85,6 +85,7 @@ def bitstring_to_theta(counts, num_counting_qubits):
 
 # Execute program with default parameters
 def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
+        init_phase=None,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
@@ -149,6 +150,11 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 
         # loop over limited # of random theta choices
         for theta in theta_range:
+            theta = float(theta) 
+            
+            # if initial phase passed in, use it instead of random values
+            if init_phase:
+                theta = init_phase
         
             # create the circuit for given qubit size and theta, store time metric
             ts = time.time()
@@ -189,7 +195,8 @@ def get_args():
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-    parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
+    parser.add_argument("--init_phase", "-p", default=0.0, help="Input Phase Value", type=float)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
     
@@ -203,6 +210,8 @@ if __name__ == '__main__':
     
     # special argument handling
     ex.verbose = args.verbose
+    verbose = args.verbose
+    
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
     # execute benchmark program
@@ -210,8 +219,9 @@ if __name__ == '__main__':
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots=args.num_shots,
         #method=args.method,
-        #theta=args.theta,
+        init_phase=args.init_phase,
         backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
         #api=args.api
         )
    
