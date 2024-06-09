@@ -200,6 +200,7 @@ def get_args():
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
     
@@ -213,6 +214,8 @@ if __name__ == '__main__':
     
     # special argument handling
     ex.verbose = args.verbose
+    verbose = args.verbose
+    
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
     # execute benchmark program
@@ -222,6 +225,7 @@ if __name__ == '__main__':
         method=args.method,
         input_value=args.input_value,
         backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
         #api=args.api
         )
    
