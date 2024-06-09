@@ -4,54 +4,89 @@ Phase Estimation Benchmark Program - CUDA Quantum Kernel
 '''
 
 import cudaq
-
+    
 # saved circuits for display
 QC_ = None
 Uf_ = None
 
-############### BV Circuit Definition
-'''
+############### Phase Esimation Circuit Definition
+
+# Inverse Quantum Fourier Transform
 @cudaq.kernel
-def oracle(register: cudaq.qview, auxillary_qubit: cudaq.qubit,
-           hidden_bits: List[int]):
-    input_size = len(hidden_bits)
-    for index, bit in enumerate(hidden_bits):
-        if bit == 1:
-            # apply a `cx` gate with the current qubit as
-            # the control and the auxillary qubit as the target.
-            x.ctrl(register[input_size - index - 1], auxillary_qubit)
-'''
+def iqft(register: cudaq.qview):
+    M_PI = 3.1415926536
+    
+    input_size = register.size()
+     
+    # use this as a barrier when drawing circuit; comment out otherwise
+    for i in range(input_size / 2):
+        swap(register[i], register[input_size - i - 1])
+        swap(register[i], register[input_size - i - 1])
+            
+    # Generate multiple groups of diminishing angle CRZs and H gate
+    for i_qubit in range(input_size):
+        ri_qubit = input_size - i_qubit - 1             # map to cudaq qubits
+        
+        # precede with an H gate (applied to all qubits)
+        h(register[ri_qubit])
+        
+        # number of controlled Z rotations to perform at this level
+        num_crzs = input_size - i_qubit - 1
+        
+        # if not the highest order qubit, add multiple controlled RZs of decreasing angle
+        if i_qubit < input_size - 1:   
+            for j in range(0, num_crzs):
+                #divisor = 2 ** (j + 1)     # DEVNOTE: #1663 This does not work on Quantum Cloud
+
+                X = j + 1                   # WORKAROUND
+                divisor = 1
+                for i in range(X):
+                    divisor *= 2
+                
+                r1.ctrl( -M_PI / divisor , register[ri_qubit], register[ri_qubit - j - 1])       
+    
 @cudaq.kernel           
+#def pe_kernel (num_qubits: int, theta: float, do_uopt: bool):
 def pe_kernel (num_qubits: int, theta: float):
+    M_PI = 3.1415926536
+    
+    init_phase = 2 * M_PI * theta
+    do_uopt = True
     
     # size of input is one less than available qubits
     input_size = num_qubits - 1
         
-    # Allocate the specified number of qubits - this
-    # corresponds to the length of the hidden bitstring.
-    qubits = cudaq.qvector(input_size)
+    # Allocate on less than the specified number of qubits for phase register
+    counting_qubits = cudaq.qvector(input_size)
     
-    # Allocate an extra auxillary qubit.
-    auxillary_qubit = cudaq.qubit()
+    # Allocate an extra qubit for the state register (can expand this later)
+    state_register = cudaq.qubit()
 
     # Prepare the auxillary qubit.
-    h(auxillary_qubit)
-    z(auxillary_qubit)
+    x(state_register)
 
-    # Place the rest of the register in a superposition state.
-    h(qubits)
+    # Place the phase register in a superposition state.
+    h(counting_qubits)
 
-    # Query the oracle.
-    #oracle(qubits, auxillary_qubit, hidden_bits)
-
-    # Apply another set of Hadamards to the register.
-    h(qubits)
+    # Perform `ctrl-U^j`        (DEVNOTE: need to pass in as lambda later)
+    for i in range(input_size):
+        ii_qubit = input_size - i - 1
+        i_qubit = i
+        
+        # optimize by collapsing all phase gates at one level to single gate
+        if do_uopt:
+            exp_phase = init_phase * (2 ** i_qubit) 
+            r1.ctrl(exp_phase, counting_qubits[i_qubit], state_register);
+        else:
+            for j in range(2 ** i_qubit):
+                r1.ctrl(init_phase, counting_qubits[i_qubit], state_register);
     
-    # DEVNOTE: compare to Qiskit version - do we need to flip the aux bit back? and measure all?
+    # Apply inverse quantum Fourier transform
+    iqft(counting_qubits)
 
     # Apply measurement gates to just the `qubits`
     # (excludes the auxillary qubit).
-    mz(qubits)
+    mz(counting_qubits)
         
  
 def PhaseEstimation (num_qubits: int, theta: float):
