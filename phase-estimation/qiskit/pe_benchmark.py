@@ -47,9 +47,9 @@ def analyze_and_print_result(qc, result, num_counting_qubits, theta, num_shots):
 
     if verbose:
         print(f"For theta {theta}, expected: {correct_dist} measured: {counts}")
-        print(f"   ... For theta {theta} thermal_dist: {thermal_dist}")
+        #print(f"   ... For theta {theta} thermal_dist: {thermal_dist}")
         print(f"For theta {theta}, app expected: {app_correct_dist} measured: {app_counts}")
-        print(f"   ... For theta {theta} app_thermal_dist: {app_thermal_dist}")
+        #print(f"   ... For theta {theta} app_thermal_dist: {app_thermal_dist}")
         
     # use polarization fidelity with rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
@@ -135,7 +135,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         np.random.seed(0)
 
         # as circuit width grows, the number of counting qubits is increased
-        num_counting_qubits = num_qubits - num_state_qubits - 1
+        num_counting_qubits = num_qubits - num_state_qubits
 
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_counting_qubits), max_circuits)
@@ -144,9 +144,13 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         
         # determine range of secret strings to loop over
         if 2**(num_counting_qubits) <= max_circuits:
-            theta_range = [i/(2**(num_counting_qubits)) for i in list(range(num_circuits))]
+            theta_choices = list(range(num_circuits))
         else:
-            theta_range = [i/(2**(num_counting_qubits)) for i in np.random.choice(2**(num_counting_qubits), num_circuits, False)]
+            theta_choices = np.random.randint(1, 2**(num_counting_qubits), num_circuits + 10)
+            theta_choices = list(set(theta_choices))[0:num_circuits]
+            
+        # scale choices to 1.0
+        theta_range = [i/(2**(num_counting_qubits)) for i in theta_choices]
 
         # loop over limited # of random theta choices
         for theta in theta_range:
