@@ -127,8 +127,8 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
                         
             else:
                 # Optimized XX + YY + ZZ operator on each pair of qubits in linear chain
-                for j in range(2):
-                    for i in range(j % 2, n_spins - 1, 2):
+                for j in reversed(range(2)):
+                    for i in reversed(range(j % 2, n_spins - 1, 2)):
                         qc.append(xxyyzz_opt_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
             qc.barrier()
 
@@ -318,6 +318,9 @@ def xxyyzz_opt_gate(tau: float) -> QuantumCircuit:
     XXYYZZ_ = qc
 
     return qc
+
+    
+
 
 ############### Mirrors of XX, YY, ZZ Gate Implementations   
 def xx_gate_mirror(tau: float) -> QuantumCircuit:

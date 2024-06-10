@@ -83,14 +83,13 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     elif method == 3 and hamiltonian == "tfim":
         correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
     else:
-        raise ValueError("Method is not 1 or 2, or hamiltonian is not tfim or heisenberg.")
+        raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
 
     if verbose:
         print(f"Correct dist: {correct_dist}")
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
-
     return counts, fidelity
 
 ############### Benchmark Loop
