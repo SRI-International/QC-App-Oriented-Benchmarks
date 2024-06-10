@@ -415,18 +415,17 @@ def xxyyzz_opt_gate_mirror(tau: float) -> QuantumCircuit:
     qc = QuantumCircuit(qr, name="xxyyzz_opt_mirror")
     qc.rz(3.1416 / 2, qr[0])
     qc.cx(qr[1], qr[0])
-    qc.ry((-3.1416 * beta) + (3.1416 / 2), qr[1])
+    qc.ry(-3.1416 * beta + 3.1416 / 2, qr[1])
     qc.cx(qr[0], qr[1])
-    qc.ry((-3.1416 / 2) + (3.1416 * alpha), qr[1])
-    qc.rz((-3.1416 * gamma) + (3.1416 / 2), qr[0])
+    qc.ry(-3.1416 / 2 + 3.1416 * alpha, qr[1])
+    qc.rz(-3.1416 * gamma + 3.1416 / 2, qr[0])
     qc.cx(qr[1], qr[0])
-    qc.rz((-3.1416 / 2), qr[1])
+    qc.rz(-3.1416 / 2, qr[1])
 
     global XXYYZZ_mirror_
     XXYYZZ_mirror_ = qc
 
     return qc
-
 
 
 ############### BV Circuit Drawer

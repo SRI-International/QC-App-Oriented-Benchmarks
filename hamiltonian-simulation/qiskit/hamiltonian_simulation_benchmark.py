@@ -90,14 +90,13 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
-    print(counts, correct_dist)
     return counts, fidelity
 
 ############### Benchmark Loop
 
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
-        hamiltonian: str = "tfim", method: int = 3,
+        hamiltonian: str = "heisenberg", method: int = 1,
         use_XX_YY_ZZ_gates: bool = False,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
