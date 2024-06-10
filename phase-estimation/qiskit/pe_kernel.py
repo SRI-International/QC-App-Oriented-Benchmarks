@@ -82,24 +82,23 @@ def inv_qft_gate(input_size):
     #global QFTI_, num_gates, depth
     global QFTI_
     qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="inv_qft")
-    
+
     # Generate multiple groups of diminishing angle CRZs and H gate
-    for i_qubit in reversed(range(0, input_size)):
-    
-        # start laying out gates from highest order qubit (the hidx)
-        hidx = input_size - i_qubit - 1
+    for i_qubit in range(input_size):
         
         # precede with an H gate (applied to all qubits)
-        qc.h(qr[hidx])
+        qc.h(qr[i_qubit])
+        
+        # number of controlled Z rotations to perform at this level
+        num_crzs = input_size - i_qubit - 1
         
         # if not the highest order qubit, add multiple controlled RZs of decreasing angle
-        if hidx < input_size - 1:   
-            num_crzs = i_qubit
-            for j in reversed(range(0, num_crzs)):
-                divisor = 2 ** (num_crzs - j)
-                qc.crz( -math.pi / divisor , qr[hidx], qr[input_size - j - 1])
+        if i_qubit < input_size - 1:   
+            for j in range(0, num_crzs):
+                divisor = 2 ** (j + 1)
+                qc.crz( -math.pi / divisor , qr[i_qubit], qr[i_qubit + j + 1])
             
-        qc.barrier()  
+        qc.barrier()
     
     if QFTI_ == None or input_size <= 5:
         if input_size < 9: QFTI_= qc
