@@ -173,6 +173,7 @@ def get_args():
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     #parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
     parser.add_argument("--use_mcx_shim", action="store_true", help="Use MCX Shim")
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
     
@@ -186,6 +187,8 @@ if __name__ == '__main__':
     
     # special argument handling
     ex.verbose = args.verbose
+    verbose = args.verbose
+    
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
     # execute benchmark program
@@ -195,6 +198,7 @@ if __name__ == '__main__':
         #method=args.method,            # not used currently
         use_mcx_shim=args.use_mcx_shim,
         backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
         #api=args.api
         )
  
