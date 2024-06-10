@@ -60,7 +60,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 def HamiltonianSimulation(n_spins: int, K: int, t: float,
             hamiltonian: str, w: float, hx: list[float], hz: list[float],
             use_XX_YY_ZZ_gates: bool = False,
-            method: int = 3) -> QuantumCircuit:
+            method: int = 1) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 
