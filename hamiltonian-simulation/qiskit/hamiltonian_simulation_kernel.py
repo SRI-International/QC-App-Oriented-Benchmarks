@@ -307,12 +307,12 @@ def xxyyzz_opt_gate(tau: float) -> QuantumCircuit:
     qc = QuantumCircuit(qr, name="xxyyzz_opt")
     qc.rz(3.1416 / 2, qr[1])
     qc.cx(qr[1], qr[0])
-    qc.rz((3.1416 * gamma) - (3.1416 / 2), qr[0])
-    qc.ry((3.1416 / 2) - (3.1416 * alpha), qr[1])
+    qc.rz(3.1416 * gamma - 3.1416 / 2, qr[0])
+    qc.ry(3.1416 / 2 - 3.1416 * alpha, qr[1])
     qc.cx(qr[0], qr[1])
-    qc.ry((3.1416 * beta) - (3.1416 / 2), qr[1])
+    qc.ry(3.1416 * beta - 3.1416 / 2, qr[1])
     qc.cx(qr[1], qr[0])
-    qc.rz((-3.1416 / 2), qr[0])
+    qc.rz(-3.1416 / 2, qr[0])
 
     global XXYYZZ_
     XXYYZZ_ = qc
