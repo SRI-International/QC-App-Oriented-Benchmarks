@@ -60,7 +60,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 def HamiltonianSimulation(n_spins: int, K: int, t: float,
             hamiltonian: str, w: float, hx: list[float], hz: list[float],
             use_XX_YY_ZZ_gates: bool = False,
-            method: int = 1) -> QuantumCircuit:
+            method: int = 3) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 
@@ -127,8 +127,8 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
                         
             else:
                 # Optimized XX + YY + ZZ operator on each pair of qubits in linear chain
-                for j in range(2):
-                    for i in range(j % 2, n_spins - 1, 2):
+                for j in reversed(range(2)):
+                    for i in reversed(range(j % 2, n_spins - 1, 2)):
                         qc.append(xxyyzz_opt_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
             qc.barrier()
 
@@ -307,17 +307,20 @@ def xxyyzz_opt_gate(tau: float) -> QuantumCircuit:
     qc = QuantumCircuit(qr, name="xxyyzz_opt")
     qc.rz(3.1416 / 2, qr[1])
     qc.cx(qr[1], qr[0])
-    qc.rz(3.1416 * gamma - 3.1416 / 2, qr[0])
-    qc.ry(3.1416 / 2 - 3.1416 * alpha, qr[1])
+    qc.rz((3.1416 * gamma) - (3.1416 / 2), qr[0])
+    qc.ry((3.1416 / 2) - (3.1416 * alpha), qr[1])
     qc.cx(qr[0], qr[1])
-    qc.ry(3.1416 * beta - 3.1416 / 2, qr[1])
+    qc.ry((3.1416 * beta) - (3.1416 / 2), qr[1])
     qc.cx(qr[1], qr[0])
-    qc.rz(-3.1416 / 2, qr[0])
+    qc.rz((-3.1416 / 2), qr[0])
 
     global XXYYZZ_
     XXYYZZ_ = qc
 
     return qc
+
+    
+
 
 ############### Mirrors of XX, YY, ZZ Gate Implementations   
 def xx_gate_mirror(tau: float) -> QuantumCircuit:
@@ -412,17 +415,18 @@ def xxyyzz_opt_gate_mirror(tau: float) -> QuantumCircuit:
     qc = QuantumCircuit(qr, name="xxyyzz_opt_mirror")
     qc.rz(3.1416 / 2, qr[0])
     qc.cx(qr[1], qr[0])
-    qc.ry(-3.1416 * beta + 3.1416 / 2, qr[1])
+    qc.ry((-3.1416 * beta) + (3.1416 / 2), qr[1])
     qc.cx(qr[0], qr[1])
-    qc.ry(-3.1416 / 2 + 3.1416 * alpha, qr[1])
-    qc.rz(-3.1416 * gamma + 3.1416 / 2, qr[0])
+    qc.ry((-3.1416 / 2) + (3.1416 * alpha), qr[1])
+    qc.rz((-3.1416 * gamma) + (3.1416 / 2), qr[0])
     qc.cx(qr[1], qr[0])
-    qc.rz(-3.1416 / 2, qr[1])
+    qc.rz((-3.1416 / 2), qr[1])
 
     global XXYYZZ_mirror_
     XXYYZZ_mirror_ = qc
 
     return qc
+
 
 
 ############### BV Circuit Drawer

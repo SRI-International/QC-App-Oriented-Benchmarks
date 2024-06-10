@@ -83,21 +83,21 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     elif method == 3 and hamiltonian == "tfim":
         correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
     else:
-        raise ValueError("Method is not 1 or 2, or hamiltonian is not tfim or heisenberg.")
+        raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
 
     if verbose:
         print(f"Correct dist: {correct_dist}")
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
-
+    print(counts, correct_dist)
     return counts, fidelity
 
 ############### Benchmark Loop
 
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
-        hamiltonian: str = "heisenberg", method: int = 1,
+        hamiltonian: str = "tfim", method: int = 3,
         use_XX_YY_ZZ_gates: bool = False,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
