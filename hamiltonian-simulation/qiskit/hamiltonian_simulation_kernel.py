@@ -95,7 +95,7 @@ def Heisenberg(n_spins: int, K: int, t: float, tau: float, w: float, h_x: list[f
     return qc
 
 ########### TFIM circuit
-def tfim(n_spins: int, K: int, tau: float, use_XX_YY_ZZ_gates: bool):
+def tfim(n_spins: int, K: int, tau: float, use_XX_YY_ZZ_gates: bool)-> QuantumCircuit:
     h = 0.2  # Strength of transverse field
     qr = QuantumRegister(n_spins)
     qc = QuantumCircuit(qr, name = "TFIM")
@@ -111,7 +111,7 @@ def tfim(n_spins: int, K: int, tau: float, use_XX_YY_ZZ_gates: bool):
     return qc
 
 ############## Apply random Pauli gates to all the qubits.
-def create_random_paulis(n_spins):
+def create_random_paulis(n_spins)-> QuantumCircuit:
     """Create a quantum oracle that applies random Pauli gates to n qubits."""
     qr = QuantumRegister(n_spins)
     qc = QuantumCircuit(qr, name = "RandomPaulis")
@@ -128,7 +128,7 @@ def create_random_paulis(n_spins):
     return qc
 
 ############# Resultant Pauli after applying quasi inverse Hamiltonain and random Pauli to Hamiltonian.
-def ResultantPauli(n_spins):
+def ResultantPauli(n_spins)-> QuantumCircuit:
     """Create a quantum oracle that is the result of applying quasi inverse Hamiltonain and random Pauli to Hamiltonian."""
     qr = QuantumRegister(n_spins)
     qc = QuantumCircuit(qr)
@@ -138,7 +138,7 @@ def ResultantPauli(n_spins):
     return qc
 
 ############ Quasi Inverse Heisenberg    
-def QuasiHamiltonian(hamiltonian_circuit, random_pauli_oracle, res_pauli, n_spins):
+def QuasiHamiltonian(hamiltonian_circuit, random_pauli_oracle, res_pauli, n_spins)-> QuantumCircuit:
                 qr = QuantumRegister(n_spins)
                 qc = QuantumCircuit(qr, name = "QuasiHamiltonian")
                 hamiltonian_circuit_inverse = hamiltonian_circuit.inverse()
