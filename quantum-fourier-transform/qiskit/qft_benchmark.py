@@ -248,7 +248,7 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots, met
 
 # Execute program with default parameters
 def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, skip_qubits=1, num_shots = 100,
-        method=1, 
+        method=1, input_value=None,
         backend_id='qasm_simulator', provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
@@ -302,7 +302,8 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, skip_qubits=1, num_sh
             if 2**(input_size) <= max_circuits:
                 s_range = list(range(num_circuits))
             else:
-                s_range = np.random.choice(2**(input_size), num_circuits, False)
+                s_range = np.random.randint(0, 2**(input_size), num_circuits + 2)
+                s_range = list(set(s_range))[0:num_circuits]
          
         elif method == 3:
             num_circuits = min(input_size, max_circuits)
@@ -310,15 +311,22 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, skip_qubits=1, num_sh
             if input_size <= max_circuits:
                 s_range = list(range(num_circuits))
             else:
-                s_range = np.random.choice(range(input_size), num_circuits, False)
+                s_range = np.random.randint(0, 2**(input_size), num_circuits + 2)
+                s_range = list(set(s_range))[0:num_circuits]
         
         else:
             sys.exit("Invalid QFT method")
-
+            
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
         
         # loop over limited # of secret strings for this
         for s_int in s_range:
+            s_int = int(s_int)
+            
+            # if user specifies input_value, use it instead
+            # DEVNOTE: if max_circuits used, this will generate separate bar for each num_circuits
+            if input_value is not None:
+                s_int = input_value
 
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
@@ -351,5 +359,49 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, skip_qubits=1, num_sh
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
 
-# if main, execute method 1
-if __name__ == '__main__': run()
+#######################
+# MAIN
+
+import argparse
+def get_args():
+    parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
+    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
+    parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
+    parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits", type=int)
+    parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
+    parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
+    parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
+    parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    return parser.parse_args()
+    
+# if main, execute method
+if __name__ == '__main__': 
+    args = get_args()
+    
+    # configure the QED-C Benchmark package for use with the given API
+    # (done here so we can set verbose for now)
+    #QuantumFourierTransform, kernel_draw = qedc_benchmarks_init(args.api)
+    
+    # special argument handling
+    ex.verbose = args.verbose
+    verbose = args.verbose
+    
+    if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
+    
+    # execute benchmark program
+    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
+        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
+        num_shots=args.num_shots,
+        method=args.method,
+        input_value=args.input_value,      # not implemented yet
+        backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
+        #api=args.api
+        )
+   

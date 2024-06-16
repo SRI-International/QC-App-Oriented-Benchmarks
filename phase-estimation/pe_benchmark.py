@@ -5,17 +5,30 @@ Phase Estimation Benchmark Program
 
 import sys
 import time
-
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
-import execute as ex
-import metrics as metrics
+############### Configure API
+# 
+# Configure the QED-C Benchmark package for use with the given API
+def qedc_benchmarks_init(api: str = "qiskit"):
 
-#from qft_benchmark import inv_qft_gate
-from pe_kernel import PhaseEstimation, kernel_draw
+    if api == None: api = "qiskit"
 
+    sys.path[1:1] = [ f"{api}" ]
+    sys.path[1:1] = [ "_common", f"_common/{api}" ]
+    sys.path[1:1] = [ "../_common", f"../_common/{api}" ]
+
+    import execute as ex
+    globals()["ex"] = ex
+
+    import metrics as metrics
+    globals()["metrics"] = metrics
+
+    from pe_kernel import PhaseEstimation, kernel_draw
+    
+    return PhaseEstimation, kernel_draw
+    
+    
 # Benchmark Name
 benchmark_name = "Phase Estimation"
 
@@ -31,7 +44,7 @@ verbose = False
 def analyze_and_print_result(qc, result, num_counting_qubits, theta, num_shots):
 
     # get results as measured counts
-    counts = result.get_counts(qc)  
+    counts = result.get_counts(qc)
 
     # calculate expected output histogram
     correct_dist = theta_to_bitstring(theta, num_counting_qubits)
@@ -88,8 +101,11 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         init_phase=None,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None):
+        context=None, api=None):
 
+    # configure the QED-C Benchmark package for use with the given API
+    PhaseEstimation, kernel_draw = qedc_benchmarks_init(api)
+    
     print(f"{benchmark_name} Benchmark Program - Qiskit")
 
     num_state_qubits = 1 # default, not exposed to users, cannot be changed in current implementation
@@ -189,8 +205,8 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 import argparse
 def get_args():
     parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
-    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
-    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
     parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
     parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
     parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits", type=int)
@@ -210,7 +226,7 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    #PhaseEstimation, kernel_draw = qedc_benchmarks_init(args.api)
+    PhaseEstimation, kernel_draw = qedc_benchmarks_init(args.api)
     
     # special argument handling
     ex.verbose = args.verbose
@@ -226,7 +242,7 @@ if __name__ == '__main__':
         init_phase=args.init_phase,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
-        #api=args.api
+        api=args.api
         )
    
 
