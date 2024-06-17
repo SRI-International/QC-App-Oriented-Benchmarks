@@ -79,7 +79,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     elif method == 2 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
     elif method == 3 and hamiltonian == "heisenberg":
-        correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}
+        correct_dist = {''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]):num_shots}
     elif method == 3 and hamiltonian == "tfim":
         correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
     else:
@@ -90,6 +90,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    print(counts,correct_dist)
     return counts, fidelity
 
 ############### Benchmark Loop
