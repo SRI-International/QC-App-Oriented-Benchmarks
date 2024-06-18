@@ -561,6 +561,11 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
     print("Sample Circuit:")
     print(QC_ if QC_ is not None else "  ... too large!")
     
+    # we don't restrict save of large sub-circuits, so skip printing if num_qubits too large
+    if QCI_ is not None and QCI_.num_qubits > 6:
+        print("... subcircuits too large to print") 
+        return
+        
     print("  Initial State:")
     if QCI_ is not None: print(QCI_)
     

@@ -96,8 +96,6 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
-    print("count", counts)
-    print("exp:", correct_dist)
     return counts, fidelity
 
 
