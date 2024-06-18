@@ -12,14 +12,24 @@ In this case, method 3 is used to create a mirror circuit for scalability.
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 import numpy as np
+
+# DEVNOTE: the global variables below will be converted to class instance variables later
+
 # Saved circuits and subcircuits for display
 QC_ = None
+QCI_ = None
+QCR_ = None
+QCRP_ = None
+QCRS_ = None
+
+QC2_ = None
 XX_ = None
 YY_ = None
 ZZ_ = None
 XXYYZZ_ = None
 
 # Mirror Gates of the previous four gates
+QC2D_ = None
 XX_mirror_ = None
 YY_mirror_ = None
 ZZ_mirror_ = None
@@ -123,33 +133,37 @@ def create_random_paulis(n_spins)-> QuantumCircuit:
             qc.y(i)
         elif gate == 'z':
             qc.z(i)
-        qc.barrier()   
+            
+    qc.barrier()  
+    
     return qc
 
 ############# Resultant Pauli after applying quasi inverse Hamiltonain and random Pauli to Hamiltonian.
 def ResultantPauli(n_spins)-> QuantumCircuit:
     """Create a quantum oracle that is the result of applying quasi inverse Hamiltonain and random Pauli to Hamiltonian."""
     qr = QuantumRegister(n_spins)
-    qc = QuantumCircuit(qr)
+    qc = QuantumCircuit(qr, name = "ResultantPaulis")
     for n in range(n_spins):
         qc.x(n)      # You can apply any Pauli, but you must also change the state you are comparing with.
-        qc.barrier()
+        
+    qc.barrier()
+    
     return qc
 
 ############ Quasi Inverse Heisenberg 
 ########### ~H P H = R ==> ~H = R H' P'  ; ~H is QuasiHamiltonian, P is Random Pauli, H is Hamiltonian, R is resultant circuit that appends on the initial state
 def QuasiHamiltonian(hamiltonian_circuit, random_pauli_oracle, res_pauli, n_spins)-> QuantumCircuit:
-                qr = QuantumRegister(n_spins)
-                qc = QuantumCircuit(qr, name = "QuasiHamiltonian")
-                hamiltonian_circuit_inverse = hamiltonian_circuit.inverse()
-                random_pauli_oracle_inverse = random_pauli_oracle.inverse()
-                
-                qc.append(random_pauli_oracle_inverse,qr)             
-                qc.append(hamiltonian_circuit_inverse ,qr)
-                
-                qc.append(res_pauli,qr) 
+    qr = QuantumRegister(n_spins)
+    qc = QuantumCircuit(qr, name = "QuasiHamiltonian")
+    hamiltonian_circuit_inverse = hamiltonian_circuit.inverse()
+    random_pauli_oracle_inverse = random_pauli_oracle.inverse()
+    
+    qc.append(random_pauli_oracle_inverse,qr)             
+    qc.append(hamiltonian_circuit_inverse ,qr)
+    
+    qc.append(res_pauli,qr) 
 
-                return qc
+    return qc
 
 #Inverse of Heisenberg model. mirror gates are applied.
 def HeisenbergInverse(n_spins: int, K: int, t: float, tau: float, w: float, h_x: list[float], h_z: list[float],
@@ -225,6 +239,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
     Returns:
         QuantumCircuit: The constructed Qiskit circuit.
     """
+    global QC_, QCI_, QCRP_, QCRS_, QC2_, QC2D_
     global _use_XX_YY_ZZ_gates
     _use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates
     
@@ -243,51 +258,64 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
     hamiltonian = hamiltonian.strip().lower()
 
     if hamiltonian == "heisenberg": 
+    
+        # append the initial state circuit to the quantum circuit
         init_state = "checkerboard"
-        # apply initial state
-        qc.append(initial_state(n_spins, init_state), qr) # append the initial circuit on the quantum circuit.
+        QCI_ = initial_state(n_spins, init_state)
+        qc.append(QCI_, qr)
         qc.barrier()
-        heisenberg_circuit = Heisenberg(n_spins, K, t, tau, w, h_x, h_z, use_XX_YY_ZZ_gates) #append the heisenberg on the circuit
+        
+        # append the Hamiltonian-specific circuit
+        QC2_ = heisenberg_circuit = Heisenberg(n_spins, K, t, tau, w, h_x, h_z, use_XX_YY_ZZ_gates) 
         qc.append(heisenberg_circuit, qr)
         qc.barrier()
  
         if (method == 3):
             if random_pauli_flag:
-                random_pauli_oracle = create_random_paulis(n_spins)
+            
+                QCRP_ = random_pauli_oracle = create_random_paulis(n_spins)
                 qc.append(random_pauli_oracle, qr)    #append the random pauli on the circuit
                 qc.barrier()
-                res_pauli = ResultantPauli(n_spins) # create a resultant pauli that we want to apply to initial state.
-                Quasi_heisenberg = QuasiHamiltonian(heisenberg_circuit, random_pauli_oracle, res_pauli, n_spins) # create a QuasiHamiltonian. 
+                
+                QCRS_ = res_pauli = ResultantPauli(n_spins) # create a resultant pauli that we want to apply to initial state.
+                
+                QC2D_ = Quasi_heisenberg = QuasiHamiltonian(heisenberg_circuit, random_pauli_oracle, res_pauli, n_spins) # create a QuasiHamiltonian. 
                 qc.append(Quasi_heisenberg, qr)    #append the Quasi Hamiltonian on the circuit
             
             else:
                 #if random_pauli_flag is False, just use traditional mirror circuit, i.e. Apply Inverse of Hamiltonian to the Hamiltonian to give Inverse.
-                heisenberg_inverse_circuit = HeisenbergInverse(n_spins, K, t, tau, w, h_x, h_z, use_XX_YY_ZZ_gates)
+                QC2D_ = heisenberg_inverse_circuit = HeisenbergInverse(n_spins, K, t, tau, w, h_x, h_z, use_XX_YY_ZZ_gates)
                 qc.append(heisenberg_inverse_circuit, qr)
                 qc.barrier()
 
 
     elif hamiltonian == "tfim":
 
+        # append the initial state circuit to the quantum circuit
         init_state = "ghz"
-        #apply initial state
-        qc.append(initial_state(n_spins, init_state), qr)
+        QCI_ = initial_state(n_spins, init_state)  
+        qc.append(QCI_, qr)
         qc.barrier()
-        tfim_circuit = tfim(n_spins, K, tau, use_XX_YY_ZZ_gates)
+        
+        # append the Hamiltonian-specific circuit
+        QC2_ = tfim_circuit = tfim(n_spins, K, tau, use_XX_YY_ZZ_gates)
         qc.append(tfim_circuit, qr)
         qc.barrier()
         
         if (method == 3):
+        
             if random_pauli_flag == True:
-                random_pauli_oracle = create_random_paulis(n_spins)
+                QCRP_ = random_pauli_oracle = create_random_paulis(n_spins)
                 qc.append(random_pauli_oracle, qr)  #append the random pauli on the circuit
                 qc.barrier()
-                res_pauli = ResultantPauli(n_spins) # create a resultant pauli that we want to apply to initial state.
-                Quasi_tfim = QuasiHamiltonian(tfim_circuit, random_pauli_oracle, res_pauli, n_spins) # create a QuasiHamiltonian.
+                
+                QCRS_ = res_pauli = ResultantPauli(n_spins) # create a resultant pauli that we want to apply to initial state.
+                
+                QC2D_ = Quasi_tfim = QuasiHamiltonian(tfim_circuit, random_pauli_oracle, res_pauli, n_spins) # create a QuasiHamiltonian.
                 qc.append(Quasi_tfim, qr) #append the Quasi Hamiltonian on the circuit
             else:
                 #if random_pauli_flag is False, just use traditional mirror circuit, i.e. Apply Inverse of Hamiltonian to the Hamiltonian to give Inverse.
-                tfim_inverse_circuit = tfimInverse(n_spins, K, tau, use_XX_YY_ZZ_gates)
+                QC2D_ = tfim_inverse_circuit = tfimInverse(n_spins, K, tau, use_XX_YY_ZZ_gates)
                 qc.append(tfim_inverse_circuit, qr)
                 qc.barrier()
 
@@ -299,13 +327,12 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
         qc.measure(qr[i_qubit], cr[i_qubit])
 
     # Save smaller circuit example for display
-    global QC_
     if QC_ is None or n_spins <= 6:
         if n_spins < 9:
             QC_ = qc
 
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
-    qc2 = qc.decompose()
+    qc2 = qc.decompose().decompose()
             
     return qc2
     
@@ -323,7 +350,7 @@ def xx_gate(tau: float) -> QuantumCircuit:
         QuantumCircuit: The XX gate circuit.
     """
     qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="xx_gate")
+    qc = QuantumCircuit(qr, name="XX")
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cx(qr[0], qr[1])
@@ -348,7 +375,7 @@ def yy_gate(tau: float) -> QuantumCircuit:
         QuantumCircuit: The YY gate circuit.
     """
     qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="yy_gate")
+    qc = QuantumCircuit(qr, name="YY")
     qc.s(qr[0])
     qc.s(qr[1])
     qc.h(qr[0])
@@ -377,7 +404,7 @@ def zz_gate(tau: float) -> QuantumCircuit:
         QuantumCircuit: The ZZ gate circuit.
     """
     qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="zz_gate")
+    qc = QuantumCircuit(qr, name="ZZ")
     qc.cx(qr[0], qr[1])
     qc.rz(3.1416 * tau, qr[1])
     qc.cx(qr[0], qr[1])
@@ -401,7 +428,7 @@ def xxyyzz_opt_gate(tau: float) -> QuantumCircuit:
     beta = tau
     gamma = tau
     qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="xxyyzz_opt")
+    qc = QuantumCircuit(qr, name="XXYYZZ")
     qc.rz(3.1416 / 2, qr[1])
     qc.cx(qr[1], qr[0])
     qc.rz(3.1416 * gamma - 3.1416 / 2, qr[0])
@@ -431,7 +458,7 @@ def xx_gate_mirror(tau: float) -> QuantumCircuit:
         QuantumCircuit: The XX_mirror_ gate circuit.
     """
     qr = QuantumRegister(2, 'q')
-    qc = QuantumCircuit(qr, name="xx_gate_mirror")
+    qc = QuantumCircuit(qr, name="XX\u2020")
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cx(qr[0], qr[1])
@@ -456,7 +483,7 @@ def yy_gate_mirror(tau: float) -> QuantumCircuit:
         QuantumCircuit: The YY_mirror_ gate circuit.
     """
     qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="yy_gate_mirror")
+    qc = QuantumCircuit(qr, name="YY\u2020")
     qc.s(qr[0])
     qc.s(qr[1])
     qc.h(qr[0])
@@ -485,7 +512,7 @@ def zz_gate_mirror(tau: float) -> QuantumCircuit:
         QuantumCircuit: The ZZ_mirror_ gate circuit.
     """
     qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="zz_gate_mirror")
+    qc = QuantumCircuit(qr, name="ZZ\u2020")
     qc.cx(qr[0], qr[1])
     qc.rz(-3.1416 * tau, qr[1])
     qc.cx(qr[0], qr[1])
@@ -509,7 +536,7 @@ def xxyyzz_opt_gate_mirror(tau: float) -> QuantumCircuit:
     beta = tau
     gamma = tau
     qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="xxyyzz_opt_mirror")
+    qc = QuantumCircuit(qr, name="XXYYZZ\u2020")
     qc.rz(3.1416 / 2, qr[0])
     qc.cx(qr[1], qr[0])
     qc.ry(-3.1416 * beta + 3.1416 / 2, qr[1])
@@ -533,6 +560,21 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
     # Print a sample circuit
     print("Sample Circuit:")
     print(QC_ if QC_ is not None else "  ... too large!")
+    
+    # we don't restrict save of large sub-circuits, so skip printing if num_qubits too large
+    if QCI_ is not None and QCI_.num_qubits > 6:
+        print("... subcircuits too large to print") 
+        return
+        
+    print("  Initial State:")
+    if QCI_ is not None: print(QCI_)
+    
+    print(f"  Hamiltonian ({QC2_.name if QC2_ is not None else '?'}):")
+    if QC2_ is not None: print(QC2_)
+      
+    if QC2D_ is not None:
+        print("  Quasi-Hamiltonian:")
+        print(QC2D_)
 
     if hamiltonian == "heisenberg": 
         if use_XX_YY_ZZ_gates:
@@ -541,21 +583,29 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
             print(YY_)
             print(ZZ_)
             if method == 3:
-                print("\nXX, YY, ZZ mirror = ")
+                print("\nXX, YY, ZZ \u2020 = ")
                 print(XX_mirror_)
                 print(YY_mirror_)
                 print(ZZ_mirror_)
         else:
-            print("\nXXYYZZ_opt = ")
+            print("\nXXYYZZ = ")
             print(XXYYZZ_)  
             if method == 3:
-                print("\nXXYYZZ_opt_mirror = ")
+                print("\nXXYYZZ\u2020 = ")
                 print(XXYYZZ_mirror_)
     
     if hamiltonian == "tfim": 
         print("\nZZ = ")
         print(ZZ_)
         if method == 3:
-            print("\nZZ mirror = ")
+            print("\nZZ\u2020 = ")
             print(ZZ_mirror_)
     
+    if QCRP_ is not None:
+        print("  Random Paulis:")
+        print(QCRP_)
+        
+    if QCRS_ is not None:
+        print("  Resultant Paulis:")
+        print(QCRS_)
+        
