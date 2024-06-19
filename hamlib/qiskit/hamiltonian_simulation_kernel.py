@@ -13,10 +13,15 @@ In this case, method 3 is used to create a mirror circuit for scalability.
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 # from hamlib_test import create_circuit, HamiltonianSimulationExact
 import h5py
+import re
+import os
+import requests
+import zipfile
 from qiskit.quantum_info import SparsePauliOp, Pauli
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import SparsePauliOp
+
 
 # Saved circuits and subcircuits for display
 QC_ = None
@@ -34,156 +39,259 @@ XXYYZZ_mirror_ = None
 # For validating the implementation of XXYYZZ operation (saved for possible use in drawing)
 _use_XX_YY_ZZ_gates = False
 
-def extract_dataset_hdf5_2(filename, dataset_name):
+def extract_dataset_hdf5(filename, dataset_name):
     """
     Extract a dataset from an HDF5 file.
-    
+
     Args:
-        filename (str): The name of the HDF5 file.
+        filename (str): The path to the HDF5 file.
         dataset_name (str): The name of the dataset to extract.
 
     Returns:
-        data: The extracted data. Returns None if the dataset is not found.
+        numpy.ndarray or None: The extracted dataset as a NumPy array, or None if the dataset is not found.
+
     """
     # Open the HDF5 file
     with h5py.File(filename, 'r') as file:
-        # Check if the dataset exists
         if dataset_name in file:
             dataset = file[dataset_name]
-            # Check if the dataset is a scalar
-            if dataset.shape == ():
-                data = dataset[()]  # Correct way to read scalar data
-            else:
-                data = dataset[:]  # For non-scalar, use slicing
-            # Convert bytes to string if necessary
-            if isinstance(data, bytes):
-                data = data.decode('utf-8')
+            data = dataset[()] if dataset.shape == () else dataset[:]
         else:
             data = None
             print(f"Dataset {dataset_name} not found in the file.")
     return data
 
-def parse_hamiltonian(hamiltonian):
+def needs_normalization(data):
     """
-    Parse a Hamiltonian string into a list of Pauli terms with coefficients and involved qubits.
-    
+    Determine if the given data needs normalization.
+
     Args:
-        hamiltonian (str): The Hamiltonian string to be parsed.
-    
+        data (str or bytes): The data to be checked. Can be a string or bytes.
+
     Returns:
-        list: A list of tuples, each containing a Pauli string, a list of involved qubits, and a coefficient.
+        str: "Yes" if the data needs normalization, "No" otherwise.
     """
-    import re
-    # Regular expression to capture numeric coefficients and the involved qubits
-    term_pattern = re.compile(r'([+-]?\d*\.?\d*) \[([Z\d\s]*)\]')
+    if isinstance(data, bytes):
+        data = data.decode()
+    # Check if the data matches the format that does not need normalization
+    if re.search(r'\(\s*-?\d+(\.\d+)?(\+|\-)?\d*?j?\s*\)\s*\[.*?\]', data):
+        return "No"
+    else:
+        return "Yes"
+
+def normalize_data_format(data):
+    """
+    Normalize the format of the given data.
+
+    Args:
+        data (str or bytes): The data to be normalized. Can be a string or bytes.
+
+    Returns:
+        bytes: The normalized data as a byte string.
+    """
+    if isinstance(data, bytes):
+        data = data.decode()
+    normalized_data = []
+    terms = data.split('+')
+    for term in terms:
+        term = term.strip()
+        if term:
+            match = re.match(r'(\S+)\s*\[(.*?)\]', term)
+            if match:
+                coeff = match.group(1)
+                ops = match.group(2).strip()
+                normalized_term = f"({coeff}) [{ops}]"
+                normalized_data.append(normalized_term)
+    return ' +\n'.join(normalized_data).encode()
+
+def parse_hamiltonian_to_sparsepauliop(data):
+    """
+    Parse the Hamiltonian string into a list of SparsePauliOp terms.
+
+    Args:
+        data (str or bytes): The Hamiltonian data to be parsed. Can be a string or bytes.
+
+    Returns:
+        list: A list of tuples, where each tuple contains a dictionary representing the Pauli operators and 
+              their corresponding qubit indices, and a complex coefficient.
+    """
+    if isinstance(data, bytes):
+        data = data.decode()
     
-    pauli_list = []
+    terms = re.findall(r'\(([^)]+)\)\s*\[(.*?)\]', data)
     
-    # Iterate over all matches
-    for match in term_pattern.finditer(hamiltonian):
-        coefficient = float(match.group(1))  # Convert coefficient to float
-        if not coefficient:  # Skip terms with a coefficient of 0
-            continue
-        
-        # Extract qubits and construct the Pauli string
-        qubits = []
-        pauli_string = ''
-        if match.group(2):  # Check if there are any qubits
-            qubits_info = match.group(2).split()
-            for qubit_info in qubits_info:
-                qubit_index = int(qubit_info[1:])  # Extract the qubit index from the format Z0, Z1, etc.
-                qubits.append(qubit_index)
-                pauli_string += 'Z'
-        
-        pauli_list.append((pauli_string, qubits, coefficient))
+    parsed_pauli_list = []
+
+    for coeff, ops in terms:
+        coeff = complex(coeff.strip())
+        ops_list = ops.split()
+        pauli_dict = {}
+
+        for op in ops_list:
+            match = re.match(r'([XYZ])(\d+)', op)
+            if match:
+                pauli_op = match.group(1)
+                qubit_index = int(match.group(2))
+                pauli_dict[qubit_index] = pauli_op
+
+        parsed_pauli_list.append((pauli_dict, coeff))
     
-    return pauli_list
+    return parsed_pauli_list
 
 def determine_qubit_count(terms):
     """
-    Determine the number of qubits required for a given list of Pauli terms.
-    
+    Determine the number of qubits required based on the given list of Pauli terms.
+
     Args:
-        terms (list): A list of tuples, each containing a Pauli string, a list of involved qubits, and a coefficient.
-    
+        terms (list): A list of tuples, where each tuple contains a dictionary representing the Pauli operators and 
+                      their corresponding qubit indices, and a complex coefficient.
+
     Returns:
-        int: The total number of qubits required, determined by the highest qubit index in the terms.
+        int: The number of qubits required.
     """
     max_qubit = 0
-    for _, qubits, _ in terms:
-        if qubits:  # Ensure the list is not empty
-            max_in_term = max(qubits)
+    for pauli_dict, _ in terms:
+        if pauli_dict:
+            max_in_term = max(pauli_dict.keys())
             if max_in_term > max_qubit:
                 max_qubit = max_in_term
     return max_qubit + 1  # Since qubit indices start at 0
 
 def sparse_pauliop(terms, num_qubits):
     """
-    Create a SparsePauliOp representation from a list of Pauli terms and the number of qubits.
-    
+    Construct a SparsePauliOp from a list of Pauli terms and the number of qubits.
+
     Args:
-        terms (list): A list of tuples, each containing a Pauli string, a list of involved qubits, and a coefficient.
-        num_qubits (int): The total number of qubits in the system.
-    
+        terms (list): A list of tuples, where each tuple contains a dictionary representing the Pauli operators and 
+                      their corresponding qubit indices, and a complex coefficient.
+        num_qubits (int): The total number of qubits.
+
     Returns:
-        SparsePauliOp: The Hamiltonian represented as a SparsePauliOp object.
+        SparsePauliOp: The Hamiltonian represented as a SparsePauliOp.
     """
-    edges = []
     pauli_list = []
     
-    for pauli_string, qubits, coefficient in terms:
-        # Generate PauliOp representation
-        label = ''.join(['I']*num_qubits)  # Start with identity on all qubits
-        if qubits:
-            label_list = list(label)
-            for qubit in qubits:
-                label_list[qubit] = 'Z'
-            label = ''.join(label_list)
+    for pauli_dict, coefficient in terms:
+        label = ['I'] * num_qubits  # Start with identity on all qubits
+        for qubit, pauli_op in pauli_dict.items():
+            label[qubit] = pauli_op
+        label = ''.join(label)
         pauli_list.append((label, coefficient))
-        
-        # Generate edges for ZZ interactions (representing graph edges)
-        if len(qubits) == 2 and pauli_string == 'ZZ':
-            edges.append((qubits[0], qubits[1], coefficient))
     
-    # Creating the SparsePauliOp from the list of Pauli terms
-    hamiltonian = SparsePauliOp.from_list(pauli_list)
+    hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
     return hamiltonian
+
+def process_data(data):
+    """
+    Process the given data to construct a Hamiltonian in the form of a SparsePauliOp and determine the number of qubits.
+
+    Args:
+        data (str or bytes): The Hamiltonian data to be processed. Can be a string or bytes.
+
+    Returns:
+        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits.
+    """
+    if needs_normalization(data) == "Yes":
+        data = normalize_data_format(data)
+    parsed_pauli_list = parse_hamiltonian_to_sparsepauliop(data)
+    num_qubits = determine_qubit_count(parsed_pauli_list)
+    hamiltonian = sparse_pauliop(parsed_pauli_list, num_qubits)
+    return hamiltonian, num_qubits
+
+def download_and_extract(filename, url):
+    """
+    Download a file from a given URL and unzip it.
+
+    Args:
+        filename (str): The name of the file to be downloaded.
+        url (str): The URL to download the file from.
+
+    Returns:
+        str: The path to the extracted file.
+    """
+    download_dir = "downloaded_hamlib_files"
+    os.makedirs(download_dir, exist_ok=True)
+    local_zip_path = os.path.join(download_dir, os.path.basename(url))
+    
+    # Download the file
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(local_zip_path, 'wb') as file:
+            file.write(response.content)
+        print(f"Downloaded {local_zip_path} successfully.")
+    else:
+        raise Exception(f"Failed to download from {url}.")
+
+    # Unzip the file
+    with zipfile.ZipFile(local_zip_path, 'r') as zip_ref:
+        zip_ref.extractall(download_dir)
+        print(f"Extracted to {download_dir}.")
+    
+    # Return the path to the directory containing the extracted files
+    return download_dir
+
+def process_hamiltonian_file(filename, dataset_name):
+    """
+    Download the Hamiltonian file, extract it, and process the data to create a quantum circuit.
+
+    Args:
+        dataset_name (str): The name of the dataset to extract.
+        filename (str): The name of the Hamiltonian file to be downloaded and processed.
+
+    Returns:
+        tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
+    """
+    url_mapping = {
+        'tfim.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/tfim/tfim.zip',
+        'FH_D-1.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/fermihubbard/FH_D-1.zip'
+        # Add more mappings as needed
+    }
+    
+    if filename in url_mapping:
+        url = url_mapping[filename]
+        extracted_path = download_and_extract(filename, url)
+        print('downloaded_path',extracted_path)
+        # Assuming the HDF5 file is located directly inside the extracted folder
+        hdf5_file_path = os.path.join(extracted_path, filename)
+        print('hdf5_file_path', hdf5_file_path)
+    else:
+        raise ValueError(f"No URL mapping found for filename: {filename}")
+    data = extract_dataset_hdf5(hdf5_file_path, dataset_name)
+    print(data)
+    return data
+
 
 def create_circuit():
     """
-    Create and return a quantum circuit based on the Hamiltonian extracted from an HDF5 file.
-    
-    The function performs the following steps:
-    1. Extracts the dataset from the HDF5 file.
-    2. Parses the Hamiltonian string into Pauli terms.
-    3. Determines the number of qubits required.
-    4. Converts the Pauli terms into a SparsePauliOp object.
-    5. Constructs a quantum circuit with an initial state and evolution gate.
-    6. Measures all qubits and returns the circuit and Hamiltonian.
+    Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
+
+    Steps:
+        1. Extract Hamiltonian data from an HDF5 file.
+        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
+        3. Build a quantum circuit with an initial state and an evolution gate based on the Hamiltonian.
+        4. Measure all qubits and print the circuit details.
 
     Returns:
-        tuple: A tuple containing the quantum circuit and the Hamiltonian as a SparsePauliOp object.
+        tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
-    # Usage
-    dataset_name = 'graph-1D-grid-nonpbc-qubitnodes_Lx-2_h-0.1'
-    # filename = '/Users/avimitachatterjee/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/PSU/Internship/SRI/work/hamiltonnian/QC-App-Oriented-Benchmarks/hamiltonian-simulation/qiskit/tfim.hdf5'
-    filename = '/Users/avimitachatterjee/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/PSU/Internship/SRI/work/hamiltonnian/hamlib_tfim/tfim.hdf5'
-    data = extract_dataset_hdf5_2(filename, dataset_name)
 
-    if data:
-        parsed_pauli_list = parse_hamiltonian(data)
-        print(parsed_pauli_list)
+    # dataset_name = 'graph-1D-grid-nonpbc-qubitnodes_Lx-4_h-0.1'
+    # filename = 'tfim.hdf5'
+
+    dataset_name = 'fh-graph-1D-grid-nonpbc-qubitnodes_Lx-3_U-0_enc-jw'
+    filename = 'FH_D-1.hdf5'
+    data = process_hamiltonian_file(filename, dataset_name)
+    if data is not None:
+        print("Raw Hamiltonian Data: ",data)
     else:
         print("No data extracted.")
 
-    # Usage
-    num_qubits = determine_qubit_count(parsed_pauli_list)
-    hamiltonian = sparse_pauliop(parsed_pauli_list, num_qubits)
+    hamiltonian, num_qubits = process_data(data)
 
-    print("Number of qubits",num_qubits)
-    print("Hamiltonian:", hamiltonian)
-    
-    # Assuming 'hamiltonian' is already defined as a SparsePauliOp object from your previous code:
+    print("Number of qubits:", num_qubits)
+    print("Hamiltonian:")
+    print(hamiltonian)
+
     operator = hamiltonian  # Use the SparsePauliOp object directly
     time = 0.2
 
@@ -192,22 +300,18 @@ def create_circuit():
 
     # Plug it into a circuit
     circuit = QuantumCircuit(operator.num_qubits)
-    
-
     init_state = "checkerboard"
-
-    # apply initial state
     circuit.append(initial_state(num_qubits, init_state), range(operator.num_qubits))
     circuit.barrier()
     circuit.append(evo, range(operator.num_qubits))
     circuit.barrier()
+
     circuit.measure_all() 
     print (circuit)
-    circuit.draw(output="mpl") 
-    global QC_
-    QC_ = circuit
+    # circuit.draw(output="mpl")
+    # circuit.decompose(reps=2).draw(output="mpl", style="iqp")
     return circuit, hamiltonian
-    #        
+
 
 ############### Circuit Definition
 
