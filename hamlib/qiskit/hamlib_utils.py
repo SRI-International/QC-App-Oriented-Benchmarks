@@ -132,32 +132,6 @@ def determine_qubit_count(terms):
                 max_qubit = max_in_term
     return max_qubit + 1  # Since qubit indices start at 0
 
-def sparse_pauliop(terms, num_qubits):
-    """
-    Construct a SparsePauliOp from a list of Pauli terms and the number of qubits.
-
-    Args:
-        terms (list): A list of tuples, where each tuple contains a dictionary representing the Pauli operators and 
-                      their corresponding qubit indices, and a complex coefficient.
-        num_qubits (int): The total number of qubits.
-
-    Returns:
-        SparsePauliOp: The Hamiltonian represented as a SparsePauliOp.
-    """
-    pauli_list = []
-    
-    for pauli_dict, coefficient in terms:
-        label = ['I'] * num_qubits  # Start with identity on all qubits
-        for qubit, pauli_op in pauli_dict.items():
-            label[qubit] = pauli_op
-        label = ''.join(label)
-        pauli_list.append((label, coefficient))
-    
-    hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
-    return hamiltonian
-
-
-
 def download_and_extract(filename, url):
     """
     Download a file from a given URL and unzip it.

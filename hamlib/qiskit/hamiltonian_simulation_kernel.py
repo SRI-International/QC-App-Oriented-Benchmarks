@@ -20,7 +20,7 @@ import zipfile
 from qiskit.quantum_info import SparsePauliOp, Pauli
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.quantum_info import SparsePauliOp
+
 
 
 # Saved circuits and subcircuits for display
@@ -40,8 +40,7 @@ XXYYZZ_mirror_ = None
 _use_XX_YY_ZZ_gates = False
 
 
-from hamlib_utils import process_hamiltonian_file
-
+from hamlib_utils import process_hamiltonian_file, needs_normalization, normalize_data_format, parse_hamiltonian_to_sparsepauliop, determine_qubit_count
 
 def process_data(data):
     """
@@ -59,6 +58,31 @@ def process_data(data):
     num_qubits = determine_qubit_count(parsed_pauli_list)
     hamiltonian = sparse_pauliop(parsed_pauli_list, num_qubits)
     return hamiltonian, num_qubits
+
+
+def sparse_pauliop(terms, num_qubits):
+    """
+    Construct a SparsePauliOp from a list of Pauli terms and the number of qubits.
+
+    Args:
+        terms (list): A list of tuples, where each tuple contains a dictionary representing the Pauli operators and 
+                      their corresponding qubit indices, and a complex coefficient.
+        num_qubits (int): The total number of qubits.
+
+    Returns:
+        SparsePauliOp: The Hamiltonian represented as a SparsePauliOp.
+    """
+    pauli_list = []
+    
+    for pauli_dict, coefficient in terms:
+        label = ['I'] * num_qubits  # Start with identity on all qubits
+        for qubit, pauli_op in pauli_dict.items():
+            label[qubit] = pauli_op
+        label = ''.join(label)
+        pauli_list.append((label, coefficient))
+    
+    hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
+    return hamiltonian
 
 def create_circuit():
     """
