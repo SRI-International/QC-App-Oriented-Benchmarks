@@ -215,7 +215,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
        
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
+    options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
+    if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
 #######################

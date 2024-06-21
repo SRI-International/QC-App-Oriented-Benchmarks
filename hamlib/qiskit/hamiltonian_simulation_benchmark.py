@@ -269,7 +269,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method)
        
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
+    options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
+    if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
 #######################
@@ -287,7 +289,7 @@ def get_args():
     parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)     
-    parser.add_argument("--hamiltonian", "-ham", default="heisenberg", help="Name of Hamiltonian", type=str)
+    parser.add_argument("--hamiltonian", "-ham", default="hamlib", help="Name of Hamiltonian", type=str)
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--use_XX_YY_ZZ_gates", action="store_true", help="Use explicit XX, YY, ZZ gates")
     #parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
