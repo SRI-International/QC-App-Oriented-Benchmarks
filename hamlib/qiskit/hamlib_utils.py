@@ -191,10 +191,102 @@ def process_hamiltonian_file(filename, dataset_name):
     else:
         raise ValueError(f"No URL mapping found for filename: {filename}")
     data = extract_dataset_hdf5(hdf5_file_path, dataset_name)
-    print(data)
+    # print(data)
     return data
 
+def extract_variable_ranges(file_input):
+    """
+    Extracts the ranges of variable values from HDF5 files specified in the input.
 
+    Args:
+        file_input (list): A list of strings, each containing a function name, file path, 
+                           and optionally a fixed variable with its value separated by colons.
+
+    Returns:
+        dict: A dictionary where keys are function names and values are dictionaries
+              of variables and their possible values.
+    """
+    results = {}
+
+    for entry in file_input:
+        parts = entry.split(':')
+        function_name, file_path = parts[0], parts[1]
+        
+        # Check if a fixed variable and value are provided
+        if len(parts) > 2:
+            fixed_var_value = parts[2]
+            fixed_variable, fixed_value = fixed_var_value.split('=')
+        else:
+            fixed_variable, fixed_value = None, None
+
+        # Dictionary to hold variables and their values
+        variable_values = {}
+
+        with h5py.File(file_path, 'r') as file:
+            for item in file.keys():
+                # Assuming the format includes instance names in item or its attributes
+                instance_name = item.split(':')[0] if ':' in item else item
+                variables = parse_instance_variables(instance_name)
+
+                if fixed_variable is None or variables.get(fixed_variable) == fixed_value:
+                    for var, val in variables.items():
+                        if var not in variable_values:
+                            variable_values[var] = set()
+                        variable_values[var].add(val)
+
+        # Store the results
+        if variable_values:
+            results[function_name] = variable_values
+    
+    # Print the results
+    for function_name, variables in results.items():
+        print(f"{function_name}:")
+        for var, values in variables.items():
+            # Use a sorting method that safely handles mixed data types
+            sorted_values = sorted(values, key=lambda x: (is_numeric(x), float(x) if is_numeric(x) else x))
+            print(f"  {var}: {sorted_values}")
+
+def is_numeric(value):
+    """ 
+    Helper function to check if a string represents a numeric value. 
+    """
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
+
+def parse_instance_variables(instance_name):
+    """
+    Parses an instance name to extract variable names and their values.
+
+    Args:
+        instance_name (str): The name of the instance to be parsed.
+
+    Returns:
+        dict: A dictionary where keys are variable names and values are their corresponding values.
+    """
+    parts = instance_name.split('_')
+    variables = {}
+    for part in parts:
+        if '-' in part:
+            index = part.find('-')
+            var = part[:index]
+            val = part[index+1:]
+            variables[var] = val
+    return variables
+
+def view_hdf5_structure():
+    """
+    A sample function to view the structure of specific HDF5 files and their variable ranges.
+    """
+    file_input = [
+        "tfim1:downloaded_hamlib_files/tfim.hdf5:graph=1D-grid-pbc-qubitnodes",
+        "tfim2:downloaded_hamlib_files/tfim.hdf5",
+        "fermi-hubbard:downloaded_hamlib_files/FH_D-1.hdf5:fh=graph-1D-grid-nonpbc-qubitnodes",
+        # Add more entries as needed
+    ]
+    extract_variable_ranges(file_input)
 
 #######################
 # MAIN
@@ -242,10 +334,13 @@ if __name__ == '__main__':
     
     data = process_hamiltonian_file(filename, dataset_name)
     if data is not None:
-        print("Raw Hamiltonian Data: ",data)
+        # print("Raw Hamiltonian Data: ",data)
+        print("Data extracted")
     else:
         print("No data extracted.")
-        
+    
+    print("\n\n\n\nPrinting the structure of the hdf5 file")
+    view_hdf5_structure()
     '''
     # execute benchmark program
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
