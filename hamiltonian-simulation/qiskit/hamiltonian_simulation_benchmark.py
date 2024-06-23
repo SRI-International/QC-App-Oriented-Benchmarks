@@ -41,6 +41,23 @@ with open(filename, 'r') as file:
     data = file.read()
 precalculated_data = json.loads(data)
 
+# Calculate initial state data for method = 3
+def method3_correct_dist(num_qubits, num_shots, hamiltonian, random_pauli_flag):
+    if hamiltonian == "heisenberg":
+        if random_pauli_flag:
+            correct_dist = {''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]): num_shots}
+        else:
+            correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]): num_shots}
+    elif hamiltonian == "tfim":
+        if random_pauli_flag:
+            correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
+        else:
+            correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
+    else:
+        correct_dist = {}  # Default case if the hamiltonian does not match known types
+    
+    return correct_dist
+
 
 ############### Result Data Analysis
 
@@ -77,17 +94,8 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         correct_dist = precalculated_data[f"TFIM - Qubits{num_qubits}"]
     elif method == 2 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
-    elif method == 3 and hamiltonian == "heisenberg":
-        if random_pauli_flag == True:
-            correct_dist = {''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]):num_shots}
-        else:
-            correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}    
-    elif method == 3 and hamiltonian == "tfim":
-        if random_pauli_flag == True:
-            correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
-        else:
-            correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
-
+    elif method == 3:
+        correct_dist = method3_correct_dist(num_qubits, num_shots, hamiltonian, random_pauli_flag )
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
 
@@ -96,6 +104,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    print(counts, correct_dist)
     return counts, fidelity
 
 
