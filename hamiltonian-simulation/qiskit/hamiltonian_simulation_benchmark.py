@@ -41,12 +41,34 @@ with open(filename, 'r') as file:
     data = file.read()
 precalculated_data = json.loads(data)
 
+# Creates a key for distribution of initial state for method = 3.
+def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag):
+    def generate_pattern(starting_bit):
+        pattern = ''.join([str((i + starting_bit) % 2) for i in range(num_qubits)])
+        return pattern
+
+    correct_dist = {}
+
+    if init_state == "checkerboard":
+        if random_pauli_flag:
+            starting_bit = 0 if num_qubits % 2 != 0 else 1
+        else:
+            starting_bit = 1 if num_qubits % 2 != 0 else 0
+        correct_dist[generate_pattern(starting_bit)] = num_shots
+    elif init_state == "ghz":
+        correct_dist = {
+            '0' * num_qubits: num_shots/2,
+            '1' * num_qubits: num_shots/2
+        }
+
+    return correct_dist
+
 
 ############### Result Data Analysis
 
 #def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int,
 def analyze_and_print_result(qc, result, num_qubits: int,
-            type: str, num_shots: int, hamiltonian: str, method: int, random_pauli_flag: bool) -> tuple:
+            type: str, num_shots: int, hamiltonian: str, method: int, random_pauli_flag: bool, init_state: str) -> tuple:
     """
     Analyze and print the measured results. Compute the quality of the result based on operator expectation for each state.
 
@@ -77,17 +99,8 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         correct_dist = precalculated_data[f"TFIM - Qubits{num_qubits}"]
     elif method == 2 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
-    elif method == 3 and hamiltonian == "heisenberg":
-        if random_pauli_flag == True:
-            correct_dist = {''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]):num_shots}
-        else:
-            correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}    
-    elif method == 3 and hamiltonian == "tfim":
-        if random_pauli_flag == True:
-            correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
-        else:
-            correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
-
+    elif method == 3:
+        correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag )
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
 
@@ -104,7 +117,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "heisenberg", method: int = 1,
-        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag = True,
+        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = True, init_state: str = "checkerboard",
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None):
@@ -154,7 +167,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     def execution_handler(qc, result, num_qubits, type, num_shots):
         # Determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, hamiltonian, method, random_pauli_flag)
+        counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, hamiltonian, method, random_pauli_flag, init_state)
         metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
 
     # Initialize execution module using the execution result handler above and specified backend_id
@@ -242,6 +255,7 @@ def get_args():
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="random pauli flag")
+    parser.add_argument("--init_state", "-init", default="checkerboard", help="initial state")
     return parser.parse_args()
  
 # if main, execute method
@@ -266,6 +280,7 @@ if __name__ == '__main__':
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
         use_XX_YY_ZZ_gates =args.use_XX_YY_ZZ_gates,
+        init_state = args.init_state,
         #theta=args.theta,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
