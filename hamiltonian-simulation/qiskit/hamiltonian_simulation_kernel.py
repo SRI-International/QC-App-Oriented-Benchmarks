@@ -129,10 +129,10 @@ def random_paulis_list(n_spins):
     for i in range(n_spins):
         gate = np.random.choice(["x","z"])
         if gate == "x":
-            pauli_tracker.append("x")
+            pauli_tracker_list.append("x")
         if gate == "z":
-            pauli_tracker.append("z")                
-    return qc, pauli_tracker_list
+            pauli_tracker_list.append("z")                
+    return pauli_tracker_list
 
 ############# Resultant Pauli after applying quasi inverse Hamiltonain and random Pauli to Hamiltonian.
 def ResultantPauli(n_spins)-> QuantumCircuit:
@@ -170,6 +170,7 @@ def QuasiInverseHeisenberg(n_spins: int, K: int, t: float, tau: float, w: float,
     qr = QuantumRegister(n_spins)
     qc = QuantumCircuit(qr, name = "quasiheisenberg")
 
+    # Apply random paulis
     pauli_list = random_paulis_list(n_spins)
 
     for i, gate in enumerate(pauli_list):
@@ -178,8 +179,6 @@ def QuasiInverseHeisenberg(n_spins: int, K: int, t: float, tau: float, w: float,
         else:
             qc.z(qr[i])
 
-
-    qc.append(QCRP_, qr)    #append the random pauli on the circuit
     qc.barrier()
 
     QCRS_ = res_pauli = ResultantPauli(n_spins) # create a resultant pauli that we want to apply to initial state.
