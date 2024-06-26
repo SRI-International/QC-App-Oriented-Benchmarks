@@ -1,8 +1,12 @@
 # Hamiltonian Simulation - Prototype Benchmark Program
 
-Simulation of quantum systems is one of the most promising applications for quantum computers [[1]](#references). In the current version of this benchmark, we compare the quantum simulation against a classical simultion of the same circuit in order to report our fidelity. This works well for small circuit sizes, but is not scalable past a certain number of qubits. We also compare the quantum simulation 
+Simulation of quantum systems is one of the most promising applications for quantum computers [1](#references). In the current version of this benchmark, we have two main strategies for calculating fidelities. 
 
-Additionally, we can now only run specific circuits, rather than random ones, limiting the ability of this benchmark to completely characterize real uses cases of the Hamiltonian simulation algorithm. We have some suggested modifications to this benchmark which we outline and explain why we did not chose to use them at this time in the section [Proposed Improvements](#Proposed-Improvements).
+In the first strategy, we compare the quantum simulation against a classical simultion in order to report our fidelity. This works well for small circuit sizes, but is not scalable past a certain number of qubits. 
+
+In the second strategy, we use the mirror circuits method developed by Sandia Labratories [2](#references). This is scalable to all qubit sizes. 
+
+We can now only run specific circuits, rather than random ones, limiting the ability of this benchmark to completely characterize real uses cases of the Hamiltonian simulation algorithm. We have some suggested modifications to this benchmark which we outline and explain why we did not chose to use them at this time in the section [Proposed Improvements](#Proposed-Improvements).
 
 ## Problem outline
 
@@ -44,13 +48,19 @@ In our benchmarks, currently both $J=1$ and $h=1$.
 ## Benchmarking
 The Hamiltonian Simulation algorithm is benchmarked by running **just a single circuit**. This circuit is repeated a number of times denoted by `num_shots`. We then run the algorithm circuit for numbers of qubits between `min_qubits` and `max_qubits`, inclusive. The test returns the averages of the circuit creation times, average execution times, fidelities, and circuit depths, like all of the other algorithms. 
 
-After running the Hamiltonian Simulation circuit, there are two options for how to produce the fidelity metric, both of which use a precalculated distribution to compare to the Hamiltonian Simulation results. Method = 1 uses a distribution from a noiseless simulation of the trotterized quantum circuit. For this method, if the benchmark is also run on a noiseless simulation, with a high number of shots, the fidelity should be high. Method = 2 uses a classical matrix technique to simulate the evolution of the hamiltonian directly. Wheras method = 1 more directly tests the hardware, method = 2 also tests the accuracy of the hamiltonian simulation algorithm itself. 
+There are currently three methods for how to produce the fidelity metric. All three methods evolve a state, and create a metric based on how well the state evolved. 
 
-In either case, we compare the resultant distribution using our [noise-normalized fidelity calculation](../_doc/POLARIZATION_FIDELITY.md).
+The first two methods evolve an initial state a time $t$, and compare the final state against a precalculated distribution. Method = 1 creates the precalculated distribution from a noiseless simulation of the Hamiltonian Simulation quantum circuit. Method = 2 uses a classical matrix technique to simulate the evolution of the hamiltonian directly. Wheras method = 1 only tests the performance of the hardware, method = 2 also tests the accuracy of the Hamiltonian simulation itself. 
 
-We calculate these expected distributions in the jupyter notebook `precalculated_data.ipynb`, which stores the results for up to 20 qubits in the `precalculated_data.json` data file. The python code then imports the distributions from the `json` file. This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in number of qubits. 
+We calculate these precalculated distributions in the jupyter notebook `precalculated_data.ipynb`, which stores the results for up to 20 qubits in the `precalculated_data.json` data file. The python code then imports the distributions from the `json` file. This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in number of qubits. 
 
 In the `precalculated_data.ipnyb`, we set the trotterization steps (k) to 5 and the time to .2. For the Heisenberg Hamiltonian, $w$ is set to 1 but $J$ is hard-coded to 1. For TFIM, the Hamiltonian variables are both hard-coded to $J=1$ and $h=1$ respectively. 
+
+Method = 3 uses a mirror circuit based off of the Hamiltonian Simulation circuit, designed so that the target distribution is trivial. It evolves an initial state forwards a time $t$, then backwards in time $t$, so that the final state should be the (trivial) initial state. Because this doesn't utilize classical resources to generate a comparison metric, this scales to any size of qubits. 
+
+
+In all cases, we compare the resultant distribution using our [noise-normalized fidelity calculation](../_doc/POLARIZATION_FIDELITY.md).
+
 
 ## Classical algorithm
 
@@ -127,18 +137,12 @@ There are two options of circuit creation for this simulation:
 </p>
 
 *Fig 6. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(YY)}"/> gate.*
-
-## Proposed Improvements
-
-Our suggested method of modifying this benchmark involves a topic taken from condensed matter called *many-body localization* [[2]](#references) [[5]](#references). The essence of this phenomenon is that for certain closed quantum systems, some excited states fail to thermalize as expected. 
-
-The parameters that we use for the current Hamiltonian simulation benchmark already put us in the many-body localization regime. After evolving the system for a suitibly long time, with <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}t\approx{1}">, we can then take a look at a parameter called *imbalance* to characterize this property. The imbalance compares the percentage of measured 1's on the even versus odd sites. We see that for our Heisenberg Hamiltonian, when averaging over many random choices for <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{x,i}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{z,i}">, the imbalance will converge to a constant value for increasing circuit width. We could then set our fidelity calculation as the deviation from the expected imbalance value. This benchmark is outlined in the `mbl_benchmark.py` file in the qiskit `WIP_benchmarks` folder.
-
-While we have already coded this benchmark, we are not using it as a benchmark because some of the parameters required are not feasible on current computers. Because of our comparatively large value of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}t">, we need to have a large number of Trotter steps <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}k"> so our simulation is close to the actual evolution of the Hamiltonian. This results in circuits that are thousands of gates long. Then, because the imbalance converging is a feature that occurs *on average*, we need to average over more than 100 different circuits for the fidelity calculation to capture just the hardware error, not the algorithmic error. All of these factors make it such that running the benchmark is difficult on simulators, and exceedingly expensive and/or time-intensive to run on hardware. In the future, when hardware is more accessible, these downsides might not be as big of an issue, and many-body-localization can be utilized as an effective benchmark.
  
 ## References
 
 [1] Feynman, RP. (1982) Simulating physics with computers. Int J Theor Phys 21:467–488.
+
+[2] Proctor, T., Rudinger, K., Young, K. et al. Measuring the capabilities of quantum computers. Nat. Phys. 18, 75–79 (2022). https://doi.org/10.1038/s41567-021-01409-7 
 
 [2] Andrew M. Childs, Dmitri Maslov, Yunseong Nam, Neil J. Ross, Yuan Su. (2017).
     Toward the first quantum simulation with quantum speedup.
