@@ -84,7 +84,7 @@ def sparse_pauliop(terms, num_qubits):
     hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
     return hamiltonian
 
-def create_circuit():
+def create_circuit(n_spins):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
 
@@ -98,11 +98,13 @@ def create_circuit():
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
 
-    # dataset_name = 'graph-1D-grid-nonpbc-qubitnodes_Lx-4_h-0.1'
-    # filename = 'tfim.hdf5'
+    # dataset_name = 'graph-1D-grid-nonpbc-qubitnodes_Lx-2_h-0.1'
+    dataset_name = f'graph-1D-grid-nonpbc-qubitnodes_Lx-{n_spins}_h-0.1'
+    filename = 'tfim.hdf5'
 
-    dataset_name = 'fh-graph-1D-grid-nonpbc-qubitnodes_Lx-3_U-0_enc-jw'
-    filename = 'FH_D-1.hdf5'
+    # dataset_name = 'fh-graph-1D-grid-nonpbc-qubitnodes_Lx-3_U-0_enc-jw'
+    # dataset_name = f'fh-graph-1D-grid-nonpbc-qubitnodes_Lx-{int(n_spins/2)}_U-0_enc-jw'
+    # filename = 'FH_D-1.hdf5'
     data = process_hamiltonian_file(filename, dataset_name)
     if data is not None:
         print("Raw Hamiltonian Data: ",data)
@@ -302,7 +304,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
                 qc.barrier()
     
     elif hamiltonian == "hamlib":
-        qc, _ = create_circuit()
+        qc, _ = create_circuit(n_spins)
 
     else:
         raise ValueError("Invalid Hamiltonian specification.")
