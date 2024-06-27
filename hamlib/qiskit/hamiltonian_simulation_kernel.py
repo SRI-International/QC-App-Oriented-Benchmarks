@@ -124,16 +124,18 @@ def create_circuit(n_spins):
 
         operator = hamiltonian  # Use the SparsePauliOp object directly
         time = 0.2
+        num_trotter_steps = 5
 
         # Build the evolution gate
-        evo = PauliEvolutionGate(operator, time=time)
+        evo = PauliEvolutionGate(operator, time=time/num_trotter_steps)
 
         # Plug it into a circuit
         circuit = QuantumCircuit(operator.num_qubits)
         init_state = "checkerboard"
         circuit.append(initial_state(num_qubits, init_state), range(operator.num_qubits))
         circuit.barrier()
-        circuit.append(evo, range(operator.num_qubits))
+        for _ in range (num_trotter_steps):
+            circuit.append(evo, range(operator.num_qubits))
         circuit.barrier()
 
         circuit.measure_all()
