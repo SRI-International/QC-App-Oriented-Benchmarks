@@ -160,7 +160,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     
     # Set the flag to use an XX YY ZZ shim if given
     if use_XX_YY_ZZ_gates:
-        print("... using unoptimized XX YY ZZ gates"))
+        print("... using unoptimized XX YY ZZ gates")
     
     # Initialize metrics module
     metrics.init_metrics()
