@@ -1,12 +1,12 @@
 # Hamiltonian Simulation - Benchmark Program
 
-Simulation of quantum systems is one of the most promising applications for quantum computers [1](#references). In the current version of this benchmark, we have three strategies for calculating fidelities. 
+Simulation of quantum systems is one of the most promising applications for quantum computers [[1]](#references). In the current version of this benchmark, we have three strategies for calculating fidelities. 
 
 In the first strategy, we compare the quantum simulation against a classical circuit simultion in order to report our fidelity. This works well for small circuit sizes, but is not scalable past a certain number of qubits. 
 
 In the second strategy, we compare the quantum simulation against a classical simultion of the exact Hamiltonian dynamics in order to report our fidelity. Again, this is not scalable.
 
-In the third strategy, we use the mirror circuits method developed by Sandia Labratories [2](#references). This is scalable to all qubit sizes. 
+In the third strategy, we use the mirror circuits method developed by Sandia Labratories [[2]](#references). This is scalable to all qubit sizes. 
 
 ## Problem outline
 
