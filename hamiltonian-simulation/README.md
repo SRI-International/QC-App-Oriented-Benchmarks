@@ -1,12 +1,12 @@
-# Hamiltonian Simulation - Prototype Benchmark Program
+# Hamiltonian Simulation
 
-Simulation of quantum systems is one of the most promising applications for quantum computers [1](#references). In the current version of this benchmark, we have two main strategies for calculating fidelities. 
+Simulation of quantum systems is one of the most promising applications for quantum computers [1](#references). In the current version of this benchmark, we have three strategies for calculating fidelities. 
 
-In the first strategy, we compare the quantum simulation against a classical simultion in order to report our fidelity. This works well for small circuit sizes, but is not scalable past a certain number of qubits. 
+In the first strategy, we compare the quantum simulation against a classical circuit simultion in order to report our fidelity. This works well for small circuit sizes, but is not scalable past a certain number of qubits. 
 
-In the second strategy, we use the mirror circuits method developed by Sandia Labratories [2](#references). This is scalable to all qubit sizes. 
+In the second strategy, we compare the quantum simulation against a classical simultion of the exact Hamiltonian dynamics in order to report our fidelity. Again, this is not scalable.
 
-We can now only run specific circuits, rather than random ones, limiting the ability of this benchmark to completely characterize real uses cases of the Hamiltonian simulation algorithm. We have some suggested modifications to this benchmark which we outline and explain why we did not chose to use them at this time in the section [Proposed Improvements](#Proposed-Improvements).
+In the third strategy, we use the mirror circuits method developed by Sandia Labratories [2](#references). This is scalable to all qubit sizes. 
 
 ## Problem outline
 
@@ -50,7 +50,7 @@ The Hamiltonian Simulation algorithm is benchmarked by running **just a single c
 
 There are currently three methods for how to produce the fidelity metric. All three methods evolve a state, and create a metric based on how well the state evolved. 
 
-The first two methods evolve an initial state a time $t$, and compare the final state against a precalculated distribution. Method = 1 creates the precalculated distribution from a noiseless simulation of the Hamiltonian Simulation quantum circuit. Method = 2 uses a classical matrix technique to simulate the evolution of the hamiltonian directly. Wheras method = 1 only tests the performance of the hardware, method = 2 also tests the accuracy of the Hamiltonian simulation itself. 
+The first two methods evolve an initial state a time $t$, and compare the final state against a precalculated distribution. Method = 1 creates the precalculated distribution from a noiseless simulation of the Hamiltonian Simulation quantum circuit. Method = 2 uses a classical matrix technique to simulate the evolution of the Hamiltonian directly. Wheras method = 1 only tests the performance of the hardware, method = 2 also tests the accuracy of the Hamiltonian simulation itself. 
 
 We calculate these precalculated distributions in the jupyter notebook `precalculated_data.ipynb`, which stores the results for up to 20 qubits in the `precalculated_data.json` data file. The python code then imports the distributions from the `json` file. This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in number of qubits. 
 
