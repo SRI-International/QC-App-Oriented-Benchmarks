@@ -104,7 +104,7 @@ def xx_gate(qc, tau, qr):
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cnot(qr[0], qr[1])
-    qc.rz(qr[1], 3.1416*tau)
+    qc.rz(qr[1], pi*tau)
     qc.cnot(qr[0], qr[1])
     qc.h(qr[0])
     qc.h(qr[1])
@@ -117,7 +117,7 @@ def yy_gate(qc, tau, qr):
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cnot(qr[0], qr[1])
-    qc.rz(qr[1], 3.1416*tau)
+    qc.rz(qr[1], pi*tau)
     qc.cnot(qr[0], qr[1])
     qc.h(qr[0])
     qc.h(qr[1])
@@ -128,7 +128,7 @@ def yy_gate(qc, tau, qr):
 # Simple ZZ gate on q0 and q1 with angle 'tau'
 def zz_gate(qc, tau, qr):
     qc.cnot(qr[0], qr[1])
-    qc.rz(qr[1], 3.1416*tau)
+    qc.rz(qr[1], pi*tau)
     qc.cnot(qr[0], qr[1])
     return qc
 
@@ -136,14 +136,14 @@ def zz_gate(qc, tau, qr):
 def xxyyzz_opt_gate(qc, tau, qr):
     alpha = tau; beta = tau; gamma = tau
 
-    qc.rz(qr[1], 3.1416/2)
+    qc.rz(qr[1], pi/2)
     qc.cnot(qr[1], qr[0])
-    qc.rz(qr[0], 3.1416*gamma - 3.1416/2)
-    qc.ry(qr[1], 3.1416/2 - 3.1416*alpha)
+    qc.rz(qr[0], pi*gamma - pi/2)
+    qc.ry(qr[1], pi/2 - pi*alpha)
     qc.cnot(qr[0], qr[1])
-    qc.ry(qr[1], 3.1416*beta - 3.1416/2)
+    qc.ry(qr[1], pi*beta - pi/2)
     qc.cnot(qr[1], qr[0])
-    qc.rz(qr[0], -3.1416/2)
+    qc.rz(qr[0], -pi/2)
     return qc
 
 
