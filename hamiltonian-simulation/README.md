@@ -1,4 +1,4 @@
-# Hamiltonian Simulation
+# Hamiltonian Simulation - Benchmark Program
 
 Simulation of quantum systems is one of the most promising applications for quantum computers [1](#references). In the current version of this benchmark, we have three strategies for calculating fidelities. 
 
