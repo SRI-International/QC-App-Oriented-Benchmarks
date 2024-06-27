@@ -84,6 +84,14 @@ def sparse_pauliop(terms, num_qubits):
     hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
     return hamiltonian
 
+dataset_name_template = ""
+filename = ""
+
+# In hamiltonian_simulation_kernel.py
+
+dataset_name_template = ""
+filename = ""
+
 def create_circuit(n_spins):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
@@ -97,45 +105,94 @@ def create_circuit(n_spins):
     Returns:
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
+    global dataset_name_template, filename
+    
+    # Replace placeholders with actual n_spins value
+    dataset_name = dataset_name_template.replace("{n_spins}", str(n_spins)).replace("{n_spins/2}", str(n_spins // 2))
 
-    # dataset_name = 'graph-1D-grid-nonpbc-qubitnodes_Lx-2_h-0.1'
-    dataset_name = f'graph-1D-grid-nonpbc-qubitnodes_Lx-{n_spins}_h-0.1'
-    filename = 'tfim.hdf5'
+    print(f"Trying dataset: {dataset_name}")  # Debug print
 
-    # dataset_name = 'fh-graph-1D-grid-nonpbc-qubitnodes_Lx-3_U-0_enc-jw'
-    # dataset_name = f'fh-graph-1D-grid-nonpbc-qubitnodes_Lx-{int(n_spins/2)}_U-0_enc-jw'
-    # filename = 'FH_D-1.hdf5'
     data = process_hamiltonian_file(filename, dataset_name)
     if data is not None:
-        print("Raw Hamiltonian Data: ",data)
+        # print(f"Using dataset: {dataset_name}")
+        # print("Raw Hamiltonian Data: ", data)
+        hamiltonian, num_qubits = process_data(data)
+
+        # print("Number of qubits:", num_qubits)
+        # print("Hamiltonian:")
+        print(hamiltonian)
+
+        operator = hamiltonian  # Use the SparsePauliOp object directly
+        time = 0.2
+
+        # Build the evolution gate
+        evo = PauliEvolutionGate(operator, time=time)
+
+        # Plug it into a circuit
+        circuit = QuantumCircuit(operator.num_qubits)
+        init_state = "checkerboard"
+        circuit.append(initial_state(num_qubits, init_state), range(operator.num_qubits))
+        circuit.barrier()
+        circuit.append(evo, range(operator.num_qubits))
+        circuit.barrier()
+
+        circuit.measure_all()
+        print(circuit)
+        # circuit.draw(output="mpl")
+        # circuit.decompose(reps=2).draw(output="mpl", style="iqp")
+        return circuit, hamiltonian
     else:
-        print("No data extracted.")
+        # print(f"Dataset not available for n_spins = {n_spins}.")
+        return None, None
 
-    hamiltonian, num_qubits = process_data(data)
+def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
+    """
+    Get an array of valid qubits within the specified range, removing duplicates.
 
-    print("Number of qubits:", num_qubits)
-    print("Hamiltonian:")
-    print(hamiltonian)
+    Returns:
+        list: A list of valid qubits.
+    """
+    global dataset_name_template, filename
 
-    operator = hamiltonian  # Use the SparsePauliOp object directly
-    time = 0.2
+    # Create an array with the given min, max, and skip values
+    qubit_candidates = list(range(min_qubits, max_qubits + 1, skip_qubits))
+    valid_qubits_set = set()  # Use a set to avoid duplicates
 
-    # Build the evolution gate
-    evo = PauliEvolutionGate(operator, time=time)
+    for qubits in qubit_candidates:
+        initial_n_spins = qubits // 2 if "{n_spins/2}" in dataset_name_template else qubits
+        n_spins = initial_n_spins
 
-    # Plug it into a circuit
-    circuit = QuantumCircuit(operator.num_qubits)
-    init_state = "checkerboard"
-    circuit.append(initial_state(num_qubits, init_state), range(operator.num_qubits))
-    circuit.barrier()
-    circuit.append(evo, range(operator.num_qubits))
-    circuit.barrier()
+        # print(f"Starting check for qubits = {qubits}, initial n_spins = {n_spins}")
 
-    circuit.measure_all() 
-    print (circuit)
-    # circuit.draw(output="mpl")
-    # circuit.decompose(reps=2).draw(output="mpl", style="iqp")
-    return circuit, hamiltonian
+        found_valid_dataset = False
+
+        while n_spins <= max_qubits:
+            dataset_name = dataset_name_template.replace("{n_spins}", str(n_spins)).replace("{n_spins/2}", str(n_spins))
+            # print(f"Checking dataset: {dataset_name}")
+
+            data = process_hamiltonian_file(filename, dataset_name)
+            if data is not None:
+                # print(f"Valid dataset found for n_spins = {n_spins}")
+                if "{n_spins/2}" in dataset_name_template:
+                    valid_qubits_set.add(n_spins * 2)  # Add the original qubits value
+                else:
+                    valid_qubits_set.add(qubits)
+                found_valid_dataset = True
+                break
+            else:
+                # print(f"Dataset not available for n_spins = {n_spins}. Trying next value...")
+                n_spins += 1
+                if n_spins >= (qubits + skip_qubits) // 2 if "{n_spins/2}" in dataset_name_template else (qubits + skip_qubits):
+                    print(f"No valid dataset found for qubits = {qubits}")
+                    break
+
+        if found_valid_dataset:
+            continue  # Move to the next candidate in the original skip sequence
+
+    valid_qubits = list(valid_qubits_set)  # Convert set to list to remove duplicates
+    valid_qubits.sort()  # Sorting the qubits for consistent order
+    print(f"Final valid qubits: {valid_qubits}")
+    return valid_qubits  
 
 
 ############### Circuit Definition
@@ -342,7 +399,7 @@ def xx_gate(tau: float) -> QuantumCircuit:
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cx(qr[0], qr[1])
-    qc.rz(3.1416 * tau, qr[1])
+    qc.rz(pi * tau, qr[1])
     qc.cx(qr[0], qr[1])
     qc.h(qr[0])
     qc.h(qr[1])
@@ -369,7 +426,7 @@ def yy_gate(tau: float) -> QuantumCircuit:
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cx(qr[0], qr[1])
-    qc.rz(3.1416 * tau, qr[1])
+    qc.rz(pi * tau, qr[1])
     qc.cx(qr[0], qr[1])
     qc.h(qr[0])
     qc.h(qr[1])
@@ -394,7 +451,7 @@ def zz_gate(tau: float) -> QuantumCircuit:
     qr = QuantumRegister(2)
     qc = QuantumCircuit(qr, name="zz_gate")
     qc.cx(qr[0], qr[1])
-    qc.rz(3.1416 * tau, qr[1])
+    qc.rz(pi * tau, qr[1])
     qc.cx(qr[0], qr[1])
 
     global ZZ_
@@ -417,14 +474,14 @@ def xxyyzz_opt_gate(tau: float) -> QuantumCircuit:
     gamma = tau
     qr = QuantumRegister(2)
     qc = QuantumCircuit(qr, name="xxyyzz_opt")
-    qc.rz(3.1416 / 2, qr[1])
+    qc.rz(pi / 2, qr[1])
     qc.cx(qr[1], qr[0])
-    qc.rz(3.1416 * gamma - 3.1416 / 2, qr[0])
-    qc.ry(3.1416 / 2 - 3.1416 * alpha, qr[1])
+    qc.rz(pi * gamma - pi / 2, qr[0])
+    qc.ry(pi / 2 - pi * alpha, qr[1])
     qc.cx(qr[0], qr[1])
-    qc.ry(3.1416 * beta - 3.1416 / 2, qr[1])
+    qc.ry(pi * beta - pi / 2, qr[1])
     qc.cx(qr[1], qr[0])
-    qc.rz(-3.1416 / 2, qr[0])
+    qc.rz(-pi / 2, qr[0])
 
     global XXYYZZ_
     XXYYZZ_ = qc
@@ -450,7 +507,7 @@ def xx_gate_mirror(tau: float) -> QuantumCircuit:
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cx(qr[0], qr[1])
-    qc.rz(-3.1416 * tau, qr[1])
+    qc.rz(-pi * tau, qr[1])
     qc.cx(qr[0], qr[1])
     qc.h(qr[0])
     qc.h(qr[1])
@@ -477,7 +534,7 @@ def yy_gate_mirror(tau: float) -> QuantumCircuit:
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cx(qr[0], qr[1])
-    qc.rz(-3.1416 * tau, qr[1])
+    qc.rz(-pi * tau, qr[1])
     qc.cx(qr[0], qr[1])
     qc.h(qr[0])
     qc.h(qr[1])
@@ -502,7 +559,7 @@ def zz_gate_mirror(tau: float) -> QuantumCircuit:
     qr = QuantumRegister(2)
     qc = QuantumCircuit(qr, name="zz_gate_mirror")
     qc.cx(qr[0], qr[1])
-    qc.rz(-3.1416 * tau, qr[1])
+    qc.rz(-pi * tau, qr[1])
     qc.cx(qr[0], qr[1])
 
     global ZZ_mirror_
@@ -525,14 +582,14 @@ def xxyyzz_opt_gate_mirror(tau: float) -> QuantumCircuit:
     gamma = tau
     qr = QuantumRegister(2)
     qc = QuantumCircuit(qr, name="xxyyzz_opt_mirror")
-    qc.rz(3.1416 / 2, qr[0])
+    qc.rz(pi / 2, qr[0])
     qc.cx(qr[1], qr[0])
-    qc.ry(-3.1416 * beta + 3.1416 / 2, qr[1])
+    qc.ry(-pi * beta + pi / 2, qr[1])
     qc.cx(qr[0], qr[1])
-    qc.ry(-3.1416 / 2 + 3.1416 * alpha, qr[1])
-    qc.rz(-3.1416 * gamma + 3.1416 / 2, qr[0])
+    qc.ry(-pi / 2 + pi * alpha, qr[1])
+    qc.rz(-pi * gamma + pi / 2, qr[0])
     qc.cx(qr[1], qr[0])
-    qc.rz(-3.1416 / 2, qr[1])
+    qc.rz(-pi / 2, qr[1])
 
     global XXYYZZ_mirror_
     XXYYZZ_mirror_ = qc

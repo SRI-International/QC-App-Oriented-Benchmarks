@@ -152,14 +152,14 @@ def download_and_extract(filename, url):
     if response.status_code == 200:
         with open(local_zip_path, 'wb') as file:
             file.write(response.content)
-        print(f"Downloaded {local_zip_path} successfully.")
+        # print(f"Downloaded {local_zip_path} successfully.")
     else:
         raise Exception(f"Failed to download from {url}.")
 
     # Unzip the file
     with zipfile.ZipFile(local_zip_path, 'r') as zip_ref:
         zip_ref.extractall(download_dir)
-        print(f"Extracted to {download_dir}.")
+        # print(f"Extracted to {download_dir}.")
     
     # Return the path to the directory containing the extracted files
     return download_dir
@@ -184,10 +184,10 @@ def process_hamiltonian_file(filename, dataset_name):
     if filename in url_mapping:
         url = url_mapping[filename]
         extracted_path = download_and_extract(filename, url)
-        print('downloaded_path',extracted_path)
+        # print('downloaded_path',extracted_path)
         # Assuming the HDF5 file is located directly inside the extracted folder
         hdf5_file_path = os.path.join(extracted_path, filename)
-        print('hdf5_file_path', hdf5_file_path)
+        # print('hdf5_file_path', hdf5_file_path)
     else:
         raise ValueError(f"No URL mapping found for filename: {filename}")
     data = extract_dataset_hdf5(hdf5_file_path, dataset_name)
@@ -333,11 +333,11 @@ if __name__ == '__main__':
     filename = 'FH_D-1.hdf5'
     
     data = process_hamiltonian_file(filename, dataset_name)
-    if data is not None:
-        # print("Raw Hamiltonian Data: ",data)
-        print("Data extracted")
-    else:
-        print("No data extracted.")
+    # if data is not None:
+    #     # print("Raw Hamiltonian Data: ",data)
+    #     print("Data extracted")
+    # else:
+    #     print("No data extracted.")
     
     print("\n\n\n\nPrinting the structure of the hdf5 file")
     view_hdf5_structure()
