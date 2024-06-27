@@ -153,7 +153,7 @@ def HamiltonianSimulationExact(n_spins: int):
 
 ############### Benchmark Loop
 
-def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
+def run(qubit_array = [],min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "hamlib", method: int = 2,
         use_XX_YY_ZZ_gates: bool = False,
@@ -217,7 +217,8 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+    for num_qubits in qubit_array:
+    # for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
 
         # Reset random seed
         np.random.seed(0)
@@ -248,8 +249,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
                     w=w, hx = hx, hz = hz, 
                     use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
                     method = method)
-
-            # qc, _ = create_circuit()
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
