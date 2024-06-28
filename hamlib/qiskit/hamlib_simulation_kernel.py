@@ -396,7 +396,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
             EVO_ = evo
             
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
-    qc2 = qc.decompose()
+    qc2 = qc.decompose().decompose()
             
     return qc2
     
@@ -634,7 +634,7 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
         print(transpile(qctt, optimization_level=3))
                
         if QCI_ is not None:
-            print("  Initial State {QCI_.name}:")
+            print(f"  Initial State {QCI_.name}:")
             print(QCI_)
     
     else:
