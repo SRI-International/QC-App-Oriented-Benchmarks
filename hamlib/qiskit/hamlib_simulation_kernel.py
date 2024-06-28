@@ -11,7 +11,6 @@ In this case, method 3 is used to create a mirror circuit for scalability.
 '''
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
-# from hamlib_test import create_circuit, HamiltonianSimulationExact
 import h5py
 import re
 import os
