@@ -10,7 +10,7 @@ The "method" argument indicates the type of fidelity comparison that will be don
 In this case, method 3 is used to create a mirror circuit for scalability.
 '''
 
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 # from hamlib_test import create_circuit, HamiltonianSimulationExact
 import h5py
 import re
@@ -22,9 +22,12 @@ from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
 
 
-
 # Saved circuits and subcircuits for display
 QC_ = None
+QCI_ = None
+HAM_ = None
+EVO_ = None
+
 XX_ = None
 YY_ = None
 ZZ_ = None
@@ -92,7 +95,7 @@ filename = ""
 dataset_name_template = ""
 filename = ""
 
-def create_circuit(n_spins):
+def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
 
@@ -106,11 +109,13 @@ def create_circuit(n_spins):
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
     global dataset_name_template, filename
+    global QCI_
     
     # Replace placeholders with actual n_spins value
     dataset_name = dataset_name_template.replace("{n_spins}", str(n_spins)).replace("{n_spins/2}", str(n_spins // 2))
 
-    print(f"Trying dataset: {dataset_name}")  # Debug print
+    if verbose:
+        print(f"Trying dataset: {dataset_name}")  # Debug print
 
     data = process_hamiltonian_file(filename, dataset_name)
     if data is not None:
@@ -119,33 +124,38 @@ def create_circuit(n_spins):
         hamiltonian, num_qubits = process_data(data)
 
         # print("Number of qubits:", num_qubits)
-        # print("Hamiltonian:")
-        print(hamiltonian)
+        if verbose:
+            print(f"... Evolution operator = {hamiltonian}")
 
         operator = hamiltonian  # Use the SparsePauliOp object directly
-        time = 0.2
-        num_trotter_steps = 5
 
         # Build the evolution gate
-        evo = PauliEvolutionGate(operator, time=time/num_trotter_steps)
+        # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
+        evo_label = "e^iHt"
+        evo = PauliEvolutionGate(operator, time=time/num_trotter_steps, label=evo_label)
 
         # Plug it into a circuit
         circuit = QuantumCircuit(operator.num_qubits)
+        
+        # first insert the initial_state
         init_state = "checkerboard"
-        circuit.append(initial_state(num_qubits, init_state), range(operator.num_qubits))
+        QCI_ = initial_state(num_qubits, init_state)
+        circuit.append(QCI_, range(operator.num_qubits))
         circuit.barrier()
+        
+        # Append K trotter steps
         for _ in range (num_trotter_steps):
             circuit.append(evo, range(operator.num_qubits))
         circuit.barrier()
 
         circuit.measure_all()
-        print(circuit)
+        
         # circuit.draw(output="mpl")
         # circuit.decompose(reps=2).draw(output="mpl", style="iqp")
-        return circuit, hamiltonian
+        return circuit, hamiltonian, evo
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
-        return None, None
+        return None, None, None
 
 def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
     """
@@ -193,7 +203,10 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
 
     valid_qubits = list(valid_qubits_set)  # Convert set to list to remove duplicates
     valid_qubits.sort()  # Sorting the qubits for consistent order
-    print(f"Final valid qubits: {valid_qubits}")
+    
+    if verbose:
+        print(f"Final valid qubits: {valid_qubits}")
+        
     return valid_qubits  
 
 
@@ -214,10 +227,12 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 
     if initial_state.strip().lower() == "checkerboard" or initial_state.strip().lower() == "neele":
         # Checkerboard state, or "Neele" state
+        qc.name = "Neele"
         for k in range(0, n_spins, 2):
             qc.x([k])
     elif initial_state.strip().lower() == "ghz":
         # GHZ state: 1/sqrt(2) (|00...> + |11...>)
+        qc.name = "GHZ"
         qc.h(0)
         for k in range(1, n_spins):
             qc.cx(k-1, k)
@@ -266,7 +281,8 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
         init_state = "checkerboard"
 
         # apply initial state
-        qc.append(initial_state(n_spins, init_state), qr)
+        QCI_ = initial_state(n_spins, init_state)
+        qc.append(QCI, qr)
         qc.barrier()
 
         # Loop over each Trotter step, adding gates to the circuit defining the Hamiltonian
@@ -363,7 +379,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
                 qc.barrier()
     
     elif hamiltonian == "hamlib":
-        qc, _ = create_circuit(n_spins)
+        qc, ham_op, evo = create_circuit(n_spins)
 
     else:
         raise ValueError("Invalid Hamiltonian specification.")
@@ -373,11 +389,13 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
     #     qc.measure(qr[i_qubit], cr[i_qubit])
 
     # Save smaller circuit example for display
-    global QC_
+    global QC_, HAM_, EVO_
     if QC_ is None or n_spins <= 6:
         if n_spins < 9:
             QC_ = qc
-
+            HAM_ = ham_op
+            EVO_ = evo
+            
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
     qc2 = qc.decompose()
             
@@ -606,7 +624,22 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
                           
     # Print a sample circuit
     print("Sample Circuit:")
-    print(QC_ if QC_ is not None else "  ... too large!")
+    if QC_ is not None:
+        print(f"  H = {HAM_}")
+        print(QC_)
+        
+        # create a small circuit, just to display this evolution subciruit structure
+        print("  Evolution Operator (e^iHt) =")
+        qctt = QuantumCircuit(6)
+        qctt.append(EVO_, range(6))
+        print(transpile(qctt, optimization_level=3))
+               
+        if QCI_ is not None:
+            print(f"  Initial State {QCI_.name}:")
+            print(QCI_)
+    
+    else:
+        print("  ... circuit too large!")
 
     if hamiltonian == "heisenberg": 
         if use_XX_YY_ZZ_gates:
@@ -634,8 +667,6 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
             print(ZZ_mirror_)
 
     if hamiltonian == "hamlib": 
-        print("\n circuit = ")
-        print(QC_)
         if method == 3:
             print("\nZZ mirror = ")
             print(ZZ_mirror_)
