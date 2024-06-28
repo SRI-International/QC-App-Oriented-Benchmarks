@@ -13,6 +13,7 @@ In this case, method 3 is used to create a mirror circuit for scalability.
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 import numpy as np
 import math
+from typing import List
 
 pi = math.pi
 
@@ -69,7 +70,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
     return qc
 
 ############## Heisenberg Circuit
-def Heisenberg(n_spins: int, K: int, t: float, tau: float, w: float, h_x: list[float], h_z: list[float],
+def Heisenberg(n_spins: int, K: int, t: float, tau: float, w: float, h_x: List[float], h_z: List[float],
             use_XX_YY_ZZ_gates: bool = False) -> QuantumCircuit:
     qr = QuantumRegister(n_spins)
     qc = QuantumCircuit(qr, name = "Heisenberg")
@@ -165,7 +166,7 @@ def QuasiInverseTfim(n_spins: int, K: int, tau: float, use_XX_YY_ZZ_gates: bool)
     return qc
 
 ########Quasi Inverse of Heisenberg hamiltonian
-def QuasiInverseHeisenberg(n_spins: int, K: int, t: float, tau: float, w: float, h_x: list[float], h_z: list[float],
+def QuasiInverseHeisenberg(n_spins: int, K: int, t: float, tau: float, w: float, h_x: List[float], h_z: List[float],
             use_XX_YY_ZZ_gates: bool) -> QuantumCircuit:
     qr = QuantumRegister(n_spins)
     qc = QuantumCircuit(qr, name = "quasiheisenberg")
@@ -245,7 +246,7 @@ def QuasiInverseHeisenberg(n_spins: int, K: int, t: float, tau: float, w: float,
     return qc
 
 #Inverse of Heisenberg model. mirror gates are applied.
-def InverseHeisenberg(n_spins: int, K: int, t: float, tau: float, w: float, h_x: list[float], h_z: list[float],
+def InverseHeisenberg(n_spins: int, K: int, t: float, tau: float, w: float, h_x: List[float], h_z: List[float],
             use_XX_YY_ZZ_gates: bool = False) -> QuantumCircuit:
     
     qr = QuantumRegister(n_spins)
@@ -301,7 +302,7 @@ def InverseTfim(n_spins: int, K: int, tau: float, use_XX_YY_ZZ_gates: bool)-> Qu
 
 
 def HamiltonianSimulation(n_spins: int, K: int, t: float,
-            hamiltonian: str, w: float, hx: list[float], hz: list[float],
+            hamiltonian: str, w: float, hx: List[float], hz: List[float],
             use_XX_YY_ZZ_gates: bool = False,
             method: int = 1, random_pauli_flag: bool = True) -> QuantumCircuit:
     """
