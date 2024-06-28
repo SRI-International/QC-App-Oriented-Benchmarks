@@ -635,7 +635,7 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
         print(transpile(qctt, optimization_level=3))
                
         if QCI_ is not None:
-            print(f"  Initial State {QCI_.name}:")
+            print("  Initial State {QCI_.name}:")
             print(QCI_)
     
     else:
