@@ -177,7 +177,8 @@ def process_hamiltonian_file(filename, dataset_name):
     """
     url_mapping = {
         'tfim.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/tfim/tfim.zip',
-        'FH_D-1.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/fermihubbard/FH_D-1.zip'
+        'FH_D-1.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/fermihubbard/FH_D-1.zip',
+        'all-vib-h2o.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/chemistry/vibrational/'
         # Add more mappings as needed
     }
     
@@ -284,6 +285,7 @@ def view_hdf5_structure():
         "tfim1:downloaded_hamlib_files/tfim.hdf5:graph=1D-grid-pbc-qubitnodes",
         "tfim2:downloaded_hamlib_files/tfim.hdf5",
         "fermi-hubbard:downloaded_hamlib_files/FH_D-1.hdf5:fh=graph-1D-grid-nonpbc-qubitnodes",
+        "MVS-H2O:downloaded_hamlib_files/all-vib-h2o.hdf5",
         # Add more entries as needed
     ]
     extract_variable_ranges(file_input)
@@ -326,18 +328,6 @@ if __name__ == '__main__':
     #verbose = args.verbose
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
-    
-    # dataset_name = 'graph-1D-grid-nonpbc-qubitnodes_Lx-4_h-0.1'
-    # filename = 'tfim.hdf5'
-    dataset_name = 'fh-graph-1D-grid-nonpbc-qubitnodes_Lx-3_U-0_enc-jw'
-    filename = 'FH_D-1.hdf5'
-    
-    data = process_hamiltonian_file(filename, dataset_name)
-    # if data is not None:
-    #     # print("Raw Hamiltonian Data: ",data)
-    #     print("Data extracted")
-    # else:
-    #     print("No data extracted.")
     
     print("\n\n\n\nPrinting the structure of the hdf5 file")
     view_hdf5_structure()
