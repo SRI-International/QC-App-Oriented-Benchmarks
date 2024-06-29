@@ -130,7 +130,11 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         max_circuits (int): Maximum number of circuits to execute per group.
         skip_qubits (int): Increment of number of qubits.
         num_shots (int): Number of shots for each circuit execution.
+        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
+        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical, 3 for mirror circuit.)
         use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
+        random_pauli_flag (bool): Flag to use a random set of paulis, in addition to a quasi-hamiltonian. 
+        init_state (str): The desired initial state. Choices are "checkerboard" or "ghz". 
         backend_id (str): Backend identifier for execution.
         provider_backend: Provider backend instance.
         hub (str): IBM Quantum hub.
@@ -138,8 +142,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         project (str): IBM Quantum project.
         exec_options: Execution options.
 
-        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
         context: Execution context.
 
     Returns:

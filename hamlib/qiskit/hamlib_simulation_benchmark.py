@@ -22,10 +22,13 @@ from qiskit.circuit import QuantumCircuit
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
+sys.path[1:1] = ["../_common"]
+
 import execute as ex
 import metrics as metrics
 
-from hamiltonian_simulation_kernel import HamiltonianSimulation, kernel_draw, create_circuit
+from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, create_circuit, get_valid_qubits
+from hamiltonian_simulation_exact import HamiltonianSimulationExact
 # from hamlib_test import create_circuit, HamiltonianSimulationExact
 from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 
@@ -97,7 +100,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
-    print (counts, correct_dist)
+    
     return counts, fidelity
 
 def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircuit:
@@ -126,30 +129,6 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
             qc.cx(k-1, k)
 
     return qc
-
-# def HamiltonianSimulationExact(n_spins: int, t: float, init_state: str, w: float, hx: list[float], hz: list[float]) -> dict:
-def HamiltonianSimulationExact(n_spins: int):
-    """
-    Perform exact Hamiltonian simulation using classical matrix evolution.
-
-    Args:
-        n_spins (int): Number of spins (qubits).
-        t (float): Duration of simulation.
-        init_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
-        hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
-        w (float): Strength of two-qubit interactions for heisenberg hamiltonian. 
-        hx (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
-        hz (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
-
-    Returns:
-        dict: The distribution of the evolved state.
-    """
-    _, hamiltonian_sparse = create_circuit(n_spins)
-    time_problem = TimeEvolutionProblem(hamiltonian_sparse, 0.2, initial_state=initial_state(n_spins, 'checkerboard'))
-    # time_problem = TimeEvolutionProblem(hamiltonian_sparse, 0.2)
-    result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
-    print (result)
-    return result.evolved_state.probabilities_dict()
 
 ############### Benchmark Loop
 
@@ -217,7 +196,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+    valid_qubits = get_valid_qubits(min_qubits, max_qubits, skip_qubits)
+    for num_qubits in valid_qubits:
+    # for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
 
         # Reset random seed
         np.random.seed(0)
@@ -248,8 +229,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
                     w=w, hx = hx, hz = hz, 
                     use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
                     method = method)
-
-            # qc, _ = create_circuit()
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
             qc.draw()
