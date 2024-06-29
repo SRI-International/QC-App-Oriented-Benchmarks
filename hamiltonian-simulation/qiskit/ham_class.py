@@ -16,32 +16,24 @@ import math
 
 pi = math.pi
 
-# Saved circuits and subcircuits for display
-QC_ = None
-QCI_ = None
-QCRP_ = None
-QCRS_ = None
-
-QC2_ = None
+# Gates to be saved for printing purpose.
 XX_ = None
 YY_ = None
 ZZ_ = None
 XXYYZZ_ = None
-
-# Mirror Gates of the previous four gates
-QC2D_ = None
 XX_mirror_ = None
 YY_mirror_ = None
 ZZ_mirror_ = None
 XXYYZZ_mirror_ = None
-XXYYZZ_quasi_mirror = None
+XXYYZZ_quasi_mirror_ = None
+
 
 # For validating the implementation of XXYYZZ operation (saved for possible use in drawing)
 _use_XX_YY_ZZ_gates = False
 
 ## use initial state in the abstract class
 class HamiltonianKernel(object):
-    def __init__(self, n_spins, K, t, hamiltonian, w, hx, hz, use_XX_YY_ZZ_gates, method, random_pauli_flag):
+    def __init__(self, n_spins, K, t, hamiltonian, w, hx, hz, use_XX_YY_ZZ_gates, method, random_pauli_flag, init_state):
         self.n_spins = n_spins
         self.K = K
         self.t = t
@@ -53,11 +45,12 @@ class HamiltonianKernel(object):
         self.use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates
         self.random_pauli_flag = random_pauli_flag
         self.method = method
+        self.init_state = init_state
 
         self.QCI_ = None       # Initial Circuit
         self.QC_ = None        # Total Circuit
+        self.QCH_ = None       # Hamiltonian 
         self.QC2D_ = None      # Mirror Circuit
-        self.QCRP_ = None      # Random Pauli
         self.QCRS_ = None      # Resultant Pauli
 
         self.qr = QuantumRegister(n_spins)
@@ -65,16 +58,18 @@ class HamiltonianKernel(object):
         self.qc = QuantumCircuit(self.qr, self.cr, name = hamiltonian)
 
     def overall_circuit(self):
-        init_state = self.initial_state()          #create initial state
-        self.qc.append(init_state, self.qr)       #append the initial state to the quantum circuit
+        i_state = self.initial_state()          #create initial state
+        self.qc.append(i_state, self.qr)       #append the initial state to the quantum circuit
         circuit = self.create_hamiltonian()            #create the hamiltonian circuit
         self.qc.append(circuit, self.qr)          #append the hamiltoniain to the quantum circuit
 
         if self.method == 3:
+            #checks if random pauli flag is true to apply quasi inverse.
             if self.random_pauli_flag:
                 quasi_inverse_circuit = self.create_quasi_inverse_hamiltonian() 
                 self.qc.append(quasi_inverse_circuit, self.qr)
             else:
+                #applies regular inverse.
                 inverse_circuit = self.create_inverse_hamiltonian() 
                 self.qc.append(inverse_circuit, self.qr)
         
@@ -85,25 +80,26 @@ class HamiltonianKernel(object):
         #Save smaller circuit example for display
         if self.QC_ is None or self.n_spins <= 6:
             if self.n_spins < 9:
-                QC_ = self.qc
+                self.QC_ = self.qc
 
         # Collapse the sub-circuits used in this benchmark (for Qiskit)
         qc2 = self.qc.decompose().decompose() 
-        
-        self.qc = self.QC_ = qc2
-        return self.qc
+        return qc2
 
     #apply initial state to the quantum circuit
     def initial_state(self) -> QuantumCircuit:
-        qc = QuantumCircuit(self.n_spins)
-        if self.hamiltonian == "heisenberg":
+        #Initialize the quantum state.
+        qr = QuantumRegister(self.n_spins)
+        qc = QuantumCircuit(qr, name = "InitialState")
+        if self.init_state == "checkerboard" or self.init_state == "neele":
+            # Checkerboard state, or "Neele" state
             for k in range(0, self.n_spins, 2):
-                qc.x(k)
-        elif self.hamiltonian == "tfim":
+                qc.x([k])
+        elif self.init_state == "ghz":
+            # GHZ state: 1/sqrt(2) (|00...> + |11...>)
             qc.h(0)
             for k in range(1, self.n_spins):
                 qc.cx(k-1, k)
-        
         self.QCI_ = qc
         return qc
 
@@ -145,50 +141,23 @@ class HamiltonianKernel(object):
         # Print a sample circuit
         print("Sample Circuit:")
         print(self.QC_ if self.QC_ is not None else "  ... too large!")
-        
+
+        print("Hamiltonian:")
+        print(self.QCH_ if self.QCH_ is not None else "  ... too large!")
+
         # we don't restrict save of large sub-circuits, so skip printing if num_qubits too large
-        if self.QCI_ is not None and self.QCI_.num_qubits > 6:
-            print("... subcircuits too large to print") 
-            return
+        if self.QCI_ is not None and self.n_spins > 6:
+            print("... subcircuits too large to print")     
             
         print("  Initial State:")
         if self.QCI_ is not None: print(self.QCI_)
         
-        print(f"  Hamiltonian ({QC2_.name if self.QC2_ is not None else '?'}):")
-        if self.QC2_ is not None: print(self.QC2_)
+        print(f"  Hamiltonian ({self.QCH_.name if self.QCH_ is not None else '?'}):")
+        if self.QCH_ is not None: print(self.QCH_)
         
         if self.QC2D_ is not None:
-            print("  Quasi-Hamiltonian:")
+            print("Quasi-Hamiltonian:")
             print(self.QC2D_)
-
-        if self.hamiltonian == "heisenberg": 
-            if self.use_XX_YY_ZZ_gates:
-                print("\nXX, YY, ZZ = ")
-                print(XX_)
-                print(YY_)
-                print(ZZ_)
-                if self.method == 3:
-                    print("\nXX, YY, ZZ \u2020 = ")
-                    print(XX_mirror_)
-                    print(YY_mirror_)
-                    print(ZZ_mirror_)
-            else:
-                print("\nXXYYZZ = ")
-                print(XXYYZZ_)  
-                if self.method == 3:
-                    print("\nXXYYZZ\u2020 = ")
-                    print(XXYYZZ_mirror_)
-        
-        if self.hamiltonian == "tfim": 
-            print("\nZZ = ")
-            print(ZZ_)
-            if self.method == 3:
-                print("\nZZ\u2020 = ")
-                print(ZZ_mirror_)
-        
-        # if self.QCRP_ is not None:
-        #     print("  Random Paulis:")
-        #     print(self.QCRP_)
             
         if self.QCRS_ is not None:
             print("  Resultant Paulis:")
@@ -201,6 +170,7 @@ class HamiltonianKernel(object):
 # Derived class for Heisenberg.
 class HeisenbergHamiltonianKernel(HamiltonianKernel):
 
+    #apply Heisenberg hamiltonian.
     def create_hamiltonian(self) -> QuantumCircuit:
         qr = QuantumRegister(self.n_spins)
         qc = QuantumCircuit(qr, name="Heisenberg")
@@ -224,9 +194,11 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
                     for i in range(j % 2, self.n_spins - 1, 2):
                         qc.append(xxyyzz_opt_gate(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
             qc.barrier()
-            
+
+        self.QCH_ = qc   
         return qc
 
+    #apply inverse of the hamiltonian to simulate negative time evolution.
     def create_inverse_hamiltonian(self) -> QuantumCircuit:
         qr = QuantumRegister(self.n_spins)
         qc = QuantumCircuit(qr, name="InverseHeisenberg")
@@ -252,13 +224,13 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
             QC2D_ = qc
         return qc
 
+    #create quasi inverse hamiltonian to simulate negative time evolution with randomized paulis applied.
     def create_quasi_inverse_hamiltonian(self) -> QuantumCircuit:
-
-        qr = QuantumRegister(n_spins)
+        qr = QuantumRegister(self.n_spins)
         qc = QuantumCircuit(qr, name = "QuasiInverseHeisenberg")
 
         # Apply random paulis
-        pauli_list = random_paulis_list(n_spins)
+        pauli_list = self.random_paulis_list()
 
         for i, gate in enumerate(pauli_list):
             if gate == "x":
@@ -268,26 +240,26 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
 
         qc.barrier()
 
-        QCRS_ = res_pauli = ResultantPauli(n_spins) # create a resultant pauli that we want to apply to initial state.
+        self.QCRS_ = res_pauli = self.ResultantPauli() # create a resultant pauli that we want to apply to initial state.
                 
-        for k in range(K): 
+        for k in range(self.K): 
             # Basic implementation of exp(-i * t * (XX + YY + ZZ)):
-            if use_XX_YY_ZZ_gates:
+            if self.use_XX_YY_ZZ_gates:
                 # regular inverse of XX + YY + ZZ operators on each pair of quibts in linear chain
                 # XX operator on each pair of qubits in linear chain
                 for j in range(2):
-                    for i in range(j%2, n_spins - 1, 2):
-                        qc.append(zz_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+                    for i in range(j%2, self.n_spins - 1, 2):
+                        qc.append(zz_gate_mirror(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
 
                 # YY operator on each pair of qubits in linear chain
                 for j in range(2):
-                    for i in range(j%2, n_spins - 1, 2):
-                        qc.append(yy_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+                    for i in range(j%2, self.n_spins - 1, 2):
+                        qc.append(yy_gate_mirror(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
 
                 # ZZ operation on each pair of qubits in linear chain
                 for j in range(2):
-                    for i in range(j%2, n_spins - 1, 2):
-                        qc.append(xx_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+                    for i in range(j%2, self.n_spins - 1, 2):
+                        qc.append(xx_gate_mirror(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
 
             else:
                 # optimized Inverse of XX + YY + ZZ operator on each pair of qubits in linear chain
@@ -295,41 +267,65 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
                     
                     #Keep a track of what pauli is applied at the first part of mirror circuit.
                     if j == 0 and k == 0:
-                        if n_spins % 2 == 1:  
+                        if self.n_spins % 2 == 1:  
                             if pauli_list[0] == "x":
                                 qc.x(qr[0])
                             if pauli_list[0] == "z":
                                 qc.z(qr[0])
                                                                 ###applying a little twirl to prevent compiler from creating identity.
-                        if n_spins % 2 == 0:
+                        if self.n_spins % 2 == 0:
                             if pauli_list[0] == "x":
                                 qc.x(qr[0])
                             if pauli_list[0] == "z":
                                 qc.z(qr[0])
-                            if pauli_list[n_spins-1] == "x":
-                                qc.x(qr[n_spins-1])
-                            if pauli_list[n_spins-1] == "z":
-                                qc.z(qr[n_spins-1])
+                            if pauli_list[self.n_spins-1] == "x":
+                                qc.x(qr[self.n_spins-1])
+                            if pauli_list[self.n_spins-1] == "z":
+                                qc.z(qr[self.n_spins-1])
 
-                    for i in reversed(range(j % 2, n_spins - 1, 2)):
+                    for i in reversed(range(j % 2, self.n_spins - 1, 2)):
                         if k == 0 and j == 1:
                             gate_i = pauli_list[i]
-                            gate_next = pauli_list[(i + 1) % n_spins]
-                            qc.append(xxyyzz_opt_gate_quasi_mirror(tau, gate_i, gate_next).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
+                            gate_next = pauli_list[(i + 1) % self.n_spins]
+                            qc.append(xxyyzz_opt_gate_quasi_mirror(self.tau, gate_i, gate_next).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
                                                                                 
                         else:
-                            qc.append(xxyyzz_opt_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])     
+                            qc.append(xxyyzz_opt_gate_mirror(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])     
 
             qc.barrier()
 
             # the Pauli spin vector product
-            [qc.rz(-2 * tau * w * h_z[i], qr[i]) for i in range(n_spins)]
-            [qc.rx(-2 * tau * w * h_x[i], qr[i]) for i in range(n_spins)]
+            [qc.rz(-2 * self.tau * self.w * self.h_z[i], qr[i]) for i in range(self.n_spins)]
+            [qc.rx(-2 * self.tau * self.w * self.h_x[i], qr[i]) for i in range(self.n_spins)]
             qc.barrier()
 
-        qc.append(QCRS_,qr)
-        QC2D_ = qc
+        qc.append(self.QCRS_,qr)
+        self.QC2D_ = qc
         return qc
+
+    #apply extra circuit printing specific to Heisenberg.
+    def kernel_draw(self):
+        super().kernel_draw()
+        if self.use_XX_YY_ZZ_gates:
+                print("\nXX, YY, ZZ = ")
+                print(XX_)
+                print(YY_)
+                print(ZZ_)
+                if self.method == 3:
+                    print("\nXX, YY, ZZ \u2020 = ")
+                    print(XX_mirror_)
+                    print(YY_mirror_)
+                    print(ZZ_mirror_)
+        else:
+            print("\nXXYYZZ = ")
+            print(XXYYZZ_)  
+            if self.method == 3:
+                print("\nXXYYZZ\u2020 = ")
+                print(XXYYZZ_mirror_)             
+            if self.random_pauli_flag:
+                print("Qusai Inverse XXYYZZ:")
+                print(XXYYZZ_quasi_mirror_)
+
 
 ########################
 ####*****************###
@@ -338,6 +334,7 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
 #Derived Class for TFIM.
 class TfimHamiltonianKernel(HamiltonianKernel):
 
+    #apply tfim hamiltonian.
     def create_hamiltonian(self) -> QuantumCircuit:
         self.h = 0.2
         qr = QuantumRegister(self.n_spins)
@@ -350,8 +347,10 @@ class TfimHamiltonianKernel(HamiltonianKernel):
                 for i in range(j % 2, self.n_spins - 1, 2):
                     qc.append(zz_gate(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
             qc.barrier()
+        self.QCH_ = qc
         return qc
 
+    #apply inverse of the hamiltonian to simulate negative time evolution.
     def create_inverse_hamiltonian(self) -> QuantumCircuit:
         qr = QuantumRegister(self.n_spins)
         qc = QuantumCircuit(qr, name="InverseTFIM")
@@ -363,9 +362,10 @@ class TfimHamiltonianKernel(HamiltonianKernel):
             for i in range(self.n_spins):
                 qc.rx(-2 * self.tau * self.h, qr[i])
             qc.barrier()
-        QC2D_ = qc
+        self.QC2D_ = qc
         return qc
 
+    #create quasi inverse hamiltonian to simulate negative time evolution with randomized paulis applied.
     def create_quasi_inverse_hamiltonian(self) -> QuantumCircuit:
         qr = QuantumRegister(self.n_spins)
         qc = QuantumCircuit(qr, name="QuasiInverseTFIM")
@@ -377,8 +377,17 @@ class TfimHamiltonianKernel(HamiltonianKernel):
             for i in range(self.n_spins):
                 qc.rx(-2 * self.tau * self.h, qr[i])
             qc.barrier()
-        QC2D_ = qc
+        self.QC2D_ = qc
         return qc
+    
+    #apply extra circuit printing specific to tfim.
+    def kernel_draw(self):
+        super().kernel_draw()
+        print("\nZZ = ")
+        print(ZZ_)
+        if self.method == 3:
+            print("\nZZ\u2020 = ")
+            print(ZZ_mirror_)
 
 
 ########################
