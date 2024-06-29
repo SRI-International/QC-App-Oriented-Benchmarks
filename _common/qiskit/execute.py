@@ -1182,8 +1182,6 @@ def job_complete(job):
             # compute yield from number actually returned
             shots_yield = round(actual_shots / shots_executed, 3)
             
-            # DEVNOTE: need to do something else if we still don't have enough shots returned !
-            
             # save the number returned, but indicate we returned what was requested
             # we will trim the array later
             actual_shots_executed = actual_shots
