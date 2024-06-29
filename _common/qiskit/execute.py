@@ -119,6 +119,10 @@ do_transpile_for_execute = True
 result_processor = None
 width_processor = None
 
+# Shots Multiplier - used for reduced yield backends to request more shots
+shots_multiplier = None    # or a number like 1.5
+shots_yield_factor = 1.0   # for testing. e.g. 0.75 = 75% yield
+
 # Selection of basis gate set for transpilation
 # Note: selector 1 is a hardware agnostic gate set
 basis_selector = 1
@@ -744,6 +748,13 @@ def execute_circuit(circuit):
                 # to execute on Aer state vector simulator, need to remove measurements
                 if backend_name.lower() == "statevector_simulator":
                     trans_qc = trans_qc.remove_final_measurements(inplace=False)
+                    
+                # if using shots multiplier, apply to requested shots
+                if shots_multiplier is not None and shots_multiplier > 1.0:
+                    shots = int(shots * shots_multiplier)
+                    print(f"... requesting {shots} shots for improved yield")
+                    
+                    shots = int(shots_yield_factor * shots)
                             
                 #*************************************
                 # perform circuit execution on backend
@@ -1153,6 +1164,24 @@ def job_complete(job):
         # convert actual_shots to int if it is a string
         if type(actual_shots) is str:
             actual_shots = int(actual_shots)
+            
+        # if using shots multiplier, apply to requested shots
+        if shots_multiplier is not None and shots_multiplier > 1.0:
+        
+            # compute how many shots we actually submitted in execute function
+            shots_executed = int(active_circuit["shots"] * shots_multiplier)
+            
+            # compute yield from number actually returned
+            shots_yield = round(actual_shots / shots_executed, 3)
+            
+            # DEVNOTE: need to do something else if we still don't have enough shots returned !
+            
+            # save the number returned, but indicate we returned what was requested
+            # we will trim the array later
+            actual_shots_executed = actual_shots
+            actual_shots = min(active_circuit["shots"], actual_shots_executed)
+            
+            print(f'... requested shots={active_circuit["shots"]} executed={shots_executed} actual={actual_shots} yield={shots_yield}')
         
         # check for mismatch of requested shots and actual shots
         if actual_shots != active_circuit["shots"]:
@@ -1207,6 +1236,28 @@ def job_complete(job):
             results.data.counts = total_counts
             result.results = [ results ]
             
+        # if using shots multiplier, reduce result to request shots only
+        if shots_multiplier is not None and shots_multiplier > 1.0:
+        
+            # make a copy of the result object so we can return a modified version
+            orig_result = result
+            result = copy.copy(result) 
+            
+            # print(f"... vars of result = {vars(result)}")
+            # print(f"... results = {result.results}")
+            # print(f"... observed counts = {result.get_counts()}")
+            
+            # adjust the reported number of shots
+            result.results[0].shots = actual_shots
+            
+            # scale the data to match the number of shots requested
+            result.results[0].data.counts = scale_counts_to_shots(result.results[0].data.counts, actual_shots)
+            
+            # print(f"... (adjusted) results = {result.results}")
+            # print(f"... results.shots = {result.results[0].shots}")
+            # print(f"... results.data.counts = {result.results[0].data.counts}")
+            # print(f"... counts = {result.get_counts()}")
+            
         try:
             result_handler(active_circuit["qc"],
                             result,
@@ -1220,6 +1271,35 @@ def job_complete(job):
             print(f"... exception = {e}")
             if verbose:
                 print(traceback.format_exc())
+                
+                
+def scale_counts_to_shots(counts, total_shots):
+    """
+    Scale the measurement counts dictionary to exactly fit a given number of shots.
+
+    Parameters:
+    - counts (dict): Measurement counts dictionary from Qiskit result.
+    - total_shots (int): Desired total number of shots.
+
+    Returns:
+    - scaled_counts (dict): Scaled measurement counts dictionary where the total number
+                           of shots equals total_shots.
+    """
+    # Calculate the current total shots in the counts dictionary
+    current_total = sum(counts.values())
+    
+    # Scale each count value to fit the total_shots
+    scaled_counts = {key: int(value * total_shots / current_total) for key, value in counts.items()}
+    
+    # Adjust for any rounding issues to ensure exact total_shots
+    current_total_scaled = sum(scaled_counts.values())
+    if current_total_scaled != total_shots:
+        # Find the key with the largest fraction and adjust it by 1 shot
+        max_fraction_key = max(counts, key=lambda k: (counts[k] - scaled_counts[k] * current_total / total_shots) / counts[k])
+        scaled_counts[max_fraction_key] += total_shots - current_total_scaled
+    
+    return scaled_counts
+    
 
 # Process detailed step times, if they exist
 def process_step_times(job, result, active_circuit):
