@@ -24,5 +24,6 @@ jobs:
 
     - name: Run tests
       run: pytest
-      working-directory: ./hydrogen-lattice/qiskit
+      working-directory: .
+
 
