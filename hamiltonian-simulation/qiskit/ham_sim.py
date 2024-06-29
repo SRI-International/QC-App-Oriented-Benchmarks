@@ -24,8 +24,6 @@ sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 import execute as ex
 import metrics as metrics
 
-from hamiltonian_simulation_kernel import HamiltonianSimulation, kernel_draw
-
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
@@ -204,24 +202,24 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
             hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
             hz = precalculated_data['hz'][:num_qubits]
 
+            # Create HeisenbergKernel or TFIM kernel
             if hamiltonian == "heisenberg" :
                 qc_object = HeisenbergHamiltonianKernel(num_qubits, K=k, t=t,
                         hamiltonian=hamiltonian,
                         w=w, hx = hx, hz = hz, 
                         use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
-                        method = method, random_pauli_flag = random_pauli_flag)
+                        method = method, random_pauli_flag = random_pauli_flag, init_state = init_state)
             
             if hamiltonian == "tfim" :
                 qc_object = TfimHamiltonianKernel(num_qubits, K=k, t=t,
                         hamiltonian=hamiltonian,
                         w=w, hx = hx, hz = hz, 
                         use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
-                        method = method, random_pauli_flag = random_pauli_flag)
+                        method = method, random_pauli_flag = random_pauli_flag, init_state = init_state)
             
             qc = qc_object.overall_circuit()
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
-            qc.draw()
 
             # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
@@ -235,7 +233,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     ##########
     
     # draw a sample circuit
-    kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
+    qc_object.kernel_draw()
        
     # Plot metrics for all circuit sizes
     options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
