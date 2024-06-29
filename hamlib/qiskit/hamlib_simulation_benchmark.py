@@ -73,7 +73,8 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     counts = result.get_counts(qc)
 
     if verbose:
-        print(f"For type {type} measured: {counts}")
+        #print(f"For type {type} measured: {counts}")
+        print_top_measurements(f"For type {type} measured counts = ", counts, 100)
 
     hamiltonian = hamiltonian.strip().lower()
 
@@ -87,7 +88,12 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     elif method == 2 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
     elif method == 2 and hamiltonian == "hamlib":
+        if verbose:
+            print(f"... begin exact computation ...")
+        ts = time.time()
         correct_dist = HamiltonianSimulationExact(num_qubits)
+        if verbose:
+            print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
     elif method == 3 and hamiltonian == "heisenberg":
         correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}
     elif method == 3 and hamiltonian == "tfim":
@@ -96,12 +102,50 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
 
     if verbose:
-        print(f"Correct dist: {correct_dist}")
+        #print(f"Correct dist: {correct_dist}")
+        print_top_measurements(f"Correct dist = ", correct_dist, 100)
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
     
     return counts, fidelity
+    
+def print_top_measurements(label, counts, top_n):
+    """
+    Prints the top N measurements from a Qiskit measurement counts dictionary
+    in a dictionary-like format. If there are more measurements not printed,
+    indicates the count.
+    
+    Args:
+        counts (dict): The measurement counts dictionary from Qiskit.
+        top_n (int): The number of top measurements to print.
+    """
+    
+    if label is not None: print(label)
+    
+    sorted_counts = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+    
+    total_measurements = len(sorted_counts)
+    
+    if top_n >= total_measurements:
+        top_counts = sorted_counts
+        more_counts = []
+    else:
+        top_counts = sorted_counts[:top_n]
+        more_counts = sorted_counts[top_n:]
+    
+    print("{", end=" ")
+    for i, (measurement, count) in enumerate(top_counts):
+        print(f"'{measurement}': {round(count,6)}", end="")
+        if i < len(top_counts) - 1:
+            print(",", end=" ")
+    
+    if more_counts:
+        num_more = len(more_counts)
+        print(f", ... and {num_more} more.")
+    else:
+        print(" }")
+
 
 def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircuit:
     """
