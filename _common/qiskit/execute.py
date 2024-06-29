@@ -121,7 +121,7 @@ width_processor = None
 
 # Shots Multiplier - used for reduced yield backends to request more shots
 shots_multiplier = None    # or a number like 1.5
-shots_yield_factor = 1.0   # for testing. e.g. 0.75 = 75% yield
+fake_yield_factor = None   # for testing. e.g. 0.75 = 75% yield
 
 # Selection of basis gate set for transpilation
 # Note: selector 1 is a hardware agnostic gate set
@@ -647,6 +647,20 @@ def execute_circuit(circuit):
         if postprocessors:
             result_processor, width_processor = postprocessors
         
+        #############
+        # if using shots multiplier, apply to requested shots
+        global shots_multiplier, fake_yield_factor
+        shots_multiplier = backend_exec_options_copy.pop("shots_multiplier", None)   
+        fake_yield_factor = backend_exec_options_copy.pop("fake_yield_factor", 1.0)
+        
+        if shots_multiplier is not None and shots_multiplier > 1.0:
+            shots = int(shots * shots_multiplier)
+            print(f"... requesting {shots} shots for improved yield")
+            
+            # for testing, apply a fake yield factor
+            if fake_yield_factor is not None:
+                shots = int(fake_yield_factor * shots)
+                    
         ##############
         # if 'executor' is provided, perform all execution there and return
         # the executor returns a result object that implements get_counts(qc)
@@ -748,13 +762,6 @@ def execute_circuit(circuit):
                 # to execute on Aer state vector simulator, need to remove measurements
                 if backend_name.lower() == "statevector_simulator":
                     trans_qc = trans_qc.remove_final_measurements(inplace=False)
-                    
-                # if using shots multiplier, apply to requested shots
-                if shots_multiplier is not None and shots_multiplier > 1.0:
-                    shots = int(shots * shots_multiplier)
-                    print(f"... requesting {shots} shots for improved yield")
-                    
-                    shots = int(shots_yield_factor * shots)
                             
                 #*************************************
                 # perform circuit execution on backend
@@ -1164,7 +1171,8 @@ def job_complete(job):
         # convert actual_shots to int if it is a string
         if type(actual_shots) is str:
             actual_shots = int(actual_shots)
-            
+        
+        #############
         # if using shots multiplier, apply to requested shots
         if shots_multiplier is not None and shots_multiplier > 1.0:
         
