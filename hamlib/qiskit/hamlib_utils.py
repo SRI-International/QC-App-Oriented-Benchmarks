@@ -33,7 +33,8 @@ def extract_dataset_hdf5(filename, dataset_name):
             data = dataset[()] if dataset.shape == () else dataset[:]
         else:
             data = None
-            print(f"Dataset {dataset_name} not found in the file.")
+            if verbose:
+                print(f"Dataset {dataset_name} not found in the file.")
     return data
 
 def needs_normalization(data):
@@ -178,7 +179,7 @@ def process_hamiltonian_file(filename, dataset_name):
     url_mapping = {
         'tfim.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/tfim/tfim.zip',
         'FH_D-1.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/fermihubbard/FH_D-1.zip',
-        'all-vib-h2o.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/chemistry/vibrational/'
+        'all-vib-h2o.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/chemistry/vibrational/all-vib-h2o.hdf5.zip'
         # Add more mappings as needed
     }
     
@@ -281,6 +282,7 @@ def view_hdf5_structure():
     """
     A sample function to view the structure of specific HDF5 files and their variable ranges.
     """
+    verbose = False
     file_input = [
         "tfim1:downloaded_hamlib_files/tfim.hdf5:graph=1D-grid-pbc-qubitnodes",
         "tfim2:downloaded_hamlib_files/tfim.hdf5",
@@ -288,6 +290,13 @@ def view_hdf5_structure():
         "MVS-H2O:downloaded_hamlib_files/all-vib-h2o.hdf5",
         # Add more entries as needed
     ]
+    for entry in file_input:
+        parts = entry.split(':')
+        filename = parts[1]  # Extract the full path of the file
+        base_filename = os.path.basename(filename)  # Extract the base filename
+
+        if not os.path.exists(filename):
+            process_hamiltonian_file(base_filename, "")
     extract_variable_ranges(file_input)
 
 #######################
