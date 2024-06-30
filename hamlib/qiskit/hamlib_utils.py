@@ -13,6 +13,8 @@ import os
 import requests
 import zipfile
 
+verbose = False
+
 
 def extract_dataset_hdf5(filename, dataset_name):
     """
@@ -224,17 +226,20 @@ def extract_variable_ranges(file_input):
         # Dictionary to hold variables and their values
         variable_values = {}
 
-        with h5py.File(file_path, 'r') as file:
-            for item in file.keys():
-                # Assuming the format includes instance names in item or its attributes
-                instance_name = item.split(':')[0] if ':' in item else item
-                variables = parse_instance_variables(instance_name)
+        try:
+            with h5py.File(file_path, 'r') as file:
+                for item in file.keys():
+                    # Assuming the format includes instance names in item or its attributes
+                    instance_name = item.split(':')[0] if ':' in item else item
+                    variables = parse_instance_variables(instance_name)
 
-                if fixed_variable is None or variables.get(fixed_variable) == fixed_value:
-                    for var, val in variables.items():
-                        if var not in variable_values:
-                            variable_values[var] = set()
-                        variable_values[var].add(val)
+                    if fixed_variable is None or variables.get(fixed_variable) == fixed_value:
+                        for var, val in variables.items():
+                            if var not in variable_values:
+                                variable_values[var] = set()
+                            variable_values[var].add(val)
+        except Exception as e:
+            print(f"Error processing file {file_path}: {e}")
 
         # Store the results
         if variable_values:
@@ -298,6 +303,7 @@ def view_hdf5_structure():
         if not os.path.exists(filename):
             process_hamiltonian_file(base_filename, "")
     extract_variable_ranges(file_input)
+
 
 #######################
 # MAIN
