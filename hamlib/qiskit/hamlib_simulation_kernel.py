@@ -111,7 +111,7 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
     global QCI_
     
     # Replace placeholders with actual n_spins value
-    dataset_name = dataset_name_template.replace("{n_spins}", str(n_spins)).replace("{n_spins/2}", str(n_spins // 2))
+    dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
 
     if verbose:
         print(f"Trying dataset: {dataset_name}")  # Debug print
@@ -170,7 +170,7 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
     valid_qubits_set = set()  # Use a set to avoid duplicates
 
     for qubits in qubit_candidates:
-        initial_n_spins = qubits // 2 if "{n_spins/2}" in dataset_name_template else qubits
+        initial_n_spins = qubits // 2 if "{n_qubits/2}" in dataset_name_template else qubits
         n_spins = initial_n_spins
 
         # print(f"Starting check for qubits = {qubits}, initial n_spins = {n_spins}")
@@ -178,13 +178,13 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
         found_valid_dataset = False
 
         while n_spins <= max_qubits:
-            dataset_name = dataset_name_template.replace("{n_spins}", str(n_spins)).replace("{n_spins/2}", str(n_spins))
+            dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins))
             # print(f"Checking dataset: {dataset_name}")
 
             data = process_hamiltonian_file(filename, dataset_name)
             if data is not None:
                 # print(f"Valid dataset found for n_spins = {n_spins}")
-                if "{n_spins/2}" in dataset_name_template:
+                if "{n_qubits/2}" in dataset_name_template:
                     valid_qubits_set.add(n_spins * 2)  # Add the original qubits value
                 else:
                     valid_qubits_set.add(qubits)
@@ -193,7 +193,7 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
             else:
                 # print(f"Dataset not available for n_spins = {n_spins}. Trying next value...")
                 n_spins += 1
-                if n_spins >= (qubits + skip_qubits) // 2 if "{n_spins/2}" in dataset_name_template else (qubits + skip_qubits):
+                if n_spins >= (qubits + skip_qubits) // 2 if "{n_qubits/2}" in dataset_name_template else (qubits + skip_qubits):
                     print(f"No valid dataset found for qubits = {qubits}")
                     break
 

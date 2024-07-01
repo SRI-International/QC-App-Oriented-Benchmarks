@@ -12,6 +12,7 @@ import re
 import os
 import requests
 import zipfile
+import json
 
 verbose = False
 
@@ -181,7 +182,7 @@ def process_hamiltonian_file(filename, dataset_name):
     url_mapping = {
         'tfim.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/tfim/tfim.zip',
         'FH_D-1.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/fermihubbard/FH_D-1.zip',
-        'all-vib-h2o.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/chemistry/vibrational/all-vib-h2o.hdf5.zip'
+        'random_max3sat-hams.hdf5':"https://portal.nersc.gov/cfs/m888/dcamps/hamlib/binaryoptimization/max3sat/random/random_max3sat-hams.hdf5.zip",
         # Add more mappings as needed
     }
     
@@ -283,6 +284,48 @@ def parse_instance_variables(instance_name):
             variables[var] = val
     return variables
 
+def generate_json_for_hdf5_input(file_input):
+    results = {}
+
+    for entry in file_input:
+        parts = entry.split(':')
+        function_name, file_path = parts[0], parts[1]
+        base_filename = os.path.basename(file_path)
+
+        # Check if file exists, if not handle it accordingly
+        if not os.path.exists(file_path):
+            process_hamiltonian_file(base_filename, "")  # Your custom handling for missing files
+            continue  # Skip processing if file is not found or after handling
+
+        if len(parts) > 2:
+            fixed_var_value = parts[2]
+            fixed_variable, fixed_value = fixed_var_value.split('=')
+        else:
+            fixed_variable, fixed_value = None, None
+
+        variable_values = {}
+
+        try:
+            with h5py.File(file_path, 'r') as file:
+                for item in file.keys():
+                    instance_name = item.split(':')[0] if ':' in item else item
+                    variables = parse_instance_variables(instance_name)
+
+                    if fixed_variable is None or variables.get(fixed_variable) == fixed_value:
+                        for var, val in variables.items():
+                            # Store only the first encountered value for each variable
+                            if var not in variable_values:
+                                variable_values[var] = val
+        except Exception as e:
+            print(f"Error processing file {file_path}: {e}")
+
+        if variable_values:
+            results[base_filename] = variable_values
+
+    with open('downloaded_hamlib_files/sample_input_json.json', 'w') as f:
+        json.dump(results, f, indent=2)
+
+
 def view_hdf5_structure():
     """
     A sample function to view the structure of specific HDF5 files and their variable ranges.
@@ -292,7 +335,7 @@ def view_hdf5_structure():
         "tfim1:downloaded_hamlib_files/tfim.hdf5:graph=1D-grid-pbc-qubitnodes",
         "tfim2:downloaded_hamlib_files/tfim.hdf5",
         "fermi-hubbard:downloaded_hamlib_files/FH_D-1.hdf5:fh=graph-1D-grid-nonpbc-qubitnodes",
-        "MVS-H2O:downloaded_hamlib_files/all-vib-h2o.hdf5",
+        "max3sat:downloaded_hamlib_files/random_max3sat-hams.hdf5",
         # Add more entries as needed
     ]
     for entry in file_input:
@@ -303,6 +346,7 @@ def view_hdf5_structure():
         if not os.path.exists(filename):
             process_hamiltonian_file(base_filename, "")
     extract_variable_ranges(file_input)
+    generate_json_for_hdf5_input(file_input)
 
 
 #######################
