@@ -180,9 +180,11 @@ def process_hamiltonian_file(filename, dataset_name):
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
     url_mapping = {
-        'tfim.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/tfim/tfim.zip',
+        'tfim.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/tfim/tfim.hdf5.zip',
         'FH_D-1.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/fermihubbard/FH_D-1.zip',
         'random_max3sat-hams.hdf5':"https://portal.nersc.gov/cfs/m888/dcamps/hamlib/binaryoptimization/max3sat/random/random_max3sat-hams.hdf5.zip",
+        'heis.hdf5':"https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/heisenberg/heis.zip",
+        'BH_D-1_d-4.hdf5':"https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/bosehubbard/BH_D-1_d-4.zip"
         # Add more mappings as needed
     }
     
@@ -334,8 +336,10 @@ def view_hdf5_structure():
     file_input = [
         "tfim1:downloaded_hamlib_files/tfim.hdf5:graph=1D-grid-pbc-qubitnodes",
         "tfim2:downloaded_hamlib_files/tfim.hdf5",
-        "fermi-hubbard:downloaded_hamlib_files/FH_D-1.hdf5:fh=graph-1D-grid-nonpbc-qubitnodes",
+        "fermi-hubbard:downloaded_hamlib_files/FH_D-1.hdf5",
         "max3sat:downloaded_hamlib_files/random_max3sat-hams.hdf5",
+        "heis:downloaded_hamlib_files/heis.hdf5",
+        "bh:downloaded_hamlib_files/BH_D-1_d-4.hdf5"
         # Add more entries as needed
     ]
     for entry in file_input:

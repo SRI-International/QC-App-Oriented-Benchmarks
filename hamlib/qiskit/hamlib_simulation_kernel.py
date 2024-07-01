@@ -16,6 +16,7 @@ import re
 import os
 import requests
 import zipfile
+import json
 from qiskit.quantum_info import SparsePauliOp, Pauli
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
@@ -86,76 +87,6 @@ def sparse_pauliop(terms, num_qubits):
     hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
     return hamiltonian
 
-dataset_name_template = ""
-filename = ""
-
-# In hamiltonian_simulation_kernel.py
-
-dataset_name_template = ""
-filename = ""
-
-def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
-    """
-    Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
-
-    Steps:
-        1. Extract Hamiltonian data from an HDF5 file.
-        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
-        3. Build a quantum circuit with an initial state and an evolution gate based on the Hamiltonian.
-        4. Measure all qubits and print the circuit details.
-
-    Returns:
-        tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
-    """
-    global dataset_name_template, filename
-    global QCI_
-    
-    # Replace placeholders with actual n_spins value
-    dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
-
-    if verbose:
-        print(f"Trying dataset: {dataset_name}")  # Debug print
-
-    data = process_hamiltonian_file(filename, dataset_name)
-    if data is not None:
-        # print(f"Using dataset: {dataset_name}")
-        # print("Raw Hamiltonian Data: ", data)
-        hamiltonian, num_qubits = process_data(data)
-
-        # print("Number of qubits:", num_qubits)
-        if verbose:
-            print(f"... Evolution operator = {hamiltonian}")
-
-        operator = hamiltonian  # Use the SparsePauliOp object directly
-
-        # Build the evolution gate
-        # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
-        evo_label = "e^iHt"
-        evo = PauliEvolutionGate(operator, time=time/num_trotter_steps, label=evo_label)
-
-        # Plug it into a circuit
-        circuit = QuantumCircuit(operator.num_qubits)
-        
-        # first insert the initial_state
-        init_state = "checkerboard"
-        QCI_ = initial_state(num_qubits, init_state)
-        circuit.append(QCI_, range(operator.num_qubits))
-        circuit.barrier()
-        
-        # Append K trotter steps
-        for _ in range (num_trotter_steps):
-            circuit.append(evo, range(operator.num_qubits))
-        circuit.barrier()
-
-        circuit.measure_all()
-        
-        # circuit.draw(output="mpl")
-        # circuit.decompose(reps=2).draw(output="mpl", style="iqp")
-        return circuit, hamiltonian, evo
-    else:
-        # print(f"Dataset not available for n_spins = {n_spins}.")
-        return None, None, None
-
 def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
     """
     Get an array of valid qubits within the specified range, removing duplicates.
@@ -207,6 +138,104 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
         print(f"Final valid qubits: {valid_qubits}")
         
     return valid_qubits  
+
+# In hamiltonian_simulation_kernel.py
+
+dataset_name_template = ""
+filename = ""
+
+def construct_dataset_name(file_key):
+    # This should be the path to your JSON file. Adjust if it's in a different location.
+    json_file_path = 'hamlib_parameter_use_input.json'
+
+    # Try to open the JSON file and load data
+    try:
+        with open(json_file_path, 'r') as file:
+            json_data = json.load(file)
+    except FileNotFoundError:
+        return "The specified JSON file could not be found."
+    except json.JSONDecodeError:
+        return "Error decoding JSON. Please check the file content."
+
+    # Access the properties of the given file key from the JSON data
+    file_properties = json_data.get(file_key)
+    
+    # Handle case where file_key is not found in data
+    if not file_properties:
+        return "File key not found in data"
+
+    # Construct the dataset name dynamically
+    dataset_parts = []
+    for key, value in file_properties.items():
+        dataset_parts.append(f"{key}-{value}")
+
+    return '_'.join(dataset_parts)
+
+
+def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
+    """
+    Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
+
+    Steps:
+        1. Extract Hamiltonian data from an HDF5 file.
+        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
+        3. Build a quantum circuit with an initial state and an evolution gate based on the Hamiltonian.
+        4. Measure all qubits and print the circuit details.
+
+    Returns:
+        tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
+    """
+    global dataset_name_template, filename
+    # global filename
+    global QCI_
+
+    # dataset_name_template = construct_dataset_name(filename)
+    process_data(dataset_name_template)
+    # Replace placeholders with actual n_spins value
+    dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
+
+    if verbose:
+        print(f"Trying dataset: {dataset_name}")  # Debug print
+
+    data = process_hamiltonian_file(filename, dataset_name)
+    if data is not None:
+        # print(f"Using dataset: {dataset_name}")
+        # print("Raw Hamiltonian Data: ", data)
+        hamiltonian, num_qubits = process_data(data)
+
+        # print("Number of qubits:", num_qubits)
+        if verbose:
+            print(f"... Evolution operator = {hamiltonian}")
+
+        operator = hamiltonian  # Use the SparsePauliOp object directly
+
+        # Build the evolution gate
+        # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
+        evo_label = "e^iHt"
+        evo = PauliEvolutionGate(operator, time=time/num_trotter_steps, label=evo_label)
+
+        # Plug it into a circuit
+        circuit = QuantumCircuit(operator.num_qubits)
+        
+        # first insert the initial_state
+        init_state = "checkerboard"
+        QCI_ = initial_state(num_qubits, init_state)
+        circuit.append(QCI_, range(operator.num_qubits))
+        circuit.barrier()
+        
+        # Append K trotter steps
+        for _ in range (num_trotter_steps):
+            circuit.append(evo, range(operator.num_qubits))
+        circuit.barrier()
+
+        circuit.measure_all()
+        
+        # circuit.draw(output="mpl")
+        # circuit.decompose(reps=2).draw(output="mpl", style="iqp")
+        return circuit, hamiltonian, evo
+    else:
+        # print(f"Dataset not available for n_spins = {n_spins}.")
+        return None, None, None
 
 
 ############### Circuit Definition
