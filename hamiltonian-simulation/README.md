@@ -67,15 +67,15 @@ In the run() method for the benchmark, several optional arguments can be specifi
 Parameters 
 ---- 
 
- min_qubits (int): Minimum number of qubits (smallest circuit is 2 qubits).
-        max_qubits (int): Maximum number of qubits.
-        max_circuits (int): Maximum number of circuits to execute per group.
-        num_shots (int): Number of shots for each circuit execution.
-        hamiltonian (str): Which Hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical, 3 for mirror circuit.)
-        use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
-        random_pauli_flag (bool): Flag to activate more sophisticated mirror circuit formation that utilizes a layer of random paulis separating the mirror circuits in addition to using a quasi-inverse rather than an inverse. 
-        init_state (str): The desired initial state. Choices are "checkerboard" or "ghz". 
+min_qubits (int): Minimum number of qubits (smallest circuit is 2 qubits).
+max_qubits (int): Maximum number of qubits.
+max_circuits (int): Maximum number of circuits to execute per group.
+num_shots (int): Number of shots for each circuit execution.
+hamiltonian (str): Which Hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
+method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical, 3 for mirror circuit.)
+use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
+random_pauli_flag (bool): Flag to activate more sophisticated mirror circuit formation that utilizes a layer of random paulis separating the mirror circuits in addition to using a quasi-inverse rather than an inverse. 
+init_state (str): The desired initial state. Choices are "checkerboard" or "ghz". 
 ```
 
 ## Classical algorithm
