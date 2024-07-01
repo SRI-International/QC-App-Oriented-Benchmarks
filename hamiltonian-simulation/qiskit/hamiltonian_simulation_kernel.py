@@ -681,14 +681,14 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
         print("... subcircuits too large to print") 
         return
         
-    print("  Initial State:")
-    if QCI_ is not None: print(QCI_)
+    # print("  Initial State:")
+    # if QCI_ is not None: print(QCI_)
     
     print(f"  Hamiltonian ({QC2_.name if QC2_ is not None else '?'}):")
     if QC2_ is not None: print(QC2_)
       
     if QC2D_ is not None:
-        print("  Quasi-Hamiltonian:")
+        print("Quasi-Hamiltonian:")
         print(QC2D_)
 
     if hamiltonian == "heisenberg": 

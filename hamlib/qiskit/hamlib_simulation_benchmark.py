@@ -22,10 +22,13 @@ from qiskit.circuit import QuantumCircuit
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
+sys.path[1:1] = ["../_common"]
+
 import execute as ex
 import metrics as metrics
 
-from hamiltonian_simulation_kernel import HamiltonianSimulation, kernel_draw, create_circuit
+from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, create_circuit, get_valid_qubits
+from hamiltonian_simulation_exact import HamiltonianSimulationExact
 # from hamlib_test import create_circuit, HamiltonianSimulationExact
 from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 
@@ -70,7 +73,8 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     counts = result.get_counts(qc)
 
     if verbose:
-        print(f"For type {type} measured: {counts}")
+        #print(f"For type {type} measured: {counts}")
+        print_top_measurements(f"For type {type} measured counts = ", counts, 100)
 
     hamiltonian = hamiltonian.strip().lower()
 
@@ -84,7 +88,12 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     elif method == 2 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
     elif method == 2 and hamiltonian == "hamlib":
+        if verbose:
+            print(f"... begin exact computation ...")
+        ts = time.time()
         correct_dist = HamiltonianSimulationExact(num_qubits)
+        if verbose:
+            print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
     elif method == 3 and hamiltonian == "heisenberg":
         correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}
     elif method == 3 and hamiltonian == "tfim":
@@ -93,12 +102,50 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
 
     if verbose:
-        print(f"Correct dist: {correct_dist}")
+        #print(f"Correct dist: {correct_dist}")
+        print_top_measurements(f"Correct dist = ", correct_dist, 100)
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
     
     return counts, fidelity
+    
+def print_top_measurements(label, counts, top_n):
+    """
+    Prints the top N measurements from a Qiskit measurement counts dictionary
+    in a dictionary-like format. If there are more measurements not printed,
+    indicates the count.
+    
+    Args:
+        counts (dict): The measurement counts dictionary from Qiskit.
+        top_n (int): The number of top measurements to print.
+    """
+    
+    if label is not None: print(label)
+    
+    sorted_counts = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+    
+    total_measurements = len(sorted_counts)
+    
+    if top_n >= total_measurements:
+        top_counts = sorted_counts
+        more_counts = []
+    else:
+        top_counts = sorted_counts[:top_n]
+        more_counts = sorted_counts[top_n:]
+    
+    print("{", end=" ")
+    for i, (measurement, count) in enumerate(top_counts):
+        print(f"'{measurement}': {round(count,6)}", end="")
+        if i < len(top_counts) - 1:
+            print(",", end=" ")
+    
+    if more_counts:
+        num_more = len(more_counts)
+        print(f", ... and {num_more} more.")
+    else:
+        print(" }")
+
 
 def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircuit:
     """
@@ -127,36 +174,9 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 
     return qc
 
-# def HamiltonianSimulationExact(n_spins: int, t: float, init_state: str, w: float, hx: list[float], hz: list[float]) -> dict:
-def HamiltonianSimulationExact(n_spins: int):
-    """
-    Perform exact Hamiltonian simulation using classical matrix evolution.
-
-    Args:
-        n_spins (int): Number of spins (qubits).
-        t (float): Duration of simulation.
-        init_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
-        hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
-        w (float): Strength of two-qubit interactions for heisenberg hamiltonian. 
-        hx (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
-        hz (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
-
-    Returns:
-        dict: The distribution of the evolved state.
-    """
-    _, hamiltonian_sparse, _ = create_circuit(n_spins)
-    time_problem = TimeEvolutionProblem(hamiltonian_sparse, 0.2, initial_state=initial_state(n_spins, 'checkerboard'))
-    # time_problem = TimeEvolutionProblem(hamiltonian_sparse, 0.2)
-    result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
-    
-    # if verbose:
-    #   print (result)
-    
-    return result.evolved_state.probabilities_dict()
-
 ############### Benchmark Loop
 
-def run(qubit_array = [],min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
+def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "hamlib", method: int = 2,
         use_XX_YY_ZZ_gates: bool = False,
@@ -220,7 +240,8 @@ def run(qubit_array = [],min_qubits: int = 2, max_qubits: int = 8, max_circuits:
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in qubit_array:
+    valid_qubits = get_valid_qubits(min_qubits, max_qubits, skip_qubits)
+    for num_qubits in valid_qubits:
     # for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
 
         # Reset random seed

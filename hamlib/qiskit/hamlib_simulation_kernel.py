@@ -11,7 +11,6 @@ In this case, method 3 is used to create a mirror circuit for scalability.
 '''
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
-# from hamlib_test import create_circuit, HamiltonianSimulationExact
 import h5py
 import re
 import os
@@ -397,7 +396,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
             EVO_ = evo
             
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
-    qc2 = qc.decompose()
+    qc2 = qc.decompose().decompose()
             
     return qc2
     
