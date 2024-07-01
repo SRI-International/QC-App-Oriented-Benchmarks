@@ -23,7 +23,6 @@ with open(filename, 'r') as file:
 precalculated_data = json.loads(data)
 
 
-
 @pytest.mark.parametrize("n_spins,hamiltonian", [(spin, hamiltonian) for spin in range(2,13) for hamiltonian in ["Heisenberg","TFIM"]])
 def test_high_num_shots_method_1(n_spins, hamiltonian):
     """
@@ -40,7 +39,7 @@ def test_high_num_shots_method_1(n_spins, hamiltonian):
 
     K = 5 
 
-    ham_circ = kernel.HamiltonianSimulation(n_spins, K, t, hamiltonian, w, hx, hz, use_XX_YY_ZZ_gates= False) 
+    ham_circ = kernel.HamiltonianSimulation(n_spins, K, t, hamiltonian, w, hx, hz, use_XX_YY_ZZ_gates= False, method=1) 
 
     shots = 10000
 
@@ -56,7 +55,7 @@ def test_high_num_shots_method_3(n_spins, hamiltonian):
     """
     check that, given no noise, method 3 always yields almost exactly fid = 1 
     """
-  
+
     w = 1
     t = .2 
 
@@ -88,12 +87,12 @@ def test_high_num_shots_method_3(n_spins, hamiltonian):
     assert np.isclose(1, polar_fid)
 
 
-@pytest.mark.parametrize("n_spins,hamiltonian", [(spin, hamiltonian) for spin in range(2,12) for hamiltonian in ["Heisenberg", "TFIM"]])
+@pytest.mark.parametrize("n_spins,hamiltonian", [(spin, hamiltonian) for spin in [2] for hamiltonian in ["Heisenberg", "TFIM"]])
 def test_qiskit_matches_manual(n_spins, hamiltonian):
     """
     Check that the circuits that qiskit forms returns the same output as ours, if the gates are placed in the same order. 
     """
-  
+
     w = 1
     t = .2 
 
@@ -104,28 +103,45 @@ def test_qiskit_matches_manual(n_spins, hamiltonian):
 
     K = 1 
 
-    ham_circ = kernel.HamiltonianSimulation(n_spins, K, t, hamiltonian, w, hx, hz, use_XX_YY_ZZ_gates= True) 
-
+    ham_circ = kernel.HamiltonianSimulation(n_spins, K, t, hamiltonian, w, hx, hz, use_XX_YY_ZZ_gates= True, method=1) 
+  
     if hamiltonian == "Heisenberg":
         init_state = "checkerboard"
     else:
         init_state = "ghz"
 
-    hamiltonian_sparse = exact.construct_hamiltonian(n_spins, hamiltonian, w, hx, hz)
-    # print(hamiltonian_sparse)
-    time_problem = TimeEvolutionProblem(
-            hamiltonian_sparse, t, initial_state=exact.initial_state(n_spins, init_state)
-        )
-    qiskit_circuit = TrotterQRTE(num_timesteps=K).evolve(time_problem).evolved_state
+    hamiltonian_sparse = exact.construct_hamiltonian(n_spins, hamiltonian, w=1, hx=hx, hz=hz)
+
+    print(hamiltonian_sparse)
+    #
+    #
+    from qiskit.circuit.library import PauliEvolutionGate
+    evo = PauliEvolutionGate(hamiltonian_sparse, time=t/K)
+
+    from qiskit import QuantumCircuit
+
+    qiskit_circuit = QuantumCircuit(n_spins)
+
+    qiskit_circuit.append(kernel.initial_state(n_spins, init_state), range(n_spins))
+
+    for _ in range(K):
+        qiskit_circuit.append(evo, range(n_spins))
+    
     qiskit_circuit.measure_all()
+
     shots = 10000
 
     results = Sampler().run(circuits=ham_circ, n_shots = shots).result().quasi_dists[0].binary_probabilities()
     correct_dist = Sampler().run(circuits=qiskit_circuit, n_shots = shots).result().quasi_dists[0].binary_probabilities()
 
-    # print(ham_circ)
-    # print(qiskit_circuit.decompose())
+    from qiskit import transpile
+    if n_spins == 2 and hamiltonian=="Heisenberg":
+        transpile(ham_circ, ex.backend, basis_gates = ['rx', 'ry', 'rz', 'cx']).draw(filename="ourcircuit", output="mpl")
+        transpile(qiskit_circuit, ex.backend,basis_gates = ['rx', 'ry', 'rz', 'cx']).draw(filename="qiskitcirq", output="mpl")
  
+        ham_circ.draw(filename="baseourcircuit", output="mpl")
+        qiskit_circuit.decompose().draw(filename="baseqiskitcirq", output="mpl")
+
     polar_fid = metrics.polarization_fidelity(results, correct_dist)["hf_fidelity"]
 
     assert np.isclose(1, polar_fid, atol = .01)

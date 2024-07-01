@@ -425,10 +425,11 @@ def xx_gate(tau: float) -> QuantumCircuit:
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cx(qr[0], qr[1])
-    qc.rz(pi * tau, qr[1])
+    qc.rz(2* tau, qr[1])
     qc.cx(qr[0], qr[1])
     qc.h(qr[0])
     qc.h(qr[1])
+    # qc.rxx(2*tau, qr[0], qr[1])
     
     global XX_
     XX_ = qc
@@ -452,12 +453,13 @@ def yy_gate(tau: float) -> QuantumCircuit:
     qc.h(qr[0])
     qc.h(qr[1])
     qc.cx(qr[0], qr[1])
-    qc.rz(pi * tau, qr[1])
+    qc.rz(2* tau, qr[1])
     qc.cx(qr[0], qr[1])
     qc.h(qr[0])
     qc.h(qr[1])
     qc.sdg(qr[0])
     qc.sdg(qr[1])
+    #    qc.ryy(2*tau, qr[0], qr[1])
 
     global YY_
     YY_ = qc
@@ -477,7 +479,7 @@ def zz_gate(tau: float) -> QuantumCircuit:
     qr = QuantumRegister(2)
     qc = QuantumCircuit(qr, name="ZZ")
     qc.cx(qr[0], qr[1])
-    qc.rz(pi * tau, qr[1])
+    qc.rz(2* tau, qr[1])
     qc.cx(qr[0], qr[1])
 
     global ZZ_
