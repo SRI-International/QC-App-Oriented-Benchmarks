@@ -180,7 +180,7 @@ def process_hamiltonian_file(filename, dataset_name):
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
     url_mapping = {
-        'tfim.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/tfim/tfim.hdf5.zip',
+        'tfim.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/tfim/tfim.zip',
         'FH_D-1.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/fermihubbard/FH_D-1.zip',
         'random_max3sat-hams.hdf5':"https://portal.nersc.gov/cfs/m888/dcamps/hamlib/binaryoptimization/max3sat/random/random_max3sat-hams.hdf5.zip",
         'heis.hdf5':"https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/heisenberg/heis.zip",
