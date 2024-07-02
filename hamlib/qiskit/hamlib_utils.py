@@ -201,6 +201,46 @@ def process_hamiltonian_file(filename, dataset_name):
     # print(data)
     return data
 
+def construct_dataset_name(file_key):
+    """
+    Construct a dataset name by reading specified properties from a JSON file.
+
+    Args:
+        file_key (str): The key corresponding to the dataset information in the JSON file.
+
+    Returns:
+        str: A constructed dataset name if successful, or an error message if not.
+
+    Note:
+        This function assumes the JSON file is named 'hamlib_parameter_use_input.json' and is located
+        in the current working directory. The function reads the JSON file, retrieves properties 
+        for the given file_key, and constructs a dataset name by concatenating these properties.
+    """
+    json_file_path = 'hamlib_parameter_use_input.json'
+
+    # Try to open the JSON file and load data
+    try:
+        with open(json_file_path, 'r') as file:
+            json_data = json.load(file)
+    except FileNotFoundError:
+        return "The specified JSON file could not be found."
+    except json.JSONDecodeError:
+        return "Error decoding JSON. Please check the file content."
+
+    # Access the properties of the given file key from the JSON data
+    file_properties = json_data.get(file_key)
+    
+    # Handle case where file_key is not found in data
+    if not file_properties:
+        return "File key not found in data"
+
+    # Construct the dataset name dynamically
+    dataset_parts = []
+    for key, value in file_properties.items():
+        dataset_parts.append(f"{key}-{value}")
+
+    return '_'.join(dataset_parts)
+
 def extract_variable_ranges(file_input):
     """
     Extracts the ranges of variable values from HDF5 files specified in the input.

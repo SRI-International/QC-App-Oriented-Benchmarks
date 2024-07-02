@@ -144,34 +144,6 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
 dataset_name_template = ""
 filename = ""
 
-def construct_dataset_name(file_key):
-    # This should be the path to your JSON file. Adjust if it's in a different location.
-    json_file_path = 'hamlib_parameter_use_input.json'
-
-    # Try to open the JSON file and load data
-    try:
-        with open(json_file_path, 'r') as file:
-            json_data = json.load(file)
-    except FileNotFoundError:
-        return "The specified JSON file could not be found."
-    except json.JSONDecodeError:
-        return "Error decoding JSON. Please check the file content."
-
-    # Access the properties of the given file key from the JSON data
-    file_properties = json_data.get(file_key)
-    
-    # Handle case where file_key is not found in data
-    if not file_properties:
-        return "File key not found in data"
-
-    # Construct the dataset name dynamically
-    dataset_parts = []
-    for key, value in file_properties.items():
-        dataset_parts.append(f"{key}-{value}")
-
-    return '_'.join(dataset_parts)
-
-
 def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
