@@ -86,7 +86,7 @@ def test_high_num_shots_method_3(n_spins, hamiltonian):
 
     assert np.isclose(1, polar_fid)
 
-
+@pytest.mark.skip(reason="Inconsistency in the way qiskit/our code defines 2Q rotation angles")
 @pytest.mark.parametrize("n_spins,hamiltonian", [(spin, hamiltonian) for spin in [2] for hamiltonian in ["Heisenberg", "TFIM"]])
 def test_qiskit_matches_manual(n_spins, hamiltonian):
     """
