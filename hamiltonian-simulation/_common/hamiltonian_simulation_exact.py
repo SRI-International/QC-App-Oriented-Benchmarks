@@ -47,6 +47,24 @@ def construct_TFIM_hamiltonian(n_spins: int) -> SparsePauliOp:
 
     return SparsePauliOp.from_list(zip(pauli_strings, coefficients))
 
+def generate_two_qubit_paulis(n_spins, pauli):
+    identity_string = ['I'] * n_spins
+
+    pauli_strings = []
+    coefficients = []
+
+    for j in range(2):
+        for i in range(j % 2, n_spins - 1, 2):
+            paulipauli_term = identity_string.copy()
+
+            paulipauli_term[i] = pauli
+            paulipauli_term[(i + 1) % n_spins] = pauli
+
+            pauli_strings.append(''.join(paulipauli_term))
+            coefficients.append(1.0)
+
+    return pauli_strings, coefficients
+
 def construct_heisenberg_hamiltonian(n_spins: int, w: int, hx: list[float], hz: list[float]) -> SparsePauliOp:
     """
     Construct the Heisenberg Hamiltonian with disorder.
@@ -73,30 +91,13 @@ def construct_heisenberg_hamiltonian(n_spins: int, w: int, hx: list[float], hz: 
         pauli_strings.append(z_term)
         coefficients.append(w * hz[i])
 
-    identity_string = ['I'] * n_spins
-
     # Interaction terms
-    for j in range(2):
-        for i in range(j % 2, n_spins - 1, 2):
-            xx_term = identity_string.copy()
-            yy_term = identity_string.copy()
-            zz_term = identity_string.copy()
 
-            xx_term[i] = 'X'
-            xx_term[(i + 1) % n_spins] = 'X'
+    for pauli in ['X','Y','Z']:
+        pauli_string, coefficient = generate_two_qubit_paulis(n_spins, pauli)
 
-            yy_term[i] = 'Y'
-            yy_term[(i + 1) % n_spins] = 'Y'
-
-            zz_term[i] = 'Z'
-            zz_term[(i + 1) % n_spins] = 'Z'
-
-            pauli_strings.append(''.join(xx_term))
-            coefficients.append(1.0)
-            pauli_strings.append(''.join(yy_term))
-            coefficients.append(1.0)
-            pauli_strings.append(''.join(zz_term))
-            coefficients.append(1.0)
+        pauli_strings.extend(pauli_string)
+        coefficients.extend(coefficient)
 
     return SparsePauliOp.from_list(zip(pauli_strings, coefficients))
 

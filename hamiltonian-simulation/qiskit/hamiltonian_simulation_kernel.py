@@ -109,7 +109,7 @@ def Heisenberg(n_spins: int, K: int, t: float, tau: float, w: float, h_x: List[f
 
 ########### TFIM hamiltonian circuit
 def Tfim(n_spins: int, K: int, tau: float, use_XX_YY_ZZ_gates: bool)-> QuantumCircuit:
-    h = 0.2  # Strength of transverse field
+    h = 1  # Strength of transverse field
     qr = QuantumRegister(n_spins)
     qc = QuantumCircuit(qr, name = "TFIM")
     for k in range(K):
@@ -152,7 +152,7 @@ def ResultantPauli(n_spins)-> QuantumCircuit:
 
 #########Quasi Inverse of Tfim hamiltonian
 def QuasiInverseTfim(n_spins: int, K: int, tau: float, use_XX_YY_ZZ_gates: bool)-> QuantumCircuit:
-    h = 0.2
+    h = 1
     qr = QuantumRegister(n_spins)
     qc = QuantumCircuit(qr, name = "tfimInverse")
     for k in range(K):
@@ -287,7 +287,7 @@ def InverseHeisenberg(n_spins: int, K: int, t: float, tau: float, w: float, h_x:
 
 #########Inverse of tfim hamiltonian
 def InverseTfim(n_spins: int, K: int, tau: float, use_XX_YY_ZZ_gates: bool)-> QuantumCircuit:
-    h = 0.2
+    h = 1
     qr = QuantumRegister(n_spins)
     qc = QuantumCircuit(qr, name = "tfimInverse")
     for k in range(K):
