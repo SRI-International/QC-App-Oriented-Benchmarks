@@ -1,0 +1,30 @@
+{
+    "FH_D-1.hdf5": {
+      "fh": "graph-1D-grid-nonpbc-qubitnodes",
+      "Lx": "{n_qubits/2}",
+      "U": "0",
+      "enc": "jw"
+    },
+    "tfim.hdf5": {
+      "graph": "1D-grid-nonpbc-qubitnodes",
+      "Lx": "{n_qubits}",
+      "h": "0.1"
+    },
+    "random_max3sat-hams.hdf5": {
+      "max3sat_n": "{n_qubits}",
+      "ratio": "2",
+      "rinst": "00"
+    },
+    "heis.hdf5": {
+      "graph": "1D-grid-nonpbc-qubitnodes",
+      "Lx": "{n_qubits}",
+      "h": "0"
+    },
+    "BH_D-1_d-4.hdf5": {
+      "bh_graph": "1D-grid-nonpbc-qubitnodes",
+      "Lx": "{n_qubits/2}",
+      "U": "10",
+      "enc": "gray",
+      "d": "4"
+    }
+  }

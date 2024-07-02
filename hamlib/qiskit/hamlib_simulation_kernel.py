@@ -16,6 +16,7 @@ import re
 import os
 import requests
 import zipfile
+import json
 from qiskit.quantum_info import SparsePauliOp, Pauli
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
@@ -86,8 +87,57 @@ def sparse_pauliop(terms, num_qubits):
     hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
     return hamiltonian
 
-dataset_name_template = ""
-filename = ""
+def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
+    """
+    Get an array of valid qubits within the specified range, removing duplicates.
+
+    Returns:
+        list: A list of valid qubits.
+    """
+    global dataset_name_template, filename
+
+    # Create an array with the given min, max, and skip values
+    qubit_candidates = list(range(min_qubits, max_qubits + 1, skip_qubits))
+    valid_qubits_set = set()  # Use a set to avoid duplicates
+
+    for qubits in qubit_candidates:
+        initial_n_spins = qubits // 2 if "{n_qubits/2}" in dataset_name_template else qubits
+        n_spins = initial_n_spins
+
+        # print(f"Starting check for qubits = {qubits}, initial n_spins = {n_spins}")
+
+        found_valid_dataset = False
+
+        while n_spins <= max_qubits:
+            dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins))
+            # print(f"Checking dataset: {dataset_name}")
+
+            data = process_hamiltonian_file(filename, dataset_name)
+            if data is not None:
+                # print(f"Valid dataset found for n_spins = {n_spins}")
+                if "{n_qubits/2}" in dataset_name_template:
+                    valid_qubits_set.add(n_spins * 2)  # Add the original qubits value
+                else:
+                    valid_qubits_set.add(qubits)
+                found_valid_dataset = True
+                break
+            else:
+                # print(f"Dataset not available for n_spins = {n_spins}. Trying next value...")
+                n_spins += 1
+                if n_spins >= (qubits + skip_qubits) // 2 if "{n_qubits/2}" in dataset_name_template else (qubits + skip_qubits):
+                    print(f"No valid dataset found for qubits = {qubits}")
+                    break
+
+        if found_valid_dataset:
+            continue  # Move to the next candidate in the original skip sequence
+
+    valid_qubits = list(valid_qubits_set)  # Convert set to list to remove duplicates
+    valid_qubits.sort()  # Sorting the qubits for consistent order
+    
+    if verbose:
+        print(f"Final valid qubits: {valid_qubits}")
+        
+    return valid_qubits  
 
 # In hamiltonian_simulation_kernel.py
 
@@ -108,10 +158,13 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
     global dataset_name_template, filename
+    # global filename
     global QCI_
-    
+
+    # dataset_name_template = construct_dataset_name(filename)
+    process_data(dataset_name_template)
     # Replace placeholders with actual n_spins value
-    dataset_name = dataset_name_template.replace("{n_spins}", str(n_spins)).replace("{n_spins/2}", str(n_spins // 2))
+    dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
 
     if verbose:
         print(f"Trying dataset: {dataset_name}")  # Debug print
@@ -155,58 +208,6 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
         return None, None, None
-
-def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
-    """
-    Get an array of valid qubits within the specified range, removing duplicates.
-
-    Returns:
-        list: A list of valid qubits.
-    """
-    global dataset_name_template, filename
-
-    # Create an array with the given min, max, and skip values
-    qubit_candidates = list(range(min_qubits, max_qubits + 1, skip_qubits))
-    valid_qubits_set = set()  # Use a set to avoid duplicates
-
-    for qubits in qubit_candidates:
-        initial_n_spins = qubits // 2 if "{n_spins/2}" in dataset_name_template else qubits
-        n_spins = initial_n_spins
-
-        # print(f"Starting check for qubits = {qubits}, initial n_spins = {n_spins}")
-
-        found_valid_dataset = False
-
-        while n_spins <= max_qubits:
-            dataset_name = dataset_name_template.replace("{n_spins}", str(n_spins)).replace("{n_spins/2}", str(n_spins))
-            # print(f"Checking dataset: {dataset_name}")
-
-            data = process_hamiltonian_file(filename, dataset_name)
-            if data is not None:
-                # print(f"Valid dataset found for n_spins = {n_spins}")
-                if "{n_spins/2}" in dataset_name_template:
-                    valid_qubits_set.add(n_spins * 2)  # Add the original qubits value
-                else:
-                    valid_qubits_set.add(qubits)
-                found_valid_dataset = True
-                break
-            else:
-                # print(f"Dataset not available for n_spins = {n_spins}. Trying next value...")
-                n_spins += 1
-                if n_spins >= (qubits + skip_qubits) // 2 if "{n_spins/2}" in dataset_name_template else (qubits + skip_qubits):
-                    print(f"No valid dataset found for qubits = {qubits}")
-                    break
-
-        if found_valid_dataset:
-            continue  # Move to the next candidate in the original skip sequence
-
-    valid_qubits = list(valid_qubits_set)  # Convert set to list to remove duplicates
-    valid_qubits.sort()  # Sorting the qubits for consistent order
-    
-    if verbose:
-        print(f"Final valid qubits: {valid_qubits}")
-        
-    return valid_qubits  
 
 
 ############### Circuit Definition
