@@ -86,8 +86,36 @@ def test_high_num_shots_method_3(n_spins, hamiltonian):
 
     assert np.isclose(1, polar_fid)
 
-@pytest.mark.skip(reason="Inconsistency in the way qiskit/our code defines 2Q rotation angles")
-@pytest.mark.parametrize("n_spins,hamiltonian", [(spin, hamiltonian) for spin in [2] for hamiltonian in ["Heisenberg", "TFIM"]])
+@pytest.mark.parametrize("n_spins,hamiltonian", [(spin, hamiltonian) for spin in range(2,13) for hamiltonian in ["Heisenberg","TFIM"]])
+def test_high_num_shots_method_2(n_spins, hamiltonian):
+    """
+    For 2-12 qubits, check that that method 2 is not completely off (i.e, close to zero) and gives some number greater than .01 
+    """
+
+    w = 1
+    t = .2 
+
+    np.random.seed(26)
+    hx = list(2 * np.random.random(20) - 1) # random numbers between [-1, 1]
+    np.random.seed(75)
+    hz = list(2 * np.random.random(20) - 1) # random numbers between [-1, 1]
+
+    K = 5 
+
+    ham_circ = kernel.HamiltonianSimulation(n_spins, K, t, hamiltonian, w, hx, hz, use_XX_YY_ZZ_gates= False, method=1, random_pauli_flag = False) 
+
+    shots = 10000
+
+    results = Sampler().run(circuits=ham_circ, n_shots = shots).result().quasi_dists[0].binary_probabilities()
+
+    correct_dist = precalculated_data[f"Exact {hamiltonian} - Qubits{n_spins}"]
+
+    polar_fid = metrics.polarization_fidelity(results, correct_dist)["hf_fidelity"]
+
+    assert np.greater(polar_fid, .01)
+
+@pytest.mark.skip(reason="To be resolved: Inconsistency in the way qiskit/our code defines 2Q rotation angles?")
+@pytest.mark.parametrize("n_spins,hamiltonian", [(spin, hamiltonian) for spin in range(2, 13) for hamiltonian in ["Heisenberg", "TFIM"]])
 def test_qiskit_matches_manual(n_spins, hamiltonian):
     """
     Check that the circuits that qiskit forms returns the same output as ours, if the gates are placed in the same order. 
