@@ -1160,9 +1160,12 @@ def job_complete(job):
             # get the actual shots and convert to int if it is a string
             # DEVNOTE: this summation currently applies only to randomized compiling 
             # and may cause problems with other use cases (needs review)
-            actual_shots = 0
-            for experiment in result_obj["results"]:
-                actual_shots += experiment["shots"]
+            if type(result.get_counts()) == list:
+                actual_shots = 0
+                for experiment in result_obj["results"]:
+                    actual_shots += experiment["shots"]
+            else:
+                actual_shots = sum(result.get_counts().values())
 
         #print(f"result_obj = {result_obj}")
         #print(f"results_obj = {results_obj}")
@@ -1187,7 +1190,7 @@ def job_complete(job):
             actual_shots_executed = actual_shots
             actual_shots = min(active_circuit["shots"], actual_shots_executed)
             
-            print(f'... requested shots={active_circuit["shots"]} executed={shots_executed} actual={actual_shots} yield={shots_yield}')
+            print(f'... requested shots={active_circuit["shots"]} executed={shots_executed} actual={actual_shots_executed} yield={shots_yield}')
         
         # check for mismatch of requested shots and actual shots
         if actual_shots != active_circuit["shots"]:
