@@ -28,7 +28,7 @@ import execute as ex
 import metrics as metrics
 
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, create_circuit, get_valid_qubits
-from hamiltonian_simulation_exact import HamiltonianSimulationExact
+from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
 # from hamlib_test import create_circuit, HamiltonianSimulationExact
 from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 
@@ -87,6 +87,8 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         correct_dist = precalculated_data[f"TFIM - Qubits{num_qubits}"]
     elif method == 2 and hamiltonian == "tfim":
         correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
+    elif method == 1 and hamiltonian == "hamlib":
+        correct_dist = HamiltonianSimulationExact_Noiseless(num_qubits)
     elif method == 2 and hamiltonian == "hamlib":
         if verbose:
             print(f"... begin exact computation ...")
@@ -289,7 +291,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     ##########
     
     # draw a sample circuit
-    kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method)
+    # kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method)
        
     # Plot metrics for all circuit sizes
     options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
