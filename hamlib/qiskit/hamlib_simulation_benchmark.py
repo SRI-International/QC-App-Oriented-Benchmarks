@@ -291,7 +291,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     ##########
     
     # draw a sample circuit
-    # kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method)
+    kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method)
        
     # Plot metrics for all circuit sizes
     options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
