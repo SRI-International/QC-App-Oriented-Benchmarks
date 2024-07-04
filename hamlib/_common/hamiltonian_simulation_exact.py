@@ -128,27 +128,6 @@ def construct_hamiltonian(n_spins: int, hamiltonian: str, w: float, hx : list[fl
     else:
         raise ValueError("Invalid Hamiltonian specification.")
 
-# def HamiltonianSimulationExact(n_spins: int, t: float, init_state: str, hamiltonian: str, w: float, hx: list[float], hz: list[float]) -> dict:
-#     """
-#     Perform exact Hamiltonian simulation using classical matrix evolution.
-
-#     Args:
-#         n_spins (int): Number of spins (qubits).
-#         t (float): Duration of simulation.
-#         init_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
-#         hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
-#         w (float): Strength of two-qubit interactions for heisenberg hamiltonian. 
-#         hx (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
-#         hz (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
-
-#     Returns:
-#         dict: The distribution of the evolved state.
-#     """
-#     hamiltonian_sparse = construct_hamiltonian(n_spins, hamiltonian, w, hx, hz)
-#     time_problem = TimeEvolutionProblem(hamiltonian_sparse, t, initial_state=initial_state(n_spins, init_state))
-#     result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
-#     return result.evolved_state.probabilities_dict()
-
 def HamiltonianSimulationExact(n_spins: int):
     """
     Perform exact Hamiltonian simulation using classical matrix evolution.
@@ -194,6 +173,42 @@ def HamiltonianSimulationExact_Noiseless(n_spins: int):
         creation and the simulator are perfectly noiseless, meaning there are no errors during simulation.
     """
     qc, _, _ = create_circuit(n_spins)
+    num_shots = 100000
+    backend = Aer.get_backend("qasm_simulator")
+    # Transpile and run the circuits
+    transpiled_qc = transpile(qc, backend, optimization_level=0)
+    job = backend.run(transpiled_qc, shots=num_shots)
+    result = job.result()
+    counts = result.get_counts(qc)
+    # Normalize probabilities for Heisenberg model circuit 
+    dist = {}
+    for key in counts.keys():
+        prob = counts[key] / num_shots
+        dist[key] = prob
+
+    return dist
+
+def HamiltonianSimulationExact_Inverse_Init_State(n_spins: int):
+    """
+    Simulate a quantum Hamiltonian circuit for a specified number of spins using a noiseless quantum simulator.
+    
+    This function creates a quantum circuit, transpiles it for optimal execution, and runs it on a quantum simulator.
+    It simulates the circuit with a specified number of shots and collects the results to compute the probability 
+    distribution of measurement outcomes, normalized to represent probabilities.
+    
+    Args:
+        n_spins (int): The number of spins (qubits) to simulate in the circuit.
+    
+    Returns:
+        dict: A dictionary with keys representing the outcomes and values representing the probabilities of these outcomes.
+    
+    Note:
+        This function uses the 'qasm_simulator' backend from Qiskit's Aer module, which simulates a quantum circuit 
+        that measures qubits and returns a count of the measurement outcomes. The function assumes that the circuit 
+        creation and the simulator are perfectly noiseless, meaning there are no errors during simulation.
+    """
+    qc = initial_state(n_spins, 'checkerboard')
+    qc.measure_all()
     num_shots = 100000
     backend = Aer.get_backend("qasm_simulator")
     # Transpile and run the circuits
