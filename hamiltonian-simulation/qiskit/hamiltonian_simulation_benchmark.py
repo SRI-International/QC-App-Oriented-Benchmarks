@@ -16,7 +16,7 @@ import json
 import os
 import sys
 import time
-from ham_class import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
+from hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
 import numpy as np
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
