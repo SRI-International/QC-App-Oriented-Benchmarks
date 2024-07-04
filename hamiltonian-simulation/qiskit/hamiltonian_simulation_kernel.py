@@ -55,6 +55,13 @@ class HamiltonianKernel(object):
         self.use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates
         self.random_pauli_flag = random_pauli_flag
         self.method = method
+        
+        if init_state == None:
+            if hamiltonian == "tfim": 
+                init_state = "ghz"
+            else:
+                init_state = "checkerboard"
+                
         self.init_state = init_state
 
         self.qr = QuantumRegister(n_spins)
