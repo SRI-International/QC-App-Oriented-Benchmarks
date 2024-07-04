@@ -306,33 +306,5 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
     else:
         print("  ... circuit too large!")
 
-    if hamiltonian == "heisenberg": 
-        if use_XX_YY_ZZ_gates:
-            print("\nXX, YY, ZZ = ")
-            print(XX_)
-            print(YY_)
-            print(ZZ_)
-            if method == 3:
-                print("\nXX, YY, ZZ mirror = ")
-                print(XX_mirror_)
-                print(YY_mirror_)
-                print(ZZ_mirror_)
-        else:
-            print("\nXXYYZZ_opt = ")
-            print(XXYYZZ_)  
-            if method == 3:
-                print("\nXXYYZZ_opt_mirror = ")
-                print(XXYYZZ_mirror_)
-    
-    if hamiltonian == "tfim": 
-        print("\nZZ = ")
-        print(ZZ_)
-        if method == 3:
-            print("\nZZ mirror = ")
-            print(ZZ_mirror_)
 
-    if hamiltonian == "hamlib": 
-        if method == 3:
-            print("\nZZ mirror = ")
-            print(ZZ_mirror_)
     
