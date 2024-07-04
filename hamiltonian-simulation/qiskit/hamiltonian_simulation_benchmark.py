@@ -16,14 +16,14 @@ import json
 import os
 import sys
 import time
-from hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
 import numpy as np
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
+
 import execute as ex
 import metrics as metrics
-
+from hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
