@@ -161,9 +161,7 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
     # global filename
     global QCI_
 
-    # dataset_name_template = construct_dataset_name(filename)
-    process_data(dataset_name_template)
-    # Replace placeholders with actual n_spins value
+    # Replace placeholders with actual n_qubits value: n_spins
     dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
 
     if verbose:
