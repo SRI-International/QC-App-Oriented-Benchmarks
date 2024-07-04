@@ -17,6 +17,7 @@ import math
 pi = math.pi
 
 # Gates to be saved for printing purpose.
+# DEVNOTE: these are global for now, for convenience; improve later
 XX_ = None
 YY_ = None
 ZZ_ = None
@@ -33,6 +34,9 @@ _use_XX_YY_ZZ_gates = False
 
 ## use initial state in the abstract class
 class HamiltonianKernel(object):
+
+    MAX_PRINT_SIZE = 6          # default maximum size to print circuit
+    
     def __init__(self, n_spins, K, t, hamiltonian, w, hx, hz, use_XX_YY_ZZ_gates, method, random_pauli_flag, init_state):
         self.n_spins = n_spins
         self.K = K
@@ -46,6 +50,7 @@ class HamiltonianKernel(object):
         self.random_pauli_flag = random_pauli_flag
         self.method = method
         self.init_state = init_state
+        
 
         self.QCI_ = None       # Initial Circuit
         self.QC_ = None        # Total Circuit
@@ -63,11 +68,12 @@ class HamiltonianKernel(object):
         circuit = self.create_hamiltonian()            #create the hamiltonian circuit
         self.qc.append(circuit, self.qr)          #append the hamiltoniain to the quantum circuit
 
+        inverse_circuit = None
         if self.method == 3:
             #checks if random pauli flag is true to apply quasi inverse.
             if self.random_pauli_flag:
-                quasi_inverse_circuit = self.create_quasi_inverse_hamiltonian() 
-                self.qc.append(quasi_inverse_circuit, self.qr)
+                inverse_circuit = self.create_quasi_inverse_hamiltonian() 
+                self.qc.append(inverse_circuit, self.qr)
             else:
                 #applies regular inverse.
                 inverse_circuit = self.create_inverse_hamiltonian() 
@@ -77,14 +83,17 @@ class HamiltonianKernel(object):
         for i_qubit in range(self.n_spins):
             self.qc.measure(self.qr[i_qubit], self.cr[i_qubit])
 
-        #Save smaller circuit example for display
+        # Save circuits and subcircuits for possible display
         # if self.QC_ is None or self.n_spins <= 6:
         #     if self.n_spins < 9:
         #         self.QC_ = self.qc
+        self.QC_ = self.qc
+        self.QCI_ = i_state
+        self.QCH_ = circuit
+        self.QC2D_ = inverse_circuit
 
         # Collapse the sub-circuits used in this benchmark (for Qiskit)
-        qc2 = self.qc.decompose().decompose() 
-        
+        qc2 = self.qc.decompose().decompose()      
 
         return qc2
 
@@ -102,7 +111,7 @@ class HamiltonianKernel(object):
             qc.h(0)
             for k in range(1, self.n_spins):
                 qc.cx(k-1, k)
-        self.QCI_ = qc
+        #self.QCI_ = qc
         return qc
 
     def create_hamiltonian(self) -> QuantumCircuit:
@@ -126,7 +135,7 @@ class HamiltonianKernel(object):
                 pauli_tracker_list.append("z")                
         return pauli_tracker_list
 
-    #### Resultant Pauli after applying quasi inverse Hamiltonain.
+    #### Resultant Pauli after applying quasi inverse Hamiltonian
     def ResultantPauli(self)-> QuantumCircuit:
         """Create a quantum oracle that is the result of applying quasi inverse Hamiltonain and random Pauli to Hamiltonian."""
         qr = QuantumRegister(self.n_spins)
@@ -138,31 +147,39 @@ class HamiltonianKernel(object):
         self.QCRS_ = qc
         return qc
 
-    #### Draw the circuits of this benchmark program
+    #### Draw the circuits of this kernel
     def kernel_draw(self):
-        if self.n_spins == 6:                     
-            # Print a sample circuit
-            print("Sample Circuit:")
-            print(self.QC_ if self.QC_ is not None else "  ... too large!")
+                
+        # Print a sample circuit
+        print("Sample Circuit:")
+        if self.QC_ is not None and self.n_spins <= self.MAX_PRINT_SIZE:
+            print(self.QC_)
+        else:
+            print("  ... too large to print!")
+            return False
 
-            # we don't restrict save of large sub-circuits, so skip printing if num_qubits too large
-            if self.QCI_ is not None and self.n_spins > 6:
-                print("... subcircuits too large to print")     
-                
+        # we don't restrict save of large sub-circuits, so skip printing if num_qubits too large
+        #if self.QCI_ is not None and self.n_spins > 6:
+            #print("... subcircuits too large to print")     
+            
+        if self.QCI_ is not None:
             print("  Initial State:")
-            if self.QCI_ is not None: print(self.QCI_)
-            
+            print(self.QCI_)
+        
+        if self.QCH_ is not None:        
             print(f"  Hamiltonian ({self.QCH_.name if self.QCH_ is not None else '?'}):")
-            if self.QCH_ is not None: print(self.QCH_)
+            print(self.QCH_)
+        
+        if self.QC2D_ is not None:
+            print(f"  Inverse Hamiltonian ({self.QC2D_.name if self.QC2D_ is not None else '?'}):")
+            print(self.QC2D_)
             
-            if self.QC2D_ is not None:
-                print("Quasi-Hamiltonian:")
-                print(self.QC2D_)
-                
-            if self.QCRS_ is not None:
-                print("  Resultant Paulis:")
-                print(self.QCRS_)
-               
+        if self.QCRS_ is not None:
+            print("  Resultant Paulis:")
+            print(self.QCRS_)
+
+        return True
+ 
 ########################
 ####*****************###
 ########################
@@ -194,14 +211,13 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
                     for i in range(j % 2, self.n_spins - 1, 2):
                         qc.append(xxyyzz_opt_gate(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
             qc.barrier()
-
-        self.QCH_ = qc   
+  
         return qc
 
     #apply inverse of the hamiltonian to simulate negative time evolution.
     def create_inverse_hamiltonian(self) -> QuantumCircuit:
         qr = QuantumRegister(self.n_spins)
-        qc = QuantumCircuit(qr, name="InverseHeisenberg")
+        qc = QuantumCircuit(qr, name="Heisenberg\u2020")
         for k in range(self.K): 
             if self.use_XX_YY_ZZ_gates:
                 for j in range(2):
@@ -221,13 +237,13 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
             [qc.rz(-2 * self.tau * self.w * self.h_z[i], qr[i]) for i in range(self.n_spins)]
             [qc.rx(-2 * self.tau * self.w * self.h_x[i], qr[i]) for i in range(self.n_spins)]
             qc.barrier()
-            QC2D_ = qc
+
         return qc
 
     #create quasi inverse hamiltonian to simulate negative time evolution with randomized paulis applied.
     def create_quasi_inverse_hamiltonian(self) -> QuantumCircuit:
         qr = QuantumRegister(self.n_spins)
-        qc = QuantumCircuit(qr, name = "QuasiInverseHeisenberg")
+        qc = QuantumCircuit(qr, name = "Quasi-Heisenberg\u2020")
 
         # Apply random paulis
         pauli_list = self.random_paulis_list()
@@ -300,32 +316,34 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
             qc.barrier()
 
         qc.append(self.QCRS_,qr)
-        self.QC2D_ = qc
+        #self.QC2D_ = qc
         return qc
 
-    #apply extra circuit printing specific to Heisenberg.
+    # draw circuit and apply extra circuit printing specific to this kernel type.
     def kernel_draw(self):
-        if self.n_spins == 6:
-            super().kernel_draw()
-            if self.use_XX_YY_ZZ_gates:
-                    print("\nXX, YY, ZZ = ")
-                    print(XX_)
-                    print(YY_)
-                    print(ZZ_)
-                    if self.method == 3:
-                        print("\nXX, YY, ZZ \u2020 = ")
-                        print(XX_mirror_)
-                        print(YY_mirror_)
-                        print(ZZ_mirror_)
-            else:
-                print("\nXXYYZZ = ")
-                print(XXYYZZ_)  
+    
+        if super().kernel_draw() == False:
+            return
+ 
+        if self.use_XX_YY_ZZ_gates:
+                print("\nXX, YY, ZZ = ")
+                print(XX_)
+                print(YY_)
+                print(ZZ_)
                 if self.method == 3:
-                    print("\nXXYYZZ\u2020 = ")
-                    print(XXYYZZ_mirror_)             
-                if self.random_pauli_flag:
-                    print("Qusai Inverse XXYYZZ:")
-                    print(XXYYZZ_quasi_mirror_)
+                    print("\nXX, YY, ZZ \u2020 = ")
+                    print(XX_mirror_)
+                    print(YY_mirror_)
+                    print(ZZ_mirror_)
+        else:
+            print("\nXXYYZZ = ")
+            print(XXYYZZ_)  
+            if self.method == 3:
+                print("\nXXYYZZ\u2020 = ")
+                print(XXYYZZ_mirror_)             
+            if self.random_pauli_flag:
+                print("Qusai Inverse XXYYZZ:")
+                print(XXYYZZ_quasi_mirror_)
 
 
 ########################
@@ -348,13 +366,13 @@ class TfimHamiltonianKernel(HamiltonianKernel):
                 for i in range(j % 2, self.n_spins - 1, 2):
                     qc.append(zz_gate(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
             qc.barrier()
-        self.QCH_ = qc
+
         return qc
 
     #apply inverse of the hamiltonian to simulate negative time evolution.
     def create_inverse_hamiltonian(self) -> QuantumCircuit:
         qr = QuantumRegister(self.n_spins)
-        qc = QuantumCircuit(qr, name="InverseTFIM")
+        qc = QuantumCircuit(qr, name="TFIM\u2020")
         for k in range(self.K):
             for j in range(2):
                 for i in range(j % 2, self.n_spins - 1, 2):
@@ -363,13 +381,13 @@ class TfimHamiltonianKernel(HamiltonianKernel):
             for i in range(self.n_spins):
                 qc.rx(-2 * self.tau * self.h, qr[i])
             qc.barrier()
-        self.QC2D_ = qc
+
         return qc
 
     #create quasi inverse hamiltonian to simulate negative time evolution with randomized paulis applied.
     def create_quasi_inverse_hamiltonian(self) -> QuantumCircuit:
         qr = QuantumRegister(self.n_spins)
-        qc = QuantumCircuit(qr, name="QuasiInverseTFIM")
+        qc = QuantumCircuit(qr, name="Quasi-TFIM\u2020")
         for k in range(self.K):
             for j in range(2):
                 for i in range(j % 2, self.n_spins - 1, 2):
@@ -378,18 +396,20 @@ class TfimHamiltonianKernel(HamiltonianKernel):
             for i in range(self.n_spins):
                 qc.rx(-2 * self.tau * self.h, qr[i])
             qc.barrier()
-        self.QC2D_ = qc
+
         return qc
     
-    #apply extra circuit printing specific to tfim.
+    # draw circuit and apply extra circuit printing specific to this kernel type.
     def kernel_draw(self):
-        if self.n_spins == 6:
-            super().kernel_draw()
-            print("\nZZ = ")
-            print(ZZ_)
-            if self.method == 3:
-                print("\nZZ\u2020 = ")
-                print(ZZ_mirror_)
+    
+        if super().kernel_draw() == False:
+            return
+            
+        print("\nZZ = ")
+        print(ZZ_)
+        if self.method == 3:
+            print("\nZZ\u2020 = ")
+            print(ZZ_mirror_)
 
 
 ########################
