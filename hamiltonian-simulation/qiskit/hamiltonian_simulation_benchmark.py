@@ -16,16 +16,14 @@ import json
 import os
 import sys
 import time
-
 import numpy as np
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
+
 import execute as ex
 import metrics as metrics
-
-from hamiltonian_simulation_kernel import HamiltonianSimulation, kernel_draw
-
+from hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
@@ -130,11 +128,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         max_circuits (int): Maximum number of circuits to execute per group.
         skip_qubits (int): Increment of number of qubits.
         num_shots (int): Number of shots for each circuit execution.
-        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical, 3 for mirror circuit.)
         use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
-        random_pauli_flag (bool): Flag to use a random set of paulis, in addition to a quasi-hamiltonian. 
-        init_state (str): The desired initial state. Choices are "checkerboard" or "ghz". 
         backend_id (str): Backend identifier for execution.
         provider_backend: Provider backend instance.
         hub (str): IBM Quantum hub.
@@ -142,6 +136,8 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         project (str): IBM Quantum project.
         exec_options: Execution options.
 
+        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
+        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
         context: Execution context.
 
     Returns:
@@ -206,19 +202,31 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
             hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
             hz = precalculated_data['hz'][:num_qubits]
 
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t,
-                    hamiltonian=hamiltonian,
-                    w=w, hx = hx, hz = hz, 
-                    use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
-                    method = method, random_pauli_flag = random_pauli_flag)
+            # Create HeisenbergKernel or TFIM kernel
+            if hamiltonian == "heisenberg" :
+                qc_object = HeisenbergHamiltonianKernel(num_qubits, K=k, t=t,
+                        hamiltonian=hamiltonian,
+                        w=w, hx = hx, hz = hz, 
+                        use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
+                        method = method, random_pauli_flag = random_pauli_flag, init_state = init_state)
             
+            if hamiltonian == "tfim" :
+                qc_object = TfimHamiltonianKernel(num_qubits, K=k, t=t,
+                        hamiltonian=hamiltonian,
+                        w=w, hx = hx, hz = hz, 
+                        use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
+                        method = method, random_pauli_flag = random_pauli_flag, init_state = init_state)
             
+            qc = qc_object.overall_circuit()
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
-            qc.draw()
 
             # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
+            
+            # draw a sample circuit
+            if circuit_id == 0:
+                qc_object.kernel_draw()
         
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
@@ -229,7 +237,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     ##########
     
     # draw a sample circuit
-    kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
+    qc_object.kernel_draw()
        
     # Plot metrics for all circuit sizes
     options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
@@ -260,6 +268,7 @@ def get_args():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="random pauli flag")
     parser.add_argument("--init_state", "-init", default="checkerboard", help="initial state")
+
     return parser.parse_args()
  
 # if main, execute method
