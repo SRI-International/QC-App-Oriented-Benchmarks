@@ -223,10 +223,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
             # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
-            
-            # draw a sample circuit
-            if circuit_id == 0:
-                qc_object.kernel_draw()
         
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
@@ -235,7 +231,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
-    
     # draw a sample circuit
     qc_object.kernel_draw()
        
