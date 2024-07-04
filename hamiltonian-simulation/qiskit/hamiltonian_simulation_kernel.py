@@ -35,7 +35,13 @@ _use_XX_YY_ZZ_gates = False
 ## use initial state in the abstract class
 class HamiltonianKernel(object):
 
-    MAX_PRINT_SIZE = 6          # default maximum size to print circuit
+    # class variables saved for printing
+    MAX_PRINT_SIZE = 6  # default maximum size to print circuit
+    QCI_ = None         # Initial Circuit
+    QC_ = None          # Total Circuit
+    QCH_ = None         # Hamiltonian 
+    QC2D_ = None        # Mirror Circuit
+    QCRS_ = None        # Resultant Pauli
     
     def __init__(self, n_spins, K, t, hamiltonian, w, hx, hz, use_XX_YY_ZZ_gates, method, random_pauli_flag, init_state):
         self.n_spins = n_spins
@@ -50,24 +56,22 @@ class HamiltonianKernel(object):
         self.random_pauli_flag = random_pauli_flag
         self.method = method
         self.init_state = init_state
-        
-
-        self.QCI_ = None       # Initial Circuit
-        self.QC_ = None        # Total Circuit
-        self.QCH_ = None       # Hamiltonian 
-        self.QC2D_ = None      # Mirror Circuit
-        self.QCRS_ = None      # Resultant Pauli
 
         self.qr = QuantumRegister(n_spins)
         self.cr = ClassicalRegister(n_spins)
         self.qc = QuantumCircuit(self.qr, self.cr, name = hamiltonian)
 
     def overall_circuit(self):
-        i_state = self.initial_state()          #create initial state
-        self.qc.append(i_state, self.qr)       #append the initial state to the quantum circuit
-        circuit = self.create_hamiltonian()            #create the hamiltonian circuit
-        self.qc.append(circuit, self.qr)          #append the hamiltoniain to the quantum circuit
+    
+        # create initial state and append to the overall circuit
+        i_state = self.initial_state()
+        self.qc.append(i_state, self.qr)
+        
+        # create Hamiltonian evolution circuit and append to the overall circuit
+        hamiltonian_circuit = self.create_hamiltonian()
+        self.qc.append(hamiltonian_circuit, self.qr)
 
+        # if mirrored, create the inverse circuit and append to overall circuit
         inverse_circuit = None
         if self.method == 3:
             #checks if random pauli flag is true to apply quasi inverse.
@@ -83,14 +87,12 @@ class HamiltonianKernel(object):
         for i_qubit in range(self.n_spins):
             self.qc.measure(self.qr[i_qubit], self.cr[i_qubit])
 
-        # Save circuits and subcircuits for possible display
-        # if self.QC_ is None or self.n_spins <= 6:
-        #     if self.n_spins < 9:
-        #         self.QC_ = self.qc
-        self.QC_ = self.qc
-        self.QCI_ = i_state
-        self.QCH_ = circuit
-        self.QC2D_ = inverse_circuit
+        # Save circuits and subcircuits for possible display (explicitly set class variables)
+        if self.n_spins <= self.MAX_PRINT_SIZE:
+            HamiltonianKernel.QC_ = self.qc
+            HamiltonianKernel.QCI_ = i_state
+            HamiltonianKernel.QCH_ = hamiltonian_circuit
+            HamiltonianKernel.QC2D_ = inverse_circuit
 
         # Collapse the sub-circuits used in this benchmark (for Qiskit)
         qc2 = self.qc.decompose().decompose()      
@@ -111,7 +113,7 @@ class HamiltonianKernel(object):
             qc.h(0)
             for k in range(1, self.n_spins):
                 qc.cx(k-1, k)
-        #self.QCI_ = qc
+
         return qc
 
     def create_hamiltonian(self) -> QuantumCircuit:
@@ -152,15 +154,11 @@ class HamiltonianKernel(object):
                 
         # Print a sample circuit
         print("Sample Circuit:")
-        if self.QC_ is not None and self.n_spins <= self.MAX_PRINT_SIZE:
+        if self.QC_ is not None:
             print(self.QC_)
         else:
-            print("  ... too large to print!")
-            return False
-
-        # we don't restrict save of large sub-circuits, so skip printing if num_qubits too large
-        #if self.QCI_ is not None and self.n_spins > 6:
-            #print("... subcircuits too large to print")     
+            print("  ... circuit too large to print!")
+            return False    
             
         if self.QCI_ is not None:
             print("  Initial State:")
@@ -177,6 +175,10 @@ class HamiltonianKernel(object):
         if self.QCRS_ is not None:
             print("  Resultant Paulis:")
             print(self.QCRS_)
+        
+        # reset these variables after printing;
+        # (since we don't intialize them anywhere, they could be retained incorrectly on subsequent runs)
+        HamiltonianKernel.QC_ = HamiltonianKernel.QCI_ = HamiltonianKernel.QCH_ = HamiltonianKernel.QC2D_ = HamiltonianKernel.QCRS_ = None
 
         return True
  
