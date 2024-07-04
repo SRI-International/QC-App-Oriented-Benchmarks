@@ -84,7 +84,8 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     """
     counts = result.get_counts(qc)
     if verbose:
-        print(f"For type {type} measured: {counts}")
+        #print(f"For type {type} measured: {counts}")
+        print_top_measurements(f"For type {type} measured counts = ", counts, 100)
 
     hamiltonian = hamiltonian.strip().lower()
 
@@ -103,11 +104,48 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
 
     if verbose:
-        print(f"Correct dist: {correct_dist}")
+        #print(f"Correct dist: {correct_dist}")
+        print_top_measurements(f"Correct dist = ", correct_dist, 100)
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
     return counts, fidelity
+
+def print_top_measurements(label, counts, top_n):
+    """
+    Prints the top N measurements from a Qiskit measurement counts dictionary
+    in a dictionary-like format. If there are more measurements not printed,
+    indicates the count.
+    
+    Args:
+        counts (dict): The measurement counts dictionary from Qiskit.
+        top_n (int): The number of top measurements to print.
+    """
+    
+    if label is not None: print(label)
+    
+    sorted_counts = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+    
+    total_measurements = len(sorted_counts)
+    
+    if top_n >= total_measurements:
+        top_counts = sorted_counts
+        more_counts = []
+    else:
+        top_counts = sorted_counts[:top_n]
+        more_counts = sorted_counts[top_n:]
+    
+    print("{", end=" ")
+    for i, (measurement, count) in enumerate(top_counts):
+        print(f"'{measurement}': {round(count,6)}", end="")
+        if i < len(top_counts) - 1:
+            print(",", end=" ")
+    
+    if more_counts:
+        num_more = len(more_counts)
+        print(f", ... and {num_more} more.")
+    else:
+        print(" }")
 
 
 ############### Benchmark Loop
@@ -115,7 +153,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "heisenberg", method: int = 1,
-        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = True, init_state: str = "checkerboard",
+        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = True, init_state: str = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None):
@@ -262,7 +300,7 @@ def get_args():
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="random pauli flag")
-    parser.add_argument("--init_state", "-init", default="checkerboard", help="initial state")
+    parser.add_argument("--init_state", "-init", default=None, help="initial state")
 
     return parser.parse_args()
  
