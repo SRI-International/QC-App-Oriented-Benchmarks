@@ -28,20 +28,6 @@ QCI_ = None
 HAM_ = None
 EVO_ = None
 
-XX_ = None
-YY_ = None
-ZZ_ = None
-XXYYZZ_ = None
-
-# Mirror Gates of the previous four gates
-XX_mirror_ = None
-YY_mirror_ = None
-ZZ_mirror_ = None
-XXYYZZ_mirror_ = None
-
-# For validating the implementation of XXYYZZ operation (saved for possible use in drawing)
-_use_XX_YY_ZZ_gates = False
-
 
 from hamlib_utils import process_hamiltonian_file, needs_normalization, normalize_data_format, parse_hamiltonian_to_sparsepauliop, determine_qubit_count
 
@@ -257,8 +243,6 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
     Returns:
         QuantumCircuit: The constructed Qiskit circuit.
     """
-    global _use_XX_YY_ZZ_gates
-    _use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates
     
     num_qubits = n_spins
     secret_int = f"{K}-{t}"
@@ -273,110 +257,8 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
     h_z = hz[:n_spins]
 
     hamiltonian = hamiltonian.strip().lower()
-
-    if hamiltonian == "heisenberg": 
-
-        init_state = "checkerboard"
-
-        # apply initial state
-        QCI_ = initial_state(n_spins, init_state)
-        qc.append(QCI, qr)
-        qc.barrier()
-
-        # Loop over each Trotter step, adding gates to the circuit defining the Hamiltonian
-        for k in range(K):
-            # Pauli spin vector product
-            [qc.rx(2 * tau * w * h_x[i], qr[i]) for i in range(n_spins)]
-            [qc.rz(2 * tau * w * h_z[i], qr[i]) for i in range(n_spins)]
-            qc.barrier()
-            
-            # Basic implementation of exp(i * t * (XX + YY + ZZ))
-            if use_XX_YY_ZZ_gates:
-                # XX operator on each pair of qubits in linear chain
-                for j in range(2):
-                    for i in range(j%2, n_spins - 1, 2):
-                        qc.append(xx_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-
-                # YY operator on each pair of qubits in linear chain
-                for j in range(2):
-                    for i in range(j%2, n_spins - 1, 2):
-                        qc.append(yy_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-
-                # ZZ operation on each pair of qubits in linear chain
-                for j in range(2):
-                    for i in range(j%2, n_spins - 1, 2):
-                        qc.append(zz_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-                        
-            else:
-                # Optimized XX + YY + ZZ operator on each pair of qubits in linear chain
-                for j in reversed(range(2)):
-                    for i in reversed(range(j % 2, n_spins - 1, 2)):
-                        qc.append(xxyyzz_opt_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-            qc.barrier()
-
-        if (method == 3):
-            # Add mirror gates for negative time simulation
-            for k in range(K): 
-                # Basic implementation of exp(-i * t * (XX + YY + ZZ)):
-                if use_XX_YY_ZZ_gates:
-                    # regular inverse of XX + YY + ZZ operators on each pair of quibts in linear chain
-                    # XX operator on each pair of qubits in linear chain
-                    for j in range(2):
-                        for i in range(j%2, n_spins - 1, 2):
-                            qc.append(zz_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-
-                    # YY operator on each pair of qubits in linear chain
-                    for j in range(2):
-                        for i in range(j%2, n_spins - 1, 2):
-                            qc.append(yy_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-
-                    # ZZ operation on each pair of qubits in linear chain
-                    for j in range(2):
-                        for i in range(j%2, n_spins - 1, 2):
-                            qc.append(xx_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-
-                else:
-                    # optimized Inverse of XX + YY + ZZ operator on each pair of qubits in linear chain
-                    for j in range(2):
-                        for i in range(j % 2, n_spins - 1, 2):
-                            qc.append(xxyyzz_opt_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-                qc.barrier()
-
-                # the Pauli spin vector product
-                [qc.rz(-2 * tau * w * h_z[i], qr[i]) for i in range(n_spins)]
-                [qc.rx(-2 * tau * w * h_x[i], qr[i]) for i in range(n_spins)]
-                qc.barrier()
     
-    elif hamiltonian == "tfim":
-        h = 0.2  # Strength of transverse field
-        init_state = "ghz"
-
-        #apply initial state
-        qc.append(initial_state(n_spins, init_state), qr)
-        qc.barrier()
-
-        # Calculate TFIM
-        for k in range(K):
-            for i in range(n_spins):
-                qc.rx(2 * tau * h, qr[i])
-            qc.barrier()
-
-            for j in range(2):
-                for i in range(j % 2, n_spins - 1, 2):
-                    qc.append(zz_gate(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-            qc.barrier()
-        
-        if (method == 3):
-            for k in range(k):
-                for j in range(2):
-                    for i in range(j % 2, n_spins - 1, 2):
-                        qc.append(zz_gate_mirror(tau).to_instruction(), [qr[i], qr[(i + 1) % n_spins]])
-                qc.barrier()
-                for i in range(n_spins):
-                    qc.rx(-2 * tau * h, qr[i])
-                qc.barrier()
-    
-    elif hamiltonian == "hamlib":
+    if hamiltonian == "hamlib":
         qc, ham_op, evo = create_circuit(n_spins)
 
     else:
@@ -399,223 +281,8 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
             
     return qc2
     
-
-############### XX, YY, ZZ Gate Implementations
-
-def xx_gate(tau: float) -> QuantumCircuit:
-    """
-    Simple XX gate on q0 and q1 with angle 'tau'.
-
-    Args:
-        tau (float): The rotation angle.
-
-    Returns:
-        QuantumCircuit: The XX gate circuit.
-    """
-    qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="xx_gate")
-    qc.h(qr[0])
-    qc.h(qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.rz(pi * tau, qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.h(qr[0])
-    qc.h(qr[1])
     
-    global XX_
-    XX_ = qc
-    
-    return qc
-
-def yy_gate(tau: float) -> QuantumCircuit:
-    """
-    Simple YY gate on q0 and q1 with angle 'tau'.
-
-    Args:
-        tau (float): The rotation angle.
-
-    Returns:
-        QuantumCircuit: The YY gate circuit.
-    """
-    qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="yy_gate")
-    qc.s(qr[0])
-    qc.s(qr[1])
-    qc.h(qr[0])
-    qc.h(qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.rz(pi * tau, qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.h(qr[0])
-    qc.h(qr[1])
-    qc.sdg(qr[0])
-    qc.sdg(qr[1])
-
-    global YY_
-    YY_ = qc
-
-    return qc
-
-def zz_gate(tau: float) -> QuantumCircuit:
-    """
-    Simple ZZ gate on q0 and q1 with angle 'tau'.
-
-    Args:
-        tau (float): The rotation angle.
-
-    Returns:
-        QuantumCircuit: The ZZ gate circuit.
-    """
-    qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="zz_gate")
-    qc.cx(qr[0], qr[1])
-    qc.rz(pi * tau, qr[1])
-    qc.cx(qr[0], qr[1])
-
-    global ZZ_
-    ZZ_ = qc
-
-    return qc
-
-def xxyyzz_opt_gate(tau: float) -> QuantumCircuit:
-    """
-    Optimal combined XXYYZZ gate (with double coupling) on q0 and q1 with angle 'tau'.
-
-    Args:
-        tau (float): The rotation angle.
-
-    Returns:
-        QuantumCircuit: The optimal combined XXYYZZ gate circuit.
-    """
-    alpha = tau
-    beta = tau
-    gamma = tau
-    qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="xxyyzz_opt")
-    qc.rz(pi / 2, qr[1])
-    qc.cx(qr[1], qr[0])
-    qc.rz(pi * gamma - pi / 2, qr[0])
-    qc.ry(pi / 2 - pi * alpha, qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.ry(pi * beta - pi / 2, qr[1])
-    qc.cx(qr[1], qr[0])
-    qc.rz(-pi / 2, qr[0])
-
-    global XXYYZZ_
-    XXYYZZ_ = qc
-
-    return qc
-
-    
-
-
-############### Mirrors of XX, YY, ZZ Gate Implementations   
-def xx_gate_mirror(tau: float) -> QuantumCircuit:
-    """
-    Simple XX mirror gate on q0 and q1 with angle 'tau'.
-
-    Args:
-        tau (float): The rotation angle.
-
-    Returns:
-        QuantumCircuit: The XX_mirror_ gate circuit.
-    """
-    qr = QuantumRegister(2, 'q')
-    qc = QuantumCircuit(qr, name="xx_gate_mirror")
-    qc.h(qr[0])
-    qc.h(qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.rz(-pi * tau, qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.h(qr[0])
-    qc.h(qr[1])
-
-    global XX_mirror_
-    XX_mirror_ = qc
-
-    return qc
-
-def yy_gate_mirror(tau: float) -> QuantumCircuit:
-    """
-    Simple YY mirror gate on q0 and q1 with angle 'tau'.
-
-    Args:
-        tau (float): The rotation angle.
-
-    Returns:
-        QuantumCircuit: The YY_mirror_ gate circuit.
-    """
-    qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="yy_gate_mirror")
-    qc.s(qr[0])
-    qc.s(qr[1])
-    qc.h(qr[0])
-    qc.h(qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.rz(-pi * tau, qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.h(qr[0])
-    qc.h(qr[1])
-    qc.sdg(qr[0])
-    qc.sdg(qr[1])
-
-    global YY_mirror_
-    YY_mirror_ = qc
-
-    return qc   
-
-def zz_gate_mirror(tau: float) -> QuantumCircuit:
-    """
-    Simple ZZ mirror gate on q0 and q1 with angle 'tau'.
-
-    Args:
-        tau (float): The rotation angle.
-
-    Returns:
-        QuantumCircuit: The ZZ_mirror_ gate circuit.
-    """
-    qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="zz_gate_mirror")
-    qc.cx(qr[0], qr[1])
-    qc.rz(-pi * tau, qr[1])
-    qc.cx(qr[0], qr[1])
-
-    global ZZ_mirror_
-    ZZ_mirror_ = qc
-
-    return qc
-
-def xxyyzz_opt_gate_mirror(tau: float) -> QuantumCircuit:
-    """
-    Optimal combined XXYYZZ mirror gate (with double coupling) on q0 and q1 with angle 'tau'.
-
-    Args:
-        tau (float): The rotation angle.
-
-    Returns:
-        QuantumCircuit: The optimal combined XXYYZZ_mirror_ gate circuit.
-    """
-    alpha = tau
-    beta = tau
-    gamma = tau
-    qr = QuantumRegister(2)
-    qc = QuantumCircuit(qr, name="xxyyzz_opt_mirror")
-    qc.rz(pi / 2, qr[0])
-    qc.cx(qr[1], qr[0])
-    qc.ry(-pi * beta + pi / 2, qr[1])
-    qc.cx(qr[0], qr[1])
-    qc.ry(-pi / 2 + pi * alpha, qr[1])
-    qc.rz(-pi * gamma + pi / 2, qr[0])
-    qc.cx(qr[1], qr[0])
-    qc.rz(-pi / 2, qr[1])
-
-    global XXYYZZ_mirror_
-    XXYYZZ_mirror_ = qc
-
-    return qc
-
-
-############### BV Circuit Drawer
+############### Circuit Drawer
 
 # Draw the circuits of this benchmark program
 def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = False, method: int = 1):
@@ -628,8 +295,8 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
         
         # create a small circuit, just to display this evolution subciruit structure
         print("  Evolution Operator (e^iHt) =")
-        qctt = QuantumCircuit(6)
-        qctt.append(EVO_, range(6))
+        qctt = QuantumCircuit(QC_.num_qubits)
+        qctt.append(EVO_, range(QC_.num_qubits))
         print(transpile(qctt, optimization_level=3))
                
         if QCI_ is not None:
