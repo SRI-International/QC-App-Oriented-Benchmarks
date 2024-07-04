@@ -28,7 +28,7 @@ import execute as ex
 import metrics as metrics
 
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, create_circuit, get_valid_qubits
-from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless, HamiltonianSimulationExact_Inverse_Init_State
+from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
 # from hamlib_test import create_circuit, HamiltonianSimulationExact
 from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 
@@ -62,6 +62,7 @@ def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
             starting_bit = 0 if num_qubits % 2 != 0 else 1
         else:
             starting_bit = 1 if num_qubits % 2 != 0 else 0
+
         correct_dist[generate_pattern(starting_bit)] = num_shots
     elif init_state == "ghz":
         correct_dist = {
@@ -119,12 +120,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
     elif method == 3 and hamiltonian == "hamlib":
-        # correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag )
-        correct_dist = HamiltonianSimulationExact_Inverse_Init_State(num_qubits)
-    # elif method == 3 and hamiltonian == "heisenberg":
-    #     correct_dist = {''.join(['1' if i % 2 == 0 else '0' for i in range(num_qubits)]) if num_qubits % 2 != 0 else ''.join(['0' if i % 2 == 0 else '1' for i in range(num_qubits)]):num_shots}
-    # elif method == 3 and hamiltonian == "tfim":
-    #     correct_dist = {'0' * num_qubits: num_shots // 2 + num_shots % 2, '1' * num_qubits: num_shots // 2}
+        correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
 
@@ -206,7 +202,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "hamlib", method: int = 2,
-        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = True, init_state: str = "checkerboard",
+        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = False, init_state: str = "checkerboard",
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None):
