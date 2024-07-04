@@ -628,8 +628,8 @@ def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = Fals
         
         # create a small circuit, just to display this evolution subciruit structure
         print("  Evolution Operator (e^iHt) =")
-        qctt = QuantumCircuit(6)
-        qctt.append(EVO_, range(6))
+        qctt = QuantumCircuit(QC_.num_qubits)
+        qctt.append(EVO_, range(QC_.num_qubits))
         print(transpile(qctt, optimization_level=3))
                
         if QCI_ is not None:
