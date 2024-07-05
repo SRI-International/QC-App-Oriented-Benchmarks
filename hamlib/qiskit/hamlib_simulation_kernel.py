@@ -130,7 +130,13 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
 dataset_name_template = ""
 filename = ""
 
-def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
+def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
+    for _ in range (num_trotter_steps):
+        circuit.append(evo, range(operator.num_qubits))
+    circuit.barrier()
+    return circuit
+
+def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5, method = 1):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
 
@@ -164,6 +170,7 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
             print(f"... Evolution operator = {hamiltonian}")
 
         operator = hamiltonian  # Use the SparsePauliOp object directly
+        # print (operator)
 
         # Build the evolution gate
         # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
@@ -172,6 +179,7 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
 
         # Plug it into a circuit
         circuit = QuantumCircuit(operator.num_qubits)
+        circuit_without_initial_state = QuantumCircuit(operator.num_qubits)
         
         # first insert the initial_state
         init_state = "checkerboard"
@@ -180,14 +188,14 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5):
         circuit.barrier()
         
         # Append K trotter steps
-        for _ in range (num_trotter_steps):
-            circuit.append(evo, range(operator.num_qubits))
-        circuit.barrier()
+        circuit = create_trotter_steps(num_trotter_steps, evo, operator, circuit)
+        circuit_without_initial_state = create_trotter_steps(num_trotter_steps, evo, operator, circuit_without_initial_state)
+
+        if method == 3:
+            circuit_inverse = circuit_without_initial_state.inverse()
+            circuit.append(circuit_inverse,range(operator.num_qubits))
 
         circuit.measure_all()
-        
-        # circuit.draw(output="mpl")
-        # circuit.decompose(reps=2).draw(output="mpl", style="iqp")
         return circuit, hamiltonian, evo
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
@@ -259,7 +267,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
     hamiltonian = hamiltonian.strip().lower()
     
     if hamiltonian == "hamlib":
-        qc, ham_op, evo = create_circuit(n_spins)
+        qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method)
 
     else:
         raise ValueError("Invalid Hamiltonian specification.")

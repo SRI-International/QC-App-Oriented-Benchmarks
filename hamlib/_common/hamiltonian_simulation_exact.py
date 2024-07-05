@@ -128,27 +128,6 @@ def construct_hamiltonian(n_spins: int, hamiltonian: str, w: float, hx : list[fl
     else:
         raise ValueError("Invalid Hamiltonian specification.")
 
-# def HamiltonianSimulationExact(n_spins: int, t: float, init_state: str, hamiltonian: str, w: float, hx: list[float], hz: list[float]) -> dict:
-#     """
-#     Perform exact Hamiltonian simulation using classical matrix evolution.
-
-#     Args:
-#         n_spins (int): Number of spins (qubits).
-#         t (float): Duration of simulation.
-#         init_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
-#         hamiltonian (str): Which hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
-#         w (float): Strength of two-qubit interactions for heisenberg hamiltonian. 
-#         hx (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
-#         hz (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
-
-#     Returns:
-#         dict: The distribution of the evolved state.
-#     """
-#     hamiltonian_sparse = construct_hamiltonian(n_spins, hamiltonian, w, hx, hz)
-#     time_problem = TimeEvolutionProblem(hamiltonian_sparse, t, initial_state=initial_state(n_spins, init_state))
-#     result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
-#     return result.evolved_state.probabilities_dict()
-
 def HamiltonianSimulationExact(n_spins: int):
     """
     Perform exact Hamiltonian simulation using classical matrix evolution.
