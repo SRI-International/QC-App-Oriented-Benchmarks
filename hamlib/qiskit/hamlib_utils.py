@@ -16,33 +16,30 @@ import json
 
 verbose = False
 
+hamiltonian_files = {
+    'TFIM': 'tfim.hdf5',
+    'Fermi-Hubbard-1D': 'FH_D-1.hdf5',
+    'Bose-Hubbard-1D': 'BH_D-1_d-4.hdf5',
+    'Heisenberg': 'heis.hdf5',
+    'Max3Sat': 'random_max3sat-hams.hdf5'
+}
+
 def create_full_filenames(hamiltonian_name):
     """
-    Generate full filenames for specified Hamiltonian models based on their names.
-
+    Fetches the filename for a given Hamiltonian.
+    If the name is not present in the dictionary, append '.hdf5' and return.
+    
     Args:
-        hamiltonian_name (str): The name of the Hamiltonian model.
+    hamiltonian_name (str): The name of the Hamiltonian to lookup.
 
     Returns:
-        str: The filename corresponding to the given Hamiltonian model.
-
-    Raises:
-        ValueError: If the Hamiltonian name does not correspond to any known file.
+    str: The filename associated with the Hamiltonian.
     """
-    # Determine the filename based on the Hamiltonian model name
-    if hamiltonian_name == 'TFIM':
-        filename = 'tfim.hdf5'
-    elif hamiltonian_name == 'Fermi-Hubbard-1D':
-        filename = 'FH_D-1.hdf5'
-    elif hamiltonian_name == 'Bose-Hubbard-1D':
-        filename = 'BH_D-1_d-4.hdf5'
-    elif hamiltonian_name == 'Heisenberg':
-        filename = 'heis.hdf5'
-    elif hamiltonian_name == 'Max3Sat':
-        filename = 'random_max3sat-hams.hdf5'
+
+    if hamiltonian_name in hamiltonian_files:
+        return hamiltonian_files[hamiltonian_name]
     else:
-        print("No such hamltonian name exists.")
-    return filename
+        return hamiltonian_name + '.hdf5'
 
 def extract_dataset_hdf5(filename, dataset_name):
     """
