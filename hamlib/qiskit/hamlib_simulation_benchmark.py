@@ -27,7 +27,9 @@ sys.path[1:1] = ["../_common"]
 import execute as ex
 import metrics as metrics
 
-from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, create_circuit, get_valid_qubits
+import hamlib_simulation_kernel
+from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
+from hamlib_utils import create_full_filenames, construct_dataset_name
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
 # from hamlib_test import create_circuit, HamiltonianSimulationExact
 from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
@@ -51,7 +53,25 @@ precalculated_data = json.loads(data)
 
 # Creates a key for distribution of initial state for method = 3.
 def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag):
+    """
+    Generates a dictionary representing the correct distribution of quantum states based on the initial state configuration.
+
+    This function supports generating specific patterns or distributions for different initial quantum states like
+    'checkerboard' and 'ghz'. Depending on the initial state configuration, it may also factor in the effect of random
+    Pauli operations applied across the qubits.
+
+    Args:
+        num_qubits (int): The number of qubits in the quantum system.
+        num_shots (int): The number of measurements or shots to simulate.
+        init_state (str): The type of initial state to configure. Supported values are 'checkerboard' and 'ghz'.
+        random_pauli_flag (bool): Flag to indicate if random Pauli operations are considered.
+
+    Returns:
+        dict: A dictionary where keys are bit strings representing quantum states, and values are the counts
+              (or probabilities) of these states occurring.
+    """
     def generate_pattern(starting_bit):
+        # Generate a bit pattern that alternates, starting from the 'starting_bit'
         pattern = ''.join([str((i + starting_bit) % 2) for i in range(num_qubits)])
         return pattern
 
@@ -102,24 +122,16 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     hamiltonian = hamiltonian.strip().lower()
 
     # Precalculated correct distribution
-    if method == 1 and hamiltonian == "heisenberg":
-        correct_dist = precalculated_data[f"Heisenberg - Qubits{num_qubits}"]
-    elif method == 2 and hamiltonian == "heisenberg":
-        correct_dist = precalculated_data[f"Exact Heisenberg - Qubits{num_qubits}"]
-    elif method == 1 and hamiltonian == "tfim":
-        correct_dist = precalculated_data[f"TFIM - Qubits{num_qubits}"]
-    elif method == 2 and hamiltonian == "tfim":
-        correct_dist = precalculated_data[f"Exact TFIM - Qubits{num_qubits}"]
-    elif method == 1 and hamiltonian == "hamlib":
+    if method == 1:
         correct_dist = HamiltonianSimulationExact_Noiseless(num_qubits)
-    elif method == 2 and hamiltonian == "hamlib":
+    elif method == 2:
         if verbose:
             print(f"... begin exact computation ...")
         ts = time.time()
         correct_dist = HamiltonianSimulationExact(num_qubits)
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
-    elif method == 3 and hamiltonian == "hamlib":
+    elif method == 3:
         correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
@@ -201,7 +213,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
-        hamiltonian: str = "hamlib", method: int = 2,
+        hamiltonian: str = "TFIM", method: int = 2,
         use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = False, init_state: str = "checkerboard",
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
@@ -230,6 +242,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     Returns:
         None
     """
+
+    hamlib_simulation_kernel.filename = create_full_filenames(hamiltonian)
+    hamlib_simulation_kernel.dataset_name_template = construct_dataset_name(hamlib_simulation_kernel.filename)
+
     print(f"{benchmark_name} Benchmark Program - Qiskit")
     
     # Validate parameters (smallest circuit is 2 qubits)
