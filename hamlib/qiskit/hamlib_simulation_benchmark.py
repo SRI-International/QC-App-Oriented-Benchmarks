@@ -31,7 +31,6 @@ import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
 from hamlib_utils import create_full_filenames, construct_dataset_name
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
-# from hamlib_test import create_circuit, HamiltonianSimulationExact
 from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 
 min_qubits = 0
@@ -123,12 +122,12 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     # Precalculated correct distribution
     if method == 1:
-        correct_dist = HamiltonianSimulationExact_Noiseless(num_qubits)
+        correct_dist = HamiltonianSimulationExact_Noiseless(n_spins=num_qubits,init_state=init_state)
     elif method == 2:
         if verbose:
             print(f"... begin exact computation ...")
         ts = time.time()
-        correct_dist = HamiltonianSimulationExact(num_qubits)
+        correct_dist = HamiltonianSimulationExact(n_spins=num_qubits,init_state=init_state)
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
     elif method == 3:
@@ -214,7 +213,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "TFIM", method: int = 2,
-        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = False, init_state: str = "checkerboard",
+        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = False, init_state: str = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None):
@@ -242,6 +241,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     Returns:
         None
     """
+
+    if init_state == None:
+        init_state = "checkerboard"
 
     hamlib_simulation_kernel.filename = create_full_filenames(hamiltonian)
     hamlib_simulation_kernel.dataset_name_template = construct_dataset_name(hamlib_simulation_kernel.filename)
@@ -308,7 +310,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
             hz = precalculated_data['hz'][:num_qubits]
 
             qc = HamiltonianSimulation(num_qubits, K=k, t=t,
-                    hamiltonian=hamiltonian,
+                    hamiltonian=hamiltonian, init_state=init_state,
                     w=w, hx = hx, hz = hz, 
                     use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
                     method = method)
@@ -358,7 +360,7 @@ def get_args():
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="random pauli flag")
-    parser.add_argument("--init_state", "-init", default="checkerboard", help="initial state")
+    parser.add_argument("--init_state", "-init", default=None, help="initial state")
     return parser.parse_args()
  
 # if main, execute method

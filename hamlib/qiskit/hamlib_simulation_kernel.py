@@ -154,7 +154,7 @@ def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
     circuit.barrier()
     return circuit
 
-def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5, method = 1):
+def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5, method = 1, init_state=None):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
 
@@ -200,7 +200,7 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5, 
         circuit_without_initial_state = QuantumCircuit(operator.num_qubits)
         
         # first insert the initial_state
-        init_state = "checkerboard"
+        # init_state = "checkerboard"
         QCI_ = initial_state(num_qubits, init_state)
         circuit.append(QCI_, range(operator.num_qubits))
         circuit.barrier()
@@ -252,7 +252,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 
 def HamiltonianSimulation(n_spins: int, K: int, t: float,
             hamiltonian: str, w: float, hx: list[float], hz: list[float],
-            use_XX_YY_ZZ_gates: bool = False,
+            use_XX_YY_ZZ_gates: bool = False, init_state=None,
             method: int = 1) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
@@ -284,7 +284,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
 
     hamiltonian = hamiltonian.strip().lower()
     
-    qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method)
+    qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method, init_state=init_state)
 
     # Save smaller circuit example for display
     global QC_, HAM_, EVO_
