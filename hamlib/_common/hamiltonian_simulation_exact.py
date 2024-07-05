@@ -128,7 +128,7 @@ def construct_hamiltonian(n_spins: int, hamiltonian: str, w: float, hx : list[fl
     else:
         raise ValueError("Invalid Hamiltonian specification.")
 
-def HamiltonianSimulationExact(n_spins: int):
+def HamiltonianSimulationExact(n_spins: int, init_state=None):
     """
     Perform exact Hamiltonian simulation using classical matrix evolution.
 
@@ -144,8 +144,8 @@ def HamiltonianSimulationExact(n_spins: int):
     Returns:
         dict: The distribution of the evolved state.
     """
-    _, hamiltonian_sparse, _ = create_circuit(n_spins)
-    time_problem = TimeEvolutionProblem(hamiltonian_sparse, 0.2, initial_state=initial_state(n_spins, 'checkerboard'))
+    _, hamiltonian_sparse, _ = create_circuit(n_spins=n_spins, init_state=init_state)
+    time_problem = TimeEvolutionProblem(hamiltonian_sparse, 0.2, initial_state=initial_state(n_spins, init_state))
     result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
     
     # if verbose:
@@ -153,7 +153,7 @@ def HamiltonianSimulationExact(n_spins: int):
     
     return result.evolved_state.probabilities_dict()
 
-def HamiltonianSimulationExact_Noiseless(n_spins: int):
+def HamiltonianSimulationExact_Noiseless(n_spins: int, init_state=None):
     """
     Simulate a quantum Hamiltonian circuit for a specified number of spins using a noiseless quantum simulator.
     
@@ -172,7 +172,7 @@ def HamiltonianSimulationExact_Noiseless(n_spins: int):
         that measures qubits and returns a count of the measurement outcomes. The function assumes that the circuit 
         creation and the simulator are perfectly noiseless, meaning there are no errors during simulation.
     """
-    qc, _, _ = create_circuit(n_spins)
+    qc, _, _ = create_circuit(n_spins=n_spins,init_state=init_state)
     num_shots = 100000
     backend = Aer.get_backend("qasm_simulator")
     # Transpile and run the circuits
