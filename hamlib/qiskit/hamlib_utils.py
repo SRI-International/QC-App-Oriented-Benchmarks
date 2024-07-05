@@ -16,6 +16,33 @@ import json
 
 verbose = False
 
+def create_full_filenames(hamiltonian_name):
+    """
+    Generate full filenames for specified Hamiltonian models based on their names.
+
+    Args:
+        hamiltonian_name (str): The name of the Hamiltonian model.
+
+    Returns:
+        str: The filename corresponding to the given Hamiltonian model.
+
+    Raises:
+        ValueError: If the Hamiltonian name does not correspond to any known file.
+    """
+    # Determine the filename based on the Hamiltonian model name
+    if hamiltonian_name == 'TFIM':
+        filename = 'tfim.hdf5'
+    elif hamiltonian_name == 'Fermi-Hubbard-1D':
+        filename = 'FH_D-1.hdf5'
+    elif hamiltonian_name == 'Bose-Hubbard-1D':
+        filename = 'BH_D-1_d-4.hdf5'
+    elif hamiltonian_name == 'Heisenberg':
+        filename = 'heis.hdf5'
+    elif hamiltonian_name == 'Max3Sat':
+        filename = 'random_max3sat-hams.hdf5'
+    else:
+        print("No such hamltonian name exists.")
+    return filename
 
 def extract_dataset_hdf5(filename, dataset_name):
     """
@@ -191,7 +218,6 @@ def process_hamiltonian_file(filename, dataset_name):
     if filename in url_mapping:
         url = url_mapping[filename]
         extracted_path = download_and_extract(filename, url)
-        # print('downloaded_path',extracted_path)
         # Assuming the HDF5 file is located directly inside the extracted folder
         hdf5_file_path = os.path.join(extracted_path, filename)
         # print('hdf5_file_path', hdf5_file_path)
@@ -327,6 +353,14 @@ def parse_instance_variables(instance_name):
     return variables
 
 def generate_json_for_hdf5_input(file_input):
+    """
+    Generate a JSON file from a list of HDF5 file inputs describing various Hamiltonians.
+
+    Args:
+        file_input (list of str): A list containing entries of the format 'function_name:file_path[:fixed_var=value]'.
+            Each entry represents an HDF5 file along with optional fixed variable information.
+
+    """
     results = {}
 
     for entry in file_input:

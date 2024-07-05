@@ -131,6 +131,24 @@ dataset_name_template = ""
 filename = ""
 
 def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
+    """
+    Appends Trotter steps to a quantum circuit based on the given evolution operator.
+
+    This function iteratively applies an evolution operator to the quantum circuit
+    over a specified number of Trotter steps. A barrier is added at the end to 
+    prevent gate reordering across this sequence by optimization algorithms.
+
+    Args:
+        num_trotter_steps (int): The number of Trotter steps to append to the circuit.
+        evo (QuantumGate): The quantum gate representing the evolution operator.
+        operator (QuantumOperator): The operator specifying the qubits the evolution 
+                                    operator acts upon.
+        circuit (QuantumCircuit): The quantum circuit to which the Trotter steps are 
+                                  appended.
+
+    Returns:
+        QuantumCircuit: The quantum circuit with the added Trotter steps and a barrier.
+    """
     for _ in range (num_trotter_steps):
         circuit.append(evo, range(operator.num_qubits))
     circuit.barrier()
@@ -266,15 +284,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
 
     hamiltonian = hamiltonian.strip().lower()
     
-    if hamiltonian == "hamlib":
-        qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method)
-
-    else:
-        raise ValueError("Invalid Hamiltonian specification.")
-
-    # Measure all qubits
-    # for i_qubit in range(n_spins):
-    #     qc.measure(qr[i_qubit], cr[i_qubit])
+    qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method)
 
     # Save smaller circuit example for display
     global QC_, HAM_, EVO_
@@ -293,7 +303,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
 ############### Circuit Drawer
 
 # Draw the circuits of this benchmark program
-def kernel_draw(hamiltonian: str = "heisenberg", use_XX_YY_ZZ_gates: bool = False, method: int = 1):
+def kernel_draw(hamiltonian: str = "hamlib", use_XX_YY_ZZ_gates: bool = False, method: int = 1):
                           
     # Print a sample circuit
     print("Sample Circuit:")
