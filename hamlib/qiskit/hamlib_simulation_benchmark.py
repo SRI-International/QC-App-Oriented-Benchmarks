@@ -16,9 +16,7 @@ import json
 import os
 import sys
 import time
-
 import numpy as np
-from qiskit.circuit import QuantumCircuit
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
 sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
@@ -31,8 +29,6 @@ import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
 from hamlib_utils import create_full_filenames, construct_dataset_name
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
-
-min_qubits = 0
 
 
 # Benchmark Name
@@ -221,19 +217,31 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     Returns:
         None
     """
-
+    
     print(f"{benchmark_name} Benchmark Program - Qiskit")
+    
+    # Create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
     
     # Validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
-    if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even
+    if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even (DEVNOTE: is this True?)
     skip_qubits = max(1, skip_qubits)
 
     # get key infomation about the selected Hamiltonian
-    hamlib_simulation_kernel.filename = create_full_filenames(hamiltonian)
-    hamlib_simulation_kernel.dataset_name_template = construct_dataset_name(hamlib_simulation_kernel.filename)
+    # DEVNOTE: Error handling here can be improved by simply returning False or raising exception
+    try:
+        hamlib_simulation_kernel.filename = create_full_filenames(hamiltonian)
+        hamlib_simulation_kernel.dataset_name_template = construct_dataset_name(hamlib_simulation_kernel.filename)
+    except ValueError:
+        print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian}")
+        return
     
+    if hamlib_simulation_kernel.dataset_name_template == "File key not found in data":
+        print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian}")
+        return
+        
     # assume default init_state if not given
     if init_state == None:
         init_state = "checkerboard"
@@ -241,9 +249,8 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     # Set the flag to use an XX YY ZZ shim if given
     if use_XX_YY_ZZ_gates:
         print("... using unoptimized XX YY ZZ gates")
-        
-    # Create context identifier
-    if context is None: context = f"{benchmark_name} Benchmark"    
+    
+    ################################
     
     # Initialize metrics module
     metrics.init_metrics()
@@ -307,7 +314,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
                     method = method)
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
-            qc.draw()
 
             # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
@@ -344,7 +350,7 @@ def get_args():
     parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)     
-    parser.add_argument("--hamiltonian", "-ham", default="hamlib", help="Name of Hamiltonian", type=str)
+    parser.add_argument("--hamiltonian", "-ham", default="TFIM", help="Name of Hamiltonian", type=str)
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--use_XX_YY_ZZ_gates", action="store_true", help="Use explicit XX, YY, ZZ gates")
     #parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
