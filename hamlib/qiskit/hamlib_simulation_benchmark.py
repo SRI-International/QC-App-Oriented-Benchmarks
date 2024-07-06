@@ -119,9 +119,15 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     hamiltonian = hamiltonian.strip().lower()
 
-    # Precalculated correct distribution
+    # calculate correct distribution on the fly
     if method == 1:
+        if verbose:
+            print(f"... begin noiseless simulation for expected distribution ...")
+        ts = time.time()
         correct_dist = HamiltonianSimulationExact_Noiseless(n_spins=num_qubits,init_state=init_state)
+        if verbose:
+            print(f"... noiseless simulation for expected distribution time = {round((time.time() - ts), 3)} sec") 
+            
     elif method == 2:
         if verbose:
             print(f"... begin exact computation ...")
@@ -129,10 +135,12 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         correct_dist = HamiltonianSimulationExact(n_spins=num_qubits,init_state=init_state)
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
+            
     elif method == 3:
         correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
+        
     else:
-        raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
+        raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
 
     if verbose:
         #print(f"Correct dist: {correct_dist}")
@@ -179,33 +187,6 @@ def print_top_measurements(label, counts, top_n):
     else:
         print(" }")
 
-
-def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircuit:
-    """
-    Initialize the quantum state.
-
-    Dev note: This function is copy/pasted from HamiltonianSimulation.
-    
-    Args:
-        n_spins (int): Number of spins (qubits).
-        initial_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
-
-    Returns:
-        QuantumCircuit: The initialized quantum circuit.
-    """
-    qc = QuantumCircuit(n_spins)
-
-    if initial_state.strip().lower() == "checkerboard" or initial_state.strip().lower() == "neele":
-        # Checkerboard state, or "Neele" state
-        for k in range(0, n_spins, 2):
-            qc.x([k])
-    elif initial_state.strip().lower() == "ghz":
-        # GHZ state: 1/sqrt(2) (|00...> + |11...>)
-        qc.h(0)
-        for k in range(1, n_spins):
-            qc.cx(k-1, k)
-
-    return qc
 
 ############### Benchmark Loop
 
@@ -280,10 +261,14 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
+
+    # comment out the normal way to doing this
+    # for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+    
+    # for HamLib, determine available widths and loop over those 
     valid_qubits = get_valid_qubits(min_qubits, max_qubits, skip_qubits)
     for num_qubits in valid_qubits:
-    # for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
-
+    
         # Reset random seed
         np.random.seed(0)
 
@@ -308,6 +293,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
             hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
             hz = precalculated_data['hz'][:num_qubits]
 
+            # create the HamLibSimulation kernel
             qc = HamiltonianSimulation(num_qubits, K=k, t=t,
                     hamiltonian=hamiltonian, init_state=init_state,
                     w=w, hx = hx, hz = hz, 
