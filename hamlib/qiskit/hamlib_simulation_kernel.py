@@ -21,6 +21,7 @@ from qiskit.quantum_info import SparsePauliOp, Pauli
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
 
+verbose = False
 
 # Saved circuits and subcircuits for display
 QC_ = None

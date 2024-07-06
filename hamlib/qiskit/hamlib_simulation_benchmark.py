@@ -31,7 +31,6 @@ import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
 from hamlib_utils import create_full_filenames, construct_dataset_name
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
-from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 
 min_qubits = 0
 
@@ -120,9 +119,15 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     hamiltonian = hamiltonian.strip().lower()
 
-    # Precalculated correct distribution
+    # calculate correct distribution on the fly
     if method == 1:
+        if verbose:
+            print(f"... begin noiseless simulation for expected distribution ...")
+        ts = time.time()
         correct_dist = HamiltonianSimulationExact_Noiseless(n_spins=num_qubits,init_state=init_state)
+        if verbose:
+            print(f"... noiseless simulation for expected distribution time = {round((time.time() - ts), 3)} sec") 
+            
     elif method == 2:
         if verbose:
             print(f"... begin exact computation ...")
@@ -130,10 +135,12 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         correct_dist = HamiltonianSimulationExact(n_spins=num_qubits,init_state=init_state)
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
+            
     elif method == 3:
         correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
+        
     else:
-        raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not tfim or heisenberg.")
+        raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
 
     if verbose:
         #print(f"Correct dist: {correct_dist}")
@@ -181,38 +188,11 @@ def print_top_measurements(label, counts, top_n):
         print(" }")
 
 
-def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircuit:
-    """
-    Initialize the quantum state.
-
-    Dev note: This function is copy/pasted from HamiltonianSimulation.
-    
-    Args:
-        n_spins (int): Number of spins (qubits).
-        initial_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
-
-    Returns:
-        QuantumCircuit: The initialized quantum circuit.
-    """
-    qc = QuantumCircuit(n_spins)
-
-    if initial_state.strip().lower() == "checkerboard" or initial_state.strip().lower() == "neele":
-        # Checkerboard state, or "Neele" state
-        for k in range(0, n_spins, 2):
-            qc.x([k])
-    elif initial_state.strip().lower() == "ghz":
-        # GHZ state: 1/sqrt(2) (|00...> + |11...>)
-        qc.h(0)
-        for k in range(1, n_spins):
-            qc.cx(k-1, k)
-
-    return qc
-
 ############### Benchmark Loop
 
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
-        hamiltonian: str = "TFIM", method: int = 2,
+        hamiltonian: str = "TFIM", method: int = 1,
         use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = False, init_state: str = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
@@ -242,12 +222,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         None
     """
 
-    if init_state == None:
-        init_state = "checkerboard"
-
-    hamlib_simulation_kernel.filename = create_full_filenames(hamiltonian)
-    hamlib_simulation_kernel.dataset_name_template = construct_dataset_name(hamlib_simulation_kernel.filename)
-
     print(f"{benchmark_name} Benchmark Program - Qiskit")
     
     # Validate parameters (smallest circuit is 2 qubits)
@@ -256,12 +230,20 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even
     skip_qubits = max(1, skip_qubits)
 
-    # Create context identifier
-    if context is None: context = f"{benchmark_name} Benchmark"
+    # get key infomation about the selected Hamiltonian
+    hamlib_simulation_kernel.filename = create_full_filenames(hamiltonian)
+    hamlib_simulation_kernel.dataset_name_template = construct_dataset_name(hamlib_simulation_kernel.filename)
     
+    # assume default init_state if not given
+    if init_state == None:
+        init_state = "checkerboard"
+        
     # Set the flag to use an XX YY ZZ shim if given
     if use_XX_YY_ZZ_gates:
         print("... using unoptimized XX YY ZZ gates")
+        
+    # Create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"    
     
     # Initialize metrics module
     metrics.init_metrics()
@@ -281,10 +263,14 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
+
+    # comment out the normal way to doing this
+    # for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+    
+    # for HamLib, determine available widths and loop over those 
     valid_qubits = get_valid_qubits(min_qubits, max_qubits, skip_qubits)
     for num_qubits in valid_qubits:
-    # for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
-
+    
         # Reset random seed
         np.random.seed(0)
 
@@ -295,20 +281,25 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
         # Parameters of simulation
         #### CANNOT BE MODIFIED W/O ALSO MODIFYING PRECALCULATED DATA #########
+        # DEVNOTE: HamLib is calculating expectation on the fly, so these could be set rather than pulled
+        
+        # A large Trotter order approximates the Hamiltonian evolution better.
+        # But a large Trotter order also means the circuit is deeper.
+        # For ideal or noise-less quantum circuits, k >> 1 gives perfect Hamiltonian simulation.
         w = precalculated_data['w']  # Strength of disorder
         k = precalculated_data['k']   # Trotter error.
-               # A large Trotter order approximates the Hamiltonian evolution better.
-               # But a large Trotter order also means the circuit is deeper.
-               # For ideal or noise-less quantum circuits, k >> 1 gives perfect Hamiltonian simulation.
         t = precalculated_data['t']  # Time of simulation
+        
+        # Precalculated random numbers between [-1, 1]
+        hx = precalculated_data['hx'][:num_qubits]
+        hz = precalculated_data['hz'][:num_qubits]
         #######################################################################
 
         # Loop over only 1 circuit
         for circuit_id in range(num_circuits):
             ts = time.time()
-            hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
-            hz = precalculated_data['hz'][:num_qubits]
-
+            
+            # create the HamLibSimulation kernel
             qc = HamiltonianSimulation(num_qubits, K=k, t=t,
                     hamiltonian=hamiltonian, init_state=init_state,
                     w=w, hx = hx, hz = hz, 
@@ -374,6 +365,7 @@ if __name__ == '__main__':
     # special argument handling
     ex.verbose = args.verbose
     verbose = args.verbose
+    hamlib_simulation_kernel.verbose = args.verbose
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
