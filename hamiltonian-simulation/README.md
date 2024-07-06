@@ -6,7 +6,7 @@ In the first strategy, we compare the quantum simulation against a classical cir
 
 In the second strategy, we compare the quantum simulation against a classical simulation of the exact Hamiltonian dynamics to report our fidelity. Again, this is not scalable.
 
-In the third strategy, we use the mirror circuits method developed by Sandia Laboratories [[2]](#references). This is scalable to all qubit sizes. 
+In the third strategy, we use the mirror circuits method with two different ways of implementation. The first creates an inverse of the Hamiltonian, while the second, developed by Sandia Laboratories [[2]](#references), constructs a Quasi-Hamiltonian combined with random Pauli operators. This is scalable to all qubit sizes. 
 
 ## Problem outline
 
@@ -61,7 +61,7 @@ Method = 3 uses a mirror circuit based on the Hamiltonian Simulation circuit, de
 
 In all cases, we compare the resultant distribution using our [noise-normalized fidelity calculation](../_doc/POLARIZATION_FIDELITY.md).
 
-In the run() method for the benchmark, several optional arguments can be specified. Some of the key arguments are as follows: 
+In the run() method for the benchmark, several optional arguments can be specified. Some of the key parameters are as follows: 
 
 ```
 Parameters 
@@ -75,7 +75,26 @@ hamiltonian (str): Which Hamiltonian to run. "Heisenberg" by default but can als
 method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical, 3 for mirror circuit.)
 use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
 random_pauli_flag (bool): Flag to activate more sophisticated mirror circuit formation that utilizes a layer of random paulis separating the mirror circuits in addition to using a quasi-inverse rather than an inverse. 
-init_state (str): The desired initial state. Choices are "checkerboard" or "ghz". 
+init_state (str): The desired initial state. Choices are "checkerboard" or "ghz".
+```
+
+We can run the code by passing various arguments to run a desired hamiltonian with specific method in noisy or noiseless model. Key arguments are:
+
+```
+Parameters              Arguments
+----                    ----
+
+--num_qubits            : -n     (default is <= Max qubits)
+--hamiltonian           : -ham   (default is heisenberg)
+--method                : -m     (default is 1)
+--nonoise               : -non   (default is noisy model)
+--random_pauli_flag     : -ranp  (default is mirror method with inverse)
+--init_state            : -init  (default is Checkerboard)
+
+"python hamiltonian_simulation_benchmark.py -ham tfim -n 5 -init ghz -m 3-ranp -non"
+runs the TFIM hamiltonian for 5 qubits starting with ghz initial state and applies
+method 3 with random paulis and it is ran in a 0 noise model.
+
 ```
 
 ## Classical algorithm
@@ -108,13 +127,19 @@ If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolo
 
 ### Algorithm Steps
 
-1. Initialize qubits in alternating state <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}|\psi(0)\rangle\equiv|010101\ldots\rangle"/>.
+1. Initialize qubits in either Checkerboard or GHZ state.
 
 2. Build the Trotter step layer.
+   
+3. Apply the Hamiltonian as Trotter step layers for as many Trotter steps were chosen.
 
-3. Apply the Trotter step layer for as many Trotter steps were chosen.
+4. Check if method == 3. If True, apply mirror circuit.
 
-4. Measure out all of the qubits
+5. Measure out all of the qubits
+
+6. Compare the measured distribution with the distribution from specific methods.
+
+7. Get the metrics like fidelity, circuit depth, time of execution, etc.
 
 ## Gate Implementation
 
@@ -153,7 +178,15 @@ There are two options of circuit creation for this simulation:
 </p>
 
 *Fig 6. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(YY)}"/> gate.*
- 
+
+
+## Mirror Circuit Method:
+
+The primary goal of the mirror circuit is to create a negative time evolution of hamiltonian such that the quantum state returns to its initial state. Currently, two different mirror circuit methods are applied. First one simply creates an inverse of the Hamiltonian. To create the inverse, all the quantum gates in the Hamiltonian are tracked and gates are applied such that $H^{-1} H Init= Init$ holds true for the entire circuit. Few important facts used for inverse circuit creation: $R_x(-\theta) R_x(\theta) = I$, $C_{not} C_{not} = I$, $H H = I$, etc.
+
+The other method is the Randomized Pauli method that applies a Quasi Hamiltonian $\widetilde{H}$ instead of an Inverse Hamiltonian. After the hamiltonian is applied, a layer of random pauli gates $P_{random}$ is applied, and then the $\widetilde{H}$ is applied such that the overall circuit becomes a Resultant Pauli Operator $P_{resultant}$ applied over the initial state $Init$, i.e. $\widetilde{H} P_{random} H Init = P_{resultant} Init$.
+
+
 ## References
 
 [1] Feynman, RP. (1982) Simulating physics with computers. Int J Theor Phys 21:467–488.
