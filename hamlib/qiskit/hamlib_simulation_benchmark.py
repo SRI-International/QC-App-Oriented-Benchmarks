@@ -31,7 +31,6 @@ import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
 from hamlib_utils import create_full_filenames, construct_dataset_name
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
-from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 
 min_qubits = 0
 
@@ -374,6 +373,7 @@ if __name__ == '__main__':
     # special argument handling
     ex.verbose = args.verbose
     verbose = args.verbose
+    hamlib_simulation_kernel.verbose = args.verbose
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
