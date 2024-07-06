@@ -189,6 +189,13 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even
     skip_qubits = max(1, skip_qubits)
 
+    # set the initial method if no initial state argument is given by user.
+    if init_state == None:
+            if hamiltonian == "tfim": 
+                init_state = "ghz"
+            else:
+                init_state = "checkerboard"
+
     # Create context identifier
     if context is None: context = f"{benchmark_name} Benchmark"
     
