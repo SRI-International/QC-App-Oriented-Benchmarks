@@ -183,25 +183,32 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     """
     print(f"{benchmark_name} Benchmark Program - Qiskit")
     
+    # Create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
     # Validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
-    if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even
+    #if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even (DEVNOTE: why? comment out for now)
     skip_qubits = max(1, skip_qubits)
-
+    
+    # check for valid Hamiltonian name
+    if not (hamiltonian == "heisenberg" or hamiltonian == "tfim"):
+        print(f"ERROR: invalid Hamiltonian name: {hamiltonian}")
+        return
+    
     # set the initial method if no initial state argument is given by user.
     if init_state == None:
             if hamiltonian == "tfim": 
                 init_state = "ghz"
             else:
                 init_state = "checkerboard"
-
-    # Create context identifier
-    if context is None: context = f"{benchmark_name} Benchmark"
-    
+ 
     # Set the flag to use an XX YY ZZ shim if given
     if use_XX_YY_ZZ_gates:
         print("... using unoptimized XX YY ZZ gates")
+    
+    ################################
     
     # Initialize metrics module
     metrics.init_metrics()
@@ -219,9 +226,17 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
+    qc_object = None
+    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):   
+          
+        # since method 1 and 2 use pre-calculated data, cannot go above 12 qubits
+        if method == 1 or method == 2:
+            if num_qubits > 12:
+                print("ERROR: cannot execute method 1 or 2 above 12 qubits")
+                break;
 
         # Reset random seed
         np.random.seed(0)
@@ -239,13 +254,15 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
                # But a large Trotter order also means the circuit is deeper.
                # For ideal or noise-less quantum circuits, k >> 1 gives perfect Hamiltonian simulation.
         t = precalculated_data['t']  # Time of simulation
+        
+        # Precalculated random numbers between [-1, 1]
+        hx = precalculated_data['hx'][:num_qubits]
+        hz = precalculated_data['hz'][:num_qubits]
         #######################################################################
 
         # Loop over only 1 circuit
         for circuit_id in range(num_circuits):
             ts = time.time()
-            hx = precalculated_data['hx'][:num_qubits]  # Precalculated random numbers between [-1, 1]
-            hz = precalculated_data['hz'][:num_qubits]
 
             # Create HeisenbergKernel or TFIM kernel
             if hamiltonian == "heisenberg" :
@@ -277,7 +294,8 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
     ##########
     # draw a sample circuit
-    qc_object.kernel_draw()
+    if qc_object is not None:
+        qc_object.kernel_draw()
        
     # Plot metrics for all circuit sizes
     options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
@@ -322,6 +340,7 @@ if __name__ == '__main__':
     # special argument handling
     ex.verbose = args.verbose
     verbose = args.verbose
+    hamiltonian_simulation_kernel.verbose = args.verbose
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     

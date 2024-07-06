@@ -56,6 +56,7 @@ class HamiltonianKernel(object):
         self.random_pauli_flag = random_pauli_flag
         self.method = method
         
+        # DEVNOTE: this shouldn't be here, instead if None, we should not add an initial state
         if init_state == None:
             if hamiltonian == "tfim": 
                 init_state = "ghz"

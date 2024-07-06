@@ -202,9 +202,12 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5, 
         
         # first insert the initial_state
         # init_state = "checkerboard"
-        QCI_ = initial_state(num_qubits, init_state)
-        circuit.append(QCI_, range(operator.num_qubits))
+        i_state = initial_state(num_qubits, init_state)
+        circuit.append(i_state, range(operator.num_qubits))
         circuit.barrier()
+        
+        if n_spins <= 6:
+            QCI_ = i_state
         
         # Append K trotter steps
         circuit = create_trotter_steps(num_trotter_steps, evo, operator, circuit)
@@ -289,11 +292,10 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
 
     # Save smaller circuit example for display
     global QC_, HAM_, EVO_
-    if QC_ is None or n_spins <= 6:
-        if n_spins < 9:
-            QC_ = qc
-            HAM_ = ham_op
-            EVO_ = evo
+    if n_spins <= 6:
+        QC_ = qc
+        HAM_ = ham_op
+        EVO_ = evo
             
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
     qc2 = qc.decompose().decompose()
