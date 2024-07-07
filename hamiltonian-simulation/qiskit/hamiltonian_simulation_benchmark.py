@@ -340,7 +340,7 @@ if __name__ == '__main__':
     # special argument handling
     ex.verbose = args.verbose
     verbose = args.verbose
-    hamiltonian_simulation_kernel.verbose = args.verbose
+    #hamiltonian_simulation_kernel.verbose = args.verbose     # not currently defined
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
