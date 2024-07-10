@@ -96,6 +96,9 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
         found_valid_dataset = False
 
         while n_spins <= max_qubits:
+            dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
+            dataset_name_template = dataset_name_template.replace("{h}", str(global_h)).replace("{pbc_val}", str(global_pbc_val))
+            dataset_name_template = dataset_name_template.replace("{U}", str(global_U)).replace("{enc}", str(global_enc))
             dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins))
             # print(f"Checking dataset: {dataset_name}")
 
@@ -155,7 +158,7 @@ def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
     circuit.barrier()
     return circuit
 
-def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5, method = 1, init_state=None):
+def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, method = 1, init_state=None):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
 
@@ -169,10 +172,15 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5, 
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
     global dataset_name_template, filename
-    # global filename
+    global global_h, global_pbc_val
+    global global_U, global_enc
+    global global_ratio, global_rinst
     global QCI_
 
     # Replace placeholders with actual n_qubits value: n_spins
+    dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
+    dataset_name_template = dataset_name_template.replace("{h}", str(global_h)).replace("{pbc_val}", str(global_pbc_val))
+    dataset_name_template = dataset_name_template.replace("{U}", str(global_U)).replace("{enc}", str(global_enc))
     dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
 
     if verbose:
@@ -213,9 +221,13 @@ def create_circuit(n_spins: int, time: float = 0.2, num_trotter_steps: int = 5, 
         circuit = create_trotter_steps(num_trotter_steps, evo, operator, circuit)
         circuit_without_initial_state = create_trotter_steps(num_trotter_steps, evo, operator, circuit_without_initial_state)
 
-        if method == 3:
+        if method == 3:            
+            # if you want to retun a circuit combined with the inverse
             circuit_inverse = circuit_without_initial_state.inverse()
-            circuit.append(circuit_inverse,range(operator.num_qubits))
+            circuit.append(circuit_inverse,range(operator.num_qubits))            
+
+            # if you only want to return the inverse circuit
+            # circuit = circuit.inverse()            
 
         circuit.measure_all()
         return circuit, hamiltonian, evo
@@ -273,7 +285,6 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
     Returns:
         QuantumCircuit: The constructed Qiskit circuit.
     """
-    
     num_qubits = n_spins
     secret_int = f"{K}-{t}"
 
