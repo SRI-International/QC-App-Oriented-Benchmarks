@@ -23,6 +23,13 @@ from qiskit.circuit.library import PauliEvolutionGate
 
 verbose = False
 
+global_U = None
+global_enc = None
+global_ratio = None
+global_rinst = None
+global_h = 0.1
+global_pbc_val = "pbc"
+
 # Saved circuits and subcircuits for display
 QC_ = None
 QCI_ = None
