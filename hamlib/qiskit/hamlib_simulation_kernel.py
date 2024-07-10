@@ -33,6 +33,7 @@ global_pbc_val = "pbc"
 # Saved circuits and subcircuits for display
 QC_ = None
 QCI_ = None
+QCD_ = None
 HAM_ = None
 EVO_ = None
 
@@ -182,7 +183,7 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
     global global_h, global_pbc_val
     global global_U, global_enc
     global global_ratio, global_rinst
-    global QCI_
+    global QCI_, QCD_
 
     # Replace placeholders with actual n_qubits value: n_spins
     dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
@@ -208,7 +209,7 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
 
         # Build the evolution gate
         # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
-        evo_label = "e^iHt"
+        evo_label = "e^-iHt"
         evo = PauliEvolutionGate(operator, time=time/num_trotter_steps, label=evo_label)
 
         # Plug it into a circuit
@@ -230,7 +231,7 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
 
         if method == 3:            
             # if you want to retun a circuit combined with the inverse
-            circuit_inverse = circuit_without_initial_state.inverse()
+            QCD_ = circuit_inverse = circuit_without_initial_state.inverse()
             circuit.append(circuit_inverse,range(operator.num_qubits))            
 
             # if you only want to return the inverse circuit
@@ -333,7 +334,7 @@ def kernel_draw(hamiltonian: str = "hamlib", use_XX_YY_ZZ_gates: bool = False, m
         print(QC_)
         
         # create a small circuit, just to display this evolution subciruit structure
-        print("  Evolution Operator (e^iHt) =")
+        print("  Evolution Operator (e^-iHt) =")
         qctt = QuantumCircuit(QC_.num_qubits)
         qctt.append(EVO_, range(QC_.num_qubits))
         print(transpile(qctt, optimization_level=3))
@@ -341,6 +342,16 @@ def kernel_draw(hamiltonian: str = "hamlib", use_XX_YY_ZZ_gates: bool = False, m
         if QCI_ is not None:
             print(f"  Initial State {QCI_.name}:")
             print(QCI_)
+            
+        if QCD_ is not None:
+            print(f"  Inverse State {QCD_.name}:")
+            print(QCD_)
+            
+            # create a small circuit, just to display this inverse evolution subcircuit structure
+            print("  Inverse Evolution Operator (e^iHt) =")
+            qctt = QuantumCircuit(QC_.num_qubits)
+            qctt.append(EVO_.inverse(), range(QC_.num_qubits))
+            print(transpile(qctt, optimization_level=3))
     
     else:
         print("  ... circuit too large!")
