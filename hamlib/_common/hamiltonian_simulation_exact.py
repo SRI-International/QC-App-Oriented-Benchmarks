@@ -145,7 +145,7 @@ def HamiltonianSimulationExact(n_spins: int, init_state=None):
         dict: The distribution of the evolved state.
     """
     _, hamiltonian_sparse, _ = create_circuit(n_spins=n_spins, init_state=init_state)
-    time_problem = TimeEvolutionProblem(hamiltonian_sparse, 0.2, initial_state=initial_state(n_spins, init_state))
+    time_problem = TimeEvolutionProblem(hamiltonian_sparse, 1, initial_state=initial_state(n_spins, init_state))
     result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
     
     # if verbose:
