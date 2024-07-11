@@ -27,8 +27,8 @@ global_U = None
 global_enc = None
 global_ratio = None
 global_rinst = None
-global_h = 0.1
-global_pbc_val = "pbc"
+global_h = None
+global_pbc_val = None
 
 # Saved circuits and subcircuits for display
 QC_ = None
