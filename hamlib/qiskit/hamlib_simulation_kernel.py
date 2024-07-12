@@ -33,9 +33,9 @@ global_pbc_val = None
 # Saved circuits and subcircuits for display
 QC_ = None
 QCI_ = None
-QCD_ = None
 HAM_ = None
 EVO_ = None
+INV_ = None
 
 
 from hamlib_utils import process_hamiltonian_file, needs_normalization, normalize_data_format, parse_hamiltonian_to_sparsepauliop, determine_qubit_count
@@ -229,16 +229,15 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
         circuit = create_trotter_steps(num_trotter_steps, evo, operator, circuit)
         circuit_without_initial_state = create_trotter_steps(num_trotter_steps, evo, operator, circuit_without_initial_state)
 
-        if method == 3:            
-            # if you want to retun a circuit combined with the inverse
-            QCD_ = circuit_inverse = circuit_without_initial_state.inverse()
-            circuit.append(circuit_inverse,range(operator.num_qubits))            
-
-            # if you only want to return the inverse circuit
-            # circuit = circuit.inverse()            
-
+        # Append K Trotter steps of inverse, if method 3
+        inv = None
+        if method == 3: 
+            inv = evo.inverse()
+            inv.name = "e^iHt"
+            circuit = create_trotter_steps(num_trotter_steps, inv, operator, circuit)
+            
         circuit.measure_all()
-        return circuit, hamiltonian, evo
+        return circuit, hamiltonian, evo, inv
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
         return None, None, None
@@ -307,14 +306,15 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
 
     hamiltonian = hamiltonian.strip().lower()
     
-    qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method, init_state=init_state)
+    qc, ham_op, evo, inv = create_circuit(n_spins = n_spins, method = method, init_state=init_state)
 
     # Save smaller circuit example for display
-    global QC_, HAM_, EVO_
+    global QC_, HAM_, EVO_, INV_
     if n_spins <= 6:
         QC_ = qc
         HAM_ = ham_op
         EVO_ = evo
+        INV_ = inv
             
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
     qc2 = qc.decompose().decompose()
@@ -332,25 +332,22 @@ def kernel_draw(hamiltonian: str = "hamlib", use_XX_YY_ZZ_gates: bool = False, m
     if QC_ is not None:
         print(f"  H = {HAM_}")
         print(QC_)
-        
+
+        if QCI_ is not None:
+            print(f"  Initial State {QCI_.name}:")
+            print(QCI_)
+            
         # create a small circuit, just to display this evolution subciruit structure
         print("  Evolution Operator (e^-iHt) =")
         qctt = QuantumCircuit(QC_.num_qubits)
         qctt.append(EVO_, range(QC_.num_qubits))
         print(transpile(qctt, optimization_level=3))
-               
-        if QCI_ is not None:
-            print(f"  Initial State {QCI_.name}:")
-            print(QCI_)
-            
-        if QCD_ is not None:
-            print(f"  Inverse State {QCD_.name}:")
-            print(QCD_)
-            
-            # create a small circuit, just to display this inverse evolution subcircuit structure
+        
+        # create a small circuit, just to display this inverse evolution subcircuit structure        
+        if INV_ is not None:                       
             print("  Inverse Evolution Operator (e^iHt) =")
             qctt = QuantumCircuit(QC_.num_qubits)
-            qctt.append(EVO_.inverse(), range(QC_.num_qubits))
+            qctt.append(INV_, range(QC_.num_qubits))
             print(transpile(qctt, optimization_level=3))
     
     else:
