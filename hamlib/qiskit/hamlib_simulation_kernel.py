@@ -183,7 +183,7 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
     global global_h, global_pbc_val
     global global_U, global_enc
     global global_ratio, global_rinst
-    global QCI_, QCD_
+    global QCI_, INV_
 
     # Replace placeholders with actual n_qubits value: n_spins
     dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
@@ -232,12 +232,12 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
         # Append K Trotter steps of inverse, if method 3
         inv = None
         if method == 3: 
-            inv = evo.inverse()
+            INV_ = inv = evo.inverse()
             inv.name = "e^iHt"
             circuit = create_trotter_steps(num_trotter_steps, inv, operator, circuit)
             
         circuit.measure_all()
-        return circuit, hamiltonian, evo, inv
+        return circuit, hamiltonian, evo
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
         return None, None, None
@@ -306,7 +306,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
 
     hamiltonian = hamiltonian.strip().lower()
     
-    qc, ham_op, evo, inv = create_circuit(n_spins = n_spins, method = method, init_state=init_state)
+    qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method, init_state=init_state)
 
     # Save smaller circuit example for display
     global QC_, HAM_, EVO_, INV_
@@ -314,7 +314,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
         QC_ = qc
         HAM_ = ham_op
         EVO_ = evo
-        INV_ = inv
+        #INV_ = inv
             
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
     qc2 = qc.decompose().decompose()
