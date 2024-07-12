@@ -27,7 +27,7 @@ import metrics as metrics
 
 import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
-from hamlib_utils import create_full_filenames, construct_dataset_name
+from hamlib_utils import create_full_filenames, construct_dataset_name, set_default_parameter_values
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
 
 
@@ -241,6 +241,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     if hamlib_simulation_kernel.dataset_name_template == "File key not found in data":
         print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian}")
         return
+    
+    # Set default parameter values for the hamiltonians
+    set_default_parameter_values(hamlib_simulation_kernel.filename)
         
     # assume default init_state if not given
     if init_state == None:
@@ -358,11 +361,23 @@ def get_args():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="random pauli flag")
     parser.add_argument("--init_state", "-init", default=None, help="initial state")
+    parser.add_argument("--global_h", "-param_h", default=None, help="paramater h")
+    parser.add_argument("--global_U", "-param_U", default=None, help="paramater U")
+    parser.add_argument("--global_enc", "-param_enc", default=None, help="paramater enc")
+    parser.add_argument("--global_pbc_val", "-param_pbc_val", default=None, help="paramater pbc_val")
+    parser.add_argument("--global_ratio", "-param_ratio", default=None, help="paramater ratio")
+    parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")
     return parser.parse_args()
  
 # if main, execute method
 if __name__ == '__main__':   
     args = get_args()
+    hamlib_simulation_kernel.global_U = args.global_U
+    hamlib_simulation_kernel.global_enc = args.global_enc
+    hamlib_simulation_kernel.global_ratio = args.global_ratio
+    hamlib_simulation_kernel.global_rinst = args.global_rinst
+    hamlib_simulation_kernel.global_h = args.global_h
+    hamlib_simulation_kernel.global_pbc_val = args.global_pbc_val
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
