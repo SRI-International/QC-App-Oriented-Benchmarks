@@ -125,7 +125,7 @@ def VQEEnergy(n_spin_orbs, na, nb, circuit_id=0, method=1):
             off_diag.append(p)
 
     # modify the name of diagonal circuit
-    qc_list[0].name = qubit_op[1].primitive.to_list()[0][0] + " " + str(np.real(diag_coeff))
+    qc_list[0].name = qubit_op[1].to_list()[0][0] + " " + str(np.real(diag_coeff))
     normalization /= len(qc_list)
     return qc_list
 
@@ -296,7 +296,9 @@ def analyze_and_print_result(qc, result, num_qubits, references, num_shots):
 
     # modify fidelity based on the coefficient
     if (len(total_name.split()) == 2):
-        fidelity *= ( abs(float(total_name.split()[1])) / normalization )
+        coefficient = abs(float(total_name.split()[1])) / normalization
+        fidelity = {f : v * coefficient for f, v in fidelity.items()}
+        print(fidelity)
 
     return fidelity
 
