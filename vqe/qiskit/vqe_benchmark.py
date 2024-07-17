@@ -298,8 +298,7 @@ def analyze_and_print_result(qc, result, num_qubits, references, num_shots):
     if (len(total_name.split()) == 2):
         coefficient = abs(float(total_name.split()[1])) / normalization
         fidelity = {f : v * coefficient for f, v in fidelity.items()}
-        print(fidelity)
-
+    
     return fidelity
 
 ################ Benchmark Loop
@@ -445,5 +444,22 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
 
-# if main, execute methods     
-if __name__ == "__main__": run()
+#######################
+# MAIN
+
+def get_args():
+    parser = argparse.ArgumentParser(description="Variational Quantum Eigensolver Benchmark")
+    parser.add_argument("--min_qubits", "-min", default=4, help="Minimum number of qubits", type=int)
+    parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
+    parser.add_argument("--num_shots", "-s", default=4092, help="Number of shots", type=int)
+    parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
+    parser.add_argument("--backend_id", "-b", default="qasm_simulator", help="Backend Identifier", type=str)
+    
+    args = parser.parse_args()
+    return vars(args)
+   
+if __name__ == "__main__":
+    import argparse
+    run(**get_args())
