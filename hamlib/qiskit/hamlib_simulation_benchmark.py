@@ -110,7 +110,6 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     counts = result.get_counts(qc)
 
     if verbose:
-        #print(f"For type {type} measured: {counts}")
         print_top_measurements(f"For type {type} measured counts = ", counts, 100)
 
     hamiltonian = hamiltonian.strip().lower()
@@ -139,7 +138,6 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
 
     if verbose:
-        #print(f"Correct dist: {correct_dist}")
         print_top_measurements(f"Correct dist = ", correct_dist, 100)
 
     # Use polarization fidelity rescaling
