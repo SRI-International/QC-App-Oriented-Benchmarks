@@ -347,10 +347,14 @@ def kernel_draw(hamiltonian: str = "hamlib", use_XX_YY_ZZ_gates: bool = False, m
         if INV_ is not None:                       
             print("  Inverse Evolution Operator (e^iHt) = Inverse of Above Circuit")
             '''  DEVNOTE: This fails on some systems with an error about mismatch of Q and C widths
-            qctt = QuantumCircuit(QC_.num_qubits)
-            qctt.append(INV_, range(QC_.num_qubits))
-            print(transpile(qctt, optimization_level=3))
             '''
+            try:
+                qctt = QuantumCircuit(QC_.num_qubits)
+                qctt.append(INV_, range(QC_.num_qubits))
+                print(transpile(qctt, optimization_level=3))
+            except:
+                print(f"  WARNING: cannot display inverse circuit.")
+            
     
     else:
         print("  ... circuit too large!")
