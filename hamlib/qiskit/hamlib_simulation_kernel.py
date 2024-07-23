@@ -38,7 +38,16 @@ EVO_ = None
 INV_ = None
 
 
-from hamlib_utils import process_hamiltonian_file, needs_normalization, normalize_data_format, parse_hamiltonian_to_sparsepauliop, determine_qubit_count
+from hamlib_utils import (
+    process_hamiltonian_file,
+    needs_normalization,
+    normalize_data_format,
+    parse_hamiltonian_to_sparsepauliop,
+    determine_qubit_count,
+)
+
+from pygsti_mirror import convert_to_mirror_circuit
+
 
 def process_data(data):
     """
@@ -166,8 +175,16 @@ def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
     circuit.barrier()
     return circuit
 
-def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, method = 1, init_state=None):
-    """
+
+def create_circuit(
+    n_spins: int,
+    time: float = 0.2,
+    num_trotter_steps: int = 5,
+    method=1,
+    init_state=None,
+    random_pauli_flag=False,
+):
+   """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
 
     Steps:
@@ -229,15 +246,21 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
         circuit = create_trotter_steps(num_trotter_steps, evo, operator, circuit)
         circuit_without_initial_state = create_trotter_steps(num_trotter_steps, evo, operator, circuit_without_initial_state)
 
-        # Append K Trotter steps of inverse, if method 3
+        # if method 3 with random pauli flag, we use a random initial state rather than the supplied one
         inv = None
-        if method == 3: 
+        if method == 3 and not random_pauli_flag:
             INV_ = inv = evo.inverse()
             inv.name = "e^iHt"
             circuit = create_trotter_steps(num_trotter_steps, inv, operator, circuit)
-            
-        circuit.measure_all()
-        return circuit, hamiltonian, evo
+            circuit.append(circuit_inverse, range(operator.num_qubits))
+
+        elif method == 3 and random_pauli_flag:
+            circuit, _ = convert_to_mirror_circuit(circuit_without_initial_state)
+
+        # convert_to_mirror_circuit adds its own measurement gates
+        if not random_pauli_flag:
+            circuit.measure_all()
+       return circuit, hamiltonian, evo
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
         return None, None, None
@@ -305,9 +328,15 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
     h_z = hz[:n_spins]
 
     hamiltonian = hamiltonian.strip().lower()
-    
-    qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method, init_state=init_state)
 
+    qc, ham_op, evo = create_circuit(
+        n_spins=n_spins,
+        time=t,
+        method=method,
+        init_state=init_state,
+        num_trotter_steps=K,
+        random_pauli_flag=random_pauli_flag,
+    )
     # Save smaller circuit example for display
     global QC_, HAM_, EVO_, INV_
     if n_spins <= 6:

@@ -129,11 +129,16 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         ts = time.time()
         correct_dist = HamiltonianSimulationExact(n_spins=num_qubits,init_state=init_state)
         if verbose:
-            print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
-            
-    elif method == 3:
-        correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
-        
+            print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
+
+    elif method == 3 and not random_pauli_flag:
+        correct_dist = key_from_initial_state(
+            num_qubits, num_shots, init_state, random_pauli_flag
+        )
+    elif method == 3 and random_pauli_flag:
+        # random_pauli_flag is (for now) set to always return bitstring of 1's
+        correct_dist = {"1" * num_qubits: num_shots}
+
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
 
