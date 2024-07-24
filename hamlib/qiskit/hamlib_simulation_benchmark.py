@@ -310,14 +310,29 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
 
         # Loop over only 1 circuit
         for circuit_id in range(num_circuits):
+
+            # if using random pauli flag with method 3, need to generate num_shots different circuits and run them
+            # if random pauli flag is set but not with method 3, random pauli flag is ignored
+            # if random_pauli_flag == True and method == 3: 
+
             ts = time.time()
-            
+           
+            if method == 3 and random_pauli_flag: 
+
+            # create the HamLibSimulation kernel
+            qcs, bss = HamiltonianSimulation(num_qubits, K=k, t=t,
+                    hamiltonian=hamiltonian, init_state=init_state,
+                    w=w, hx = hx, hz = hz, 
+                    use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
+                    method = method, random_pauli_flag=random_pauli_flag)
+
+
             # create the HamLibSimulation kernel
             qc = HamiltonianSimulation(num_qubits, K=k, t=t,
                     hamiltonian=hamiltonian, init_state=init_state,
                     w=w, hx = hx, hz = hz, 
                     use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
-                    method = method)
+                    method = method, random_pauli_flag=random_pauli_flag)
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
