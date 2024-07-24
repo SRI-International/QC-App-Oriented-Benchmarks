@@ -184,7 +184,7 @@ def create_circuit(
     init_state=None,
     random_pauli_flag=False,
 ):
-   """
+    """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
 
     Steps:
@@ -252,7 +252,6 @@ def create_circuit(
             INV_ = inv = evo.inverse()
             inv.name = "e^iHt"
             circuit = create_trotter_steps(num_trotter_steps, inv, operator, circuit)
-            circuit.append(circuit_inverse, range(operator.num_qubits))
 
         elif method == 3 and random_pauli_flag:
             circuit, _ = convert_to_mirror_circuit(circuit_without_initial_state)
@@ -260,7 +259,8 @@ def create_circuit(
         # convert_to_mirror_circuit adds its own measurement gates
         if not random_pauli_flag:
             circuit.measure_all()
-       return circuit, hamiltonian, evo
+
+        return circuit, hamiltonian, evo
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
         return None, None, None
@@ -299,7 +299,7 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 def HamiltonianSimulation(n_spins: int, K: int, t: float,
             hamiltonian: str, w: float, hx: list[float], hz: list[float],
             use_XX_YY_ZZ_gates: bool = False, init_state=None,
-            method: int = 1) -> QuantumCircuit:
+            method: int = 1, random_pauli_flag = False) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 

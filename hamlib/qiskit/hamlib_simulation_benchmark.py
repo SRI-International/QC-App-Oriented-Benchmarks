@@ -317,7 +317,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
                     hamiltonian=hamiltonian, init_state=init_state,
                     w=w, hx = hx, hz = hz, 
                     use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
-                    method = method)
+                    method = method, random_pauli_flag=random_pauli_flag)
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
