@@ -183,7 +183,6 @@ def create_circuit(
     method=1,
     init_state=None,
     random_pauli_flag=False,
-    random_pauli_bitstring = None 
 ):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
@@ -247,26 +246,28 @@ def create_circuit(
         circuit = create_trotter_steps(num_trotter_steps, evo, operator, circuit)
         circuit_without_initial_state = create_trotter_steps(num_trotter_steps, evo, operator, circuit_without_initial_state)
 
-        # if method 3 with random pauli flag, we use a random initial state rather than the supplied one
         inv = None
-        if method == 3 and not random_pauli_flag:
+        bitstring = None
+        if method == 3 and random_pauli_flag:
+            # if method 3 with random pauli flag, we use a random initial state rather than the supplied one
+            circuit, bitstring = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli = True)
+
+            return circuit, bitstring, hamiltonian, evo
+
+        elif  method == 3 and not random_pauli_flag:
             INV_ = inv = evo.inverse()
             inv.name = "e^iHt"
             circuit = create_trotter_steps(num_trotter_steps, inv, operator, circuit)
+            #if not random_pauli_flag:
+            circuit.measure_all()
 
-        elif method == 3 and random_pauli_flag:
-            circuits, bitstrings = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli_bitstring)
 
-            return circuits, bitstrings, hamiltonian, evo
 
-        #if not random_pauli_flag:
-        circuit.measure_all()
-
-        return circuit, hamiltonian, evo
+        return circuit, bitstring, hamiltonian, evo
 
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
-        return None, None, None
+        return None, None, None, None
 
 
 ############### Circuit Definition
@@ -332,48 +333,30 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
 
     hamiltonian = hamiltonian.strip().lower()
 
-    if method == 3 and random_pauli_flag: 
-        qcs, bss, ham_op, evo = create_circuit(
-            n_spins=n_spins,
-            time=t,
-            method=method,
-            init_state=init_state,
-            num_trotter_steps=K,
-        )
-        qc2s = [qc.decompose().decompose() for qc in qcs]
-        # Save smaller circuit example for display
+    qc, bitstring, ham_op, evo = create_circuit(
+        n_spins=n_spins,
+        time=t,
+        method=method,
+        init_state=init_state,
+        num_trotter_steps=K,
+        random_pauli_flag=random_pauli_flag
+    )
 
-        global QC_, HAM_, EVO_, INV_
-        if n_spins <= 6:
-            # just show the first random pauli circuit
-            QC_ = qc2s[0]
-            HAM_ = ham_op
-            EVO_ = evo
-            #INV_ = inv
+    # Collapse the sub-circuits used in this benchmark (for Qiskit)
+    qc2 = qc.decompose().decompose()
 
-        return qc2s, bss
-    else: 
-        qc, ham_op, evo = create_circuit(
-            n_spins=n_spins,
-            time=t,
-            method=method,
-            init_state=init_state,
-            num_trotter_steps=K,
-        )
+    # Save smaller circuit example for display
+    global QC_, HAM_, EVO_, INV_
+    if n_spins <= 6:
+        QC_ = qc
+        HAM_ = ham_op
+        EVO_ = evo
+        #INV_ = inv
 
-        # Collapse the sub-circuits used in this benchmark (for Qiskit)
-        qc2 = qc.decompose().decompose()
-        # Save smaller circuit example for display
-        global QC_, HAM_, EVO_, INV_
-        if n_spins <= 6:
-            QC_ = qc
-            HAM_ = ham_op
-            EVO_ = evo
-            #INV_ = inv
+    # if random_pauli_flag is false or method isn't 3, bitstring will be None
+    return qc2, bitstring
+        
 
-        return qc2
-            
-    
     
 ############### Circuit Drawer
 

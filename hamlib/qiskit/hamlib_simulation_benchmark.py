@@ -38,6 +38,8 @@ np.random.seed(0)
 
 verbose = False
 
+# contains the correct bitstring for a random pauli circuit
+bitstring_dict = {}
 
 # Import precalculated data to compare against
 filename = os.path.join(os.path.dirname(__file__), os.path.pardir, "_common", "precalculated_data.json")
@@ -136,14 +138,23 @@ def analyze_and_print_result(qc, result, num_qubits: int,
             num_qubits, num_shots, init_state, random_pauli_flag
         )
     elif method == 3 and random_pauli_flag:
+        global bitstring_dict
+
+        print("bitstring_dict")
+        print(bitstring_dict)
+
         # random_pauli_flag is (for now) set to always return bitstring of 1's
-        correct_dist = {"1" * num_qubits: num_shots}
+        correct_bitstring = bitstring_dict[qc.name]
+        correct_dist = {correct_bitstring: num_shots}
 
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
 
     if verbose:
         print_top_measurements(f"Correct dist = ", correct_dist, 100)
+
+    print("counts and correct dist")
+    print(counts, correct_dist)
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
@@ -308,31 +319,23 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         hz = precalculated_data['hz'][:num_qubits]
         #######################################################################
 
-        # Loop over only 1 circuit
+        # in the case of random paulis, method = 3: loop over multiple random pauli circuits
+        # otherwise, loop over only 1 circuit
         for circuit_id in range(num_circuits):
 
-            # if using random pauli flag with method 3, need to generate num_shots different circuits and run them
-            # if random pauli flag is set but not with method 3, random pauli flag is ignored
-            # if random_pauli_flag == True and method == 3: 
-
             ts = time.time()
-           
-            if method == 3 and random_pauli_flag: 
+
+            #used to store random pauli correct bitstrings
+            global bitstring_dict
 
             # create the HamLibSimulation kernel
-            qcs, bss = HamiltonianSimulation(num_qubits, K=k, t=t,
+            qc, bs = HamiltonianSimulation(num_qubits, K=k, t=t,
                     hamiltonian=hamiltonian, init_state=init_state,
                     w=w, hx = hx, hz = hz, 
                     use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
                     method = method, random_pauli_flag=random_pauli_flag)
 
-
-            # create the HamLibSimulation kernel
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t,
-                    hamiltonian=hamiltonian, init_state=init_state,
-                    w=w, hx = hx, hz = hz, 
-                    use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
-                    method = method, random_pauli_flag=random_pauli_flag)
+            bitstring_dict[qc.name] = bs
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 

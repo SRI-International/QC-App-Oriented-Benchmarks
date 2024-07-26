@@ -8,15 +8,14 @@ from qiskit import transpile, QuantumCircuit
 # Code has been edited to accept random pauli bitstrings by Sonny Rappaport, July 23 2024.
 # Additional functions below also by Sonny based on Tim's code. 
 
-def sample_mirror_circuits(c, num_mcs=100, randomized_state_preparation=True, random_pauli_bitstring = None, rand_state = None):
+def sample_mirror_circuits(c, num_mcs=100, randomized_state_preparation=True, rand_state = None, random_pauli = True):
     if rand_state is None:
         rand_state = np.random.RandomState()
 
     mirror_circuits = []
     mirror_circuits_bitstrings = []
     for j in range(num_mcs):
-        mc, bs = central_pauli_mirror_circuit(c, randomized_state_preparation=randomized_state_preparation,
-                                              random_pauli_bitstring = random_pauli_bitstring, rand_state = rand_state)
+        mc, bs = central_pauli_mirror_circuit(c, randomized_state_preparation=randomized_state_preparation,random_pauli = True, rand_state = rand_state)
         mirror_circuits.append(mc)
         mirror_circuits_bitstrings.append(bs)
 
@@ -38,7 +37,7 @@ def sample_reference_circuits(qubits, num_ref=100, randomized_state_preparation=
 
     return ref_circuits, ref_circuits_bitstrings
 
-def central_pauli_mirror_circuit(circ, randomized_state_preparation=True, random_pauli_bitstring= None, rand_state = None):
+def central_pauli_mirror_circuit(circ, randomized_state_preparation=True, random_pauli = True, rand_state = None):
     if rand_state is None:
         rand_state = np.random.RandomState()
 
@@ -52,14 +51,13 @@ def central_pauli_mirror_circuit(circ, randomized_state_preparation=True, random
     n = circuit_to_mirror.width
     d = circuit_to_mirror.depth
 
-    # Sonny's edit here: Rather than generating central_pauli randomly, now we use random_pauli_bitstring if provided. 
-    
-    if random_pauli_bitstring is None:
+    # Sonny's edit here: Rather than generating central_pauli randomly, now we can use a non-random one if desired. 
+    if random_pauli is True:
         rand_state = np.random.RandomState()
         central_pauli = 2 * rand_state.randint(0, 2, 2*n) #old code 
     else: 
         central_pauli = 2 * np.ones(2*n, dtype = np.int8)  
-    print(central_pauli)
+
     central_pauli_layer = pauli_vector_to_u3_layer(central_pauli, qubits)
     q = central_pauli.copy()
 
@@ -331,7 +329,7 @@ def pygsti_string(qc):
 
     return pygstr.strip()
 
-def convert_to_mirror_circuit(qc, random_pauli_bitstring, num_shots):
+def convert_to_mirror_circuit(qc, random_pauli):
     """
     Takes an arbitrary quantum circuit, transpiles it to CX and u3, and eventually returns a mirror circuit version of the quantum circuit. 
 
@@ -344,9 +342,17 @@ def convert_to_mirror_circuit(qc, random_pauli_bitstring, num_shots):
 
     pygsti_circuit = pygsti.circuits.Circuit(pygstr)
 
-    mcs, bss = sample_mirror_circuits(pygsti_circuit, num_mcs=num_shots, random_pauli_bitstring=random_pauli_bitstring)
+    mcs, bss = sample_mirror_circuits(pygsti_circuit, num_mcs=1, random_pauli = random_pauli)
 
-    qiskit_circuit = [QuantumCircuit.from_qasm_str(mc.convert_to_openqasm()) for mc in mcs]
+    qiskit_circuit = QuantumCircuit.from_qasm_str(mcs[0].convert_to_openqasm())
     
     # this circuit is made out of u3 and cx gates by pygsti default
-    return qiskit_circuit , bss
+    # the bitstring is reversed to account for qiskit ordering
+    return qiskit_circuit , bss[0][::-1]
+
+if __name__ == "__main__":
+
+    qubits = 5
+    mss, bss = sample_reference_circuits(('Q0', 'Q1', 'Q2', 'Q3'), num_ref=10, randomized_state_preparation=True, rand_state=None)
+
+    print(mss)
