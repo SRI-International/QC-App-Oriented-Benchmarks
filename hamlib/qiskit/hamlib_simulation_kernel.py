@@ -324,21 +324,20 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
     return qc
 
 
-def HamiltonianSimulation(n_spins: int, K: int, t: float,
-            hamiltonian: str, w: float, hx: list[float], hz: list[float],
-            use_XX_YY_ZZ_gates: bool = False, init_state=None,
+def HamiltonianSimulation(n_spins: int,
+            hamiltonian: str, 
+            K: int = 5, t: float = 1.0,
+            init_state=None,
             method: int = 1) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 
     Args:
         n_spins (int): Number of spins (qubits).
+        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
         K (int): The Trotterization order.
         t (float): Duration of simulation.
-        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        w (float): Strength of two-qubit interactions for heisenberg hamiltonian. 
-        hx (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
-        hz (list[float]): Strength of internal disorder parameter for heisenberg hamiltonian. 
+        method (int): Type of comparison for fidelity
 
     Returns:
         QuantumCircuit: The constructed Qiskit circuit.
@@ -350,10 +349,12 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
     qr = QuantumRegister(n_spins)
     cr = ClassicalRegister(n_spins)
     qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{secret_int}")
+    
+    # size of one Trotter step
     tau = t / K
 
-    h_x = hx[:n_spins]
-    h_z = hz[:n_spins]
+    #h_x = hx[:n_spins]
+    #h_z = hz[:n_spins]
 
     hamiltonian = hamiltonian.strip().lower()
     
@@ -376,7 +377,7 @@ def HamiltonianSimulation(n_spins: int, K: int, t: float,
 ############### Circuit Drawer
 
 # Draw the circuits of this benchmark program
-def kernel_draw(hamiltonian: str = "hamlib", use_XX_YY_ZZ_gates: bool = False, method: int = 1):
+def kernel_draw(hamiltonian: str = "hamlib", method: int = 1):
                           
     # Print a sample circuit
     print("Sample Circuit:")
