@@ -27,7 +27,7 @@ import metrics as metrics
 import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
 from hamlib_utils import create_full_filenames, construct_dataset_name
-from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
+from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
 
 
 # Benchmark Name
@@ -37,12 +37,6 @@ np.random.seed(0)
 
 verbose = False
 
-
-# Import precalculated data to compare against
-filename = os.path.join(os.path.dirname(__file__), os.path.pardir, "_common", "precalculated_data.json")
-with open(filename, 'r') as file:
-    data = file.read()
-precalculated_data = json.loads(data)
 
 # Creates a key for distribution of initial state for method = 3.
 def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag):
@@ -98,7 +92,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         qc (QuantumCircuit): The quantum circuit.
         result: The result from the execution.
         num_qubits (int): Number of qubits.
-        type (str): Type of the simulation.
+        type (str): Type of the simulation (circuit identifier).
         num_shots (int): Number of shots.
         hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM" or "hamlib". 
         method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
@@ -116,15 +110,15 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     # calculate correct distribution on the fly
     if method == 1:
         if verbose:
-            print(f"... begin noiseless simulation for expected distribution ...")
+            print(f"... begin noiseless simulation for expected distribution for id={type} ...")
         ts = time.time()
-        correct_dist = HamiltonianSimulationExact_Noiseless(n_spins=num_qubits,init_state=init_state)
+        correct_dist = HamiltonianSimulation_Noiseless(qc, num_qubits, circuit_id=type, num_shots=num_shots)
         if verbose:
             print(f"... noiseless simulation for expected distribution time = {round((time.time() - ts), 3)} sec")
             
     elif method == 2:
         if verbose:
-            print(f"... begin exact computation ...")
+            print(f"... begin exact computation for id={type} ...")
         ts = time.time()
         correct_dist = HamiltonianSimulationExact(n_spins=num_qubits,init_state=init_state)
         if verbose:
@@ -141,6 +135,9 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    
+    if verbose:
+        print(f"... fidelity = {fidelity}")
     
     return counts, fidelity
     
