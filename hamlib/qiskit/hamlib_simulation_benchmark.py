@@ -186,7 +186,7 @@ def print_top_measurements(label, counts, top_n):
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "TFIM", method: int = 1,
-        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = False, init_state: str = None,
+        random_pauli_flag: bool = False, init_state: str = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None):
@@ -199,7 +199,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         max_circuits (int): Maximum number of circuits to execute per group.
         skip_qubits (int): Increment of number of qubits.
         num_shots (int): Number of shots for each circuit execution.
-        use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
         backend_id (str): Backend identifier for execution.
         provider_backend: Provider backend instance.
         hub (str): IBM Quantum hub.
@@ -245,10 +244,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     # assume default init_state if not given
     if init_state == None:
         init_state = "checkerboard"
-        
-    # Set the flag to use an XX YY ZZ shim if given
-    if use_XX_YY_ZZ_gates:
-        print("... using unoptimized XX YY ZZ gates")
     
     ################################
     
@@ -286,20 +281,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
 
-        # Parameters of simulation
-        #### CANNOT BE MODIFIED W/O ALSO MODIFYING PRECALCULATED DATA #########
-        # DEVNOTE: HamLib is calculating expectation on the fly, so these could be set rather than pulled
+        # Parameters of simulation   (DEVNOTE: these should be configurable)
+        k = 5
+        t = 1.0
         
-        # A large Trotter order approximates the Hamiltonian evolution better.
-        # But a large Trotter order also means the circuit is deeper.
-        # For ideal or noise-less quantum circuits, k >> 1 gives perfect Hamiltonian simulation.
-        w = precalculated_data['w']  # Strength of disorder
-        k = precalculated_data['k']   # Trotter error.
-        t = precalculated_data['t']  # Time of simulation
-        
-        # Precalculated random numbers between [-1, 1]
-        hx = precalculated_data['hx'][:num_qubits]
-        hz = precalculated_data['hz'][:num_qubits]
         #######################################################################
 
         # Loop over only 1 circuit
@@ -307,10 +292,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
             ts = time.time()
             
             # create the HamLibSimulation kernel
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t,
-                    hamiltonian=hamiltonian, init_state=init_state,
-                    w=w, hx = hx, hz = hz, 
-                    use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
+            qc = HamiltonianSimulation(num_qubits,
+                    hamiltonian=hamiltonian, 
+                    K=k, t=t,
+                    init_state=init_state,
                     method = method)
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
@@ -327,11 +312,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     ##########
     
     # draw a sample circuit
-    kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method)
+    kernel_draw(hamiltonian, method)
        
     # Plot metrics for all circuit sizes
     options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
-    if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
@@ -352,7 +336,6 @@ def get_args():
     parser.add_argument("--max_circuits", "-c", default=1, help="Maximum circuit repetitions", type=int)     
     parser.add_argument("--hamiltonian", "-ham", default="TFIM", help="Name of Hamiltonian", type=str)
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-    parser.add_argument("--use_XX_YY_ZZ_gates", action="store_true", help="Use explicit XX, YY, ZZ gates")
     #parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
@@ -394,7 +377,6 @@ if __name__ == '__main__':
         hamiltonian=args.hamiltonian,
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
-        use_XX_YY_ZZ_gates = args.use_XX_YY_ZZ_gates,
         init_state = args.init_state,
         #theta=args.theta,
         backend_id=args.backend_id,
