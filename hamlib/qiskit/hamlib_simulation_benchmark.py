@@ -1,15 +1,14 @@
 '''
 Hamiltonian Simulation Benchmark Program - Qiskit
 (C) Quantum Economic Development Consortium (QED-C) 2024.
-'''
 
-'''
 This program benchmarks Hamiltonian simulation using Qiskit. 
 The central function is the `run()` method, which orchestrates the entire benchmarking process.
 
 HamiltonianSimulation forms the trotterized circuit used in the benchmark.
 
-HamiltonianSimulationExact runs a classical calculation that perfectly simulates hamiltonian evolution, although it does not scale well. 
+HamiltonianSimulationExact runs a classical calculation that 
+perfectly simulates hamiltonian evolution, although it does not scale well. 
 '''
 
 import json
@@ -27,7 +26,7 @@ import metrics as metrics
 
 import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
-from hamlib_utils import create_full_filenames, construct_dataset_name, set_default_parameter_values
+from hamlib_utils import create_full_filenames, construct_dataset_name
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
 
 
@@ -121,7 +120,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         ts = time.time()
         correct_dist = HamiltonianSimulationExact_Noiseless(n_spins=num_qubits,init_state=init_state)
         if verbose:
-            print(f"... noiseless simulation for expected distribution time = {round((time.time() - ts), 3)} sec") 
+            print(f"... noiseless simulation for expected distribution time = {round((time.time() - ts), 3)} sec")
             
     elif method == 2:
         if verbose:
@@ -241,7 +240,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         return
     
     # Set default parameter values for the hamiltonians
-    set_default_parameter_values(hamlib_simulation_kernel.filename)
+    hamlib_simulation_kernel.set_default_parameter_values(hamlib_simulation_kernel.filename)
         
     # assume default init_state if not given
     if init_state == None:
