@@ -40,6 +40,55 @@ INV_ = None
 
 from hamlib_utils import process_hamiltonian_file, needs_normalization, normalize_data_format, parse_hamiltonian_to_sparsepauliop, determine_qubit_count
 
+def set_default_parameter_values(filename):
+    """
+    Set defaults for the parameters that are relevant to the specific Hamiltonian
+    """
+    
+    global global_U, global_enc, global_ratio, global_rinst, global_h, global_pbc_val
+
+    if filename == 'tfim.hdf5' or filename == 'heis.hdf5':
+        if global_h == None:
+            global_h = 0.1
+        if global_pbc_val == None:
+            global_pbc_val = 'nonpbc'
+        global_U = None
+        global_enc = None
+        global_ratio = None
+        global_rinst = None
+    elif filename == 'random_max3sat-hams.hdf5':
+        if global_ratio == None:
+            global_ratio = 2
+        if global_rinst == None:
+            global_rinst = '00'
+        global_U = None
+        global_enc = None
+        global_h = None
+        global_pbc_val = None
+    elif filename == 'FH_D-1.hdf5':
+        if global_U == None:
+            global_U = 0
+        if global_enc == None:
+            global_enc = 'bk'
+        if global_pbc_val == None:
+            global_pbc_val = 'nonpbc'
+        global_ratio = None
+        global_rinst = None
+        global_h = None
+    elif filename == 'BH_D-1_d-4.hdf5':
+        if global_U == None:
+            global_U = 2
+        if global_enc == None:
+            global_enc = 'gray'
+        if global_pbc_val == None:
+            global_pbc_val = 'nonpbc'
+        global_ratio = None
+        global_rinst = None
+        global_h = None
+    else:
+        print("No such hamiltonian is available.")
+
+
 def process_data(data):
     """
     Process the given data to construct a Hamiltonian in the form of a SparsePauliOp and determine the number of qubits.
@@ -232,9 +281,11 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
         # Append K Trotter steps of inverse, if method 3
         inv = None
         if method == 3: 
-            INV_ = inv = evo.inverse()
+            inv = evo.inverse()
             inv.name = "e^iHt"
             circuit = create_trotter_steps(num_trotter_steps, inv, operator, circuit)
+            if n_spins <= 6:
+                INV_ = inv
             
         circuit.measure_all()
         return circuit, hamiltonian, evo
@@ -346,16 +397,12 @@ def kernel_draw(hamiltonian: str = "hamlib", use_XX_YY_ZZ_gates: bool = False, m
         # create a small circuit, just to display this inverse evolution subcircuit structure        
         if INV_ is not None:                       
             print("  Inverse Evolution Operator (e^iHt) = Inverse of Above Circuit")
-            '''  DEVNOTE: This fails on some systems with an error about mismatch of Q and C widths
-            '''
             try:
                 qctt = QuantumCircuit(QC_.num_qubits)
                 qctt.append(INV_, range(QC_.num_qubits))
                 print(transpile(qctt, optimization_level=3))
             except:
                 print(f"  WARNING: cannot display inverse circuit.")
-            
-    
     else:
         print("  ... circuit too large!")
 
