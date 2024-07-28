@@ -247,48 +247,50 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
     if data is not None:
         # print(f"Using dataset: {dataset_name}")
         # print("Raw Hamiltonian Data: ", data)
-        hamiltonian, num_qubits = process_data(data)
+        
+        # get the Hamiltonian operator as SparsePauliOp and its size from the data
+        ham_op, num_qubits = process_data(data)
 
         # print("Number of qubits:", num_qubits)
         if verbose:
-            print(f"... Evolution operator = {hamiltonian}")
+            print(f"... Evolution operator = {ham_op}")
 
-        operator = hamiltonian  # Use the SparsePauliOp object directly
-        # print (operator)
+        ham_op = ham_op  # Use the SparsePauliOp object directly
+        # print (ham_op)
 
         # Build the evolution gate
         # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
         evo_label = "e^-iHt"
-        evo = PauliEvolutionGate(operator, time=time/num_trotter_steps, label=evo_label)
+        evo = PauliEvolutionGate(ham_op, time=time/num_trotter_steps, label=evo_label)
 
         # Plug it into a circuit
-        circuit = QuantumCircuit(operator.num_qubits)
-        circuit_without_initial_state = QuantumCircuit(operator.num_qubits)
+        circuit = QuantumCircuit(ham_op.num_qubits)
+        circuit_without_initial_state = QuantumCircuit(ham_op.num_qubits)
         
         # first insert the initial_state
         # init_state = "checkerboard"
         i_state = initial_state(num_qubits, init_state)
-        circuit.append(i_state, range(operator.num_qubits))
+        circuit.append(i_state, range(ham_op.num_qubits))
         circuit.barrier()
         
         if n_spins <= 6:
             QCI_ = i_state
         
         # Append K trotter steps
-        circuit = create_trotter_steps(num_trotter_steps, evo, operator, circuit)
-        circuit_without_initial_state = create_trotter_steps(num_trotter_steps, evo, operator, circuit_without_initial_state)
+        circuit = create_trotter_steps(num_trotter_steps, evo, ham_op, circuit)
+        circuit_without_initial_state = create_trotter_steps(num_trotter_steps, evo, ham_op, circuit_without_initial_state)
 
         # Append K Trotter steps of inverse, if method 3
         inv = None
         if method == 3: 
             inv = evo.inverse()
             inv.name = "e^iHt"
-            circuit = create_trotter_steps(num_trotter_steps, inv, operator, circuit)
+            circuit = create_trotter_steps(num_trotter_steps, inv, ham_op, circuit)
             if n_spins <= 6:
                 INV_ = inv
             
         circuit.measure_all()
-        return circuit, hamiltonian, evo
+        return circuit, ham_op, evo
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
         return None, None, None
@@ -353,9 +355,6 @@ def HamiltonianSimulation(n_spins: int,
     # size of one Trotter step
     tau = t / K
 
-    #h_x = hx[:n_spins]
-    #h_z = hz[:n_spins]
-
     hamiltonian = hamiltonian.strip().lower()
     
     qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method, init_state=init_state)
@@ -370,8 +369,9 @@ def HamiltonianSimulation(n_spins: int,
             
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
     qc2 = qc.decompose().decompose()
-            
-    return qc2
+    
+    # return both the circuit created and the Hamiltonian operator
+    return qc2, ham_op
     
     
 ############### Circuit Drawer

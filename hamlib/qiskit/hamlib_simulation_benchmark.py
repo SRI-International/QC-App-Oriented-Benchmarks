@@ -84,7 +84,12 @@ def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
 
 #def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int,
 def analyze_and_print_result(qc, result, num_qubits: int,
-            type: str, num_shots: int, hamiltonian: str, method: int, random_pauli_flag: bool, init_state: str) -> tuple:
+            type: str,
+            num_shots: int,
+            hamiltonian: str,
+            method: int,
+            random_pauli_flag: bool,
+            init_state: str) -> tuple:
     """
     Analyze and print the measured results. Compute the quality of the result based on operator expectation for each state.
 
@@ -94,7 +99,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         num_qubits (int): Number of qubits.
         type (str): Type of the simulation (circuit identifier).
         num_shots (int): Number of shots.
-        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM" or "hamlib". 
+        hamiltonian (str): Which hamiltonian to run.
         method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
 
     Returns:
@@ -107,20 +112,39 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     hamiltonian = hamiltonian.strip().lower()
 
+    from hamlib_simulation_kernel import initial_state, create_circuit
+
     # calculate correct distribution on the fly
+    
+    # for method 1, compute expected dist using ideal quantum simulation of the circuit provided
     if method == 1:
         if verbose:
             print(f"... begin noiseless simulation for expected distribution for id={type} ...")
+            
         ts = time.time()
         correct_dist = HamiltonianSimulation_Noiseless(qc, num_qubits, circuit_id=type, num_shots=num_shots)
+        
         if verbose:
             print(f"... noiseless simulation for expected distribution time = {round((time.time() - ts), 3)} sec")
             
+    # for method 2, use exact evolution of the Hamiltonian, starting with the initial state circuit
     elif method == 2:
         if verbose:
             print(f"... begin exact computation for id={type} ...")
+            
         ts = time.time()
-        correct_dist = HamiltonianSimulationExact(n_spins=num_qubits,init_state=init_state)
+        
+        # create quantum circuit with initial state
+        qc_initial = initial_state(n_spins=num_qubits, initial_state=init_state)
+        
+        # get Hamiltonian operator by creating entire circuit (DEVNOTE: need to not require whole circuit)
+        _, ham_op, _ = create_circuit(n_spins=num_qubits, init_state=init_state)
+        
+        # compute the exact evolution
+        correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
+                hamiltonian_op=ham_op,
+                time=1.0)
+                
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
             
@@ -284,12 +308,12 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         
         #######################################################################
 
-        # Loop over only 1 circuit
+        # Loop over only the same circuit, executing it num_circuits times
         for circuit_id in range(num_circuits):
             ts = time.time()
             
-            # create the HamLibSimulation kernel
-            qc = HamiltonianSimulation(num_qubits,
+            # create the HamLibSimulation kernel and the associated Hamiltonian operator
+            qc, ham_op = HamiltonianSimulation(num_qubits,
                     hamiltonian=hamiltonian, 
                     K=k, t=t,
                     init_state=init_state,
