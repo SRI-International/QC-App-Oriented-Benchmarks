@@ -221,6 +221,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "TFIM", method: int = 1,
         random_pauli_flag: bool = False, init_state: str = None,
+        K: int = None, t: float = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None):
@@ -278,6 +279,13 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     # assume default init_state if not given
     if init_state == None:
         init_state = "checkerboard"
+        
+    # Parameters of simulation
+    if K is None:
+        K = 5
+        
+    if t is None:
+        t = 1.0
     
     ################################
     
@@ -314,10 +322,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         num_circuits = max(1, max_circuits)
         
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
-
-        # Parameters of simulation   (DEVNOTE: these should be configurable)
-        k = 5
-        t = 1.0
         
         #######################################################################
 
@@ -329,7 +333,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
             qc, ham_op = HamiltonianSimulation(
                     num_qubits,
                     hamiltonian=hamiltonian, 
-                    K=k, t=t,
+                    K=K, t=t,
                     init_state=init_state,
                     method = method,
                     random_pauli_flag=random_pauli_flag
@@ -384,6 +388,8 @@ def get_args():
     parser.add_argument("--global_pbc_val", "-param_pbc_val", default=None, help="paramater pbc_val")
     parser.add_argument("--global_ratio", "-param_ratio", default=None, help="paramater ratio")
     parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")
+    parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
+    parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
     return parser.parse_args()
  
 # if main, execute method
@@ -415,6 +421,8 @@ if __name__ == '__main__':
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
         init_state = args.init_state,
+        K = args.num_steps,
+        t = args.time,
         #theta=args.theta,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
