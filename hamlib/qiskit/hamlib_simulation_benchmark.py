@@ -1,15 +1,14 @@
 '''
 Hamiltonian Simulation Benchmark Program - Qiskit
 (C) Quantum Economic Development Consortium (QED-C) 2024.
-'''
 
-'''
 This program benchmarks Hamiltonian simulation using Qiskit. 
 The central function is the `run()` method, which orchestrates the entire benchmarking process.
 
 HamiltonianSimulation forms the trotterized circuit used in the benchmark.
 
-HamiltonianSimulationExact runs a classical calculation that perfectly simulates hamiltonian evolution, although it does not scale well. 
+HamiltonianSimulationExact runs a classical calculation that 
+perfectly simulates hamiltonian evolution, although it does not scale well. 
 '''
 
 import json
@@ -27,8 +26,9 @@ import metrics as metrics
 
 import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
-from hamlib_utils import create_full_filenames, construct_dataset_name, set_default_parameter_values
-from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulationExact_Noiseless
+from hamlib_simulation_kernel import initial_state, create_circuit   # would like to remove these
+from hamlib_utils import create_full_filenames, construct_dataset_name
+from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
 
 
 # Benchmark Name
@@ -38,12 +38,6 @@ np.random.seed(0)
 
 verbose = False
 
-
-# Import precalculated data to compare against
-filename = os.path.join(os.path.dirname(__file__), os.path.pardir, "_common", "precalculated_data.json")
-with open(filename, 'r') as file:
-    data = file.read()
-precalculated_data = json.loads(data)
 
 # Creates a key for distribution of initial state for method = 3.
 def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag):
@@ -90,8 +84,16 @@ def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
 ############### Result Data Analysis
 
 #def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int,
-def analyze_and_print_result(qc, result, num_qubits: int,
-            type: str, num_shots: int, hamiltonian: str, method: int, random_pauli_flag: bool, init_state: str) -> tuple:
+def analyze_and_print_result(
+            qc,
+            result,
+            num_qubits: int,
+            type: str,
+            num_shots: int,
+            hamiltonian: str,
+            method: int,
+            random_pauli_flag: bool,
+            init_state: str) -> tuple:
     """
     Analyze and print the measured results. Compute the quality of the result based on operator expectation for each state.
 
@@ -99,9 +101,9 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         qc (QuantumCircuit): The quantum circuit.
         result: The result from the execution.
         num_qubits (int): Number of qubits.
-        type (str): Type of the simulation.
+        type (str): Type of the simulation (circuit identifier).
         num_shots (int): Number of shots.
-        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM" or "hamlib". 
+        hamiltonian (str): Which hamiltonian to run.
         method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
 
     Returns:
@@ -115,30 +117,53 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     hamiltonian = hamiltonian.strip().lower()
 
     # calculate correct distribution on the fly
+    
+    # for method 1, compute expected dist using ideal quantum simulation of the circuit provided
     if method == 1:
         if verbose:
-            print(f"... begin noiseless simulation for expected distribution ...")
-        ts = time.time()
-        correct_dist = HamiltonianSimulationExact_Noiseless(n_spins=num_qubits,init_state=init_state)
-        if verbose:
-            print(f"... noiseless simulation for expected distribution time = {round((time.time() - ts), 3)} sec") 
+            print(f"... begin noiseless simulation for expected distribution for id={type} ...")
             
+        ts = time.time()
+        correct_dist = HamiltonianSimulation_Noiseless(qc, num_qubits, circuit_id=type, num_shots=num_shots)
+        
+        if verbose:
+            print(f"... noiseless simulation for expected distribution time = {round((time.time() - ts), 3)} sec")
+            
+    # for method 2, use exact evolution of the Hamiltonian, starting with the initial state circuit
     elif method == 2:
         if verbose:
-            print(f"... begin exact computation ...")
+            print(f"... begin exact computation for id={type} ...")
+            
         ts = time.time()
-        correct_dist = HamiltonianSimulationExact(n_spins=num_qubits,init_state=init_state)
+
+        # DEVNOTE: ideally, we can remove these next two lines by performing this code in the run() loop        
+        # create quantum circuit with initial state
+        qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
+        
+        # get Hamiltonian operator by creating entire circuit (DEVNOTE: need to not require whole circuit)
+        _, ham_op, _ = create_circuit(n_spins=num_qubits, init_state=init_state)
+        
+        # compute the expected  distribution after exact evolution
+        correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
+                hamiltonian_op=ham_op,
+                time=1.0)
+                
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
-
-    elif method == 3 and not random_pauli_flag:
-        correct_dist = key_from_initial_state(
-            num_qubits, num_shots, init_state, random_pauli_flag
-        )
-    elif method == 3 and random_pauli_flag:
+            
+    # for method 3, compute expected distribution from the initial state
+    elif method == 3:
+    
+        # check simple distribution if not inserting random Paulis
+        if not random_pauli_flag:
+            correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
+            
+        # if using random paulis, distribution is based on all ones in initial state
         # random_pauli_flag is (for now) set to always return bitstring of 1's
-        correct_dist = {"1" * num_qubits: num_shots}
+        else:
+            correct_dist = {"1" * num_qubits: num_shots}
 
+        
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
 
@@ -147,6 +172,9 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    
+    if verbose:
+        print(f"... fidelity = {fidelity}")
     
     return counts, fidelity
     
@@ -192,7 +220,8 @@ def print_top_measurements(label, counts, top_n):
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "TFIM", method: int = 1,
-        use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = False, init_state: str = None,
+        random_pauli_flag: bool = False, init_state: str = None,
+        K: int = None, t: float = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None):
@@ -205,7 +234,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         max_circuits (int): Maximum number of circuits to execute per group.
         skip_qubits (int): Increment of number of qubits.
         num_shots (int): Number of shots for each circuit execution.
-        use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
         backend_id (str): Backend identifier for execution.
         provider_backend: Provider backend instance.
         hub (str): IBM Quantum hub.
@@ -246,15 +274,18 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         return
     
     # Set default parameter values for the hamiltonians
-    set_default_parameter_values(hamlib_simulation_kernel.filename)
+    hamlib_simulation_kernel.set_default_parameter_values(hamlib_simulation_kernel.filename)
         
     # assume default init_state if not given
     if init_state == None:
         init_state = "checkerboard"
         
-    # Set the flag to use an XX YY ZZ shim if given
-    if use_XX_YY_ZZ_gates:
-        print("... using unoptimized XX YY ZZ gates")
+    # Parameters of simulation
+    if K is None:
+        K = 5
+        
+    if t is None:
+        t = 1.0
     
     ################################
     
@@ -291,33 +322,22 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         num_circuits = max(1, max_circuits)
         
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
-
-        # Parameters of simulation
-        #### CANNOT BE MODIFIED W/O ALSO MODIFYING PRECALCULATED DATA #########
-        # DEVNOTE: HamLib is calculating expectation on the fly, so these could be set rather than pulled
         
-        # A large Trotter order approximates the Hamiltonian evolution better.
-        # But a large Trotter order also means the circuit is deeper.
-        # For ideal or noise-less quantum circuits, k >> 1 gives perfect Hamiltonian simulation.
-        w = precalculated_data['w']  # Strength of disorder
-        k = precalculated_data['k']   # Trotter error.
-        t = precalculated_data['t']  # Time of simulation
-        
-        # Precalculated random numbers between [-1, 1]
-        hx = precalculated_data['hx'][:num_qubits]
-        hz = precalculated_data['hz'][:num_qubits]
         #######################################################################
 
-        # Loop over only 1 circuit
+        # Loop over only the same circuit, executing it num_circuits times
         for circuit_id in range(num_circuits):
             ts = time.time()
             
-            # create the HamLibSimulation kernel
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t,
-                    hamiltonian=hamiltonian, init_state=init_state,
-                    w=w, hx = hx, hz = hz, 
-                    use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
-                    method = method, random_pauli_flag=random_pauli_flag)
+            # create the HamLibSimulation kernel and the associated Hamiltonian operator
+            qc, ham_op = HamiltonianSimulation(
+                    num_qubits,
+                    hamiltonian=hamiltonian, 
+                    K=K, t=t,
+                    init_state=init_state,
+                    method = method,
+                    random_pauli_flag=random_pauli_flag
+                    )
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
@@ -333,11 +353,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     ##########
     
     # draw a sample circuit
-    kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method)
+    kernel_draw(hamiltonian, method)
        
     # Plot metrics for all circuit sizes
     options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
-    if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
@@ -358,7 +377,6 @@ def get_args():
     parser.add_argument("--max_circuits", "-c", default=1, help="Maximum circuit repetitions", type=int)     
     parser.add_argument("--hamiltonian", "-ham", default="TFIM", help="Name of Hamiltonian", type=str)
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-    parser.add_argument("--use_XX_YY_ZZ_gates", action="store_true", help="Use explicit XX, YY, ZZ gates")
     #parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
@@ -370,6 +388,8 @@ def get_args():
     parser.add_argument("--global_pbc_val", "-param_pbc_val", default=None, help="paramater pbc_val")
     parser.add_argument("--global_ratio", "-param_ratio", default=None, help="paramater ratio")
     parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")
+    parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
+    parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
     return parser.parse_args()
  
 # if main, execute method
@@ -400,8 +420,9 @@ if __name__ == '__main__':
         hamiltonian=args.hamiltonian,
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
-        use_XX_YY_ZZ_gates = args.use_XX_YY_ZZ_gates,
         init_state = args.init_state,
+        K = args.num_steps,
+        t = args.time,
         #theta=args.theta,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},

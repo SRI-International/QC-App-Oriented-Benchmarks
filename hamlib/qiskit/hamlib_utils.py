@@ -13,7 +13,6 @@ import os
 import requests
 import zipfile
 import json
-import hamlib_simulation_kernel
 
 verbose = False
 
@@ -42,48 +41,6 @@ def create_full_filenames(hamiltonian_name):
     else:
         return hamiltonian_name + '.hdf5'
     
-def set_default_parameter_values(filename):
-    if filename == 'tfim.hdf5' or filename == 'heis.hdf5':
-        if hamlib_simulation_kernel.global_h == None:
-            hamlib_simulation_kernel.global_h = 0.1
-        if hamlib_simulation_kernel.global_pbc_val == None:
-            hamlib_simulation_kernel.global_pbc_val = 'nonpbc'
-        hamlib_simulation_kernel.global_U = None
-        hamlib_simulation_kernel.global_enc = None
-        hamlib_simulation_kernel.global_ratio = None
-        hamlib_simulation_kernel.global_rinst = None
-    elif filename == 'random_max3sat-hams.hdf5':
-        if hamlib_simulation_kernel.global_ratio == None:
-            hamlib_simulation_kernel.global_ratio = 2
-        if hamlib_simulation_kernel.global_rinst == None:
-            hamlib_simulation_kernel.global_rinst = '00'
-        hamlib_simulation_kernel.global_U = None
-        hamlib_simulation_kernel.global_enc = None
-        hamlib_simulation_kernel.global_h = None
-        hamlib_simulation_kernel.global_pbc_val = None
-    elif filename == 'FH_D-1.hdf5':
-        if hamlib_simulation_kernel.global_U == None:
-            hamlib_simulation_kernel.global_U = 0
-        if hamlib_simulation_kernel.global_enc == None:
-            hamlib_simulation_kernel.global_enc = 'bk'
-        if hamlib_simulation_kernel.global_pbc_val == None:
-            hamlib_simulation_kernel.global_pbc_val = 'nonpbc'
-        hamlib_simulation_kernel.global_ratio = None
-        hamlib_simulation_kernel.global_rinst = None
-        hamlib_simulation_kernel.global_h = None
-    elif filename == 'BH_D-1_d-4.hdf5':
-        if hamlib_simulation_kernel.global_U == None:
-            hamlib_simulation_kernel.global_U = 2
-        if hamlib_simulation_kernel.global_enc == None:
-            hamlib_simulation_kernel.global_enc = 'gray'
-        if hamlib_simulation_kernel.global_pbc_val == None:
-            hamlib_simulation_kernel.global_pbc_val = 'nonpbc'
-        hamlib_simulation_kernel.global_ratio = None
-        hamlib_simulation_kernel.global_rinst = None
-        hamlib_simulation_kernel.global_h = None
-    else:
-        print("No such hamiltonian is available.")
-
 def extract_dataset_hdf5(filename, dataset_name):
     """
     Extract a dataset from an HDF5 file.
