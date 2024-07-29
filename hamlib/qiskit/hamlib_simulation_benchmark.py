@@ -26,6 +26,7 @@ import metrics as metrics
 
 import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
+from hamlib_simulation_kernel import initial_state, create_circuit   # would like to remove these
 from hamlib_utils import create_full_filenames, construct_dataset_name
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
 
@@ -83,7 +84,10 @@ def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
 ############### Result Data Analysis
 
 #def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int,
-def analyze_and_print_result(qc, result, num_qubits: int,
+def analyze_and_print_result(
+            qc,
+            result,
+            num_qubits: int,
             type: str,
             num_shots: int,
             hamiltonian: str,
@@ -112,8 +116,6 @@ def analyze_and_print_result(qc, result, num_qubits: int,
 
     hamiltonian = hamiltonian.strip().lower()
 
-    from hamlib_simulation_kernel import initial_state, create_circuit
-
     # calculate correct distribution on the fly
     
     # for method 1, compute expected dist using ideal quantum simulation of the circuit provided
@@ -133,23 +135,34 @@ def analyze_and_print_result(qc, result, num_qubits: int,
             print(f"... begin exact computation for id={type} ...")
             
         ts = time.time()
-        
+
+        # DEVNOTE: ideally, we can remove these next two lines by performing this code in the run() loop        
         # create quantum circuit with initial state
-        qc_initial = initial_state(n_spins=num_qubits, initial_state=init_state)
+        qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
         
         # get Hamiltonian operator by creating entire circuit (DEVNOTE: need to not require whole circuit)
         _, ham_op, _ = create_circuit(n_spins=num_qubits, init_state=init_state)
         
-        # compute the exact evolution
+        # compute the expected  distribution after exact evolution
         correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
                 hamiltonian_op=ham_op,
                 time=1.0)
                 
         if verbose:
-            print(f"... exact computation time = {round((time.time() - ts), 3)} sec") 
+            print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
             
+    # for method 3, compute expected distribution from the initial state
     elif method == 3:
-        correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
+    
+        # check simple distribution if not inserting random Paulis
+        if not random_pauli_flag:
+            correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
+            
+        # if using random paulis, distribution is based on all ones in initial state
+        # random_pauli_flag is (for now) set to always return bitstring of 1's
+        else:
+            correct_dist = {"1" * num_qubits: num_shots}
+
         
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
@@ -313,11 +326,14 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
             ts = time.time()
             
             # create the HamLibSimulation kernel and the associated Hamiltonian operator
-            qc, ham_op = HamiltonianSimulation(num_qubits,
+            qc, ham_op = HamiltonianSimulation(
+                    num_qubits,
                     hamiltonian=hamiltonian, 
                     K=k, t=t,
                     init_state=init_state,
-                    method = method)
+                    method = method,
+                    random_pauli_flag=random_pauli_flag
+                    )
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 

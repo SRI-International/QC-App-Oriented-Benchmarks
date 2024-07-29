@@ -38,7 +38,13 @@ EVO_ = None
 INV_ = None
 
 
-from hamlib_utils import process_hamiltonian_file, needs_normalization, normalize_data_format, parse_hamiltonian_to_sparsepauliop, determine_qubit_count
+from hamlib_utils import (
+    process_hamiltonian_file,
+    needs_normalization,
+    normalize_data_format,
+    parse_hamiltonian_to_sparsepauliop,
+    determine_qubit_count,
+)
 
 def set_default_parameter_values(filename):
     """
@@ -215,7 +221,14 @@ def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
     circuit.barrier()
     return circuit
 
-def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, method = 1, init_state=None):
+def create_circuit(
+    n_spins: int,
+    time: float = 1,
+    num_trotter_steps: int = 5,
+    method: int = 1,
+    init_state: str = None,
+    random_pauli_flag: bool = False,
+):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
 
@@ -255,9 +268,6 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
         if verbose:
             print(f"... Evolution operator = {ham_op}")
 
-        ham_op = ham_op  # Use the SparsePauliOp object directly
-        # print (ham_op)
-
         # Build the evolution gate
         # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
         evo_label = "e^-iHt"
@@ -267,7 +277,7 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
         circuit = QuantumCircuit(ham_op.num_qubits)
         circuit_without_initial_state = QuantumCircuit(ham_op.num_qubits)
         
-        # first insert the initial_state
+        # first create and append the initial_state
         # init_state = "checkerboard"
         i_state = initial_state(num_qubits, init_state)
         circuit.append(i_state, range(ham_op.num_qubits))
@@ -283,40 +293,54 @@ def create_circuit(n_spins: int, time: float = 1, num_trotter_steps: int = 5, me
         # Append K Trotter steps of inverse, if method 3
         inv = None
         if method == 3: 
-            inv = evo.inverse()
-            inv.name = "e^iHt"
-            circuit = create_trotter_steps(num_trotter_steps, inv, ham_op, circuit)
-            if n_spins <= 6:
-                INV_ = inv
-            
-        circuit.measure_all()
+    
+            # if not adding random Paulis, just create simple inverse Trotter steps
+            if not random_pauli_flag:
+                inv = evo.inverse()
+                inv.name = "e^iHt"
+                circuit = create_trotter_steps(num_trotter_steps, inv, ham_op, circuit)
+                if n_spins <= 6:
+                    INV_ = inv
+     
+            # if adding Paulis, do that here, with code from pyGSTi
+            else:
+                from pygsti_mirror import convert_to_mirror_circuit
+                circuit, _ = convert_to_mirror_circuit(circuit_without_initial_state)
+                
+        # convert_to_mirror_circuit adds its own measurement gates    
+        if not random_pauli_flag:
+            circuit.measure_all()
+        
         return circuit, ham_op, evo
+        
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
         return None, None, None
 
 
-############### Circuit Definition
+############### Initial Circuit Definition
 
-def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircuit:
+def initial_state(n_spins: int, init_state: str = "checker") -> QuantumCircuit:
     """
     Initialize the quantum state.
     
     Args:
         n_spins (int): Number of spins (qubits).
-        initial_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
+        init_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
 
     Returns:
         QuantumCircuit: The initialized quantum circuit.
     """
     qc = QuantumCircuit(n_spins)
 
-    if initial_state.strip().lower() == "checkerboard" or initial_state.strip().lower() == "neele":
+    init_state = init_state.strip().lower()
+    
+    if init_state == "checkerboard" or init_state == "neele":
         # Checkerboard state, or "Neele" state
         qc.name = "Neele"
         for k in range(0, n_spins, 2):
             qc.x([k])
-    elif initial_state.strip().lower() == "ghz":
+    elif init_state.strip().lower() == "ghz":
         # GHZ state: 1/sqrt(2) (|00...> + |11...>)
         qc.name = "GHZ"
         qc.h(0)
@@ -325,12 +349,16 @@ def initial_state(n_spins: int, initial_state: str = "checker") -> QuantumCircui
 
     return qc
 
+############### Hamiltonian Circuit Definition
 
-def HamiltonianSimulation(n_spins: int,
+def HamiltonianSimulation(
+            n_spins: int,
             hamiltonian: str, 
             K: int = 5, t: float = 1.0,
-            init_state=None,
-            method: int = 1) -> QuantumCircuit:
+            init_state = None,
+            method: int = 1,
+            random_pauli_flag = False
+        ) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 
@@ -340,6 +368,7 @@ def HamiltonianSimulation(n_spins: int,
         K (int): The Trotterization order.
         t (float): Duration of simulation.
         method (int): Type of comparison for fidelity
+        random_pauli_flag (bool): Insert random Pauli gates if method 3
 
     Returns:
         QuantumCircuit: The constructed Qiskit circuit.
@@ -351,13 +380,18 @@ def HamiltonianSimulation(n_spins: int,
     qr = QuantumRegister(n_spins)
     cr = ClassicalRegister(n_spins)
     qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{secret_int}")
-    
-    # size of one Trotter step
-    tau = t / K
 
     hamiltonian = hamiltonian.strip().lower()
     
-    qc, ham_op, evo = create_circuit(n_spins = n_spins, method = method, init_state=init_state)
+    # create the quantum circuit for this Hamiltonian, along with the operator and trotter evolution circuit
+    qc, ham_op, evo = create_circuit(
+        n_spins=n_spins,
+        time=t,
+        method=method,
+        init_state=init_state,
+        num_trotter_steps=K,
+        random_pauli_flag=random_pauli_flag,
+        )
 
     # Save smaller circuit example for display
     global QC_, HAM_, EVO_, INV_
