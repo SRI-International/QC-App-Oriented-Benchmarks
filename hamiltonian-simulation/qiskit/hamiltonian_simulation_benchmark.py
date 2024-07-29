@@ -154,6 +154,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "heisenberg", method: int = 1,
         use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = False, init_state: str = None,
+        K: int = None, t: float = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None):
@@ -207,6 +208,15 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     # Set the flag to use an XX YY ZZ shim if given
     if use_XX_YY_ZZ_gates:
         print("... using unoptimized XX YY ZZ gates")
+        
+    # Parameters of simulation (note used yet, since we use hardcoded data for comparison)
+    """
+    if K is None:
+        K = 5
+        
+    if t is None:
+        t = 1.0
+    """
     
     ################################
     
@@ -326,6 +336,8 @@ def get_args():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="random pauli flag")
     parser.add_argument("--init_state", "-init", default=None, help="initial state")
+    parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
+    parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
 
     return parser.parse_args()
  
@@ -353,7 +365,8 @@ if __name__ == '__main__':
         random_pauli_flag=args.random_pauli_flag,
         use_XX_YY_ZZ_gates =args.use_XX_YY_ZZ_gates,
         init_state = args.init_state,
-        #theta=args.theta,
+        #K = args.num_steps,                    # not used yet, since we use preloaded data for comparison
+        #t = args.time,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
         #api=args.api
