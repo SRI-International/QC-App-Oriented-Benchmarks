@@ -365,7 +365,7 @@ class TfimHamiltonianKernel(HamiltonianKernel):
 
     #apply tfim hamiltonian.
     def create_hamiltonian(self) -> QuantumCircuit:
-        self.h = 0.2
+        self.h = 1
         qr = QuantumRegister(self.n_spins)
         qc = QuantumCircuit(qr, name="TFIM")
         for k in range(self.K):
