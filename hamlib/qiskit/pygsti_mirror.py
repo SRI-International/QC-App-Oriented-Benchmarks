@@ -3,6 +3,7 @@ import tqdm
 import numpy as np
 import scipy as sp
 from qiskit import transpile, QuantumCircuit
+import re
 
 # Below code created by Timothy Proctor, July 16 2024, using code developed by various members of Sandia's QPL.
 # Code has been edited to accept random pauli bitstrings by Sonny Rappaport, July 23 2024.
@@ -54,7 +55,7 @@ def central_pauli_mirror_circuit(circ, randomized_state_preparation=True, random
     # Sonny's edit here: Rather than generating central_pauli randomly, now we can use a non-random one if desired. 
     if random_pauli is True:
         rand_state = np.random.RandomState()
-        central_pauli = 2 * rand_state.randint(0, 2, 2*n) #old code 
+        central_pauli = 2 * np.random.randint(0, 2, 2*n) #old code 
     else: 
         central_pauli = 2 * np.ones(2*n, dtype = np.int8)  
 
@@ -129,8 +130,8 @@ def haar_random_u3(q, rand_state=None):
     if rand_state is None:
         rand_state = np.random.RandomState()
 
-    a, b = 2 * np.pi * rand_state.rand(2)
-    theta = mod_2pi(2 * np.arcsin(np.sqrt(rand_state.rand(1)))[0])
+    a, b = 2 * np.pi * np.random.rand(2)
+    theta = mod_2pi(2 * np.arcsin(np.sqrt(np.random.rand(1)))[0])
     phi = mod_2pi(a - b + np.pi)
     lamb = mod_2pi(-1 * (a + b + np.pi))
     return pygsti.baseobjs.Label('Gu3', q, args=(theta, phi, lamb))
@@ -329,12 +330,20 @@ def pygsti_string(qc):
 
     return pygstr.strip()
 
-def convert_to_mirror_circuit(qc, random_pauli):
+def convert_to_mirror_circuit(qc, random_pauli, init_state):
     """
     Takes an arbitrary quantum circuit, transpiles it to CX and u3, and eventually returns a mirror circuit version of the quantum circuit. 
 
     The mirror circuit will have a random initial state in addition to random paulis. 
     """
+
+    # if no initial state is provided, use a ranmdom one
+    random_init_flag = True  
+
+    if init_state: 
+        random_init_flag = False
+        init_state.append(qc, range(qc.num_qubits))
+        qc = init_state
 
     qc = transpile(qc, basis_gates=["cx","u3"])
 
@@ -342,17 +351,35 @@ def convert_to_mirror_circuit(qc, random_pauli):
 
     pygsti_circuit = pygsti.circuits.Circuit(pygstr)
 
-    mcs, bss = sample_mirror_circuits(pygsti_circuit, num_mcs=1, random_pauli = random_pauli)
+    mcs, bss = sample_mirror_circuits(pygsti_circuit, num_mcs=1, random_pauli = random_pauli, randomized_state_preparation=random_init_flag)
 
-    qiskit_circuit = QuantumCircuit.from_qasm_str(mcs[0].convert_to_openqasm())
+    # !TODO: REMOVE THIS DEBUGGING PRINT STATEMENT
+    # print("original circuit")
+    # print(mcs[0])
+    # d = mcs[0].depth
+    # print("getting original circuit bits out of the original mess")
+    # print(mcs[0][0:d])
+    # print("d+1 (just to see what happens")
+    # print(mcs[0][0:d+1])
+    qasm_string = mcs[0].convert_to_openqasm()
+
+    # use regex to remove lines that begin with Delay gates 
+    # delays_removed_string = re.sub(r'^Oh.*\n?', '', string, flags=re.MULTILINE) 
+
+
+    qiskit_circuit = QuantumCircuit.from_qasm_str(qasm_string)
+    #
+    # print("qiskit circuit before deleting delays")
+    # print(qiskit_circuit)
+    # for i, gate in enumerate(qiskit_circuit.data):
+    #     print(gate)
+    #     if gate.name == "Delay":
+    #         del qiskit_circuit[i]
+    #
+    # print("qiskit circuit afterwards")
+    # print(qiskit_circuit)
+
     
     # this circuit is made out of u3 and cx gates by pygsti default
     # the bitstring is reversed to account for qiskit ordering
     return qiskit_circuit , bss[0][::-1]
-
-if __name__ == "__main__":
-
-    qubits = 5
-    mss, bss = sample_reference_circuits(('Q0', 'Q1', 'Q2', 'Q3'), num_ref=10, randomized_state_preparation=True, rand_state=None)
-
-    print(mss)

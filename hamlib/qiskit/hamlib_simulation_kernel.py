@@ -228,6 +228,7 @@ def create_circuit(
     method: int = 1,
     init_state: str = None,
     random_pauli_flag: bool = False,
+    random_init_state: bool = False 
 ):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
@@ -307,8 +308,14 @@ def create_circuit(
             # if adding Paulis, do that here, with code from pyGSTi
             else:
                 from pygsti_mirror import convert_to_mirror_circuit
-                circuit, bitstring = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli = True)
-                
+               
+                # if random init flag state is set, then discard the inital state input and use a completely (harr) random one
+                if random_init_state:
+                    circuit, bitstring = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli = True, init_state=None)
+                else: 
+                    init_state = initial_state(n_spins, init_state)
+                    circuit, bitstring = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli = True, init_state=init_state)
+
         # convert_to_mirror_circuit adds its own measurement gates    
         if not random_pauli_flag:
             circuit.measure_all()
@@ -359,7 +366,8 @@ def HamiltonianSimulation(
             K: int = 5, t: float = 1.0,
             init_state = None,
             method: int = 1,
-            random_pauli_flag = False
+            random_pauli_flag = False,
+            random_init_state = False
         ) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
@@ -392,6 +400,7 @@ def HamiltonianSimulation(
         init_state=init_state,
         num_trotter_steps=K,
         random_pauli_flag=random_pauli_flag,
+        random_init_state=random_init_state
         )
 
     # Save smaller circuit example for display

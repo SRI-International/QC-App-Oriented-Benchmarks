@@ -160,9 +160,6 @@ def analyze_and_print_result(
     elif method == 3 and random_pauli_flag:
         global bitstring_dict
 
-        print("bitstring_dict")
-        print(bitstring_dict)
-
         # random_pauli_flag is (for now) set to always return bitstring of 1's
         correct_bitstring = bitstring_dict[qc.name]
         correct_dist = {correct_bitstring: num_shots}
@@ -174,6 +171,7 @@ def analyze_and_print_result(
     if verbose:
         print_top_measurements(f"Correct dist = ", correct_dist, 100)
 
+    # !TODO: COMMENT THIS OUT
     print("counts and correct dist")
     print(counts, correct_dist)
 
@@ -227,7 +225,9 @@ def print_top_measurements(label, counts, top_n):
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "TFIM", method: int = 1,
-        random_pauli_flag: bool = False, init_state: str = None,
+        random_pauli_flag: bool = False, 
+        random_init_state: bool = False, 
+        init_state: str = None,
         K: int = None, t: float = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
@@ -344,7 +344,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
             # create the HamLibSimulation kernel
             qc, bs, ham_op = HamiltonianSimulation(num_qubits, K=K, t=t,
                     hamiltonian=hamiltonian, init_state=init_state,
-                    method = method, random_pauli_flag=random_pauli_flag)
+                    method = method, random_pauli_flag=random_pauli_flag, random_init_state=random_init_state)
 
             bitstring_dict[qc.name] = bs
                     
@@ -399,6 +399,7 @@ def get_args():
     parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
+    parser.add_argument("--random_init_state", "-rani", default=False, help="random inital state flag", type=float)
     return parser.parse_args()
  
 # if main, execute method
@@ -429,6 +430,7 @@ if __name__ == '__main__':
         hamiltonian=args.hamiltonian,
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
+        random_init_state=args.random_init_state,
         init_state = args.init_state,
         K = args.num_steps,
         t = args.time,
