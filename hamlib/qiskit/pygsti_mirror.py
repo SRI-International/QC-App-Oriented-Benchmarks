@@ -363,11 +363,10 @@ def convert_to_mirror_circuit(qc, random_pauli, init_state):
     # print(mcs[0][0:d+1])
     qasm_string = mcs[0].convert_to_openqasm()
 
-    # use regex to remove lines that begin with Delay gates 
-    # delays_removed_string = re.sub(r'^Oh.*\n?', '', string, flags=re.MULTILINE) 
+    # use regex magic to remove lines that begin with Delay gates, since they are meaningless in this benchmarking context 
+    delays_removed_string = re.sub(r'^delay.*\n?', '', qasm_string, flags=re.MULTILINE) 
 
-
-    qiskit_circuit = QuantumCircuit.from_qasm_str(qasm_string)
+    qiskit_circuit = QuantumCircuit.from_qasm_str(delays_removed_string)
     #
     # print("qiskit circuit before deleting delays")
     # print(qiskit_circuit)
