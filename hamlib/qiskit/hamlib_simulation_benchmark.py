@@ -225,7 +225,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "TFIM", method: int = 1,
         random_pauli_flag: bool = False, 
-        random_init_state: bool = False, 
+        random_init_flag: bool = False, 
         init_state: str = None,
         K: int = None, t: float = None,
         backend_id: str = None, provider_backend = None,
@@ -348,7 +348,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
                 init_state=init_state,
                 method = method, 
                 random_pauli_flag=random_pauli_flag, 
-                random_init_state=random_init_state)
+                random_init_flag=random_init_flag)
 
             bitstring_dict[qc.name] = bs
                     
@@ -403,7 +403,7 @@ def get_args():
     parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
-    parser.add_argument("--random_init_state", "-rani", default=False, help="random inital state flag", type=float)
+    parser.add_argument("--random_init_flag", "-rani", default=False, help="random inital state flag", type=float)
     return parser.parse_args()
  
 # if main, execute method
@@ -434,7 +434,7 @@ if __name__ == '__main__':
         hamiltonian=args.hamiltonian,
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
-        random_init_state=args.random_init_state,
+        random_init_flag=args.random_init_flag,
         init_state = args.init_state,
         K = args.num_steps,
         t = args.time,
