@@ -403,7 +403,7 @@ def get_args():
     parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
-    parser.add_argument("--random_init_flag", "-rani", default=False, help="random inital state flag", type=float)
+    parser.add_argument("--random_init_flag", "-rani", action="store_true", help="random pauli flag")
     return parser.parse_args()
  
 # if main, execute method
