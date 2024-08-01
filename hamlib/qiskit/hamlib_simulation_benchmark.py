@@ -153,27 +153,26 @@ def analyze_and_print_result(
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
 
-    elif method == 3 and not random_pauli_flag:
-        correct_dist = key_from_initial_state(
-            num_qubits, num_shots, init_state, random_pauli_flag
-        )
-    elif method == 3 and random_pauli_flag:
-        global bitstring_dict
+   # for method 3, compute expected distribution from the initial state
+    elif method == 3: 
 
-        # random_pauli_flag is (for now) set to always return bitstring of 1's
-        correct_bitstring = bitstring_dict[qc.name]
-        correct_dist = {correct_bitstring: num_shots}
+        # check simple distribution if not inserting random Paulis 
+        if not random_pauli_flag: 
+            correct_dist = key_from_initial_state(
+                num_qubits, num_shots, init_state, random_pauli_flag
+            )
 
+        # if using random paulis, a potentially random bitstring is collected from circuit generation
+        else: 
+            global bitstring_dict
+            correct_bitstring = bitstring_dict[qc.name]
+            correct_dist = {correct_bitstring: num_shots}
         
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
 
     if verbose:
         print_top_measurements(f"Correct dist = ", correct_dist, 100)
-
-    # !TODO: COMMENT THIS OUT
-    print("counts and correct dist")
-    print(counts, correct_dist)
 
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
@@ -333,7 +332,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         #######################################################################
 
         # in the case of random paulis, method = 3: loop over multiple random pauli circuits
-        # otherwise, loop over only 1 circuit
+        # otherwise, loop over the same circuit, executing it num_circuits times 
         for circuit_id in range(num_circuits):
 
             ts = time.time()
@@ -341,10 +340,15 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
             #used to store random pauli correct bitstrings
             global bitstring_dict
 
-            # create the HamLibSimulation kernel
-            qc, bs, ham_op = HamiltonianSimulation(num_qubits, K=K, t=t,
-                    hamiltonian=hamiltonian, init_state=init_state,
-                    method = method, random_pauli_flag=random_pauli_flag, random_init_state=random_init_state)
+            # create the HamLibSimulation kernel, random pauli bitstring, and the associated Hamiltonian operator
+            qc, bs, ham_op = HamiltonianSimulation(
+                num_qubits, 
+                K=K, t=t,
+                hamiltonian=hamiltonian, 
+                init_state=init_state,
+                method = method, 
+                random_pauli_flag=random_pauli_flag, 
+                random_init_state=random_init_state)
 
             bitstring_dict[qc.name] = bs
                     

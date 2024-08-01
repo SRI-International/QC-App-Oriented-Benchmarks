@@ -353,31 +353,12 @@ def convert_to_mirror_circuit(qc, random_pauli, init_state):
 
     mcs, bss = sample_mirror_circuits(pygsti_circuit, num_mcs=1, random_pauli = random_pauli, randomized_state_preparation=random_init_flag)
 
-    # !TODO: REMOVE THIS DEBUGGING PRINT STATEMENT
-    # print("original circuit")
-    # print(mcs[0])
-    # d = mcs[0].depth
-    # print("getting original circuit bits out of the original mess")
-    # print(mcs[0][0:d])
-    # print("d+1 (just to see what happens")
-    # print(mcs[0][0:d+1])
     qasm_string = mcs[0].convert_to_openqasm()
 
-    # use regex magic to remove lines that begin with Delay gates, since they are meaningless in this benchmarking context 
+    # use regex magic to remove lines that begin with Delay gates
     delays_removed_string = re.sub(r'^delay.*\n?', '', qasm_string, flags=re.MULTILINE) 
 
     qiskit_circuit = QuantumCircuit.from_qasm_str(delays_removed_string)
-    #
-    # print("qiskit circuit before deleting delays")
-    # print(qiskit_circuit)
-    # for i, gate in enumerate(qiskit_circuit.data):
-    #     print(gate)
-    #     if gate.name == "Delay":
-    #         del qiskit_circuit[i]
-    #
-    # print("qiskit circuit afterwards")
-    # print(qiskit_circuit)
-
     
     # this circuit is made out of u3 and cx gates by pygsti default
     # the bitstring is reversed to account for qiskit ordering

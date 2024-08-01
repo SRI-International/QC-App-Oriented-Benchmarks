@@ -392,7 +392,7 @@ def HamiltonianSimulation(
     qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{secret_int}")
 
     hamiltonian = hamiltonian.strip().lower()
-
+    # create the quantum circuit for this Hamiltonian, along with the correct pauli bstring, the operator and trotter evolution circuit
     qc, bitstring, ham_op, evo = create_circuit(
         n_spins=n_spins,
         time=t,
@@ -414,6 +414,7 @@ def HamiltonianSimulation(
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
     qc2 = qc.decompose().decompose()
 
+    # return both the circuit created, the bitstring, and the Hamiltonian operator
     # if random_pauli_flag is false or method isn't 3, bitstring will be None
     return qc2, bitstring, ham_op
         
