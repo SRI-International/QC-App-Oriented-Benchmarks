@@ -153,7 +153,7 @@ def analyze_and_print_result(
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
 
-   # for method 3, compute expected distribution from the initial state
+    # for method 3, compute expected distribution from the initial state
     elif method == 3: 
 
         # check simple distribution if not inserting random Paulis 
