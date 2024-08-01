@@ -454,4 +454,3 @@ def kernel_draw(hamiltonian: str = "hamlib", method: int = 1):
         print("  ... circuit too large!")
 
 
-    
