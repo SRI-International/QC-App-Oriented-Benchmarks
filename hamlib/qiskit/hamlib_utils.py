@@ -13,16 +13,28 @@ import os
 import requests
 import zipfile
 import json
+from dataclasses import dataclass
 
 verbose = False
 
-hamiltonian_files = {
-    'TFIM': 'tfim.hdf5',
-    'Fermi-Hubbard-1D': 'FH_D-1.hdf5',
-    'Bose-Hubbard-1D': 'BH_D-1_d-4.hdf5',
-    'Heisenberg': 'heis.hdf5',
-    'Max3Sat': 'random_max3sat-hams.hdf5'
-}
+
+@dataclass
+class HamLibData:
+    name: str
+    file_name: str
+    url: str
+
+
+_base_url = 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/'
+
+
+hamiltonians = [
+    HamLibData('TFIM', 'tfim.hdf5', f'{_base_url}condensedmatter/tfim/tfim.zip'),
+    HamLibData('Fermi-Hubbard-1D', 'FH_D-1.hdf5', f'{_base_url}condensedmatter/fermihubbard/FH_D-1.zip'),
+    HamLibData('Bose-Hubbard-1D', 'BH_D-1_d-4.hdf5', f'{_base_url}condensedmatter/bosehubbard/BH_D-1_d-4.zip'),
+    HamLibData('Heisenberg', 'heis.hdf5', f'{_base_url}condensedmatter/heisenberg/heis.zip'),
+    HamLibData('Max3Sat', 'random_max3sat-hams.hdf5', f'{_base_url}binaryoptimization/max3sat/random/random_max3sat-hams.hdf5.zip')
+]
 
 def create_full_filenames(hamiltonian_name):
     """
@@ -36,8 +48,10 @@ def create_full_filenames(hamiltonian_name):
     str: The filename associated with the Hamiltonian.
     """
 
-    if hamiltonian_name in hamiltonian_files:
-        return hamiltonian_files[hamiltonian_name]
+    ham_names = [h.name for h in hamiltonians]
+
+    if hamiltonian_name in ham_names:
+        return hamiltonians[ham_names.index(hamiltonian_name)].file_name
     else:
         return hamiltonian_name + '.hdf5'
     
@@ -203,17 +217,11 @@ def process_hamiltonian_file(filename, dataset_name):
     Returns:
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
-    url_mapping = {
-        'tfim.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/tfim/tfim.zip',
-        'FH_D-1.hdf5': 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/fermihubbard/FH_D-1.zip',
-        'random_max3sat-hams.hdf5':"https://portal.nersc.gov/cfs/m888/dcamps/hamlib/binaryoptimization/max3sat/random/random_max3sat-hams.hdf5.zip",
-        'heis.hdf5':"https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/heisenberg/heis.zip",
-        'BH_D-1_d-4.hdf5':"https://portal.nersc.gov/cfs/m888/dcamps/hamlib/condensedmatter/bosehubbard/BH_D-1_d-4.zip"
-        # Add more mappings as needed
-    }
+
+    ham_files = [h.file_name for h in hamiltonians]
     
-    if filename in url_mapping:
-        url = url_mapping[filename]
+    if filename in ham_files:
+        url = hamiltonians[ham_files.index(filename)].url
         extracted_path = download_and_extract(filename, url)
         # Assuming the HDF5 file is located directly inside the extracted folder
         hdf5_file_path = os.path.join(extracted_path, filename)
