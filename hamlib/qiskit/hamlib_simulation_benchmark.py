@@ -143,7 +143,7 @@ def analyze_and_print_result(
         qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
         
         # get Hamiltonian operator by creating entire circuit (DEVNOTE: need to not require whole circuit)
-        _, ham_op, _ = create_circuit(n_spins=num_qubits, init_state=init_state)
+        _, _, ham_op, _ = create_circuit(n_spins=num_qubits, init_state=init_state)
         
         # compute the expected  distribution after exact evolution
         correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
