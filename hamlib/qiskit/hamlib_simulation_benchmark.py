@@ -38,6 +38,8 @@ np.random.seed(0)
 
 verbose = False
 
+# contains the correct bitstring for a random pauli circuit
+bitstring_dict = {}
 
 # Creates a key for distribution of initial state for method = 3.
 def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag):
@@ -150,19 +152,21 @@ def analyze_and_print_result(
                 
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
-            
-    # for method 3, compute expected distribution from the initial state
-    elif method == 3:
-    
-        # check simple distribution if not inserting random Paulis
-        if not random_pauli_flag:
-            correct_dist = key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
-            
-        # if using random paulis, distribution is based on all ones in initial state
-        # random_pauli_flag is (for now) set to always return bitstring of 1's
-        else:
-            correct_dist = {"1" * num_qubits: num_shots}
 
+    # for method 3, compute expected distribution from the initial state
+    elif method == 3: 
+
+        # check simple distribution if not inserting random Paulis 
+        if not random_pauli_flag: 
+            correct_dist = key_from_initial_state(
+                num_qubits, num_shots, init_state, random_pauli_flag
+            )
+
+        # if using random paulis, a potentially random bitstring is collected from circuit generation
+        else: 
+            global bitstring_dict
+            correct_bitstring = bitstring_dict[qc.name]
+            correct_dist = {correct_bitstring: num_shots}
         
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
@@ -220,7 +224,9 @@ def print_top_measurements(label, counts, top_n):
 def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "TFIM", method: int = 1,
-        random_pauli_flag: bool = False, init_state: str = None,
+        random_pauli_flag: bool = False, 
+        random_init_flag: bool = False, 
+        init_state: str = None,
         K: int = None, t: float = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
@@ -325,19 +331,26 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         
         #######################################################################
 
-        # Loop over only the same circuit, executing it num_circuits times
+        # in the case of random paulis, method = 3: loop over multiple random pauli circuits
+        # otherwise, loop over the same circuit, executing it num_circuits times 
         for circuit_id in range(num_circuits):
+
             ts = time.time()
-            
-            # create the HamLibSimulation kernel and the associated Hamiltonian operator
-            qc, ham_op = HamiltonianSimulation(
-                    num_qubits,
-                    hamiltonian=hamiltonian, 
-                    K=K, t=t,
-                    init_state=init_state,
-                    method = method,
-                    random_pauli_flag=random_pauli_flag
-                    )
+
+            #used to store random pauli correct bitstrings
+            global bitstring_dict
+
+            # create the HamLibSimulation kernel, random pauli bitstring, and the associated Hamiltonian operator
+            qc, bs, ham_op = HamiltonianSimulation(
+                num_qubits, 
+                K=K, t=t,
+                hamiltonian=hamiltonian, 
+                init_state=init_state,
+                method = method, 
+                random_pauli_flag=random_pauli_flag, 
+                random_init_flag=random_init_flag)
+
+            bitstring_dict[qc.name] = bs
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
@@ -390,6 +403,7 @@ def get_args():
     parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
+    parser.add_argument("--random_init_flag", "-rani", action="store_true", help="random pauli flag")
     return parser.parse_args()
  
 # if main, execute method
@@ -420,6 +434,7 @@ if __name__ == '__main__':
         hamiltonian=args.hamiltonian,
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
+        random_init_flag=args.random_init_flag,
         init_state = args.init_state,
         K = args.num_steps,
         t = args.time,
