@@ -317,9 +317,9 @@ def create_circuit(
                     circuit, bitstring = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli = True, init_state=init_state)
 
         # convert_to_mirror_circuit adds its own measurement gates    
-        if not random_pauli_flag:
+        if not (random_pauli_flag and method == 3):
             circuit.measure_all()
-        
+    
         return circuit, bitstring, ham_op, evo
 
     else:
