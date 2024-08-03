@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import time
+import math
 import numpy as np
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
@@ -95,6 +96,7 @@ def analyze_and_print_result(
             hamiltonian: str,
             method: int,
             random_pauli_flag: bool,
+            do_sqrt_fidelity: bool,
             init_state: str) -> tuple:
     """
     Analyze and print the measured results. Compute the quality of the result based on operator expectation for each state.
@@ -177,6 +179,11 @@ def analyze_and_print_result(
     # Use polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
     
+    # return the square root of the fidelities if indicated
+    if do_sqrt_fidelity:
+        fidelity["fidelity"] = math.sqrt(fidelity["fidelity"])
+        fidelity["hf_fidelity"] = math.sqrt(fidelity["hf_fidelity"])
+    
     if verbose:
         print(f"... fidelity = {fidelity}")
     
@@ -226,6 +233,8 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         hamiltonian: str = "TFIM", method: int = 1,
         random_pauli_flag: bool = False, 
         random_init_flag: bool = False, 
+        use_inverse_flag: bool = False,
+        do_sqrt_fidelity: bool = False,
         init_state: str = None,
         K: int = None, t: float = None,
         backend_id: str = None, provider_backend = None,
@@ -302,7 +311,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     def execution_handler(qc, result, num_qubits, type, num_shots):
         # Determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, hamiltonian, method, random_pauli_flag, init_state)
+        counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, hamiltonian, method, random_pauli_flag, do_sqrt_fidelity, init_state)
         metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
 
     # Initialize execution module using the execution result handler above and specified backend_id
@@ -341,16 +350,17 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
             global bitstring_dict
 
             # create the HamLibSimulation kernel, random pauli bitstring, and the associated Hamiltonian operator
-            qc, bs, ham_op = HamiltonianSimulation(
+            qc, bitstring, ham_op = HamiltonianSimulation(
                 num_qubits, 
                 K=K, t=t,
-                hamiltonian=hamiltonian, 
-                init_state=init_state,
+                hamiltonian = hamiltonian, 
+                init_state = init_state,
                 method = method, 
-                random_pauli_flag=random_pauli_flag, 
-                random_init_flag=random_init_flag)
+                use_inverse_flag = use_inverse_flag,
+                random_pauli_flag = random_pauli_flag, 
+                random_init_flag = random_init_flag)
 
-            bitstring_dict[qc.name] = bs
+            bitstring_dict[qc.name] = bitstring
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
@@ -393,7 +403,10 @@ def get_args():
     #parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
-    parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="random pauli flag")
+    parser.add_argument("--use_inverse_flag", "-inverse", action="store_true", help="Use inverse evolution")
+    parser.add_argument("--do_sqrt_fidelity", "-sqrt", action="store_true", help="Return square root of fidelities")
+    parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="Gen random paulis")
+    parser.add_argument("--random_init_flag", "-rani", action="store_true", help="Gen random initialization")
     parser.add_argument("--init_state", "-init", default=None, help="initial state")
     parser.add_argument("--global_h", "-param_h", default=None, help="paramater h")
     parser.add_argument("--global_U", "-param_U", default=None, help="paramater U")
@@ -402,8 +415,7 @@ def get_args():
     parser.add_argument("--global_ratio", "-param_ratio", default=None, help="paramater ratio")
     parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
-    parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
-    parser.add_argument("--random_init_flag", "-rani", action="store_true", help="random pauli flag")
+    parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)   
     return parser.parse_args()
  
 # if main, execute method
@@ -435,6 +447,8 @@ if __name__ == '__main__':
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
         random_init_flag=args.random_init_flag,
+        use_inverse_flag=args.use_inverse_flag,
+        do_sqrt_fidelity=args.do_sqrt_fidelity,
         init_state = args.init_state,
         K = args.num_steps,
         t = args.time,

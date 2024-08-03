@@ -226,6 +226,7 @@ def create_circuit(
     time: float = 1,
     num_trotter_steps: int = 5,
     method: int = 1,
+    use_inverse_flag: bool = False,
     init_state: str = None,
     random_pauli_flag: bool = False,
     random_init_flag: bool = False 
@@ -288,8 +289,15 @@ def create_circuit(
             QCI_ = i_state
         
         # Append K trotter steps
-        circuit = create_trotter_steps(num_trotter_steps, evo, ham_op, circuit)
-        circuit_without_initial_state = create_trotter_steps(num_trotter_steps, evo, ham_op, circuit_without_initial_state)
+        circuit = create_trotter_steps(num_trotter_steps,
+                evo if not use_inverse_flag else evo.inverse(),
+                ham_op,
+                circuit)
+                
+        circuit_without_initial_state = create_trotter_steps(num_trotter_steps,
+                evo if not use_inverse_flag else evo.inverse(),
+                ham_op,
+                circuit_without_initial_state)
 
         # Append K Trotter steps of inverse, if method 3
         inv = None
@@ -320,7 +328,7 @@ def create_circuit(
         if not (random_pauli_flag and method == 3):
             circuit.measure_all()
     
-        return circuit, bitstring, ham_op, evo
+        return circuit, bitstring, ham_op, evo if not use_inverse_flag else evo.inverse()
 
     else:
         # print(f"Dataset not available for n_spins = {n_spins}.")
@@ -366,6 +374,7 @@ def HamiltonianSimulation(
             K: int = 5, t: float = 1.0,
             init_state = None,
             method: int = 1,
+            use_inverse_flag: bool = False,
             random_pauli_flag = False,
             random_init_flag = False
         ) -> QuantumCircuit:
@@ -392,11 +401,14 @@ def HamiltonianSimulation(
     qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{secret_int}")
 
     hamiltonian = hamiltonian.strip().lower()
-    # create the quantum circuit for this Hamiltonian, along with the correct pauli bstring, the operator and trotter evolution circuit
+    
+    # create the quantum circuit for this Hamiltonian, along with the correct pauli bstring,
+    # the operator and trotter evolution circuit
     qc, bitstring, ham_op, evo = create_circuit(
         n_spins=n_spins,
         time=t,
         method=method,
+        use_inverse_flag=use_inverse_flag,
         init_state=init_state,
         num_trotter_steps=K,
         random_pauli_flag=random_pauli_flag,
