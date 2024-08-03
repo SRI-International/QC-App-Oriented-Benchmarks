@@ -400,9 +400,11 @@ def get_args():
     parser.add_argument("--max_circuits", "-c", default=1, help="Maximum circuit repetitions", type=int)     
     parser.add_argument("--hamiltonian", "-ham", default="TFIM", help="Name of Hamiltonian", type=str)
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-    #parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
+    parser.add_argument("--data_suffix", "-suffix", default=None, help="Data File Suffix", type=str)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
+    parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
     parser.add_argument("--use_inverse_flag", "-inverse", action="store_true", help="Use inverse evolution")
     parser.add_argument("--do_sqrt_fidelity", "-sqrt", action="store_true", help="Return square root of fidelities")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="Gen random paulis")
@@ -413,9 +415,7 @@ def get_args():
     parser.add_argument("--global_enc", "-param_enc", default=None, help="paramater enc")
     parser.add_argument("--global_pbc_val", "-param_pbc_val", default=None, help="paramater pbc_val")
     parser.add_argument("--global_ratio", "-param_ratio", default=None, help="paramater ratio")
-    parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")
-    parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
-    parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)   
+    parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")      
     return parser.parse_args()
  
 # if main, execute method
@@ -436,6 +436,7 @@ if __name__ == '__main__':
     ex.verbose = args.verbose
     verbose = args.verbose
     hamlib_simulation_kernel.verbose = args.verbose
+    metrics.data_suffix = args.data_suffix
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
