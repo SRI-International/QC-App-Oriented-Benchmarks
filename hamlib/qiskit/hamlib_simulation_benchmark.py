@@ -436,7 +436,9 @@ if __name__ == '__main__':
     ex.verbose = args.verbose
     verbose = args.verbose
     hamlib_simulation_kernel.verbose = args.verbose
-    metrics.data_suffix = args.data_suffix
+    
+    if args.data_suffix is not None:
+        metrics.data_suffix = args.data_suffix
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
