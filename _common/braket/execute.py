@@ -54,6 +54,19 @@ result_handler = None
 
 verbose = False
 
+# Print additional time metrics for each stage of execution
+verbose_time = False
+
+import logging
+# logger for this module
+logger = logging.getLogger(__name__)
+
+# Option to compute normalized depth during execution (can disable to reduce overhead in large circuits)
+use_normalized_depth = True
+
+# Option to perform explicit transpile to collect depth metrics
+do_transpile_metrics = True
+
 # Special object class to hold job information and used as a dict key
 class Job:
     pass
@@ -65,6 +78,8 @@ def init_execution(handler):
     active_circuits.clear()
     result_handler = handler
 
+    # On initialize, always set trnaspilation for metrics and execute to True
+    set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
 
 # Set the backend for execution
 def set_execution_target(backend_id='simulator'):
@@ -134,6 +149,37 @@ def execute_circuit(batched_circuit):
         
     # Initiate execution (currently, waits for completion)
     job = Job()
+    circuit = batched_circuit["qc"]
+
+    # obtain initial circuit metrics
+    qc_depth, qc_size, qc_count_ops = get_circuit_metrics(circuit)
+
+    # default the normalized transpiled metrics to the same, in case exec fails
+    qc_tr_depth = qc_depth
+    qc_tr_size = qc_size
+    qc_tr_count_ops = qc_count_ops
+    #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
+
+    try:    
+        # transpile the circuit to obtain size metrics using normalized basis
+        if do_transpile_metrics and use_normalized_depth:
+            qc_tr_depth, qc_tr_size, qc_tr_count_ops = transpile_for_metrics(circuit)
+            
+            # we want to ignore elapsed time contribution of transpile for metrics (normalized depth)
+            active_circuit["launch_time"] = time.time()
+
+    except Exception as e:
+        print(f'ERROR: Failed to execute circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+        print(f"... exception = {e}")
+        return
+
+    # store circuit dimensional metrics
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'depth', qc_depth)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'size', qc_size)
+
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_depth', qc_tr_depth)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_size', qc_tr_size)
+    
     job.result = braket_execute(batched_circuit["qc"], batched_circuit["shots"])
     
     # put job into the active circuits with circuit info
@@ -276,3 +322,58 @@ def braket_execute(qc, shots=100):
 # Test circuit execution
 def test_execution():
     pass
+
+###############
+# Get circuit metrics fom the circuit passed in
+def get_circuit_metrics(qc):
+
+    logger.info('Entering get_circuit_metrics')
+    # print(qc)
+    
+    # obtain initial circuit size metrics
+    qc_depth = qc.depth
+    qc_size = len(qc.instructions)    # total gate operations
+    qc_count_ops = count_operations(qc)
+
+    return qc_depth, qc_size, qc_count_ops
+
+
+def count_operations(circuit):
+    operation_counts = {}
+
+    for instruction in circuit.instructions:
+        operation = instruction.operator.name
+        if operation in operation_counts:
+            operation_counts[operation] += 1
+        else:
+            operation_counts[operation] = 1
+
+    return operation_counts
+
+
+######
+# Set the state of the transpilation flags
+def set_tranpilation_flags(do_transpile_metrics = True, do_transpile_for_execute = True):
+    globals()['do_transpile_metrics'] = do_transpile_metrics
+    globals()['do_transpile_for_execute'] = do_transpile_for_execute
+
+######
+# Transpile the circuit to obtain normalized size metrics against a common basis gate set
+def transpile_for_metrics(qc):
+
+    logger.info('Entering transpile_for_metrics')
+    #print("*** Before transpile ...")
+    #print(qc)
+    st = time.time()
+
+    #kept Transpiled Depth and Algorithmic Depth same, to get the Volumetric Positioning Plot 
+    qc_tr_depth = qc.depth
+    qc_tr_size =len(qc.instructions)    # total gate operations 
+    qc_tr_count_ops = count_operations(qc)
+    # print(f"*** after transpile: 'qc_tr_depth' {qc_tr_depth} 'qc_tr_size' {qc_tr_size} 'qc_tr_count_ops' {qc_tr_count_ops}\n")
+    
+    
+    logger.info(f'transpile_for_metrics - {round(time.time() - st, 5)} (ms)')
+    if verbose_time: print(f"  *** transpile_for_metrics() time = {round(time.time() - st, 5)}")
+    
+    return qc_tr_depth, qc_tr_size, qc_tr_count_ops
