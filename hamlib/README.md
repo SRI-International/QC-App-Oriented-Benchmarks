@@ -95,7 +95,7 @@ K (int): Number of Trotter steps for the simulation.
           This is a crucial parameter for the precision of the Trotterized simulation.
 t (float): Total simulation time. This parameter is used to determine the evolution time for the Hamiltonian.
 ```
-You can run the code by passing various arguments to execute a desired Hamiltonian with a specific method in either a noisy or noiseless model. Below are the key arguments available for this benchmark:
+You can run the code by passing various arguments to execute a desired Hamiltonian with a specific method in either a noisy or noiseless model. Below are some key arguments available for this benchmark:
 
 | Parameters              | Arguments  | Description                                                                 | Default Value |
 |-------------------------|------------|-----------------------------------------------------------------------------|---------------|
@@ -121,7 +121,7 @@ python hamiltonian_simulation_benchmark.py -n 5 -init ghz -m 3 -ranp -non
 ```
 
 Explanation:
-
+```
     -n 5: Specifies the use of 5 qubits for the simulation (sets both min_qubits and max_qubits to 5).
     -init ghz: Sets the initial state to GHZ.
     -m 3: Applies Method 3, which involves using mirror circuits.
