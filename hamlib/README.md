@@ -207,9 +207,11 @@ Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the
 
 ## Mirror Circuit Method:
 
-The primary goal of the mirror circuit is to create a scalable benchmarks for the Hamiltonian Simulation circuits. There are several options for how the mirror circuits are constructed. By default, a mirror circuit consists of an initial state, the trotterized Hamiltonian simulation circuit, then the inverse of the trotterized circuit. In this case, the correct distribution is simply the starting state. 
+The primary goal of the mirror circuit is to create scalable benchmarks for the Hamiltonian Simulation circuits. There are several options for how the mirror circuits are constructed. By default, a mirror circuit consists of an initial state, the Trotterized Hamiltonian simulation circuit, and then the inverse of the Trotterized circuit. In this case, the correct distribution is simply the starting state.
 
-The first option to consider is to apply a randomized pauli layer in the center of the circuit. method that applies a Quasi Hamiltonian $\widetilde{H}$ instead of an Inverse Hamiltonian. After the hamiltonian is applied, a layer of random pauli gates $P_{random}$ is applied, and then the $\widetilde{H}$ is applied such that the overall circuit becomes a Resultant Pauli Operator $P_{resultant}$ applied over the initial state $Init$, i.e. $\widetilde{H} P_{random} H Init = P_{resultant} Init$.
+The first option to consider is to apply a randomized Pauli layer in the center of the circuit. This layer is designed to lessen error propagation between the two halves of the circuit, improving the accuracy of the simulation. To most effectively utilize the randomized Pauli layer, set `max_circuits` > 1 to average over several random Pauli circuits. 
+
+There is also the option to use a random initial state, which replaces the currently set initial state with a completely random one. This allows for testing the circuit's performance and robustness under varied initial conditions, providing a more comprehensive evaluation of the simulation.
 
 
 ## References
