@@ -14,14 +14,23 @@ This benchmark is a more advanced version of the existing Hamiltonian Simulation
 
 This benchmark is written as a simulation of non-trivial Hamiltonians from Hamlib. It currently supports the following Hamiltonians: The Fermi-Hubbard Model, the Bose-Hubbard Model, the Heisenberg Model, the Transverse Field Ising Model, and the Max3Sat problem. However, it can be easily generalized to benchmark any of the other Hamiltonians classes from Hamlib. 
 
-**For the Heisenberg Hamiltonian**, we start the system in an easily preparable classical state $|\psi(0)\rangle\equiv|010101\ldots\rangle$. **For the Transverse Field Ising Model (TFIM)**, we start the system in a GHZ state  $|\psi(0)\rangle = \left| \text{GHZ} \right\rangle = \frac{1}{\sqrt{2}} \left( |0\rangle^{\otimes n} + |1\rangle^{\otimes n} \right)$, where $n$ is equivalently the number of spins or qubits. In either case, we aim to evolve the system for $t$ time according to the solution to the Schrödinger equation with $H$ constant,
+The benchmark evolves an initial state according to a Hamiltonian $H$. The benchmark has two possible initial states, the checkerboard state $|\psi(0)\rangle\equiv|010101\ldots\rangle$ or the GHZ state  $|\psi(0)\rangle = \left| \text{GHZ} \right\rangle = \frac{1}{\sqrt{2}} \left( |0\rangle^{\otimes n} + |1\rangle^{\otimes n} \right)$, where $n$ is equivalently the number of spins or qubits. In either case, we aim to evolve the system for $t$ time according to the solution to the Schrödinger equation with $H$ constant,
 
 $$
 |\psi(t)\rangle=e^{-i{H}t}|\psi(0)\rangle
 $$
 
-
 where we set <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\hbar=1"> here and elsewhere.
+
+# Fermi-Hubbard Model
+
+The Fermi-Hubbard Hamiltonian \cite{hubbard1964electron} models the dynamics of fermions on lattice sites and is given by
+\[
+H_{FH} = -t \sum_{\langle i, j \rangle, \sigma} (c_{i,\sigma}^\dagger c_{j,\sigma} + c_{j,\sigma}^\dagger c_{i,\sigma}) + U \sum_i n_{i,\uparrow} n_{i,\downarrow},
+\]
+where \(\langle i, j \rangle\) denotes adjacent lattice sites \(i\) and \(j\), \(\sigma\) represents the fermion spin, \(c\) and \(c^\dagger\) are the fermionic annihilation and creation operators, respectively, and \(n_{j,\sigma} = c_{j,\sigma}^\dagger c_{j,\sigma}\) is the number operator. The first term of the Hamiltonian describes the tunneling of fermions between adjacent sites with amplitude \(t\), representing the noninteracting dynamics, while the second term captures the on-site fermion interaction with strength \(U\).
+
+For our benchmarks, we only use the 1D Fermi-Hubbard model but allow varying $U$ and $t$. 
 
 ### Heisenberg Model
 
@@ -117,7 +126,7 @@ Example Command
 Here’s how you can run the script with specific parameters:
 
 ```
-python hamiltonian_simulation_benchmark.py -n 5 -init ghz -m 3 -ranp -non
+python hamlib_simulation_benchmark.py -n 5 -init ghz -m 3 -ranp -non
 ```
 
 Explanation:
@@ -151,12 +160,6 @@ If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolo
 
 *Fig 1. Example of circuit with 1 Trotter step. We can see that our <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^x_i"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^y_i"/> turned into Rx and Ry gates, while the two qubit interactions turned into the gates that result from exponentiating these terms in the Hamiltonian. Note that this circuit application is less efficient than applying the XX, YY, and ZZ operations all at once.*
 
-<p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/ham_sim_full_circuit.png"  width="700" />
-</p>
-
-*Fig 2. Circuit with 2 Trotter steps and the optimal XXYYZZ operator.*
-
 ### Algorithm Steps
 
 1. Initialize qubits in either Checkerboard or GHZ state.
@@ -175,17 +178,7 @@ If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolo
 
 ## Gate Implementation
 
-There are two options of circuit creation for this simulation:
-
-- **Default:** Optimal implementation of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX+YY+ZZ)}"/>, used as the default. See [[4]](#references) for reasoning for why this is the optimal application of gates.
-
-- **use_XX_YY_ZZ_gates:** Simple implementation of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX)}"/>, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(YY)}"/>, and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(ZZ)}"/>, provided for reference purposes and validation of the optimal implementation. In essence, we initially generate <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(ZZ)}"/> using two CNOT gates and an RZ gate. We then apply the XX and YY versions of this gate by providing a basis change from Z to X and from Z to Y, using Hadamard gates for the X transformation and using S and Hadamard gates for the Y transformation respectively. These circuits are below. It is possible to use this type of gate by passing `use_XX_YY_ZZ_gates=True` to the `run()` function.
-
-<p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/XXYYZZ_gate.png"  />
-</p>
-
-*Fig 3. Optimal gate which applies <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX+YY+ZZ)}"/>.*
+Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the Pauli exponential gates used are shown below.
 
 ---
 
@@ -214,9 +207,9 @@ There are two options of circuit creation for this simulation:
 
 ## Mirror Circuit Method:
 
-The primary goal of the mirror circuit is to create a negative time evolution of hamiltonian such that the quantum state returns to its initial state. Currently, two different mirror circuit methods are applied. First one simply creates an inverse of the Hamiltonian. To create the inverse, all the quantum gates in the Hamiltonian are tracked and gates are applied such that $H^{-1} H Init= Init$ holds true for the entire circuit. Few important facts used for inverse circuit creation: $R_x(-\theta) R_x(\theta) = I$, $C_{not} C_{not} = I$, $H H = I$, etc.
+The primary goal of the mirror circuit is to create a scalable benchmarks for the Hamiltonian Simulation circuits. There are several options for how the mirror circuits are constructed. By default, a mirror circuit consists of an initial state, the trotterized Hamiltonian simulation circuit, then the inverse of the trotterized circuit. In this case, the correct distribution is simply the starting state. 
 
-The other method is the Randomized Pauli method that applies a Quasi Hamiltonian $\widetilde{H}$ instead of an Inverse Hamiltonian. After the hamiltonian is applied, a layer of random pauli gates $P_{random}$ is applied, and then the $\widetilde{H}$ is applied such that the overall circuit becomes a Resultant Pauli Operator $P_{resultant}$ applied over the initial state $Init$, i.e. $\widetilde{H} P_{random} H Init = P_{resultant} Init$.
+The first option to consider is to apply a randomized pauli layer in the center of the circuit. method that applies a Quasi Hamiltonian $\widetilde{H}$ instead of an Inverse Hamiltonian. After the hamiltonian is applied, a layer of random pauli gates $P_{random}$ is applied, and then the $\widetilde{H}$ is applied such that the overall circuit becomes a Resultant Pauli Operator $P_{resultant}$ applied over the initial state $Init$, i.e. $\widetilde{H} P_{random} H Init = P_{resultant} Init$.
 
 
 ## References
@@ -240,13 +233,3 @@ The other method is the Randomized Pauli method that applies a Quasi Hamiltonian
 [5] D. Zhu, S. Johri, N. H. Nguyen, C. Huerta Alderete, K. A. Landsman, N. M. Linke, C. Monroe, A. Y. Matsuura. (2021).
     Probing many-body localization on a noisy quantum computer.
     [`arXiv:2006.12355`](https://arxiv.org/abs/2006.12355)
-
-[//]: # (Below are some thoughts that went into the choice of the type of Hamiltonian simulation to be used for this benchmark.)
-
-[//]: # (Nearest-neighbor 1D, 2D and 3D cases are all physically motivated, corresponding to say, a nanowire, a thin film, and a cubic crystal. In this case, 1D is a suitable benchmark for current quantum computers since it has the least number of gates. As quantum computers improve, the simulation benchmarks could be designed to include higher dimensions.)
-
-[//]: # (If interactions between all pairs of spins were to be added, it would correspond to a limit of the long-range Heisenberg model. There are studies on this, but it may not show the localization behavior being captured in the accuracy metric in the benchmark. For this reason, the benchmark was written for the 1D case only.)
-
-[//]: # (The bodies being simulated can be represented as a linear chain of bodies, i.e. a 'open boundary condition' or in a circle, i.e. a 'periodic boundary condition'. In the limit of large system size, the boundary will not affect the bulk physics represented here. For small system sizes, periodic boundaries have some advantage in that they are less susceptible to 'edge effects', and the system can be Fourier transformed and studied in momentum space. Their drawback is that some numerical approximation techniques work poorly. In other simulation studies such as those of topological phenomena, there is important physics corresponding to a 'bulk-boundary correspondence', and the open edge is purposefully introduced.)
-
-[//]: # (Therefore, the choice of boundary condition depends on the system being studied and the computational technique being employed. Here it does not matter too much.)
