@@ -96,19 +96,21 @@ K (int): Number of Trotter steps for the simulation.
 t (float): Total simulation time. This parameter is used to determine the evolution time for the Hamiltonian.
 ```
 You can run the code by passing various arguments to execute a desired Hamiltonian with a specific method in either a noisy or noiseless model. Below are the key arguments available for this benchmark:
-Parameters	Arguments	Description	Default Value
---num_shots	-s	Number of measurement shots for each circuit execution	100
---num_qubits	-n	Number of qubits (sets both min and max qubits to the same value)	0
---min_qubits	-min	Minimum number of qubits for the simulation	3
---max_qubits	-max	Maximum number of qubits for the simulation	8
---max_circuits	-c	Maximum number of circuit repetitions	1
---method	-m	Algorithm Method (1 for noiseless, 2 for classical, 3 for mirror circuit)	1
---nonoise	-non	Use Noiseless Simulator (enables a noiseless model for the simulation)	False
---time	-time	Total time of evolution for the Hamiltonian simulation	1
---num_steps	-steps	Number of Trotter steps for the simulation	5
---random_pauli_flag	-ranp	Generate random Pauli gates in the circuit	False
---random_init_flag	-rani	Generate random initial states for the simulation	False
---init_state	-init	Initial state for the quantum circuit (e.g., GHZ, Checkerboard)	None
+
+| Parameters              | Arguments  | Description                                                                 | Default Value |
+|-------------------------|------------|-----------------------------------------------------------------------------|---------------|
+| `--num_shots`           | `-s`       | Number of measurement shots for each circuit execution                      | `100`         |
+| `--num_qubits`          | `-n`       | Number of qubits (sets both min and max qubits to the same value)           | `0`           |
+| `--min_qubits`          | `-min`     | Minimum number of qubits for the simulation                                 | `3`           |
+| `--max_qubits`          | `-max`     | Maximum number of qubits for the simulation                                 | `8`           |
+| `--max_circuits`        | `-c`       | Maximum number of circuit repetitions                                       | `1`           |
+| `--method`              | `-m`       | Algorithm Method (1 for noiseless, 2 for classical, 3 for mirror circuit)   | `1`           |
+| `--nonoise`             | `-non`     | Use Noiseless Simulator (enables a noiseless model for the simulation)      | `False`       |
+| `--time`                | `-time`    | Total time of evolution for the Hamiltonian simulation                      | `1`           |
+| `--num_steps`           | `-steps`   | Number of Trotter steps for the simulation                                  | `5`           |
+| `--random_pauli_flag`   | `-ranp`    | Generate random Pauli gates in the circuit                                  | `False`       |
+| `--random_init_flag`    | `-rani`    | Generate random initial states for the simulation                           | `False`       |
+| `--init_state`          | `-init`    | Initial state for the quantum circuit (e.g., GHZ, Checkerboard)             | `None`        |
 
 Example Command
 
