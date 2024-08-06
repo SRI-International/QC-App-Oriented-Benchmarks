@@ -8,7 +8,7 @@ In the second strategy, we compare the quantum simulation against a classical si
 
 In the third strategy, we use the mirror circuits method developed by Sandia Laboratories [[2]](#references). This technique constructs a mirror circuit, which is a base circuit followed by a reverse circuit. It produces an easy to verify correct distribution. This is scalable to all qubit sizes. 
 
-This benchmark is a more advanced version of the existing Hamiltonian Simulation Benchmark. It offers the user several Hamiltonians to simulate from Hamlib [3](#references), a comprehensive dataset of qubit-based Hamiltonians. It also offers a more sophisticated version of the mirror circuits method that uses techniques such as a random Pauli layer and random initial state to reduce unintentional error effects from the circuit mirroring.  
+This benchmark is a more advanced version of the existing Hamiltonian Simulation Benchmark. It offers the user several Hamiltonians to simulate from Hamlib [[3]](#references), a comprehensive dataset of qubit-based Hamiltonians. It also offers a more sophisticated version of the mirror circuits method that uses techniques such as a random Pauli layer and random initial state to reduce unintentional error effects from the circuit mirroring.  
 
 ## Problem outline
 
@@ -160,11 +160,11 @@ Explanation:
 
 ## Classical algorithm
 
-Much effort has been made in the field of many-body physics to understand the approximate behaviors of Hamiltonians like the ones we have here. However, to calculate the evolution of an excited state through exact diagonalization scales approximately as <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(2^{3n})"> for <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}n"> qubits, quite poor scaling [[2]](#references). This quickly becomes intractable even utilizing extremely powerful classical supercomputers.
+Much effort has been made in the field of many-body physics to understand the approximate behaviors of Hamiltonians like the ones we have here. However, to calculate the evolution of an excited state through exact diagonalization scales approximately as <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(2^{3n})"> for <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}n"> qubits, quite poor scaling [[4]](#references). This quickly becomes intractable even utilizing extremely powerful classical supercomputers.
 
 ## Quantum algorithm
 
-To run this algorithm on our quantum computer, we need to find a way to apply the unitary <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}U(t)\equiv{e}^{-i{H}t}"/> through a combination of quantum gates. In order to approximate this operator, we use Trotterization [[3]](#references), where we note that Lie product formula gives
+To run this algorithm on our quantum computer, we need to find a way to apply the unitary <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}U(t)\equiv{e}^{-i{H}t}"/> through a combination of quantum gates. In order to approximate this operator, we use Trotterization [[5]](#references), where we note that Lie product formula gives
 
 <p align="center">
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{-i{\sum_j{H}_j}t}=\lim_{k\rightarrow\infty}\left(\prod_j{e}^{-iH_j{t}/k}\right)^k"/>.
@@ -240,18 +240,14 @@ There is also the option to use a random initial state, which replaces the curre
 
 [2] Proctor, T., Rudinger, K., Young, K. et al. Measuring the capabilities of quantum computers. Nat. Phys. 18, 75–79 (2022). https://doi.org/10.1038/s41567-021-01409-7 
 
-[2] Andrew M. Childs, Dmitri Maslov, Yunseong Nam, Neil J. Ross, Yuan Su. (2017).
+[3] Sawaya, N. P., Marti-Dafcik, D., Ho, Y., Tabor, D. P., Neira, D. E. B., Magann, A. B., ... & Camps, D. (2023, September). 
+    HamLib: A library of Hamiltonians for benchmarking quantum algorithms and hardware. 
+    In 2023 IEEE International Conference on Quantum Computing and Engineering (QCE) (Vol. 2, pp. 389-390). IEEE.
+
+[4] Andrew M. Childs, Dmitri Maslov, Yunseong Nam, Neil J. Ross, Yuan Su. (2017).
     Toward the first quantum simulation with quantum speedup.
     [`arXiv:1711.10980`](https://arxiv.org/pdf/1711.10980.pdf)
 
-[3] Naomichi Hatano, Masuo Suzuki. (2005).
+[5] Naomichi Hatano, Masuo Suzuki. (2005).
     Finding Exponential Product Formulas of Higher Orders
     [`arXiv:math-ph/0506007`](https://arxiv.org/abs/math-ph/0506007v1)
-
-[4] Farrokh Vatan, Colin Williams. (2004).
-    Optimal Quantum Circuits for General Two-Qubit Gates.
-    [`arXiv:quant-ph/0308006`](https://arxiv.org/abs/quant-ph/0308006)
-
-[5] D. Zhu, S. Johri, N. H. Nguyen, C. Huerta Alderete, K. A. Landsman, N. M. Linke, C. Monroe, A. Y. Matsuura. (2021).
-    Probing many-body localization on a noisy quantum computer.
-    [`arXiv:2006.12355`](https://arxiv.org/abs/2006.12355)
