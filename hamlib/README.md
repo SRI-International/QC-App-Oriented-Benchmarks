@@ -72,11 +72,6 @@ max_qubits (int): Maximum number of qubits for the simulation.
 max_circuits (int): Maximum number of circuits to execute per group.
 skip_qubits (int): Increment of number of qubits between simulations.
 num_shots (int): Number of measurement shots for each circuit execution.
-hamiltonian (str): The type of Hamiltonian to simulate. Default is "TFIM" (Transverse Field Ising Model).
-                    Options include:
-                    - "TFIM": Transverse Field Ising Model.
-                    - "heisenberg": Heisenberg model.
-                
 method (int): Method for fidelity checking. 
               Options include:
 hamiltonian (str): The type of Hamiltonian to simulate. Default is "tfim".
