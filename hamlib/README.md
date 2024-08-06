@@ -51,7 +51,7 @@ where $b_i^\dagger$ and $b_i$ denote the creation and annihilation operators res
 We implement the following Hamiltonian for the quantum Heisenberg model:
 
 $$
-H_{\text{Heis}} = \sum_{i=1}^{N} (\vec{\sigma}_i \cdot \vec{\sigma}_{i+1} + h Z_i).
+H_{\text{Heis}} = \sum_{i=1}^{N} (\vec{\sigma}_i \cdot \vec{\sigma}\_{i+1} + h Z_i).
 $$
 
 where $\vec{\sigma}_i = (X_i, Y_i, Z_i)$. This Hamiltonian, known as the Heisenberg XXX model, incorporates an external magnetic field represented by $h$, where $h$ modulates the strength of the magnetic field interaction along the Z-axis of each spin.
@@ -87,7 +87,7 @@ The first two methods evolve an initial state a time $t$ and compare the final s
 
 These correct distributions are created on-the-fly as the benchmarks are run. (This is unlike the Hamiltonian Simulation Benchmark, which uses precalculated distributions.) This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in the number of qubits. 
 
-Method = 3 uses a mirror circuit built using the Hamiltonian Simulation circuit, designed so that the correct distribution is trivial. It applies first the circuit, then the reverse of the circuit, so that the final state should be the (trivial) initial state. There are additional options to use a layer of random Paulis in the middle and/or a random initial state to increase generality and resistance to unintentional error effects from the structure of mirroring. This method scales to any size of qubits, since the correct distribution is easy to calculate.  
+Method = 3 uses a mirror circuit built using the Hamiltonian Simulation circuit, designed so that the correct distribution is trivial. It applies first the circuit, then the reverse of the circuit, so that the final state should be the (trivial) initial state. There are additional options to use a layer of random Paulis in the middle and/or a random initial state to increase generality and resistance to unintentional error effects from the structure of mirroring. **See the Mirror Circuit section below for more details.** This method scales to any size of qubits, since the correct distribution is easy to calculate.  
 
 In all cases, we compare the resultant distribution using our [noise-normalized fidelity calculation](../_doc/POLARIZATION_FIDELITY.md).
 
