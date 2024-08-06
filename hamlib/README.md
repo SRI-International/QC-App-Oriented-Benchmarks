@@ -27,41 +27,54 @@ where we set <img align=center src="https://latex.codecogs.com/svg.latex?\pageco
 ### Fermi-Hubbard Model
 
 The Fermi-Hubbard Hamiltonian models the dynamics of fermions on lattice sites and is given by
-\[
-H_{FH} = -t \sum_{\langle i, j \rangle, \sigma} (c_{i,\sigma}^\dagger c_{j,\sigma} + c_{j,\sigma}^\dagger c_{i,\sigma}) + U \sum_i n_{i,\uparrow} n_{i,\downarrow},
-\]
-where \(\langle i, j \rangle\) denotes adjacent lattice sites \(i\) and \(j\), \(\sigma\) represents the fermion spin, \(c\) and \(c^\dagger\) are the fermionic annihilation and creation operators, respectively, and \(n_{j,\sigma} = c_{j,\sigma}^\dagger c_{j,\sigma}\) is the number operator. The first term of the Hamiltonian describes the tunneling of fermions between adjacent sites with amplitude \(t\), representing the noninteracting dynamics, while the second term captures the on-site fermion interaction with strength \(U\).
 
-For our benchmarks, we only use the 1D Fermi-Hubbard model but allow varying $U$ and $t$. 
+$$
+H_{FH} = -t \sum_{\langle i, j \rangle, \sigma} (c_{i,\sigma}^\dagger c_{j,\sigma} + c_{j,\sigma}^\dagger c_{i,\sigma}) + U \sum_i n_{i,\uparrow} n_{i,\downarrow},
+$$
+
+where $\langle i, j \rangle$ denotes adjacent lattice sites $i$ and $j$, $\sigma$ represents the fermion spin, $c$ and $c^\dagger$ are the fermionic annihilation and creation operators, respectively, and $n_{j,\sigma} = c_{j,\sigma}^\dagger c_{j,\sigma}$ is the number operator. The first term of the Hamiltonian describes the tunneling of fermions between adjacent sites with amplitude $t$, representing the noninteracting dynamics, while the second term captures the on-site fermion interaction with strength $U$.
+
+For our benchmarks, we only use the 1D Fermi-Hubbard model but allow varying $U$ and $t$.
 
 ### Bose-Hubbard Model
 
-the Bose-Hubbard model is expressed as
-\[
+The Bose-Hubbard model is expressed as
+
+$$
 H_{BH} = -t \sum_i (b_i^\dagger b_{i+1} + b_{i+1}^\dagger b_i) + \frac{U}{2} \sum_i n_i(n_i - 1),
-\]
-where \(b_i^\dagger\) and \(b_i\) denote the creation and annihilation operators respectively, \(n_i = b_i^\dagger b_i\) represents the number operator at site \(i\), \(t\) is the tunnelling strength (assumed to be \(t = 1\) in this dataset), and \(U\) is the interaction energy per site.
+$$
+
+where $b_i^\dagger$ and $b_i$ denote the creation and annihilation operators respectively, $n_i = b_i^\dagger b_i$ represents the number operator at site $i$, $t$ is the tunneling strength (assumed to be $t = 1$ in this dataset), and $U$ is the interaction energy per site.
 
 ### Heisenberg Model
-we implement the following Hamiltonian for the quantum Heisenberg model,
-\[
+
+We implement the following Hamiltonian for the quantum Heisenberg model:
+
+$$
 H_{\text{Heis}} = \sum_{i=1}^{N} (\vec{\sigma}_i \cdot \vec{\sigma}_{i+1} + h Z_i).
-\]
-where \(\vec{\sigma}_i = (X_i, Y_i, Z_i)\). This Hamiltonian, known as the Heisenberg XXX model, incorporates an external magnetic field represented by \( h \), where \( h \) modulates the strength of the magnetic field interaction along the Z-axis of each spin.
+$$
+
+where $\vec{\sigma}_i = (X_i, Y_i, Z_i)$. This Hamiltonian, known as the Heisenberg XXX model, incorporates an external magnetic field represented by $h$, where $h$ modulates the strength of the magnetic field interaction along the Z-axis of each spin.
+
 ### Transverse Field Ising Model (TFIM)
+
 The Hamiltonian for this model is expressed as
-\[
+
+$$
 H = \sum_i h_i X_i + \sum_{\langle i, j \rangle} Z_i Z_j,
-\]
-where the summation extends over each edge \(\langle i, j \rangle\) within the lattice.
+$$
+
+where the summation extends over each edge $\langle i, j \rangle$ within the lattice.
 
 ### Max3Sat Problem
 
-To represent a 3-SAT problem in quantum computing, one constructs a Hamiltonian by summing terms involving three variables. If no negations are included, the Hamiltonian for a clause \(x_i \lor x_j \lor x_k\) is represented as:
-\[
+To represent a 3-SAT problem in quantum computing, one constructs a Hamiltonian by summing terms involving three variables. If no negations are included, the Hamiltonian for a clause $(x_i \lor x_j \lor x_k)$ is represented as:
+
+$$
 x_i \lor x_j \lor x_k = I - \frac{1}{8} (I + Z_i)(I + Z_j)(I + Z_k),
-\]
-where \(I\) is the identity matrix and \(Z\) denotes the Pauli-Z operator, reflecting the influence of each variable in the clause.
+$$
+
+where $I$ is the identity matrix and $Z$ denotes the Pauli-Z operator, reflecting the influence of each variable in the clause.
 
 ## Benchmarking
 The Hamiltonian Simulation algorithm is benchmarked by running **just a single circuit**. This circuit is repeated a number of times denoted by `num_shots`. We then run the algorithm circuit for numbers of qubits between `min_qubits` and `max_qubits`, inclusive. The test returns the averages of the circuit creation times, average execution times, fidelities, and circuit depths, like all of the other algorithms. 
