@@ -66,7 +66,6 @@ In the run() method for the benchmark, several optional arguments can be specifi
 ```
 Parameters 
 ---- 
-```
 min_qubits (int): Minimum number of qubits for the simulation. 
                   The smallest circuit is 2 qubits.
 max_qubits (int): Maximum number of qubits for the simulation.
