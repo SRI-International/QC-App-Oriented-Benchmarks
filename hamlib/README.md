@@ -52,51 +52,82 @@ The Hamiltonian Simulation algorithm is benchmarked by running **just a single c
 
 There are currently three methods for how to produce the fidelity metric. All three methods evolve a state and create a metric based on how well the state evolved. 
 
-The first two methods evolve an initial state a time $t$ and compare the final state against a precalculated distribution. Method = 1 creates the precalculated distribution from a noiseless simulation of the Hamiltonian Simulation quantum circuit. Method = 2 uses a classical matrix technique to simulate the evolution of the Hamiltonian directly. Whereas method = 1 only tests the performance of the hardware, method = 2 also tests the accuracy of the Hamiltonian simulation itself. 
+In all three methods, by default, we set the trotterization steps (k) to 5 and the total time to 1, but these can be set to different values at the user's discretion.  
 
-We calculate these precalculated distributions in the Jupyter Notebook `precalculated_data.ipynb`, which stores the results for up to 20 qubits in the `precalculated_data.json` data file. The Python code then imports the distributions from the `JSON` file. This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in the number of qubits. 
+The first two methods evolve an initial state a time $t$ and compare the final state against a correct distribution. Method = 1 creates the correct distribution from a noiseless simulation of the Hamiltonian Simulation quantum circuit. Method = 2 creates a correct distribution from a classical matrix technique to simulate the evolution of the Hamiltonian directly. Whereas method = 1 only tests the performance of the hardware, method = 2 also tests the accuracy of the Hamiltonian simulation itself. 
 
-In the `precalculated_data.ipnyb`, we set the trotterization steps (k) to 5 and the time to .2. For the Heisenberg Hamiltonian, $w$ is set to 1 but $J$ is hard-coded to 1. For TFIM, the Hamiltonian variables are both hard-coded to $J=1$ and $h=1$ respectively. 
+These correct distributions are created on-the-fly as the benchmarks are run. (This is unlike the Hamiltonian Simulation Benchmark, which uses precalculated distributions.) This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in the number of qubits. 
 
-Method = 3 uses a mirror circuit based on the Hamiltonian Simulation circuit, designed so that the target distribution is trivial. It evolves an initial state forwards a time $t$, then backward in time $t$, so that the final state should be the (trivial) initial state. Because this doesn't utilize classical resources to generate a comparison metric, this scales to any size of qubits. 
-
+Method = 3 uses a mirror circuit built using the Hamiltonian Simulation circuit, designed so that the correct distribution is trivial. It applies first the circuit, then the reverse of the circuit, so that the final state should be the (trivial) initial state. There are additional options to use a layer of random Paulis in the middle and/or a random initial state to increase generality and resistance to unintentional error effects from the structure of mirroring. This method scales to any size of qubits, since the correct distribution is easy to calculate.  
 
 In all cases, we compare the resultant distribution using our [noise-normalized fidelity calculation](../_doc/POLARIZATION_FIDELITY.md).
 
 In the run() method for the benchmark, several optional arguments can be specified. Some of the key parameters are as follows: 
-
 ```
 Parameters 
 ---- 
-
-min_qubits (int): Minimum number of qubits (smallest circuit is 2 qubits).
-max_qubits (int): Maximum number of qubits.
+```
+min_qubits (int): Minimum number of qubits for the simulation. 
+                  The smallest circuit is 2 qubits.
+max_qubits (int): Maximum number of qubits for the simulation.
 max_circuits (int): Maximum number of circuits to execute per group.
-num_shots (int): Number of shots for each circuit execution.
-hamiltonian (str): Which Hamiltonian to run. "Heisenberg" by default but can also choose "TFIM". 
-method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical, 3 for mirror circuit.)
-use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
-random_pauli_flag (bool): Flag to activate more sophisticated mirror circuit formation that utilizes a layer of random paulis separating the mirror circuits in addition to using a quasi-inverse rather than an inverse. 
-init_state (str): The desired initial state. Choices are "checkerboard" or "ghz".
+skip_qubits (int): Increment of number of qubits between simulations.
+num_shots (int): Number of measurement shots for each circuit execution.
+hamiltonian (str): The type of Hamiltonian to simulate. Default is "TFIM" (Transverse Field Ising Model).
+                    Options include:
+                    - "TFIM": Transverse Field Ising Model.
+                    - "heisenberg": Heisenberg model.
+                
+method (int): Method for fidelity checking. 
+              Options include:
+hamiltonian (str): The type of Hamiltonian to simulate. Default is "tfim".
+                    Options include:
+                    - "tfim": Transverse Field Ising Model.
+                    - "heis": Heisenberg model.
+                    - "random_max3sat-hams": Random Max 3-SAT Hamiltonians for binary optimization problems.
+                    - "FH_D-1": Fermi-Hubbard model in 1D
+                    - "BH_D-1_d-4": Bose-Hubbard model in 1D
+random_pauli_flag (bool): If True and method is 3, activates random Pauli gates in the circuit.
+random_init_flag (bool): If True, initializes random quantum states. 
+                          Only active if random_pauli_flag is True and method is 3.
+use_inverse_flag (bool): If True, uses the inverse of the quantum circuit rather than the original circuit.
+do_sqrt_fidelity (bool): If True, computes the square root of the fidelity for measurement results.
+init_state (str): Specifies the initial state for the quantum circuit. 
+                  If None, a default state is used.
+K (int): Number of Trotter steps for the simulation. 
+          This is a crucial parameter for the precision of the Trotterized simulation.
+t (float): Total simulation time. This parameter is used to determine the evolution time for the Hamiltonian.
+```
+You can run the code by passing various arguments to execute a desired Hamiltonian with a specific method in either a noisy or noiseless model. Below are the key arguments available for this benchmark:
+Parameters	Arguments	Description	Default Value
+--num_shots	-s	Number of measurement shots for each circuit execution	100
+--num_qubits	-n	Number of qubits (sets both min and max qubits to the same value)	0
+--min_qubits	-min	Minimum number of qubits for the simulation	3
+--max_qubits	-max	Maximum number of qubits for the simulation	8
+--max_circuits	-c	Maximum number of circuit repetitions	1
+--method	-m	Algorithm Method (1 for noiseless, 2 for classical, 3 for mirror circuit)	1
+--nonoise	-non	Use Noiseless Simulator (enables a noiseless model for the simulation)	False
+--time	-time	Total time of evolution for the Hamiltonian simulation	1
+--num_steps	-steps	Number of Trotter steps for the simulation	5
+--random_pauli_flag	-ranp	Generate random Pauli gates in the circuit	False
+--random_init_flag	-rani	Generate random initial states for the simulation	False
+--init_state	-init	Initial state for the quantum circuit (e.g., GHZ, Checkerboard)	None
+
+Example Command
+
+Here’s how you can run the script with specific parameters:
+
+```
+python hamiltonian_simulation_benchmark.py -n 5 -init ghz -m 3 -ranp -non
 ```
 
-We can run the code by passing various arguments to run a desired hamiltonian with specific method in noisy or noiseless model. Key arguments are:
+Explanation:
 
-```
-Parameters              Arguments
-----                    ----
-
---num_qubits            : -n     (default is <= Max qubits)
---hamiltonian           : -ham   (default is heisenberg)
---method                : -m     (default is 1)
---nonoise               : -non   (default is noisy model)
---random_pauli_flag     : -ranp  (default is mirror method with inverse)
---init_state            : -init  (default is Checkerboard)
-
-"python hamiltonian_simulation_benchmark.py -ham tfim -n 5 -init ghz -m 3-ranp -non"
-runs the TFIM hamiltonian for 5 qubits starting with ghz initial state and applies
-method 3 with random paulis and it is ran in a 0 noise model.
-
+    -n 5: Specifies the use of 5 qubits for the simulation (sets both min_qubits and max_qubits to 5).
+    -init ghz: Sets the initial state to GHZ.
+    -m 3: Applies Method 3, which involves using mirror circuits.
+    -ranp: Activates random Pauli gates in the circuit.
+    -non: Runs the simulation in a noiseless model.
 ```
 
 ## Classical algorithm
