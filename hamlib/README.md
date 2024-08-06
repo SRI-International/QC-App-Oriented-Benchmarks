@@ -22,9 +22,11 @@ $$
 
 where we set <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\hbar=1"> here and elsewhere.
 
-# Fermi-Hubbard Model
+**The following Hamiltonians are currently supported. See the Benchmarking section below to see how to select them. For the physical models, only the 1D cases have been implemented thus far.** 
 
-The Fermi-Hubbard Hamiltonian \cite{hubbard1964electron} models the dynamics of fermions on lattice sites and is given by
+### Fermi-Hubbard Model
+
+The Fermi-Hubbard Hamiltonian models the dynamics of fermions on lattice sites and is given by
 \[
 H_{FH} = -t \sum_{\langle i, j \rangle, \sigma} (c_{i,\sigma}^\dagger c_{j,\sigma} + c_{j,\sigma}^\dagger c_{i,\sigma}) + U \sum_i n_{i,\uparrow} n_{i,\downarrow},
 \]
@@ -32,29 +34,34 @@ where \(\langle i, j \rangle\) denotes adjacent lattice sites \(i\) and \(j\), \
 
 For our benchmarks, we only use the 1D Fermi-Hubbard model but allow varying $U$ and $t$. 
 
+### Bose-Hubbard Model
+
+the Bose-Hubbard model is expressed as
+\[
+H_{BH} = -t \sum_i (b_i^\dagger b_{i+1} + b_{i+1}^\dagger b_i) + \frac{U}{2} \sum_i n_i(n_i - 1),
+\]
+where \(b_i^\dagger\) and \(b_i\) denote the creation and annihilation operators respectively, \(n_i = b_i^\dagger b_i\) represents the number operator at site \(i\), \(t\) is the tunnelling strength (assumed to be \(t = 1\) in this dataset), and \(U\) is the interaction energy per site.
+
 ### Heisenberg Model
-
-<p align="center">
-<img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}H=J\sum_{i=0}^{N-2}(\sigma^x_i\sigma^x_{i+1}+\sigma^y_i\sigma^y_{i+1}+\sigma^z_i\sigma^z_{i+1})+w\sum_{i=0}^{N-1}(h_{x,i}\sigma^x_i+h_{z,i}\sigma^z_i)"/>
-</p>
-
-Where <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}J"/> is the strength of the interaction, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}w"/> is the strength of the disordered fields, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{x,i}"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{z,i}"/> give the strength of the x and z disorded fields at site <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}i"/>, and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^{\{x,y,z\}}_i"/> are the usual Pauli operators acting on site <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}i"/>. We will use the notation <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\{X_i,Y_i,Z_i\}\equiv\sigma^{\{x,y,z\}}_i"/> interchangably throughout this explanation.
-
-The first sum represents the **interaction terms**, whereas the second represents the **disordered field terms** (see Fig 1.)
-
-In our benchmarks, currently both $J=1$ and $w=1$.
-
+we implement the following Hamiltonian for the quantum Heisenberg model,
+\[
+H_{\text{Heis}} = \sum_{i=1}^{N} (\vec{\sigma}_i \cdot \vec{\sigma}_{i+1} + h Z_i).
+\]
+where \(\vec{\sigma}_i = (X_i, Y_i, Z_i)\). This Hamiltonian, known as the Heisenberg XXX model, incorporates an external magnetic field represented by \( h \), where \( h \) modulates the strength of the magnetic field interaction along the Z-axis of each spin.
 ### Transverse Field Ising Model (TFIM)
+The Hamiltonian for this model is expressed as
+\[
+H = \sum_i h_i X_i + \sum_{\langle i, j \rangle} Z_i Z_j,
+\]
+where the summation extends over each edge \(\langle i, j \rangle\) within the lattice.
 
-The TFIM Hamiltonian is given by:
+### Max3Sat Problem
 
-$$
-H= J\sum_{i=0}^{N-2}\sigma^z_i\sigma^z_{i+1} + h\sum_{i=0}^{N-1}\sigma^x_i
-$$
-
-Where <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}J"/> is the coupling strength between neighboring spins, and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h"/> is the strength of the transverse field.
-
-In our benchmarks, currently both $J=1$ and $h=1$.
+To represent a 3-SAT problem in quantum computing, one constructs a Hamiltonian by summing terms involving three variables. If no negations are included, the Hamiltonian for a clause \(x_i \lor x_j \lor x_k\) is represented as:
+\[
+x_i \lor x_j \lor x_k = I - \frac{1}{8} (I + Z_i)(I + Z_j)(I + Z_k),
+\]
+where \(I\) is the identity matrix and \(Z\) denotes the Pauli-Z operator, reflecting the influence of each variable in the clause.
 
 ## Benchmarking
 The Hamiltonian Simulation algorithm is benchmarked by running **just a single circuit**. This circuit is repeated a number of times denoted by `num_shots`. We then run the algorithm circuit for numbers of qubits between `min_qubits` and `max_qubits`, inclusive. The test returns the averages of the circuit creation times, average execution times, fidelities, and circuit depths, like all of the other algorithms. 
