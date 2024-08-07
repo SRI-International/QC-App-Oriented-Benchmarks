@@ -1,18 +1,18 @@
 # HamLib Simulation - Benchmark Program
 
-Simulation of quantum systems is one of the most promising applications for quantum computers [[1]](#references). In the current version of this benchmark, we have three strategies for calculating fidelities. 
+Simulation of quantum systems is one of the most promising applications for quantum computers [[1]](#references). In the current version of this benchmark, we have three strategies for calculating the fidelity of a quantum Trotterization circuit. 
 
-In the first strategy, we compare the quantum simulation against a classical circuit simulation to report our fidelity. This works well for small circuit sizes but is not scalable past a certain number of qubits. 
+In the first strategy, we compare the trotter circuit results on target hardware against a classical circuit simulation to report our fidelity. This works well for small circuit sizes but is not scalable past a certain number of qubits. 
 
-In the second strategy, we compare the quantum simulation against a classical simulation of the exact Hamiltonian dynamics to report our fidelity. Again, this is not scalable.
+In the second strategy, we compare the trotter circuit results against a classical simulation of the exact Hamiltonian dynamics to report our fidelity. Again, this is not scalable.
 
-In the third strategy, we use the mirror circuits method developed by Sandia Laboratories [[2]](#references). This technique constructs a mirror circuit, which is a base circuit followed by a reverse circuit. It produces an easy to verify correct distribution. This is scalable to all qubit sizes. 
+In the third strategy, we use the mirror circuits method developed by Sandia Laboratories [[2]](#references). This technique constructs a mirror circuit, which is a base circuit followed by a reverse circuit. It produces an easy to verify correct distribution that still reflects the effectiveness of the original circuit. This is scalable to all qubit sizes. 
 
-This benchmark is a more advanced version of the existing Hamiltonian Simulation Benchmark. It offers the user several Hamiltonians to simulate from Hamlib [[3]](#references), a comprehensive dataset of qubit-based Hamiltonians. It also offers a more sophisticated version of the mirror circuits method that uses techniques such as a random Pauli layer and random initial state to reduce unintentional error effects from the circuit mirroring.  
+This benchmark is a more advanced version of the existing Hamiltonian Simulation Benchmark. It offers the user several Hamiltonians to simulate from Hamlib [[3]](#references), a comprehensive dataset of qubit-based Hamiltonians. It also offers a more complete version of the mirror circuits method that offers techniques such as implementing a random Pauli layer and random initial state to reduce unintentional error effects from the circuit mirroring.  
 
 ## Problem outline
 
-This benchmark is written as a simulation of non-trivial Hamiltonians from Hamlib. It currently supports the following Hamiltonians: The Fermi-Hubbard Model, the Bose-Hubbard Model, the Heisenberg Model, the Transverse Field Ising Model, and the Max3Sat problem. However, it can be easily generalized to benchmark any of the other Hamiltonians classes from Hamlib. 
+This benchmark is written as a simulation of non-trivial Hamiltonians from Hamlib. It currently supports the following Hamiltonians: The Fermi-Hubbard Model, the Bose-Hubbard Model, the Heisenberg Model, the Transverse Field Ising Model, and the Max3Sat problem. The first four problems have only been implemented in their 1D cases. However, the benchmark can be easily generalized to benchmark any of the other Hamiltonians classes from Hamlib. 
 
 The benchmark evolves an initial state according to a Hamiltonian $H$. The benchmark has two possible initial states, the checkerboard state $|\psi(0)\rangle\equiv|010101\ldots\rangle$ or the GHZ state  $|\psi(0)\rangle = \left| \text{GHZ} \right\rangle = \frac{1}{\sqrt{2}} \left( |0\rangle^{\otimes n} + |1\rangle^{\otimes n} \right)$, where $n$ is equivalently the number of spins or qubits. In either case, we aim to evolve the system for $t$ time according to the solution to the Schrödinger equation with $H$ constant,
 
@@ -77,7 +77,7 @@ $$
 where $I$ is the identity matrix and $Z$ denotes the Pauli-Z operator, reflecting the influence of each variable in the clause.
 
 ## Benchmarking
-The Hamiltonian Simulation algorithm is benchmarked by running **just a single circuit**. This circuit is repeated a number of times denoted by `num_shots`. We then run the algorithm circuit for numbers of qubits between `min_qubits` and `max_qubits`, inclusive. The test returns the averages of the circuit creation times, average execution times, fidelities, and circuit depths, like all of the other algorithms. 
+The Hamlib Simulation algorithm is benchmarked, in most cases, by running **just a single circuit (see Mirror Method Circuit Section for the exception.**) This circuit is repeated a number of times denoted by `num_shots`. We then run the algorithm circuit for numbers of qubits between `min_qubits` and `max_qubits`, inclusive. The test returns the averages of the circuit creation times, average execution times, fidelities, and circuit depths, like all of the other algorithms. 
 
 There are currently three methods for how to produce the fidelity metric. All three methods evolve a state and create a metric based on how well the state evolved. 
 
@@ -227,11 +227,11 @@ Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the
 
 ## Mirror Circuit Method:
 
-The primary goal of the mirror circuit is to create scalable benchmarks for the Hamiltonian Simulation circuits. There are several options for how the mirror circuits are constructed. By default, a mirror circuit consists of an initial state, the Trotterized Hamiltonian simulation circuit, and then the inverse of the Trotterized circuit. In this case, the correct distribution is simply the starting state.
+The primary goal of implementing the mirror circuit methods is to create accurate and scalable benchmarks for the Hamiltonian Simulation circuits. There are several options for how the mirror circuits are constructed. By default, a mirror circuit consists of an initial state, the Trotterized Hamiltonian simulation circuit, and then the inverse of the Trotterized circuit. In this case, the correct distribution is simply the starting state.
 
-The first option to consider is to apply a randomized Pauli layer in the center of the circuit. This layer is designed to lessen error propagation between the two halves of the circuit, improving the accuracy of the simulation. To most effectively utilize the randomized Pauli layer, set `max_circuits` > 1 to average over several random Pauli circuits. 
+The first option to consider is to apply a randomized Pauli layer in the center of the circuit. This layer is designed to lessen error propagation between the two halves of the circuit, improving the accuracy of the simulation since we are only interested in the error profile of half a mirror circuit. To most effectively utilize the randomized Pauli layer, set `max_circuits` > 1 to average over several random Pauli circuits, where each random Pauli circuit is run `num_shots` times. The reported metrics will be an average across all the random circuits results. 
 
-There is also the option to use a random initial state, which replaces the currently set initial state with a completely random one. This allows for testing the circuit's performance and robustness under varied initial conditions, providing a more comprehensive evaluation of the simulation.
+There is also the option to use a random initial state, which replaces the currently set initial state with a (Harr) random one. This allows for testing the circuit's performance under varied initial conditions, which may provide a more comprehensive evaluation of the simulation circuit. 
 
 
 ## References
