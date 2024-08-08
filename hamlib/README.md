@@ -43,7 +43,7 @@ H_{BH} = -t \sum_i (b_i^\dagger b_{i+1} + b_{i+1}^\dagger b_i) + \frac{U}{2} \su
 where \(b_i^\dagger\) and \(b_i\) denote the creation and annihilation operators respectively, \(n_i = b_i^\dagger b_i\) represents the number operator at site \(i\), \(t\) is the tunnelling strength (assumed to be \(t = 1\) in this dataset), and \(U\) is the interaction energy per site.
 
 ### Heisenberg Model
-we implement the following Hamiltonian for the quantum Heisenberg model,
+We implement the following Hamiltonian for the quantum Heisenberg model,
 \[
 H_{\text{Heis}} = \sum_{i=1}^{N} (\vec{\sigma}_i \cdot \vec{\sigma}_{i+1} + h Z_i).
 \]
