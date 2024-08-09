@@ -250,13 +250,6 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         max_circuits (int): Maximum number of circuits to execute per group.
         skip_qubits (int): Increment of number of qubits between simulations.
         num_shots (int): Number of measurement shots for each circuit execution.
-        hamiltonian (str): The type of Hamiltonian to simulate. Default is "TFIM" (Transverse Field Ising Model).
-                           Options include:
-                           - "TFIM": Transverse Field Ising Model.
-                           - "heisenberg": Heisenberg model.
-                        
-        method (int): Method for fidelity checking. 
-                      Options include:
         hamiltonian (str): The type of Hamiltonian to simulate. Default is "tfim".
                            Options include:
                            - "tfim": Transverse Field Ising Model.
@@ -264,6 +257,11 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
                            - "random_max3sat-hams": Random Max 3-SAT Hamiltonians for binary optimization problems.
                            - "FH_D-1": Fermi-Hubbard model in 1D
                            - "BH_D-1_d-4": Bose-Hubbard model in 1D
+        method (int): Method for fidelity checking. 
+                      Options include:
+                      - 1: Noiseless Trotterized Quantum Simulation.
+                      - 2: Exact Classical Simulation.
+                      - 3: Mirror Circuit Simulation using Sandia Labs' method.
         random_pauli_flag (bool): If True and method is 3, activates random Pauli gates in the circuit.
         random_init_flag (bool): If True, initializes random quantum states. 
                                  Only active if random_pauli_flag is True and method is 3.
