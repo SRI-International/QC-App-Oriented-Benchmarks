@@ -244,21 +244,42 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     Execute program with default parameters.
 
     Args:
-        min_qubits (int): Minimum number of qubits (smallest circuit is 2 qubits).
-        max_qubits (int): Maximum number of qubits.
+        min_qubits (int): Minimum number of qubits for the simulation. 
+                          The smallest circuit is 2 qubits.
+        max_qubits (int): Maximum number of qubits for the simulation.
         max_circuits (int): Maximum number of circuits to execute per group.
-        skip_qubits (int): Increment of number of qubits.
-        num_shots (int): Number of shots for each circuit execution.
-        backend_id (str): Backend identifier for execution.
-        provider_backend: Provider backend instance.
-        hub (str): IBM Quantum hub.
-        group (str): IBM Quantum group.
-        project (str): IBM Quantum project.
-        exec_options: Execution options.
-
-        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
-        context: Execution context.
+        skip_qubits (int): Increment of number of qubits between simulations.
+        num_shots (int): Number of measurement shots for each circuit execution.
+        hamiltonian (str): The type of Hamiltonian to simulate. Default is "tfim".
+                           Options include:
+                           - "tfim": Transverse Field Ising Model.
+                           - "heis": Heisenberg model.
+                           - "random_max3sat-hams": Random Max 3-SAT Hamiltonians for binary optimization problems.
+                           - "FH_D-1": Fermi-Hubbard model in 1D
+                           - "BH_D-1_d-4": Bose-Hubbard model in 1D
+        method (int): Method for fidelity checking. 
+                      Options include:
+                      - 1: Noiseless Trotterized Quantum Simulation.
+                      - 2: Exact Classical Simulation.
+                      - 3: Mirror Circuit Simulation using Sandia Labs' method.
+        random_pauli_flag (bool): If True and method is 3, activates random Pauli gates in the circuit.
+        random_init_flag (bool): If True, initializes random quantum states. 
+                                 Only active if random_pauli_flag is True and method is 3.
+        use_inverse_flag (bool): If True, uses the inverse of the quantum circuit rather than the original circuit.
+        do_sqrt_fidelity (bool): If True, computes the square root of the fidelity for measurement results.
+        init_state (str): Specifies the initial state for the quantum circuit. 
+                          If None, a default state is used.
+        K (int): Number of Trotter steps for the simulation. 
+                 This is a crucial parameter for the precision of the Trotterized simulation.
+        t (float): Total simulation time. This parameter is used to determine the evolution time for the Hamiltonian.
+        backend_id (str): Backend identifier for execution on a quantum processor.
+        provider_backend: Provider backend instance for advanced execution settings.
+        hub (str): IBM Quantum hub identifier. Default is "ibm-q".
+        group (str): IBM Quantum group identifier. Default is "open".
+        project (str): IBM Quantum project identifier. Default is "main".
+        exec_options: Additional execution options, such as optimization levels or custom settings.
+        context: Execution context for running the simulation, such as cloud or local settings.
+        api: API settings or credentials for accessing quantum computing resources.
 
     Returns:
         None
