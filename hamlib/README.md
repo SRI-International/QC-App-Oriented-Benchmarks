@@ -1,68 +1,176 @@
-# Hamiltonian Simulation - Prototype Benchmark Program
+# HamLib Simulation - Benchmark Program
 
-Simulation of quantum systems is one of the most promising applications for quantum computers [[1]](#references). In the current version of this benchmark, we compare the quantum simulation against a classical simultion of the same circuit in order to report our fidelity. This works well for small circuit sizes, but is not scalable past a certain number of qubits. Additionally, we can now only run specific circuits, rather than random ones, limiting the ability of this benchmark to completely characterize real uses cases of the Hamiltonian simulation algorithm. We have some suggested modifications to this benchmark which we outline and explain why we did not chose to use them at this time in the section [Proposed Improvements](#Proposed-Improvements).
+Simulation of quantum systems is one of the most promising applications for quantum computers [[1]](#references). In the current version of this benchmark, we have three strategies for calculating the fidelity of a quantum Trotterization circuit. 
+
+In the first strategy, we compare the trotter circuit results on target hardware against a classical circuit simulation to report our fidelity. This works well for small circuit sizes but is not scalable past a certain number of qubits. 
+
+In the second strategy, we compare the trotter circuit results against a classical simulation of the exact Hamiltonian dynamics to report our fidelity. Again, this is not scalable.
+
+In the third strategy, we use the mirror circuits method developed by Sandia Laboratories [[2]](#references). This technique constructs a mirror circuit, which is a base circuit followed by a reverse circuit. It produces an easy to verify correct distribution that still reflects the effectiveness of the original circuit. This is scalable to all qubit sizes. 
+
+This benchmark is a more advanced version of the existing Hamiltonian Simulation Benchmark. It offers the user several Hamiltonians to simulate from Hamlib [[3]](#references), a comprehensive dataset of qubit-based Hamiltonians. It also offers a more complete version of the mirror circuits method that offers techniques such as implementing a random Pauli layer and random initial state to reduce unintentional error effects from the circuit mirroring.  
 
 ## Problem outline
 
-This benchmark is written as a simulation of non-trivial Hamiltonians. It is constrained to model a linear chain of interacting bodies with an open boundary condition. Our Hamiltonians of interest are the **Heisenberg model with disordered fields** and the **Transverse Field Ising Model (TFIM)**, both with open boundary conditions.
+This benchmark is written as a simulation of non-trivial Hamiltonians from Hamlib. It currently supports the following Hamiltonians: The Fermi-Hubbard Model, the Bose-Hubbard Model, the Heisenberg Model, the Transverse Field Ising Model, and the Max3Sat problem. The first four problems have only been implemented in their 1D cases. However, the benchmark can be easily generalized to benchmark any of the other Hamiltonians classes from Hamlib. 
 
-**For the Heisenberg Hamiltonian**, we start the system in an easily preparable classical state $|\psi(0)\rangle\equiv|010101\ldots\rangle$. **For the Transverse Field Ising Model (TFIM)**, we start the system in a GHZ state  $|\psi(0)\rangle = \left| \text{GHZ} \right\rangle = \frac{1}{\sqrt{2}} \left( |0\rangle^{\otimes n} + |1\rangle^{\otimes n} \right)$, where $n$ is equivalently the number of spins or qubits. In either case, we aim to evolve the system for $t$ time according to the solution to the Schrödinger equation with $H$ constant,
+The benchmark evolves an initial state according to a Hamiltonian $H$. The benchmark has two possible initial states, the checkerboard state $|\psi(0)\rangle\equiv|010101\ldots\rangle$ or the GHZ state  $|\psi(0)\rangle = \left| \text{GHZ} \right\rangle = \frac{1}{\sqrt{2}} \left( |0\rangle^{\otimes n} + |1\rangle^{\otimes n} \right)$, where $n$ is equivalently the number of spins or qubits. In either case, we aim to evolve the system for $t$ time according to the solution to the Schrödinger equation with $H$ constant,
 
 $$
 |\psi(t)\rangle=e^{-i{H}t}|\psi(0)\rangle
 $$
 
-
 where we set <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\hbar=1"> here and elsewhere.
+
+**The following Hamiltonians are currently supported. See the Benchmarking section below to see how to select them. For the physical models, only the 1D cases have been implemented thus far.** 
+
+### Fermi-Hubbard Model
+
+The Fermi-Hubbard Hamiltonian models the dynamics of fermions on lattice sites and is given by
+
+$$
+H_{FH} = -t \sum_{\langle i, j \rangle, \sigma} (c_{i,\sigma}^\dagger c_{j,\sigma} + c_{j,\sigma}^\dagger c_{i,\sigma}) + U \sum_i n_{i,\uparrow} n_{i,\downarrow},
+$$
+
+where $\langle i, j \rangle$ denotes adjacent lattice sites $i$ and $j$, $\sigma$ represents the fermion spin, $c$ and $c^\dagger$ are the fermionic annihilation and creation operators, respectively, and $n_{j,\sigma} = c_{j,\sigma}^\dagger c_{j,\sigma}$ is the number operator. The first term of the Hamiltonian describes the tunneling of fermions between adjacent sites with amplitude $t$, representing the noninteracting dynamics, while the second term captures the on-site fermion interaction with strength $U$.
+
+For our benchmarks, we only use the 1D Fermi-Hubbard model but allow varying $U$ and $t$.
+
+### Bose-Hubbard Model
+
+The Bose-Hubbard model is expressed as
+
+$$
+H_{BH} = -t \sum_i (b_i^\dagger b_{i+1} + b_{i+1}^\dagger b_i) + \frac{U}{2} \sum_i n_i(n_i - 1),
+$$
+
+where $b_i^\dagger$ and $b_i$ denote the creation and annihilation operators respectively, $n_i = b_i^\dagger b_i$ represents the number operator at site $i$, $t$ is the tunneling strength (assumed to be $t = 1$ in this dataset), and $U$ is the interaction energy per site.
 
 ### Heisenberg Model
 
-<p align="center">
-<img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}H=J\sum_{i=0}^{N-2}(\sigma^x_i\sigma^x_{i+1}+\sigma^y_i\sigma^y_{i+1}+\sigma^z_i\sigma^z_{i+1})+w\sum_{i=0}^{N-1}(h_{x,i}\sigma^x_i+h_{z,i}\sigma^z_i)"/>
-</p>
+We implement the following Hamiltonian for the quantum Heisenberg model:
 
-Where <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}J"/> is the strength of the interaction, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}w"/> is the strength of the disordered fields, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{x,i}"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{z,i}"/> give the strength of the x and z disorded fields at site <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}i"/>, and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^{\{x,y,z\}}_i"/> are the usual Pauli operators acting on site <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}i"/>. We will use the notation <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\{X_i,Y_i,Z_i\}\equiv\sigma^{\{x,y,z\}}_i"/> interchangably throughout this explanation.
+$$
+H_{\text{Heis}} = \sum_{i=1}^{N} (\vec{\sigma}_i \cdot \vec{\sigma}\_{i+1} + h Z_i).
+$$
 
-The first sum represents the **interaction terms**, wheras the second sum represents the **disordered field terms** (see Fig 1.)
-
-In our benchmarks, currently both $J=1$ and $w=1$.
+where $\vec{\sigma}_i = (X_i, Y_i, Z_i)$. This Hamiltonian, known as the Heisenberg XXX model, incorporates an external magnetic field represented by $h$, where $h$ modulates the strength of the magnetic field interaction along the Z-axis of each spin.
 
 ### Transverse Field Ising Model (TFIM)
 
-The TFIM Hamiltonian is given by:
+The Hamiltonian for this model is expressed as
 
 $$
-H= J\sum_{i=0}^{N-2}\sigma^z_i\sigma^z_{i+1} + h\sum_{i=0}^{N-1}\sigma^x_i
+H = \sum_i h_i X_i + \sum_{\langle i, j \rangle} Z_i Z_j,
 $$
 
-Where <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}J"/> is the coupling strength between neighboring spins, and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h"/> is the strength of the transverse field.
+where the summation extends over each edge $\langle i, j \rangle$ within the lattice.
 
-In our benchmarks, currently both $J=1$ and $h=.2$.
+### Max3Sat Problem
+
+To represent a 3-SAT problem in quantum computing, one constructs a Hamiltonian by summing terms involving three variables. If no negations are included, the Hamiltonian for a clause $(x_i \lor x_j \lor x_k)$ is represented as:
+
+$$
+x_i \lor x_j \lor x_k = I - \frac{1}{8} (I + Z_i)(I + Z_j)(I + Z_k),
+$$
+
+where $I$ is the identity matrix and $Z$ denotes the Pauli-Z operator, reflecting the influence of each variable in the clause.
 
 ## Benchmarking
-The Hamiltonian Simulation algorithm is benchmarked by running **just a single circuit**. This circuit is repeated a number of times denoted by `num_shots`. We then run the algorithm circuit for numbers of qubits between `min_qubits` and `max_qubits`, inclusive. The test returns the averages of the circuit creation times, average execution times, fidelities, and circuit depths, like all of the other algorithms. 
+The Hamlib Simulation algorithm is benchmarked, in most cases, by running **just a single circuit (see Mirror Method Circuit Section for the exception.**) This circuit is repeated a number of times denoted by `num_shots`. We then run the algorithm circuit for numbers of qubits between `min_qubits` and `max_qubits`, inclusive. The test returns the averages of the circuit creation times, average execution times, fidelities, and circuit depths, like all of the other algorithms. 
 
-After running the Hamiltonian Simulation circuit, there are two options for how to produce the fidelity metric, both of which use a precalculated distribution to compare to the Hamiltonian Simulation results. Method = 1 uses a distribution from a noiseless simulation of the trotterized quantum circuit. For this method, if the benchmark is also run on a noiseless simulation, with a high number of shots, the fidelity should be high. Method = 2 uses a classical matrix technique to simulate the evolution of the hamiltonian directly. Wheras method = 1 more directly tests the hardware, method = 2 also tests the accuracy of the hamiltonian simulation algorithm itself. 
+There are currently three methods for how to produce the fidelity metric. All three methods evolve a state and create a metric based on how well the state evolved. 
 
-In either case, we compare the resultant distribution using our [noise-normalized fidelity calculation](../_doc/POLARIZATION_FIDELITY.md).
+In all three methods, by default, we set the trotterization steps (k) to 5 and the total time to 1, but these can be set to different values at the user's discretion.  
 
-We calculate these expected distributions in the jupyter notebook `precalculated_data.ipynb`, which stores the results for up to 20 qubits in the `precalculated_data.json` data file. The python code then imports the distributions from the `json` file. This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in number of qubits. 
+The first two methods evolve an initial state a time $t$ and compare the final state against a correct distribution. Method = 1 creates the correct distribution from a noiseless simulation of the Hamiltonian Simulation quantum circuit. Method = 2 creates a correct distribution from a classical matrix technique to simulate the evolution of the Hamiltonian directly. Whereas method = 1 only tests the performance of the hardware, method = 2 also tests the accuracy of the Hamiltonian simulation itself. 
 
-In the `precalculated_data.ipnyb`, we set the trotterization steps (k) to 5 and the time to .2. For the Heisenberg Hamiltonian, $w$ is set to 1 but $J$ is hard-coded to 1. For TFIM, the Hamiltonian variables are both hard-coded to $J=1$ and $h=.2$ respectively. 
+These correct distributions are created on-the-fly as the benchmarks are run. (This is unlike the Hamiltonian Simulation Benchmark, which uses precalculated distributions.) This is a less than ideal fidelity calculation as it does not scale to any size of qubits. It requires the classical simulation of matrix products, which requires resources exponential in the number of qubits. 
+
+Method = 3 uses a mirror circuit built using the Hamiltonian Simulation circuit, designed so that the correct distribution is trivial. It applies first the circuit, then the reverse of the circuit, so that the final state should be the (trivial) initial state. There are additional options to use a layer of random Paulis in the middle and/or a random initial state to increase generality and resistance to unintentional error effects from the structure of mirroring. **See the Mirror Circuit section below for more details.** This method scales to any size of qubits, since the correct distribution is easy to calculate.  
+
+In all cases, we compare the resultant distribution using our [noise-normalized fidelity calculation](../_doc/POLARIZATION_FIDELITY.md).
+
+In the run() method for the benchmark, several optional arguments can be specified. Some of the key parameters are as follows: 
+```
+Parameters 
+---- 
+min_qubits (int): Minimum number of qubits for the simulation. 
+                  The smallest circuit is 2 qubits.
+max_qubits (int): Maximum number of qubits for the simulation.
+max_circuits (int): Maximum number of circuits to execute per group.
+skip_qubits (int): Increment of number of qubits between simulations.
+num_shots (int): Number of measurement shots for each circuit execution.
+hamiltonian (str): The type of Hamiltonian to simulate. Default is "tfim".
+                    Options include:
+                    - "tfim": Transverse Field Ising Model.
+                    - "heis": Heisenberg model.
+                    - "random_max3sat-hams": Random Max 3-SAT Hamiltonians for binary optimization problems.
+                    - "FH_D-1": Fermi-Hubbard model in 1D
+                    - "BH_D-1_d-4": Bose-Hubbard model in 1D
+method (int): Method for fidelity checking. 
+              Options include:
+              - 1: Noiseless Trotterized Quantum Simulation.
+              - 2: Exact Classical Simulation.
+              - 3: Mirror Circuit Simulation using Sandia Labs' method.
+random_pauli_flag (bool): If True and method is 3, activates random Pauli gates in the circuit.
+random_init_flag (bool): If True, initializes random quantum states. 
+                          Only active if random_pauli_flag is True and method is 3.
+use_inverse_flag (bool): If True, uses the inverse of the quantum circuit rather than the original circuit.
+do_sqrt_fidelity (bool): If True, computes the square root of the fidelity for measurement results.
+init_state (str): Specifies the initial state for the quantum circuit. 
+                  If None, a default state is used.
+K (int): Number of Trotter steps for the simulation. 
+          This is a crucial parameter for the precision of the Trotterized simulation.
+t (float): Total simulation time. This parameter is used to determine the evolution time for the Hamiltonian.
+```
+You can run the code by passing various arguments to execute a desired Hamiltonian with a specific method in either a noisy or noiseless model. Below are some key arguments available for this benchmark:
+
+| Parameters              | Arguments  | Description                                                                 | Default Value |
+|-------------------------|------------|-----------------------------------------------------------------------------|---------------|
+| `--num_shots`           | `-s`       | Number of measurement shots for each circuit execution                      | `100`         |
+| `--num_qubits`          | `-n`       | Number of qubits (sets both min and max qubits to the same value)           | `0`           |
+| `--min_qubits`          | `-min`     | Minimum number of qubits for the simulation                                 | `3`           |
+| `--max_qubits`          | `-max`     | Maximum number of qubits for the simulation                                 | `8`           |
+| `--max_circuits`        | `-c`       | Maximum number of circuit repetitions                                       | `1`           |
+| `--method`              | `-m`       | Algorithm Method (1 for noiseless, 2 for classical, 3 for mirror circuit)   | `1`           |
+| `--nonoise`             | `-non`     | Use Noiseless Simulator (enables a noiseless model for the simulation)      | `False`       |
+| `--time`                | `-time`    | Total time of evolution for the Hamiltonian simulation                      | `1`           |
+| `--num_steps`           | `-steps`   | Number of Trotter steps for the simulation                                  | `5`           |
+| `--random_pauli_flag`   | `-ranp`    | Generate random Pauli gates in the circuit                                  | `False`       |
+| `--random_init_flag`    | `-rani`    | Generate random initial states for the simulation                           | `False`       |
+| `--init_state`          | `-init`    | Initial state for the quantum circuit (e.g., GHZ, Checkerboard)             | `None`        |
+
+Example Command
+
+Here’s how you can run the script with specific parameters:
+
+```
+python hamlib_simulation_benchmark.py -n 5 -init ghz -m 3 -ranp -non
+```
+
+Explanation:
+```
+    -n 5: Specifies the use of 5 qubits for the simulation (sets both min_qubits and max_qubits to 5).
+    -init ghz: Sets the initial state to GHZ.
+    -m 3: Applies Method 3, which involves using mirror circuits.
+    -ranp: Activates random Pauli gates in the circuit.
+    -non: Runs the simulation in a noiseless model.
+```
 
 ## Classical algorithm
 
-Much effort has been done in the field of many-body physics to understand the approximate behaviors of Hamiltonians like the ones we have here. However, to calculate the evolution of an excited state through exact diagonalization scales approximately as <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(2^{3n})"> for <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}n"> qubits, quite poor scaling [[2]](#references). This quickly becomes intractible even utilizing extremely powerful classical supercomputers.
+Much effort has been made in the field of many-body physics to understand the approximate behaviors of Hamiltonians like the ones we have here. However, to calculate the evolution of an excited state through exact diagonalization scales approximately as <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(2^{3n})"> for <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}n"> qubits, quite poor scaling [[4]](#references). This quickly becomes intractable even utilizing extremely powerful classical supercomputers.
 
 ## Quantum algorithm
 
-To run this algorithm on our quantum computer, we need to find a way to apply the unitary <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}U(t)\equiv{e}^{-i{H}t}"/> through a combination of quantum gates. In order to approximate this operator, we use Trotterization [[3]](#references), where we note that Lie product formula gives
+To run this algorithm on our quantum computer, we need to find a way to apply the unitary <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}U(t)\equiv{e}^{-i{H}t}"/> through a combination of quantum gates. In order to approximate this operator, we use Trotterization [[5]](#references), where we note that Lie product formula gives
 
 <p align="center">
 <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{-i{\sum_j{H}_j}t}=\lim_{k\rightarrow\infty}\left(\prod_j{e}^{-iH_j{t}/k}\right)^k"/>.
 </p>
 
-If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}k"/> to be finite, this is called Trotterization. This has a gate complexity of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(n^5)"/>, which is an exponential speedup. We can then apply successive layers of by exponentiating the individual terms in the Hamiltonian to approximate the evolution of any state. This makes the simulation easier, as it is much easier to calculate the gates which apply <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta\sigma^x_0\sigma^x_1}"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta\sigma^x_1\sigma^x_2}"/> than to find the gates which apply <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta(\sigma^x_0\sigma^x_1+\sigma^x_1\sigma^x_2)}"/>. This process can be visualized in the circuit diagram below for the **Heisenberg Hamiltonian** with a single step.
+If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}k"/> to be finite, this is called Trotterization. This has a gate complexity of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}O(n^5)"/>, which is an exponential speedup. We can then apply successive layers by exponentiating the individual terms in the Hamiltonian to approximate the evolution of any state. This makes the simulation easier, as it is much easier to calculate the gates which apply <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta\sigma^x_0\sigma^x_1}"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta\sigma^x_1\sigma^x_2}"/> than to find the gates which apply <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta(\sigma^x_0\sigma^x_1+\sigma^x_1\sigma^x_2)}"/>. This process can be visualized in the circuit diagram below for the **Heisenberg Hamiltonian** with a single step.
 
 ### General Quantum Circuit
 
@@ -72,35 +180,25 @@ If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolo
 
 *Fig 1. Example of circuit with 1 Trotter step. We can see that our <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^x_i"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^y_i"/> turned into Rx and Ry gates, while the two qubit interactions turned into the gates that result from exponentiating these terms in the Hamiltonian. Note that this circuit application is less efficient than applying the XX, YY, and ZZ operations all at once.*
 
-<p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/ham_sim_full_circuit.png"  width="700" />
-</p>
-
-*Fig 2. Circuit with 2 Trotter steps and the optimal XXYYZZ operator.*
-
 ### Algorithm Steps
 
-1. Initialize qubits in alternating state <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}|\psi(0)\rangle\equiv|010101\ldots\rangle"/>.
+1. Initialize qubits in either Checkerboard or GHZ state.
 
 2. Build the Trotter step layer.
+   
+3. Apply the Hamiltonian as Trotter step layers for as many Trotter steps were chosen.
 
-3. Apply the Trotter step layer for as many Trotter steps were chosen.
+4. Check if method == 3. If True, apply mirror circuit.
 
-4. Measure out all of the qubits
+5. Measure out all of the qubits
+
+6. Compare the measured distribution with the distribution from specific methods.
+
+7. Get the metrics like fidelity, circuit depth, time of execution, etc.
 
 ## Gate Implementation
 
-There are two options of circuit creation for this simulation:
-
-- **Default:** Optimal implementation of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX+YY+ZZ)}"/>, used as the default. See [[4]](#references) for reasoning for why this is the optimal application of gates.
-
-- **use_XX_YY_ZZ_gates:** Simple implementation of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX)}"/>, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(YY)}"/>, and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(ZZ)}"/>, provided for reference purposes and validation of the optimal implementation. In essence, we initially generate <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(ZZ)}"/> using two CNOT gates and an RZ gate. We then apply the XX and YY versions of this gate by providing a basis change from Z to X and from Z to Y, using Hadamard gates for the X transformation and using S and Hadamard gates for the Y transformation respectively. These circuits are below. It is possible to use this type of gates by passing `use_XX_YY_ZZ_gates=True` to the `run()` function.
-
-<p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/XXYYZZ_gate.png"  />
-</p>
-
-*Fig 3. Optimal gate which applies <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX+YY+ZZ)}"/>.*
+Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the Pauli exponential gates used are shown below.
 
 ---
 
@@ -126,40 +224,30 @@ There are two options of circuit creation for this simulation:
 
 *Fig 6. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(YY)}"/> gate.*
 
-## Proposed Improvements
 
-Our suggested method of modifying this benchmark involves a topic taken from condensed matter called *many-body localization* [[2]](#references) [[5]](#references). The essence of this phenomenon is that for certain closed quantum systems, some excited states fail to thermalize as expected. 
+## Mirror Circuit Method:
 
-The parameters that we use for the current Hamiltonian simulation benchmark already put us in the many-body localization regime. After evolving the system for a suitibly long time, with <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}t\approx{1}">, we can then take a look at a parameter called *imbalance* to characterize this property. The imbalance compares the percentage of measured 1's on the even versus odd sites. We see that for our Heisenberg Hamiltonian, when averaging over many random choices for <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{x,i}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}h_{z,i}">, the imbalance will converge to a constant value for increasing circuit width. We could then set our fidelity calculation as the deviation from the expected imbalance value. This benchmark is outlined in the `mbl_benchmark.py` file in the qiskit `WIP_benchmarks` folder.
+The primary goal of implementing the mirror circuit methods is to create accurate and scalable benchmarks for the Hamiltonian Simulation circuits. There are several options for how the mirror circuits are constructed. By default, a mirror circuit consists of an initial state, the Trotterized Hamiltonian simulation circuit, and then the inverse of the Trotterized circuit. In this case, the correct distribution is simply the starting state.
 
-While we have already coded this benchmark, we are not using it as a benchmark because some of the parameters required are not feasible on current computers. Because of our comparatively large value of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}t">, we need to have a large number of Trotter steps <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}k"> so our simulation is close to the actual evolution of the Hamiltonian. This results in circuits that are thousands of gates long. Then, because the imbalance converging is a feature that occurs *on average*, we need to average over more than 100 different circuits for the fidelity calculation to capture just the hardware error, not the algorithmic error. All of these factors make it such that running the benchmark is difficult on simulators, and exceedingly expensive and/or time-intensive to run on hardware. In the future, when hardware is more accessible, these downsides might not be as big of an issue, and many-body-localization can be utilized as an effective benchmark.
- 
+The first option to consider is to apply a randomized Pauli layer in the center of the circuit. This layer is designed to lessen error propagation between the two halves of the circuit, improving the accuracy of the simulation since we are only interested in the error profile of half a mirror circuit. To most effectively utilize the randomized Pauli layer, set `max_circuits` > 1 to average over several random Pauli circuits, where each random Pauli circuit is run `num_shots` times. The reported metrics will be an average across all the random circuits results. 
+
+There is also the option to use a random initial state, which replaces the currently set initial state with a (Harr) random one. This allows for testing the circuit's performance under varied initial conditions, which may provide a more comprehensive evaluation of the simulation circuit. 
+
+
 ## References
 
 [1] Feynman, RP. (1982) Simulating physics with computers. Int J Theor Phys 21:467–488.
 
-[2] Andrew M. Childs, Dmitri Maslov, Yunseong Nam, Neil J. Ross, Yuan Su. (2017).
+[2] Proctor, T., Rudinger, K., Young, K. et al. Measuring the capabilities of quantum computers. Nat. Phys. 18, 75–79 (2022). https://doi.org/10.1038/s41567-021-01409-7 
+
+[3] Sawaya, N. P., Marti-Dafcik, D., Ho, Y., Tabor, D. P., Neira, D. E. B., Magann, A. B., ... & Camps, D. (2023, September). 
+    HamLib: A library of Hamiltonians for benchmarking quantum algorithms and hardware. 
+    In 2023 IEEE International Conference on Quantum Computing and Engineering (QCE) (Vol. 2, pp. 389-390). IEEE.
+
+[4] Andrew M. Childs, Dmitri Maslov, Yunseong Nam, Neil J. Ross, Yuan Su. (2017).
     Toward the first quantum simulation with quantum speedup.
     [`arXiv:1711.10980`](https://arxiv.org/pdf/1711.10980.pdf)
 
-[3] Naomichi Hatano, Masuo Suzuki. (2005).
+[5] Naomichi Hatano, Masuo Suzuki. (2005).
     Finding Exponential Product Formulas of Higher Orders
     [`arXiv:math-ph/0506007`](https://arxiv.org/abs/math-ph/0506007v1)
-
-[4] Farrokh Vatan, Colin Williams. (2004).
-    Optimal Quantum Circuits for General Two-Qubit Gates.
-    [`arXiv:quant-ph/0308006`](https://arxiv.org/abs/quant-ph/0308006)
-
-[5] D. Zhu, S. Johri, N. H. Nguyen, C. Huerta Alderete, K. A. Landsman, N. M. Linke, C. Monroe, A. Y. Matsuura. (2021).
-    Probing many-body localization on a noisy quantum computer.
-    [`arXiv:2006.12355`](https://arxiv.org/abs/2006.12355)
-
-[//]: # (Below are some thoughts that went into the choice of the type of hamiltonian simulation to be used for this benchmark.)
-
-[//]: # (Nearest-neighbor 1D, 2D and 3D cases are all physically motivated, corresponding to say, a nanowire, a thin film, and a cubic crystal. In this case, 1D is a suitable benchmark for current quantum computers since it has the least number of gates. As quantum computers improve, the simulation benchmarks could be designed to include higher dimensions.)
-
-[//]: # (If interactions between all pairs of spins were to be added, it would correspond to a limit of the long-range Heisenberg model. There are studies on this, but it may not show the localization behavior being captured in the accuracy metric in the benchmark. For this reason, the benchmark was written for the 1D case only.)
-
-[//]: # (The bodies being simulated can be represented as a linear chain of bodies, i.e. a 'open boundary condition' or in a circle, i.e. a 'periodic boundary condition'. In the limit of large system size, the boundary will not affect the bulk physics represented here. For small system sizes, periodic boundaries have some advantage in that they are less susceptible to 'edge effects', and the system can be Fourier transformed and studied in momentum space. Their drawback is that some numerical approximation techniques work poorly. In other simulation studies such as those of topological phenomena, there is important physics corresponding to a 'bulk-boundary correspondence', and the open edge is purposefully introduced.)
-
-[//]: # (Therefore, the choice of boundary condition depends on the system being studied and the computational technique being employed. Here it does not matter too much.)
