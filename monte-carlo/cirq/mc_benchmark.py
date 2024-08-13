@@ -253,9 +253,15 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots, met
     
     # convert bit_counts into expectation values counts according to Quantum Risk Analysis paper
     counts = expectation_from_bits(bit_counts, num_counting_qubits, num_shots, method)
+
+    # Convert keys of counts to strings
+    counts = {str(key): value for key, value in counts.items()}
     
     # calculate the distribution we should expect from the amplitude estimation routine
     correct_dist = mc_utils.mc_dist(num_counting_qubits, exact, c_star, method)
+    
+    # Convert keys of correct_dist to strings
+    correct_dist = {str(key): value for key, value in correct_dist.items()}
 
     # generate thermal_dist with amplitudes instead, to be comparable to correct_dist
     bit_thermal_dist = metrics.uniform_dist(num_counting_qubits)

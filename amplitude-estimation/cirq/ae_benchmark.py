@@ -153,20 +153,20 @@ def Ctrl_Q(num_state_qubits, A_circ):
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
 def analyze_and_print_result(qc, result, num_counting_qubits, s_int, num_shots):
-    
-    measurements = result.measurements['result']
-    
-    counts_str = defaultdict(lambda: 0)
-    for row in measurements:
-        counts_str["".join([str(x) for x in reversed(row)])] += 1
         
-    counts = bitstring_to_a(counts_str, num_counting_qubits)
+    # get measurement array
+    measurements = result.measurements['result']
+
+    # create counts distribution
+    counts = defaultdict(lambda: 0)
+    for row in measurements:
+        counts["".join([str(x) for x in reversed(row)])] += 1
     a = a_from_s_int(s_int, num_counting_qubits)
     
     if verbose: print(f"For amplitude {a} measured: {counts}")
     
     # correct distribution is measuring amplitude a 100% of the time
-    correct_dist = {a: 1.0}
+    correct_dist = a_to_bitstring(a, num_counting_qubits)
 
     # generate thermal_dist with amplitudes instead, to be comparable to correct_dist
     bit_thermal_dist = metrics.uniform_dist(num_counting_qubits)
@@ -176,6 +176,16 @@ def analyze_and_print_result(qc, result, num_counting_qubits, s_int, num_shots):
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
         
     return counts, fidelity
+
+def a_to_bitstring(a, num_counting_qubits):
+    m = num_counting_qubits
+    num1 = round(np.arcsin(np.sqrt(a)) / np.pi * 2**m)
+    num2 = round( (np.pi - np.arcsin(np.sqrt(a))) / np.pi * 2**m)
+    if num1 != num2 and num2 < 2**m and num1 < 2**m:
+        counts = {format(num1, "0"+str(m)+"b"): 0.5, format(num2, "0"+str(m)+"b"): 0.5}
+    else:
+        counts = {format(num1, "0"+str(m)+"b"): 1}
+    return counts
 
 def bitstring_to_a(counts, num_counting_qubits):
     est_counts = {}
