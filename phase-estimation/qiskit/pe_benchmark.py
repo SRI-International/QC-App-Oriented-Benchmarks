@@ -36,15 +36,19 @@ def analyze_and_print_result(qc, result, num_counting_qubits, theta, num_shots):
     # calculate expected output histogram
     correct_dist = theta_to_bitstring(theta, num_counting_qubits)
     
-    # generate thermal_dist to be comparable to correct_dist
-    thermal_dist = metrics.uniform_dist(num_counting_qubits)
-
-    # convert counts, expectation, and thermal_dist to app form for visibility
+    # generate thermal_dist and ap form of thermal_dist to be comparable to correct_dist
+    if num_counting_qubits < 15:
+        thermal_dist = metrics.uniform_dist(num_counting_qubits)
+        app_thermal_dist = bitstring_to_theta(thermal_dist, num_counting_qubits)
+    else :
+        thermal_dist = None
+        app_thermal_dist = None
+        
+    # convert counts expectation to app form for visibility
     # app form of correct distribution is measuring theta correctly 100% of the time
     app_counts = bitstring_to_theta(counts, num_counting_qubits)
-    app_correct_dist = {theta: 1.0}
-    app_thermal_dist = bitstring_to_theta(thermal_dist, num_counting_qubits)
-
+    app_correct_dist = {theta: 1.0} 
+    
     if verbose:
         print(f"For theta {theta}, expected: {correct_dist} measured: {counts}")
         #print(f"   ... For theta {theta} thermal_dist: {thermal_dist}")
