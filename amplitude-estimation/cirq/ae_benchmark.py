@@ -214,7 +214,7 @@ def a_from_s_int(s_int, num_counting_qubits):
 MAX_QUBITS=8
 
 # Execute program with default parameters
-def run(min_qubits=3, max_qubits=8, max_circuits=1, num_shots=100,
+def run(min_qubits=3, max_qubits=8, max_circuits=3, num_shots=100,
         num_state_qubits=1, # default, not exposed to users
         backend_id='simulator', provider_backend=None):
 
