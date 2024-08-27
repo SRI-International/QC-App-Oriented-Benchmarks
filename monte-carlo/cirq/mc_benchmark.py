@@ -399,6 +399,8 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, max_circuits=1, num_shots=100,
 
             qc = MonteCarloSampling(target_dist, f_to_estimate, num_state_qubits, num_counting_qubits, epsilon, degree, method=method)
             metrics.store_metric(num_qubits, mu, 'create_time', time.time() - ts)
+
+            qc = cirq.Circuit(cirq.decompose(op) for op in qc.all_operations())
                 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc, num_qubits, mu, num_shots)
