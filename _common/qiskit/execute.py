@@ -150,8 +150,9 @@ class BenchmarkResult(object):
         # counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
         # for key in counts.keys():
         #     counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])        
-        register_name = list(self.qiskit_result[qc].data.keys())[0]
-        bitvals = getattr(self.qiskit_result[qc].data, register_name)
+        qc_index = 0 # this should point to the index of the circuit in a pub
+        register_name = list(self.qiskit_result[qc_index].data.keys())[0]
+        bitvals = getattr(self.qiskit_result[qc_index].data, register_name)
         counts = bitvals.get_counts()
         return counts
 
@@ -754,7 +755,7 @@ def execute_circuit(circuit):
                 st = time.time() 
 
                 if use_sessions:
-                    # turn circuit to pub-like
+                    # turn input into pub-like
                     job = sampler.run([trans_qc], shots=shots, **backend_exec_options_copy)
                 else:
                     job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
@@ -1138,12 +1139,13 @@ def job_complete(job):
             
             # actual_shots = result.metadata[0]['shots']
             # get the name of the classical register
-            register_name = list(result.qiskit_result[qc].data.keys())[0]
-            # get the 
-            bitvals = getattr(result.qiskit_result[qc].data, register_name)
+            # TODO: need to rewrite to allow for submit multiple circuits in one job
+            register_name = list(result.qiskit_result[0].data.keys())[0]
+            # get DataBin associated with the classical register
+            bitvals = getattr(result.qiskit_result[0].data, register_name)
             actual_shots = bitvals.num_shots
-            result_obj = result.metadata[0]
-            results_obj = result.metadata[0]
+            result_obj = result.metadata # not sure how to update to be V2 compatible
+            results_obj = result.metadata
         else:
             result_obj = result.to_dict()
             results_obj = result.to_dict()['results'][0]
@@ -1177,6 +1179,14 @@ def job_complete(job):
         
         elif "time_taken" in results_obj:
             exec_time = results_obj["time_taken"]
+        
+        elif 'execution' in result_obj:
+            # read execution time for the first circuit
+            time_dict = result_obj['execution']['execution_spans']['__value__']['spans'][0]['__value__']
+            start = time_dict['start']
+            stop = time_dict['stop']
+            duration = stop - start
+            exec_time = duration.total_seconds()
         
         # override the initial value with exec_time returned from successful execution
         metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
@@ -1282,7 +1292,7 @@ def process_step_times(job, result, active_circuit):
         
         if verbose:
             print(f"... job.metrics() = {job.metrics()}")
-            print(f"... job.result().metadata[0] = {result.metadata[0]}")
+            print(f"... job.result().metadata[0] = {result.metadata}")
 
         # occasionally, these metrics come back as None, so try to use them
         try:
