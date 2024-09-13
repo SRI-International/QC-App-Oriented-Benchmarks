@@ -300,7 +300,7 @@ def set_execution_target(backend_id='qasm_simulator',
     elif 'fake' in backend_id:
         backend = getattr(
             importlib.import_module(
-                f'qiskit.providers.fake_provider.backends.{backend_id.split("_")[-1]}.{backend_id}'
+                f'qiskit_ibm_runtime.fake_provider.backends.{backend_id.split("_")[-1]}.{backend_id}'
             ),
             backend_id.title().replace('_', '')
         )
