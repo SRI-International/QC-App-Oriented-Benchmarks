@@ -300,7 +300,7 @@ def set_execution_target(backend_id='qasm_simulator',
     elif 'fake' in backend_id:
         backend = getattr(
             importlib.import_module(
-                f'qiskit.providers.fake_provider.backends.{backend_id.split("_")[-1]}.{backend_id}'
+                f'qiskit_ibm_runtime.fake_provider.backends.{backend_id.split("_")[-1]}.{backend_id}'
             ),
             backend_id.title().replace('_', '')
         )
@@ -1182,12 +1182,8 @@ def job_complete(job):
         
         elif 'execution' in result_obj:
             # read execution time for the first circuit
-            time_dict = result_obj['execution']['execution_spans']['__value__']['spans'][0]['__value__']
-            start = time_dict['start']
-            stop = time_dict['stop']
-            duration = stop - start
-            exec_time = duration.total_seconds()
-        
+            exec_time = result_obj['execution']['execution_spans'][0].duration
+
         # override the initial value with exec_time returned from successful execution
         metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
         
