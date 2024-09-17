@@ -131,7 +131,7 @@ def QuantumFourierTransform (num_qubits, secret_int, method=1):
 
 def qft_gate(input_size):
     global QFT_, num_gates, depth
-    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="qft")
+    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="qft_gate")
     
     # Generate multiple groups of diminishing angle CRZs and H gate
     for i_qubit in range(0, input_size):
@@ -164,7 +164,7 @@ def qft_gate(input_size):
 
 def inv_qft_gate(input_size):
     global QFTI_, num_gates, depth
-    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="inv_qft")
+    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="inv_qft_gate")
     
     # Generate multiple groups of diminishing angle CRZs and H gate
     for i_qubit in reversed(range(0, input_size)):
