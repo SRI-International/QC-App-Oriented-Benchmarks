@@ -431,7 +431,6 @@ def set_execution_target(backend_id='qasm_simulator',
             
             # create the Runtime Service object
             service = QiskitRuntimeService(instance=f'{hub}/{group}/{project}')
-            print(f'setting instance {hub}/{group}/{project}')
             # obtain a backend from the service
             backend = service.backend(backend_id)
                
