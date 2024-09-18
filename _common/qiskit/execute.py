@@ -149,10 +149,9 @@ class BenchmarkResult(object):
     def get_counts(self, qc=0):
         # counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
         # for key in counts.keys():
-        #     counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])        
+        #     counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])
         qc_index = 0 # this should point to the index of the circuit in a pub
-        register_name = list(self.qiskit_result[qc_index].data.keys())[0]
-        bitvals = getattr(self.qiskit_result[qc_index].data, register_name)
+        bitvals = next(iter(self.qiskit_result[qc_index].data.values()))
         counts = bitvals.get_counts()
         return counts
 
@@ -254,6 +253,7 @@ def set_execution_target(backend_id='qasm_simulator',
                         provider_name='Quantinuum')
     """
     global backend
+    global sampler
     global session
     global use_sessions
     global session_count
@@ -295,7 +295,11 @@ def set_execution_target(backend_id='qasm_simulator',
     # handle Statevector simulator specially
     elif backend_id == 'statevector_simulator':
         backend = Aer.get_backend("statevector_simulator")
-        
+    
+    elif backend_id == "statevector_sampler":
+        from qiskit.primitives import StatevectorSampler
+        sampler = StatevectorSampler()
+
     # handle 'fake' backends here
     elif 'fake' in backend_id:
         backend = getattr(
@@ -310,7 +314,6 @@ def set_execution_target(backend_id='qasm_simulator',
     # otherwise use the given providername or backend_id to find the backend
     else:
         global service
-        global sampler
     
         # if provider_module name and provider_name are provided, obtain a custom provider
         if provider_module_name and provider_name:  
@@ -434,7 +437,7 @@ def set_execution_target(backend_id='qasm_simulator',
             print(f'setting instance {hub}/{group}/{project}')
             # obtain a backend from the service
             backend = service.backend(backend_id)
-               
+
             # DEVNOTE: here we assume if the sessions flag is set, we use Sampler
             # however, we may want to add a use_sampler option so that we can separate these
             
@@ -679,7 +682,7 @@ def execute_circuit(circuit):
 
             #************************************************
             # Initiate execution (with noise if specified and this is a simulator backend)
-            if this_noise is not None and not use_sessions and backend_name.endswith("qasm_simulator"):
+            if this_noise is not None and not sampler and backend_name.endswith("qasm_simulator"):
                 logger.info(f"Performing noisy simulation, shots = {shots}")
                 
                 # if the noise model has associated QV value, copy it to metrics module for plotting
@@ -754,9 +757,9 @@ def execute_circuit(circuit):
                 logger.info(f'Running trans_qc, shots={shots}')
                 st = time.time() 
 
-                if use_sessions:
+                if sampler:
                     # turn input into pub-like
-                    job = sampler.run([trans_qc], shots=shots, **backend_exec_options_copy)
+                    job = sampler.run([trans_qc], shots=shots)
                 else:
                     job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
 
@@ -1133,16 +1136,15 @@ def job_complete(job):
         # if we are using sessions, structure of result object is different;
         # use a BenchmarkResult object to hold session result and provide a get_counts()
         # that returns counts to the benchmarks in the same form as without sessions
-        if use_sessions:
+        if sampler:
             result = BenchmarkResult(result)
             #counts = result.get_counts()
             
             # actual_shots = result.metadata[0]['shots']
             # get the name of the classical register
             # TODO: need to rewrite to allow for submit multiple circuits in one job
-            register_name = list(result.qiskit_result[0].data.keys())[0]
             # get DataBin associated with the classical register
-            bitvals = getattr(result.qiskit_result[0].data, register_name)
+            bitvals = next(iter(result.qiskit_result[0].data.values()))
             actual_shots = bitvals.num_shots
             result_obj = result.metadata # not sure how to update to be V2 compatible
             results_obj = result.metadata
