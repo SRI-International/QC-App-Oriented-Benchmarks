@@ -165,7 +165,7 @@ def qft_gate(input_size):
 
 def inv_qft_gate(input_size):
     global QFTI_, num_gates, depth
-    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="inv_qft_gate")
+    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="inv_qft")
     
     # Generate multiple groups of diminishing angle CRZs and H gate
     for i_qubit in reversed(range(0, input_size)):
