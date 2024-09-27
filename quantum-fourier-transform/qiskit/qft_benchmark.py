@@ -131,7 +131,8 @@ def QuantumFourierTransform (num_qubits, secret_int, method=1):
 
 def qft_gate(input_size):
     global QFT_, num_gates, depth
-    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="qft")
+	# avoid name "qft" as workaround of https://github.com/Qiskit/qiskit/issues/13174
+    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="qft_")
     
     # Generate multiple groups of diminishing angle CRZs and H gate
     for i_qubit in range(0, input_size):
