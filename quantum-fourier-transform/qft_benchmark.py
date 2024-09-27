@@ -1,198 +1,70 @@
-"""
-Quantum Fourier Transform Benchmark Program - Qiskit
-"""
+'''
+Quantum Fourier Transform Benchmark Program
+(C) Quantum Economic Development Consortium (QED-C) 2024.
+'''
 
-import math
+# This benchmark program runs at the top level of the named benchmark directory.
+# It uses the "api" parameter to select the API to be used for kernel construction and execution.
+
 import sys
 import time
-
 import numpy as np
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
-import execute as ex
-import metrics as metrics
+############### Configure API
+# 
+# Configure the QED-C Benchmark package for use with the given API
+def qedc_benchmarks_init(api: str = "qiskit"):
+
+    if api == None: api = "qiskit"
+
+    sys.path[1:1] = [ f"{api}" ]
+    sys.path[1:1] = [ "_common", f"_common/{api}" ]
+    sys.path[1:1] = [ "../_common", f"../_common/{api}" ]
+
+    import execute as ex
+    globals()["ex"] = ex
+
+    import metrics as metrics
+    globals()["metrics"] = metrics
+
+    from qft_kernel import QuantumFourierTransform, kernel_draw
+    
+    return QuantumFourierTransform, kernel_draw
+
 
 # Benchmark Name
-benchmark_name = "Quantum Fourier Transform"
+benchmark_name = "Quantum-Fourier-Transform"
 
 np.random.seed(0)
 
 verbose = False
 
-# saved circuits for display
-num_gates = 0
-depth = 0
-QC_ = None
-QFT_ = None
-QFTI_ = None
-
-############### Circuit Definition
-
-def QuantumFourierTransform (num_qubits, secret_int, method=1):
-    global num_gates, depth
-    # Size of input is one less than available qubits
-    input_size = num_qubits
-    num_gates = 0
-    depth = 0
+# Variable for number of resets to perform after mid circuit measurements
+num_resets = 1
     
-    # allocate qubits
-    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits)
-    qc = QuantumCircuit(qr, cr, name=f"qft({method})-{num_qubits}-{secret_int}")
+# Routine to convert the secret integer into an array of integers, each representing one bit
+# DEVNOTE: do we need to convert to string, or can we just keep shifting?
+def str_to_ivec(input_size: int, s_int: int):
 
-    if method==1:
-
-        # Perform X on each qubit that matches a bit in secret string
-        s = ('{0:0'+str(input_size)+'b}').format(secret_int)
-        for i_qubit in range(input_size):
-            if s[input_size-1-i_qubit]=='1':
-                qc.x(qr[i_qubit])
-                num_gates += 1
-
-        depth += 1
-
-        qc.barrier()
-
-        # perform QFT on the input
-        qc.append(qft_gate(input_size).to_instruction(), qr)
-
-        # End with Hadamard on all qubits (to measure the z rotations)
-        ''' don't do this unless NOT doing the inverse afterwards
-        for i_qubit in range(input_size):
-             qc.h(qr[i_qubit])
-
-        qc.barrier()
-        '''
-
-        qc.barrier()
-        
-        # some compilers recognize the QFT and IQFT in series and collapse them to identity;
-        # perform a set of rotations to add one to the secret_int to avoid this collapse
-        for i_q in range(0, num_qubits):
-            divisor = 2 ** (i_q)
-            qc.rz( 1 * math.pi / divisor , qr[i_q])
-            num_gates+=1
-        
-        qc.barrier()
-
-        # to revert back to initial state, apply inverse QFT
-        qc.append(inv_qft_gate(input_size).to_instruction(), qr)
-
-        qc.barrier()
-
-    elif method == 2:
-
-        for i_q in range(0, num_qubits):
-            qc.h(qr[i_q])
-            num_gates += 1
-
-        for i_q in range(0, num_qubits):
-            divisor = 2 ** (i_q)
-            qc.rz(secret_int * math.pi / divisor, qr[i_q])
-            num_gates += 1
-
-        depth += 1
-
-        qc.append(inv_qft_gate(input_size).to_instruction(), qr)
-
-    # This method is a work in progress
-    elif method==3:
-
-        for i_q in range(0, secret_int):
-            qc.h(qr[i_q])
-            num_gates+=1
-
-        for i_q in range(secret_int, num_qubits):
-            qc.x(qr[i_q])
-            num_gates+=1
-            
-        depth += 1
-        
-        qc.append(inv_qft_gate(input_size).to_instruction(), qr)
-        
-    else:
-        exit("Invalid QFT method")
-
-    # measure all qubits
-    qc.measure(qr, cr)
-    num_gates += num_qubits
-    depth += 1
-
-    # save smaller circuit example for display
-    global QC_    
-    if QC_ == None or num_qubits <= 5:
-        if num_qubits < 9: QC_ = qc
-        
-    # return a handle on the circuit
-    return qc
-
-############### QFT Circuit
-
-def qft_gate(input_size):
-    global QFT_, num_gates, depth
-    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="qft")
+    # convert the secret integer into a string so we can scan the characters
+    s = ('{0:0' + str(input_size) + 'b}').format(s_int)
     
-    # Generate multiple groups of diminishing angle CRZs and H gate
-    for i_qubit in range(0, input_size):
+    # create an array to hold one integer per bit
+    bitset = []
     
-        # start laying out gates from highest order qubit (the hidx)
-        hidx = input_size - i_qubit - 1
-        
-        # if not the highest order qubit, add multiple controlled RZs of decreasing angle
-        if hidx < input_size - 1:   
-            num_crzs = i_qubit
-            for j in range(0, num_crzs):
-                divisor = 2 ** (num_crzs - j)
-                qc.crz( math.pi / divisor , qr[hidx], qr[input_size - j - 1])
-                num_gates += 1
-                depth += 1
-            
-        # followed by an H gate (applied to all qubits)
-        qc.h(qr[hidx])
-        num_gates += 1
-        depth += 1
-        
-        qc.barrier()
-    
-    if QFT_ == None or input_size <= 5:
-        if input_size < 9: QFT_ = qc
-        
-    return qc
+    # assign bits in reverse order of characters in string
+    for i in range(input_size):
 
-############### Inverse QFT Circuit
+        if s[input_size - 1 - i] == '1':
+            bitset.append(1)
+        else:
+            bitset.append(0)
+    
+    return bitset
+    
+    
+############### Result Data Analysis
 
-def inv_qft_gate(input_size):
-    global QFTI_, num_gates, depth
-    qr = QuantumRegister(input_size); qc = QuantumCircuit(qr, name="inv_qft")
-    
-    # Generate multiple groups of diminishing angle CRZs and H gate
-    for i_qubit in reversed(range(0, input_size)):
-    
-        # start laying out gates from highest order qubit (the hidx)
-        hidx = input_size - i_qubit - 1
-        
-        # precede with an H gate (applied to all qubits)
-        qc.h(qr[hidx])
-        num_gates += 1
-        depth += 1
-        
-        # if not the highest order qubit, add multiple controlled RZs of decreasing angle
-        if hidx < input_size - 1:   
-            num_crzs = i_qubit
-            for j in reversed(range(0, num_crzs)):
-                divisor = 2 ** (num_crzs - j)
-                qc.crz( -math.pi / divisor , qr[hidx], qr[input_size - j - 1])
-                num_gates += 1
-                depth += 1
-            
-        qc.barrier()  
-    
-    if QFTI_ == None or input_size <= 5:
-        if input_size < 9: QFTI_= qc
-        
-    return qc
-    
 # Define expected distribution calculated from applying the iqft to the prepared secret_int state
 def expected_dist(num_qubits, secret_int, counts):
     dist = {}
@@ -254,8 +126,11 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
         method=1, input_value=None,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None):
+        context=None, api=None):
 
+    # configure the QED-C Benchmark package for use with the given API
+    QuantumFourierTransform, kernel_draw = qedc_benchmarks_init(api)
+    
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
     # validate parameters (smallest circuit is 2 qubits)
@@ -263,7 +138,7 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
     min_qubits = min(max(2, min_qubits), max_qubits)
     skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
-    
+
     # create context identifier
     if context is None: context = f"{benchmark_name} ({method}) Benchmark"
     
@@ -319,47 +194,50 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
         
         else:
             sys.exit("Invalid QFT method")
-            
+        
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
         
+        # determine range of secret strings to loop over
+        if 2**(input_size) <= max_circuits:
+            s_range = list(range(num_circuits))
+        else:
+            # create selection larger than needed and remove duplicates
+            s_range = np.random.randint(1, 2**(input_size), num_circuits + 2)
+            s_range = list(set(s_range))[0:max_circuits]
+            
         # loop over limited # of secret strings for this
         for s_int in s_range:
             s_int = int(s_int)
-            
+        
             # if user specifies input_value, use it instead
             # DEVNOTE: if max_circuits used, this will generate separate bar for each num_circuits
             if input_value is not None:
                 s_int = input_value
-
+                
+            # convert the secret int string to array of integers, each representing one bit
+            bitset = str_to_ivec(input_size, s_int)
+            if verbose: print(f"... s_int={s_int} bitset={bitset}")
+            
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = QuantumFourierTransform(num_qubits, s_int, method=method)
+            qc = QuantumFourierTransform(num_qubits, s_int, bitset, method)       
             metrics.store_metric(input_size, s_int, 'create_time', time.time()-ts)
-
-            # collapse the sub-circuits used in this benchmark (for qiskit)
-            qc2 = qc.decompose()
             
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-
-            ex.submit_circuit(qc2, input_size, s_int, num_shots)
-        
-        print(f"... number of gates, depth = {num_gates}, {depth}")
-        
+            ex.submit_circuit(qc, input_size, s_int, shots=num_shots)
+              
         # Wait for some active circuits to complete; report metrics when groups complete
-        ex.throttle_execution(metrics.finalize_group)
-
+        ex.throttle_execution(metrics.finalize_group)  
+        
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
-    
+       
     ##########
     
-    # print a sample circuit created (if not too large)
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    if method==1:
-        print("\nQFT Circuit ="); print(QFT_)
-    print("\nInverse QFT Circuit ="); print(QFTI_)
-     
-    # Plot metrics for all circuit sizes
+    # draw a sample circuit
+    kernel_draw()
+
+    # Plot metrics for all circuit sizes                         
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
 
 #######################
@@ -367,9 +245,9 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
 
 import argparse
 def get_args():
-    parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
-    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
-    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser = argparse.ArgumentParser(description="Quantum Fourier Transform Benchmark")
+    parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
     parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
     parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
     parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits", type=int)
@@ -389,7 +267,7 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    #QuantumFourierTransform, kernel_draw = qedc_benchmarks_init(args.api)
+    QuantumFourierTransform, kernel_draw = qedc_benchmarks_init(args.api)
     
     # special argument handling
     ex.verbose = args.verbose
@@ -402,9 +280,9 @@ if __name__ == '__main__':
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots=args.num_shots,
         method=args.method,
-        input_value=args.input_value,      # not implemented yet
+        input_value=args.input_value,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
-        #api=args.api
+        api=args.api
         )
    
