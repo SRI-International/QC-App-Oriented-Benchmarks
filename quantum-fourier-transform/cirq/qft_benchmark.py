@@ -309,6 +309,8 @@ def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, num_shots=100,
             qc = QuantumFourierTransform(num_qubits, s_int, method=method)
             metrics.store_metric(input_size, s_int, 'create_time', time.time()-ts)
             
+            qc = cirq.Circuit(cirq.decompose(op) for op in qc.all_operations())
+            
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc, input_size, s_int, num_shots)
         

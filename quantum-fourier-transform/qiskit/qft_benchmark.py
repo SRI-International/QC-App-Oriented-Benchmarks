@@ -209,6 +209,7 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots, met
 
     # obtain counts from the result object
     counts = result.get_counts(qc)
+    if verbose: print(f"For secret int {secret_int} measured: {counts}") 
 
     # For method 1, expected result is always the secret_int
     if method==1:
@@ -221,6 +222,7 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots, met
 
         # correct distribution is measuring the key 100% of the time
         correct_dist = {key: 1.0}
+        if verbose: print(f"... correct_dist: {correct_dist}")
         
     # For method 2, expected result is always the secret_int
     elif method==2:
@@ -240,16 +242,17 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots, met
     # use our polarization fidelity rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist)
 
-    if verbose: print(f"For secret int {secret_int} measured: {counts} fidelity: {fidelity}")
+    if verbose: print(f"... fidelity: {fidelity}")
 
     return counts, fidelity
+
 
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run (min_qubits = 2, max_qubits = 8, max_circuits = 3, skip_qubits=1, num_shots = 100,
+def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
         method=1, input_value=None,
-        backend_id='qasm_simulator', provider_backend=None,
+        backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 
