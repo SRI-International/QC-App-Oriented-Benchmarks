@@ -23,8 +23,13 @@
 # execution, so they can be aggregated and presented to the user.
 #
 
+import os, sys
 import time
 import copy
+
+# import metrics relative to top of repo for this file location
+#root_repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+#sys.path[1:1] = [root_repo + i for i in ["/_common"]]
 import metrics
 
 import cudaq
