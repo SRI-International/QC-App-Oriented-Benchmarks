@@ -63,7 +63,7 @@ In addition to the application directories at the highest level, there are sever
 
 ## Setup and Configuration
 
-The prototype benchmark applications are easy to run and contain few dependencies. The primary dependency is on the Python packages needed for the target environment in which you would like to execute the examples.
+The benchmark applications are easy to run and contain few dependencies. The primary dependency is on the Python packages needed for the target environment in which you would like to execute the examples.
 
 In the [`Preparing to Run Benchmarks`](./_setup/) section you will find a subdirectory for each of the target environments that contains a README with everything you need to know to install and configure the specific environment in which you would like to run.
 
@@ -119,7 +119,7 @@ The second cell of the Jupyter Notebook contains commented code with references 
 
 Applications are often deployed into Container Management Frameworks such as Docker, Kubernetes, and the like. 
 
-The Prototype Benchmarks repository includes support for the creation of a unique *'container image'* for each of the supported API environments. You can find the instructions and all the necessary build files in a folder at the top level named [**`_containerbuildfiles`**](./_containerbuildfiles/).
+The Application-Oriented Benchmarks repository includes support for the creation of a unique *'container image'* for each of the supported API environments. You can find the instructions and all the necessary build files in a folder at the top level named [**`_containerbuildfiles`**](./_containerbuildfiles/).
 The benchmark program image can be deployed into a container management framework and executed as any other application in that framework.
 
 Once built, deployed, and launched, the container process invokes a Jupyter Notebook from which you can run all the available benchmarks.
@@ -133,9 +133,9 @@ Once built, deployed, and launched, the container process invokes a Jupyter Note
 
 ## Implementation Status
 
-Below is a table showing the degree to which the benchmarks have been implemented in each of the target platforms (as of the last update to this branch):
+Below is a table showing the degree to which the benchmarks have been implemented in each of the target frameworks (as of the last update to this branch):
 
-![Prototype Benchmarks - Implementation Status](./_doc/images/proto_benchmarks_status.png)
+![Application-Oriented Benchmarks - Implementation Status](./_doc/images/proto_benchmarks_status.png)
 
 
 
