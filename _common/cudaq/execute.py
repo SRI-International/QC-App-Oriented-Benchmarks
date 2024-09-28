@@ -112,7 +112,7 @@ def set_execution_target(backend_id=None, provider_backend=None,
 	global backend	 
 	
 	# in case anyone uses a name similar to that used in other APIs
-	if backend_id != "cudaq_simulator":
+	if backend_id == "cudaq_simulator":
 		backend_id = None
 	
 	# default to nvidia execution engine if None passed in
