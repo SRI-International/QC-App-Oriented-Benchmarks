@@ -129,6 +129,8 @@ def set_execution_target(backend_id=None, provider_backend=None,
 	# create an informative device name used by the metrics module
 	device_name = backend_id
 	metrics.set_plot_subtitle(f"Device = {device_name}")
+	
+	print(f"... configure execution for target backend_id = {backend_id}")
 
 # CUDA-Q supports several different models of noise. In this default
 # case, we use the modeling of depolarization noise only. This
