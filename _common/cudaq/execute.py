@@ -146,7 +146,7 @@ def set_default_noise_model():
 
 	# We define a depolarization channel setting the probability
 	# of the qubit state being scrambled to `1.0`.
-	depolarization = cudaq.DepolarizationChannel(0.3)
+	depolarization = cudaq.DepolarizationChannel(0.04)
 	
 	phase_flip = cudaq.PhaseFlipChannel(0.2)
 
@@ -154,6 +154,8 @@ def set_default_noise_model():
 		noise.add_channel('x', [i], depolarization)
 		noise.add_channel('y', [i], depolarization)
 		noise.add_channel('z', [i], depolarization)
+		
+		noise.add_channel('h', [i], depolarization)
 		
 		# consider adding this
 		#noise.add_channel('x', [i], phase_flip)
