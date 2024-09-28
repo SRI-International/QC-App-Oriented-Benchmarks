@@ -37,6 +37,7 @@ The directory names and the currently supported environments are:
     qiskit      -- IBM Qiskit
     cirq        -- Google Cirq
     braket      -- Amazon Braket
+    cudaq       -- NVIDIA CUDA-Q (WIP)
     ocean       -- D-Wave Ocean
 ```  
 The goal has been to make the implementation of each algorithm identical across the different target environments, with the processing and reporting of results as similar as possible. Each application directory includes a README file with information specific to that application or algorithm. Below we list the benchmarks we have implemented with a suggested order of approach; the benchmarks in levels 1 and 2 are simpler and a good place to start for beginners, while levels 3 and 4 are more complicated and might build off of intuition and reasoning developed in earlier algorithms. Level 5 includes newly released benchmarks based on iterative execution done within hybrid algorithms.
@@ -47,7 +48,7 @@ Complexity of Benchmark Algorithms (Increasing Difficulty)
     1: Deutsch-Jozsa, Bernstein-Vazirani, Hidden Shift
     2: Quantum Fourier Transform, Grover's Search
     3: Phase Estimation, Amplitude Estimation, HHL Linear Solver
-    4: Monte Carlo, Hamiltonian Simulation, Variational Quantum Eigensolver, Shor's Order Finding
+    4: Monte Carlo, Hamiltonian (and HamLib) Simulation, Variational Quantum Eigensolver, Shor's Order Finding Algorithm
     5: MaxCut, Hydrogen-Lattice
 ```
 
