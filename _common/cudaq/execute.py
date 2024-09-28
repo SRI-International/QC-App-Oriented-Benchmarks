@@ -97,7 +97,7 @@ def init_execution (handler):
 
 
 # Set the backend for execution
-def set_execution_target(backend_id='cudaq_simulator', provider_backend=None,
+def set_execution_target(backend_id=None, provider_backend=None,
 		hub=None, group=None, project=None, exec_options=None,
 		context=None):
 	"""
@@ -111,33 +111,68 @@ def set_execution_target(backend_id='cudaq_simulator', provider_backend=None,
 	"""
 	global backend	 
 	
-	# default to cudaq_simulator if None passed in
+	# in case anyone uses a name similar to that used in other APIs
+	if backend_id != "cudaq_simulator":
+		backend_id = None
+	
+	# default to nvidia execution engine if None passed in
 	if backend_id == None:
-		backend_id="cudaq_simulator"
+		backend_id="nvidia"
 		
-	# if a custom provider backend is given, use it ...
+	# if a custom provider backend is given, set it; currently unused
 	if provider_backend != None:
 		backend = provider_backend
-	'''	  
-	# otherwise test for simulator
-	elif backend_id == 'simulator':
-		backend = cirq.Simulator()
-	   
-	# nothing else is supported yet, default to simulator		
-	else:
-		print(f"ERROR: Unknown backend_id: {backend_id}, defaulting to Cirq Simulator")
-		backend = cirq.Simulator()
-		backend_id = "simulator"
-	'''
-	# create an informative device name
+	
+	# now set the execution target to the given backend_id
+	cudaq.set_target(backend_id)
+	
+	# create an informative device name used by the metrics module
 	device_name = backend_id
 	metrics.set_plot_subtitle(f"Device = {device_name}")
 
+# CUDA-Q supports several different models of noise. In this default
+# case, we use the modeling of depolarization noise only. This
+# depolarization will result in the qubit state decaying into a mix
+# of the basis states, |0> and |1>, with a user provided probability.
+# DEVNOTE: there are no two qubit error settings here
+def set_default_noise_model():
+	global noise
+	
+	# We will begin by defining an empty noise model that we will add
+	# our depolarization channel to.
+	noise = cudaq.NoiseModel()
 
+	# We define a depolarization channel setting the probability
+	# of the qubit state being scrambled to `1.0`.
+	depolarization = cudaq.DepolarizationChannel(0.3)
+	
+	phase_flip = cudaq.PhaseFlipChannel(0.2)
+
+	for i in range(30):
+		noise.add_channel('x', [i], depolarization)
+		noise.add_channel('y', [i], depolarization)
+		noise.add_channel('z', [i], depolarization)
+		
+		# consider adding this
+		#noise.add_channel('x', [i], phase_flip)
+		#noise.add_channel('y', [i], phase_flip)
+		#noise.add_channel('z', [i], phase_flip)
+		
+		noise.add_channel('rx', [i], depolarization)
+		noise.add_channel('ry', [i], depolarization)
+		noise.add_channel('rz', [i], depolarization)
+	
+	if verbose:
+		print(f"  ... just set DEFAULT noise model to: {noise}")
+
+# Configure execution to use the given noise model
 def set_noise_model(noise_model = None):
-	# see reference on NoiseModel here https://quantumai.google/cirq/noise
+	
 	global noise
 	noise = noise_model
+	
+	if verbose:
+		print(f"... just set noise model to: {noise}")
 
 
 # Submit circuit for execution
@@ -173,22 +208,6 @@ def execute_circuit (batched_circuit):
 	
 	# Initiate execution 
 	circuit = batched_circuit["qc"]
-	'''
-	if type(noise) == str and noise == "DEFAULT":
-		# depolarizing noise on all qubits
-		circuit = circuit.with_noise(cirq.depolarize(0.05))
-	elif noise is not None:
-		# otherwise we expect it to be a NoiseModel
-		# see documentation at https://quantumai.google/cirq/noise
-		circuit = circuit.with_noise(noise)
-	
-	# experimental, for testing AQT device
-	if device != None:
-		circuit.device=device
-		device.validate_circuit(circuit)
-
-	job.result = backend.run(circuit, repetitions=shots)
-	'''
 	
 	# create a pseudo-job to perform metrics processing upon return
 	job = Job()
@@ -197,8 +216,19 @@ def execute_circuit (batched_circuit):
 	# print(cudaq.draw(circuit[0], *circuit[1]))
 	
 	ts = time.time()
+	
 	# call sample() on circuit with its list of arguments
-	result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
+	if verbose: print(f"... during exec, noise model is: {noise}")
+	if noise is None:
+		if verbose: print("... executing without noise")
+		result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
+	else:
+		if verbose: print("... executing WITH noise")
+		result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+	
+	# control results print at benchmark level
+	#if verbose: print(result)
+		
 	exec_time = time.time() - ts
 	
 	# store the result object on the job for processing in job_complete
@@ -220,6 +250,34 @@ def execute_circuit (batched_circuit):
 	# put job into the active circuits with circuit info
 	active_circuits[job] = active_circuit
 	#print("... active_circuit = ", str(active_circuit))
+	
+	# ***********************************
+	
+	# store circuit dimensional metrics
+	# DEVNOTE: this is not accurate; it is provided so the volumetric plots show something
+	
+	# compute depth and gate counts based on number of qubits
+	qc_size = int(active_circuit["group"])
+	qc_depth = 4 * pow(qc_size, 2)
+
+	qc_xi = 0.5
+
+	qc_n2q = int(qc_depth * 0.75)
+	qc_tr_depth = qc_depth
+	qc_tr_size = qc_size
+	qc_tr_xi = qc_xi
+	qc_tr_n2q = qc_n2q
+	
+	# store circuit dimensional metrics
+	metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'depth', qc_depth)
+	metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'size', qc_size)
+	metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'xi', qc_xi)
+	metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'n2q', qc_n2q)
+
+	metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_depth', qc_tr_depth)
+	metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_size', qc_tr_size)
+	metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_xi', qc_tr_xi)
+	metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_n2q', qc_tr_n2q)
 	
 	##############
 	# Here we complete the job immediately 
@@ -292,7 +350,7 @@ def throttle_execution(completion_handler=metrics.finalize_group):
 	if completion_handler != None:
 		completion_handler(group)
 				
-	'''
+	'''  DEVNOTE: this or something similar could be used later for throtttling
 	# check and sleep if not complete
 	done = False
 	pollcount = 0
@@ -333,7 +391,7 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
 	# DEVNOTE: execution is currently synchronous, so force execution of any batched circuits
 	execute_circuits()
 	
-	'''
+	'''   DEVNOTE: this or something similar could be used later for throtttling
 	# check and sleep if not complete
 	done = False
 	pollcount = 0
