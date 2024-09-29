@@ -123,7 +123,7 @@ def QuantumFourierTransform (num_qubits: int, secret_int: int, init_phase: List[
 	qc = [qft_kernel, [num_qubits, secret_int, init_phase, method]]
 	
 	global QC_
-	if num_qubits <= 9:
+	if num_qubits <= 6:
 		QC_ = qc
 
 	return qc
