@@ -27,17 +27,27 @@ import os, sys
 import time
 import copy
 
-# import metrics relative to top of repo for this file location
-#root_repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-#sys.path[1:1] = [root_repo + i for i in ["/_common"]]
+# import metrics module relative to top level of package
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+common_dir = os.path.abspath(os.path.join(current_dir, ".."))
+#sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
+
+top_dir = os.path.abspath(os.path.join(common_dir, ".."))
+sys.path = [top_dir] + [p for p in sys.path if p != top_dir]
+
+#print(sys.path)
+
+# DEVNOTE: for some reason, this does not work - why?
+#import _common.metrics as metrics
+
+# instead, need to include the common directory in path and do this
 import metrics
 
+# import the CUDA-Q package
 import cudaq
 
 verbose = False
-
-###import cirq
-###backend = cirq.Simulator()	   # Use Cirq Simulator by default
 
 #noise = 'DEFAULT'
 noise=None
@@ -50,7 +60,8 @@ batched_circuits = [ ]
 active_circuits = { }
 result_handler = None
 
-device=None
+# save the executing device (backend_id) here
+device = None
 
 #######################
 # SUPPORTING CLASSES
