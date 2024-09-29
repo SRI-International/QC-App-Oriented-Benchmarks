@@ -40,7 +40,7 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 
 
 # Benchmark Name
-benchmark_name = "Quantum-Fourier-Transform"
+benchmark_name = "Quantum Fourier Transform"
 
 np.random.seed(0)
 
