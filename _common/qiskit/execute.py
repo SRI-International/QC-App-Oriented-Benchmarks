@@ -392,8 +392,8 @@ def set_execution_target(backend_id='qasm_simulator',
                     
                     # get Sampler resilience level and transpiler optimization level from exec_options
                     options = Options()
-                    options.resilience_level = exec_options.get("resilience_level", 1)
-                    options.optimization_level = exec_options.get("optimization_level", 3)
+                    # options.resilience_level = exec_options.get("resilience_level", 1)
+                    # options.optimization_level = exec_options.get("optimization_level", 3)
                     
                     # special handling for ibmq_qasm_simulator to set noise model
                     if backend_id == "ibmq_qasm_simulator":
