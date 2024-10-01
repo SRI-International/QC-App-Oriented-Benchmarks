@@ -120,7 +120,7 @@ def square_on_objective(qc, qr):
         qc.cx(control, num_state_qubits)
 
 def state_prep(qc, qr, target_dist, num_state_qubits):
-    """
+    r"""
     Use controlled Ry gates to construct the superposition Sum \sqrt{p_i} |i>
     """
     r_probs = mc_utils.region_probs(target_dist, num_state_qubits)
@@ -505,7 +505,7 @@ def get_args():
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-    parser.add_argument("--num_state_qubits", "-nsq", default=0.0, help="Number of State Qubits", type=int)
+    parser.add_argument("--num_state_qubits", "-nsq", default=1, help="Number of State Qubits", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
