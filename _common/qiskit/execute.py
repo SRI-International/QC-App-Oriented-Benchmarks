@@ -147,9 +147,12 @@ class BenchmarkResult(object):
         self.metadata = qiskit_result.metadata
 
     def get_counts(self, qc=0):
-        counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
-        for key in counts.keys():
-            counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])        
+        # counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
+        # for key in counts.keys():
+        #     counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])
+        qc_index = 0 # this should point to the index of the circuit in a pub
+        bitvals = next(iter(self.qiskit_result[qc_index].data.values()))
+        counts = bitvals.get_counts()
         return counts
 
 # Special Job object class to hold job information for custom executors
@@ -250,6 +253,7 @@ def set_execution_target(backend_id='qasm_simulator',
                         provider_name='Quantinuum')
     """
     global backend
+    global sampler
     global session
     global use_sessions
     global session_count
@@ -291,12 +295,16 @@ def set_execution_target(backend_id='qasm_simulator',
     # handle Statevector simulator specially
     elif backend_id == 'statevector_simulator':
         backend = Aer.get_backend("statevector_simulator")
-        
+    
+    elif backend_id == "statevector_sampler":
+        from qiskit.primitives import StatevectorSampler
+        sampler = StatevectorSampler()
+
     # handle 'fake' backends here
     elif 'fake' in backend_id:
         backend = getattr(
             importlib.import_module(
-                f'qiskit.providers.fake_provider.backends.{backend_id.split("_")[-1]}.{backend_id}'
+                f'qiskit_ibm_runtime.fake_provider.backends.{backend_id.split("_")[-1]}.{backend_id}'
             ),
             backend_id.title().replace('_', '')
         )
@@ -306,7 +314,6 @@ def set_execution_target(backend_id='qasm_simulator',
     # otherwise use the given providername or backend_id to find the backend
     else:
         global service
-        global sampler
     
         # if provider_module name and provider_name are provided, obtain a custom provider
         if provider_module_name and provider_name:  
@@ -375,7 +382,7 @@ def set_execution_target(backend_id='qasm_simulator',
 
                 # if use sessions, setup runtime service, Session, and Sampler
                 if use_sessions:
-                    from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session, Options
+                    from qiskit_ibm_runtime import QiskitRuntimeService, Session, Options, SamplerV2 as Sampler
                     
                     service = QiskitRuntimeService()
                     session_count += 1
@@ -385,8 +392,8 @@ def set_execution_target(backend_id='qasm_simulator',
                     
                     # get Sampler resilience level and transpiler optimization level from exec_options
                     options = Options()
-                    options.resilience_level = exec_options.get("resilience_level", 1)
-                    options.optimization_level = exec_options.get("optimization_level", 3)
+                    # options.resilience_level = exec_options.get("resilience_level", 1)
+                    # options.optimization_level = exec_options.get("optimization_level", 3)
                     
                     # special handling for ibmq_qasm_simulator to set noise model
                     if backend_id == "ibmq_qasm_simulator":
@@ -423,14 +430,13 @@ def set_execution_target(backend_id='qasm_simulator',
         ###############################
         # otherwise, assume the backend_id is given only and assume it is IBM Cloud device
         else:
-            from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session, Options
+            from qiskit_ibm_runtime import QiskitRuntimeService, Session, SamplerOptions as Options, SamplerV2 as Sampler
             
             # create the Runtime Service object
             service = QiskitRuntimeService()
-            
             # obtain a backend from the service
             backend = service.backend(backend_id)
-               
+
             # DEVNOTE: here we assume if the sessions flag is set, we use Sampler
             # however, we may want to add a use_sampler option so that we can separate these
             
@@ -449,8 +455,8 @@ def set_execution_target(backend_id='qasm_simulator',
                 
                 # get Sampler resilience level and transpiler optimization level from exec_options
                 options = Options()
-                options.resilience_level = exec_options.get("resilience_level", 1)
-                options.optimization_level = exec_options.get("optimization_level", 3)
+                # options.resilience_level = exec_options.get("resilience_level", 1)
+                # options.optimization_level = exec_options.get("optimization_level", 3)
                 
                 # special handling for ibmq_qasm_simulator to set noise model
                 if backend_id == "ibmq_qasm_simulator":
@@ -675,7 +681,7 @@ def execute_circuit(circuit):
 
             #************************************************
             # Initiate execution (with noise if specified and this is a simulator backend)
-            if this_noise is not None and not use_sessions and backend_name.endswith("qasm_simulator"):
+            if this_noise is not None and not sampler and backend_name.endswith("qasm_simulator"):
                 logger.info(f"Performing noisy simulation, shots = {shots}")
                 
                 # if the noise model has associated QV value, copy it to metrics module for plotting
@@ -750,8 +756,9 @@ def execute_circuit(circuit):
                 logger.info(f'Running trans_qc, shots={shots}')
                 st = time.time() 
 
-                if use_sessions:
-                    job = sampler.run(trans_qc, shots=shots, **backend_exec_options_copy)
+                if sampler:
+                    # turn input into pub-like
+                    job = sampler.run([trans_qc], shots=shots)
                 else:
                     job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
 
@@ -1106,7 +1113,7 @@ def job_complete(job):
     # get job result (DEVNOTE: this might be different for diff targets)
     result = None
         
-    if job.status() == JobStatus.DONE:
+    if job.status() == JobStatus.DONE or job.status() == 'DONE':
         result = job.result()
         # print("... result = ", str(result))
 
@@ -1128,13 +1135,18 @@ def job_complete(job):
         # if we are using sessions, structure of result object is different;
         # use a BenchmarkResult object to hold session result and provide a get_counts()
         # that returns counts to the benchmarks in the same form as without sessions
-        if use_sessions:
+        if sampler:
             result = BenchmarkResult(result)
             #counts = result.get_counts()
             
-            actual_shots = result.metadata[0]['shots']
-            result_obj = result.metadata[0]
-            results_obj = result.metadata[0]
+            # actual_shots = result.metadata[0]['shots']
+            # get the name of the classical register
+            # TODO: need to rewrite to allow for submit multiple circuits in one job
+            # get DataBin associated with the classical register
+            bitvals = next(iter(result.qiskit_result[0].data.values()))
+            actual_shots = bitvals.num_shots
+            result_obj = result.metadata # not sure how to update to be V2 compatible
+            results_obj = result.metadata
         else:
             result_obj = result.to_dict()
             results_obj = result.to_dict()['results'][0]
@@ -1169,6 +1181,10 @@ def job_complete(job):
         elif "time_taken" in results_obj:
             exec_time = results_obj["time_taken"]
         
+        elif 'execution' in result_obj:
+            # read execution time for the first circuit
+            exec_time = result_obj['execution']['execution_spans'][0].duration
+
         # override the initial value with exec_time returned from successful execution
         metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
         
@@ -1273,7 +1289,7 @@ def process_step_times(job, result, active_circuit):
         
         if verbose:
             print(f"... job.metrics() = {job.metrics()}")
-            print(f"... job.result().metadata[0] = {result.metadata[0]}")
+            print(f"... job.result().metadata[0] = {result.metadata}")
 
         # occasionally, these metrics come back as None, so try to use them
         try:
@@ -1494,7 +1510,7 @@ def check_jobs(completion_handler=None):
             if hasattr(job, "error_message"):
                 print(f"    job = {job.job_id()}  {job.error_message()}")
 
-        if status == JobStatus.DONE or status == JobStatus.CANCELLED or status == JobStatus.ERROR:
+        if status == JobStatus.DONE or status == JobStatus.CANCELLED or status == JobStatus.ERROR or status == 'DONE' or status =='CANCELLED' or status == 'ERROR':
             #if verbose: print("Job status is ", job.status() )
             
             active_circuit = active_circuits[job]
