@@ -107,7 +107,7 @@ def BersteinVazirani (num_qubits: int, secret_int: int, hidden_bits: List[int], 
     qc = [bv_kernel, [num_qubits, secret_int, hidden_bits, method]]
     
     global QC_
-    if num_qubits <= 9:
+    if num_qubits <= 6:
         QC_ = qc
 
     return qc

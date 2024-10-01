@@ -94,7 +94,7 @@ def PhaseEstimation (num_qubits: int, theta: float):
     qc = [pe_kernel, [num_qubits, theta]]
     
     global QC_
-    if num_qubits <= 9:
+    if num_qubits <= 6:
         QC_ = qc
 
     return qc
