@@ -18,11 +18,18 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
+    - name: Install hydrogen lattice dependencies
       run: pip install -r hydrogen-lattice/qiskit/requirements.txt
       working-directory: ./
 
-    - name: Run tests
+    - name: Install hamiltonian simulation dependencies
+      run: pip install -r hamiltonian-simulation/qiskit/requirements.txt
+      working-directory: ./
+
+    - name: Run hydrogen lattice tests
       run: pytest
       working-directory: ./hydrogen-lattice/qiskit
 
+    - name: Run hamiltonian simulation tests
+      run: pytest
+      working-directory: ./hamiltonian-simulation/qiskit

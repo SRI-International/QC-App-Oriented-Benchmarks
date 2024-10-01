@@ -36,20 +36,24 @@ def analyze_and_print_result(qc, result, num_counting_qubits, theta, num_shots):
     # calculate expected output histogram
     correct_dist = theta_to_bitstring(theta, num_counting_qubits)
     
-    # generate thermal_dist to be comparable to correct_dist
-    thermal_dist = metrics.uniform_dist(num_counting_qubits)
-
-    # convert counts, expectation, and thermal_dist to app form for visibility
+    # generate thermal_dist and ap form of thermal_dist to be comparable to correct_dist
+    if num_counting_qubits < 15:
+        thermal_dist = metrics.uniform_dist(num_counting_qubits)
+        app_thermal_dist = bitstring_to_theta(thermal_dist, num_counting_qubits)
+    else :
+        thermal_dist = None
+        app_thermal_dist = None
+        
+    # convert counts expectation to app form for visibility
     # app form of correct distribution is measuring theta correctly 100% of the time
     app_counts = bitstring_to_theta(counts, num_counting_qubits)
-    app_correct_dist = {theta: 1.0}
-    app_thermal_dist = bitstring_to_theta(thermal_dist, num_counting_qubits)
-
+    app_correct_dist = {theta: 1.0} 
+    
     if verbose:
         print(f"For theta {theta}, expected: {correct_dist} measured: {counts}")
-        print(f"   ... For theta {theta} thermal_dist: {thermal_dist}")
+        #print(f"   ... For theta {theta} thermal_dist: {thermal_dist}")
         print(f"For theta {theta}, app expected: {app_correct_dist} measured: {app_counts}")
-        print(f"   ... For theta {theta} app_thermal_dist: {app_thermal_dist}")
+        #print(f"   ... For theta {theta} app_thermal_dist: {app_thermal_dist}")
         
     # use polarization fidelity with rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
@@ -72,8 +76,8 @@ def theta_to_bitstring(theta, num_counting_qubits):
 # Convert bitstring to theta representation, useful for debugging
 def bitstring_to_theta(counts, num_counting_qubits):
     theta_counts = {}
-    for key in counts.keys():
-        r = counts[key]
+    for item in counts.items():
+        key, r = item
         theta = int(key,2) / (2**num_counting_qubits)
         if theta not in theta_counts.keys():
             theta_counts[theta] = 0
@@ -85,6 +89,7 @@ def bitstring_to_theta(counts, num_counting_qubits):
 
 # Execute program with default parameters
 def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
+        init_phase=None,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
@@ -134,7 +139,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         np.random.seed(0)
 
         # as circuit width grows, the number of counting qubits is increased
-        num_counting_qubits = num_qubits - num_state_qubits - 1
+        num_counting_qubits = num_qubits - num_state_qubits
 
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_counting_qubits), max_circuits)
@@ -143,12 +148,21 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         
         # determine range of secret strings to loop over
         if 2**(num_counting_qubits) <= max_circuits:
-            theta_range = [i/(2**(num_counting_qubits)) for i in list(range(num_circuits))]
+            theta_choices = list(range(num_circuits))
         else:
-            theta_range = [i/(2**(num_counting_qubits)) for i in np.random.choice(2**(num_counting_qubits), num_circuits, False)]
+            theta_choices = np.random.randint(1, 2**(num_counting_qubits), num_circuits + 10)
+            theta_choices = list(set(theta_choices))[0:num_circuits]
+            
+        # scale choices to 1.0
+        theta_range = [i/(2**(num_counting_qubits)) for i in theta_choices]
 
         # loop over limited # of random theta choices
         for theta in theta_range:
+            theta = float(theta) 
+            
+            # if initial phase passed in, use it instead of random values
+            if init_phase:
+                theta = init_phase
         
             # create the circuit for given qubit size and theta, store time metric
             ts = time.time()
@@ -189,7 +203,8 @@ def get_args():
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-    parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
+    parser.add_argument("--init_phase", "-p", default=0.0, help="Input Phase Value", type=float)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
     
@@ -203,6 +218,8 @@ if __name__ == '__main__':
     
     # special argument handling
     ex.verbose = args.verbose
+    verbose = args.verbose
+    
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
     # execute benchmark program
@@ -210,8 +227,9 @@ if __name__ == '__main__':
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots=args.num_shots,
         #method=args.method,
-        #theta=args.theta,
+        init_phase=args.init_phase,
         backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
         #api=args.api
         )
    

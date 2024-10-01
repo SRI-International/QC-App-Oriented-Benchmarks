@@ -139,26 +139,26 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
         if 2**(input_size) <= max_circuits:
             s_range = list(range(num_circuits))
         else:
-            # create selection larger than needed and remove duplicates (faster than random.choice())
-            s_range = np.random.randint(1, 2**(input_size), num_circuits + 10)
+            # create selection larger than needed and remove duplicates
+            s_range = np.random.randint(1, 2**(input_size), num_circuits + 2)
             s_range = list(set(s_range))[0:max_circuits]
-            
+
+        # If mid circuit, then add 2 to new qubit group since the circuit only uses 2 qubits
+        if method == 2:
+            mid_circuit_qubit_group.append(2)
+                
         # loop over limited # of secret strings for this
         for s_int in s_range:
             s_int = int(s_int)
         
             # if user specifies input_value, use it instead
-            # DEVNOTE: if max_circuits used, this will generate multiple bars per width
+            # DEVNOTE: if max_circuits used, this will generate separate bar for each num_circuits
             if input_value is not None:
                 s_int = input_value
                 
             # convert the secret int string to array of integers, each representing one bit
             bitset = str_to_ivec(input_size, s_int)
             if verbose: print(f"... s_int={s_int} bitset={bitset}")
-                
-            # If mid circuit, then add 2 to new qubit group since the circuit only uses 2 qubits
-            if method == 2:
-                mid_circuit_qubit_group.append(2)
             
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
@@ -200,6 +200,7 @@ def get_args():
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
     
@@ -213,6 +214,8 @@ if __name__ == '__main__':
     
     # special argument handling
     ex.verbose = args.verbose
+    verbose = args.verbose
+    
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
     # execute benchmark program
@@ -222,6 +225,7 @@ if __name__ == '__main__':
         method=args.method,
         input_value=args.input_value,
         backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
         #api=args.api
         )
    

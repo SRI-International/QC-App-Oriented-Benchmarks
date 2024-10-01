@@ -267,6 +267,8 @@ def run(min_qubits=2, max_qubits=8, max_circuits=3, num_shots=100,
             h_z = precalculated_data['h_z'][:num_qubits]
             qc = HamiltonianSimulation(num_qubits, K=k, t=t, w=w, h_x= h_x, h_z=h_z)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+
+            qc = cirq.Circuit(cirq.decompose(op) for op in qc.all_operations())
             
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)

@@ -412,6 +412,8 @@ def run(min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method=1,
             qc = ShorsAlgorithm(number, base, method=method, verbose=verbose)
             metrics.store_metric(num_qubits, number_order, 'create_time', time.time() - ts)
 
+            qc = cirq.Circuit(cirq.decompose(op) for op in qc.all_operations())
+
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
             ex.submit_circuit(qc, num_qubits, number_order, num_shots)
 
