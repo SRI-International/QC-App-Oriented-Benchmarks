@@ -228,7 +228,7 @@ MAX_QUBITS=8
 # Execute program with default parameters
 def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
         num_state_qubits=1, # default, not exposed to users
-        backend_id='qasm_simulator', provider_backend=None,
+        backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 
