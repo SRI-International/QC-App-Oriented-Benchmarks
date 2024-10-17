@@ -15,24 +15,24 @@ Ug_ = None
 ############### Circuit Definition
 
 # Uf oracle where Uf|x> = f(x)|x>, f(x) = {-1,1}
-def Uf_oracle(num_qubits, secret_int):
+def Uf_oracle(num_qubits, hidden_bits):
     # Initialize qubits qubits
     qr = QuantumRegister(num_qubits)
     qc = QuantumCircuit(qr, name="Uf")
 
     # Perform X on each qubit that matches a bit in secret string
-    s = ('{0:0'+str(num_qubits)+'b}').format(secret_int)
+    #s = ('{0:0'+str(num_qubits)+'b}').format(secret_int)
     for i_qubit in range(num_qubits):
-        if s[num_qubits-1-i_qubit]=='1':
+        if hidden_bits[i_qubit]==1:
             qc.x(qr[i_qubit])
 
     for i_qubit in range(0,num_qubits-1,2):
         qc.cz(qr[i_qubit], qr[i_qubit+1])
 
     # Perform X on each qubit that matches a bit in secret string
-    s = ('{0:0'+str(num_qubits)+'b}').format(secret_int)
+    #s = ('{0:0'+str(num_qubits)+'b}').format(secret_int)
     for i_qubit in range(num_qubits):
-        if s[num_qubits-1-i_qubit]=='1':
+        if hidden_bits[i_qubit]==1:
             qc.x(qr[i_qubit])
 
     return qc
@@ -61,7 +61,7 @@ def HiddenShift (num_qubits, secret_int, hidden_bits: List[int], method: int = 1
     qc.barrier()
 
     # Generate Uf oracle where Uf|x> = f(x)|x>, f(x) = {-1,1}
-    Uf = Uf_oracle(num_qubits, secret_int)
+    Uf = Uf_oracle(num_qubits, hidden_bits)
     qc.append(Uf,qr)
 
     qc.barrier()
