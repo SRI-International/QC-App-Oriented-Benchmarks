@@ -5,6 +5,8 @@ Hidden Shift Benchmark Program - Qiskit Kernel
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
+from typing import List
+
 # saved circuits for display
 QC_ = None
 Uf_ = None
@@ -46,7 +48,7 @@ def Ug_oracle(num_qubits):
 
     return qc
 
-def HiddenShift (num_qubits, secret_int):
+def HiddenShift (num_qubits, secret_int, hidden_bits: List[int], method: int = 1):
     
     # allocate qubits
     qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits)
