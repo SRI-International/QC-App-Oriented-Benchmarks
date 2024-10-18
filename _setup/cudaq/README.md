@@ -60,31 +60,26 @@ To execute the benchmarks in a command or shell window, you simply change direct
   
     python bv_benchmark.py -a cudaq
     
-This command instructs the benchmark program to exeucte using the CUDA Quantum kernel.  By default, the benchmark will sweep over qubits widths from 2 to 24 qubits.As it executes, the benchmark program will report the benchmark metrics to the console, save them to a data file, and also generate a set of plots depicting the results.
+This command instructs the benchmark program to exeucte using the CUDA Quantum kernel.  By default, the benchmark will sweep over qubits widths from 2 to 24 qubits.  As it executes, the benchmark program will report the benchmark metrics to the console, save them to a data file, and also generate a set of plots depicting the results. 
+
+A variety of execution options are available and can be obtained using the -h option for help information:
+
+    python bv_benchmark.py -h
 
 The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark pgrogram filename).
 
 ## Run the benchmark programs in a Jupyter Notebook
 
-Many Python users prefer to execute their Python programs in a Jupyter notebook, which is automatically available with your Anaconda installation.
+Many Python users prefer to execute their Python programs in a Jupyter notebook, which is available in installed in your environment.
 Execute the following commands to change directory to one that contains a Jupyter notebook and execute and invoke Jupyter notebook server.
 
-    cd to directory containing jupyter notebook (currently only the maxcut/cudaq directory)
+    cd [your github home directory]\QC-App-Oriented-Benchmarks]
     jupyter-notebook
     
-This will then invoke the Jupyter notebook in a new browser tab. There you can copy and paste any of the benchmark program code and execute the programs interactively.
-    
-Note; In some Windows environments, it is necessary to install one additional package (if running a Jupyter notebook results in a Windows "kernel error"):
-
-    conda install pywin32
-
-Once installed, you should be able to successfully start your Jupyter notebook.
+You can then select the **benchmarks-cudaq.ipynb** notebook in a new browser tab. The first cell of the notebook contains the execution options available for configuration.  Subsequent cells contain the run command for each of the benchmarks and can be executed one at a time. To run all the benchmarks simply use the Jupyter Notebook's Run All menu option. 
 
 ## Tested Versions
 
-The repository has been validated on Linux using the following versions as minimums:
-
-    Miniconda Version: 4.10.3
-    Python Versions: 3.8.5 and 3.9.7
+    Python Versions: 3.10 through 3.12
 
 Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.
