@@ -21,9 +21,29 @@ benchmark_name = "Hidden Shift"
 np.random.seed(0)
 
 verbose = False
+    
+# Routine to convert the secret integer into an array of integers, each representing one bit
+# DEVNOTE: do we need to convert to string, or can we just keep shifting?
+def str_to_ivec(input_size: int, s_int: int):
 
+    # convert the secret integer into a string so we can scan the characters
+    s = ('{0:0' + str(input_size) + 'b}').format(s_int)
+    
+    # create an array to hold one integer per bit
+    bitset = []
+    
+    # assign bits in reverse order of characters in string
+    for i in range(input_size):
 
-############### Analyze Result
+        if s[input_size - 1 - i] == '1':
+            bitset.append(1)
+        else:
+            bitset.append(0)
+    
+    return bitset
+    
+    
+############### Result Data Analysis
 
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
@@ -31,10 +51,11 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    if verbose: print(f"For secret int {secret_int} measured: {counts}")
+    if verbose: print(f"For secret int {secret_int} measured: {counts}")   
     
     # create the key that is expected to have all the measurements (for this circuit)
     key = format(secret_int, f"0{num_qubits}b")
+    if verbose: print(f"... key = {key}")
     
     # correct distribution is measuring the key 100% of the time
     correct_dist = {key: 1.0}
@@ -48,6 +69,7 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 
 # Execute program with default parameters
 def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=100,
+        method=1, input_value=None,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
@@ -87,8 +109,8 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
     
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1, 2):
-
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+        
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_qubits), max_circuits)
         
@@ -104,10 +126,20 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
         
         # loop over limited # of secret strings for this
         for s_int in s_range:
+            s_int = int(s_int)
         
+            # if user specifies input_value, use it instead
+            # DEVNOTE: if max_circuits used, this will generate separate bar for each num_circuits
+            if input_value is not None:
+                s_int = input_value
+                
+            # convert the secret int string to array of integers, each representing one bit
+            bitset = str_to_ivec(num_qubits, s_int)
+            if verbose: print(f"... s_int={s_int} bitset={bitset}")
+            
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = HiddenShift(num_qubits, s_int)
+            qc = HiddenShift(num_qubits, s_int, bitset, method)
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
@@ -144,7 +176,7 @@ def get_args():
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-    #parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
+    parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     return parser.parse_args()
@@ -167,8 +199,8 @@ if __name__ == '__main__':
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots=args.num_shots,
-        #method=args.method,            # not used currently
-        #input_value=args.input_value,  # not used currently
+        method=args.method,
+        input_value=args.input_value,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
         #api=args.api
