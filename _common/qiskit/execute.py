@@ -396,7 +396,7 @@ def set_execution_target(backend_id='qasm_simulator',
                 print(authentication_error_msg.format(backend_id))
                 raise ex
             print(f"... using {backend=} {primitive_name=}")
-            
+
             # DEVNOTE: here we assume if the sessions flag is set, we use Sampler
             # however, we may want to add a use_sampler option so that we can separate these
             
