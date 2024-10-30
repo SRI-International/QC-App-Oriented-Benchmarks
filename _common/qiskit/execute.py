@@ -33,9 +33,15 @@ import logging
 import numpy as np
 
 from datetime import datetime, timedelta
-from qiskit import transpile
-from qiskit_aer import Aer
+from qiskit import QuantumCircuit, transpile
 from qiskit.providers.jobstatus import JobStatus
+from qiskit.primitives import StatevectorSampler
+from qiskit_aer import Aer
+from qiskit_ibm_runtime import (
+    QiskitRuntimeService,
+    SamplerOptions,
+    SamplerV2,
+)
 
 # Noise Model imports
 from qiskit_aer.noise import NoiseModel, ReadoutError
@@ -139,7 +145,7 @@ basis_gates_array = [
 # qiskit primitive job result instances don't have a get_counts method 
 # like backend results do. As such, a get counts method is calculated
 # from the quasi distributions and shots taken.
-class BenchmarkResult(object):
+class BenchmarkResult:
 
     def __init__(self, qiskit_result):
         super().__init__()
@@ -147,9 +153,9 @@ class BenchmarkResult(object):
         self.metadata = qiskit_result.metadata
 
     def get_counts(self, qc=0):
-        # counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
-        # for key in counts.keys():
-        #     counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])
+        # TODO: need to refactor the caller of get_counts not to submit QuantumCircuit
+        # and use index instead to be compatible with PrimitiveResult.
+        # `qc` is intentionally ignored.
         qc_index = 0 # this should point to the index of the circuit in a pub
         bitvals = next(iter(self.qiskit_result[qc_index].data.values()))
         counts = bitvals.get_counts()
@@ -227,8 +233,8 @@ def init_execution(handler):
     
     cached_circuits.clear()
     
-    # On initialize, always set trnaspilation for metrics and execute to True
-    set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+    # On initialize, always set transpilation for metrics and execute to True
+    set_transpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
     
 
 # Set the backend for execution
@@ -366,76 +372,30 @@ def set_execution_target(backend_id='qasm_simulator',
             backend.latest_session = session
             
         ###############################
-        # if using IBM Quantum Platform, assume the backend_id is given only
-        elif use_ibm_quantum_platform: 
-        
-            from qiskit import IBMQ
-            if IBMQ.stored_account():
-            
-                # load a stored account
-                IBMQ.load_account()
-                
-                # set use_sessions in provided by user - NOTE: this will modify the global setting
-                this_use_sessions = exec_options.get("use_sessions", None)
-                if this_use_sessions != None:
-                    use_sessions = this_use_sessions
-
-                # if use sessions, setup runtime service, Session, and Sampler
-                if use_sessions:
-                    from qiskit_ibm_runtime import QiskitRuntimeService, Session, Options, SamplerV2 as Sampler
-                    
-                    service = QiskitRuntimeService()
-                    session_count += 1
-                    
-                    backend = service.backend(backend_id)
-                    session = Session(service=service, backend=backend_id)
-                    
-                    # get Sampler resilience level and transpiler optimization level from exec_options
-                    options = Options()
-                    # options.resilience_level = exec_options.get("resilience_level", 1)
-                    # options.optimization_level = exec_options.get("optimization_level", 3)
-                    
-                    # special handling for ibmq_qasm_simulator to set noise model
-                    if backend_id == "ibmq_qasm_simulator":
-                        this_noise = noise
-                        # get noise model from options; used only in simulator for now
-                        if "noise_model" in exec_options:
-                            this_noise = exec_options.get("noise_model", None)
-                            if verbose:
-                                print(f"... using custom noise model: {this_noise}")
-                        # attach to backend if not None
-                        if this_noise != None:
-                            options.simulator = {"noise_model": this_noise}
-                            metrics.QV = this_noise.QV
-                            if verbose:
-                                print(f"... setting noise model, QV={this_noise.QV} on {backend_id}")
-                        
-                    if verbose:
-                        print(f"... execute using Sampler on backend_id {backend_id} with options = {options}")
-                    
-                    # create the Qiskit Sampler with these options
-                    sampler = Sampler(session=session, options=options)
-                    
-                # otherwise, use provider and old style backend
-                # for IBM, create backend from IBMQ provider and given backend_id
-                else: 
-                    if verbose:
-                        print(f"... execute using Circuit Runner on backend_id {backend_id}")
-                        
-                    provider = IBMQ.get_provider(hub=hub, group=group, project=project)
-                    backend = provider.get_backend(backend_id)
-            else:
-                print(authentication_error_msg.format("IBMQ"))
-
-        ###############################
         # otherwise, assume the backend_id is given only and assume it is IBM Cloud device
         else:
-            from qiskit_ibm_runtime import QiskitRuntimeService, Session, SamplerOptions as Options, SamplerV2 as Sampler
+            # need to import `Session` here to avoid the collision with
+            # `azure.quantum.job.session.Session`
+            from qiskit_ibm_runtime import Session
             
-            # create the Runtime Service object
-            service = QiskitRuntimeService()
-            # obtain a backend from the service
-            backend = service.backend(backend_id)
+            if use_ibm_quantum_platform or hub and group and project:
+                channel = "ibm_quantum"
+                instance = f"{hub}/{group}/{project}"
+            else:
+                channel = "ibm_cloud"
+                instance = None
+            print(f"... using Qiskit Runtime {channel=} {instance=}")
+
+            backend_name = backend_id
+            primitive_name = "sampler"
+
+            try:
+                service = QiskitRuntimeService(channel=channel, instance=instance)
+                backend = service.backend(backend_name)
+            except Exception as ex:
+                print(authentication_error_msg.format(backend_id))
+                raise ex
+            print(f"... using {backend=} {primitive_name=}")
 
             # DEVNOTE: here we assume if the sessions flag is set, we use Sampler
             # however, we may want to add a use_sampler option so that we can separate these
@@ -447,46 +407,19 @@ def set_execution_target(backend_id='qasm_simulator',
 
             # if use sessions, setup runtime service, Session, and Sampler
             if use_sessions:
-            
                 if verbose:
                     print("... using sessions")
-                
-                session = Session(service=service, backend=backend_id)
-                
-                # get Sampler resilience level and transpiler optimization level from exec_options
-                options = Options()
-                # options.resilience_level = exec_options.get("resilience_level", 1)
-                # options.optimization_level = exec_options.get("optimization_level", 3)
-                
-                # special handling for ibmq_qasm_simulator to set noise model
-                if backend_id == "ibmq_qasm_simulator":
-                    this_noise = noise
-                    
-                    # get noise model from options; used only in simulators for now
-                    if "noise_model" in exec_options:
-                        this_noise = exec_options.get("noise_model", None)
-                        if verbose:
-                            print(f"... using custom noise model: {this_noise}")
-                            
-                    # attach to backend if not None
-                    if this_noise != None:
-                        options.simulator = {"noise_model": this_noise}
-                        metrics.QV = this_noise.QV
-                        if verbose:
-                            print(f"... setting noise model, QV={this_noise.QV} on {backend_id}")
-                    
-                if verbose:
-                    print(f"... execute using Sampler on backend_id {backend_id} with options = {options}")
-                
-                # create the Qiskit Sampler with these options
-                sampler = Sampler(session=session, options=options)
-                
-            # otherwise, use the circuit runner in the submit_circuit method, without sessions
-            else: 
-                if verbose:
-                    print("... not using sessions")
-                    print(f"... execute using Circuit Runner on backend_id {backend_id}")
+                session = Session(backend=backend)
+                session_count += 1
+            # otherwise, use Sampler without session
+            else:
+                session = None
 
+            # set Sampler options
+            options_dict = exec_options.get("sampler_options", None)
+            options = SamplerOptions(**options_dict if options_dict else {})
+            print(f"... execute using Sampler on {backend_name=} with {options=}")
+            sampler = SamplerV2(session if session else backend, options=options)
 
     # create an informative device name for plots
     device_name = backend_id
@@ -499,7 +432,7 @@ def set_execution_target(backend_id='qasm_simulator',
 
 
 # Set the state of the transpilation flags
-def set_tranpilation_flags(do_transpile_metrics = True, do_transpile_for_execute = True):
+def set_transpilation_flags(do_transpile_metrics = True, do_transpile_for_execute = True):
     globals()['do_transpile_metrics'] = do_transpile_metrics
     globals()['do_transpile_for_execute'] = do_transpile_for_execute
     
@@ -900,7 +833,7 @@ def transpile_for_metrics(qc):
     # use either the backend or one of the basis gate sets
     if basis_selector == 0:
         logger.info(f"Start transpile with {basis_selector = }")
-        qc = transpile(qc, backend)
+        qc = transpile(qc, backend, seed_transpiler=0)
         logger.info(f"End transpile with {basis_selector = }")
     else:
         basis_gates = basis_gates_array[basis_selector]
@@ -938,7 +871,8 @@ def transpile_for_metrics(qc):
 # DEVNOTE: this approach does not permit passing of untranspiled circuit through
 # DEVNOTE: currently this only caches a single circuit
 def transpile_and_bind_circuit(circuit, params, backend, basis_gates=None,
-                optimization_level=None, layout_method=None, routing_method=None):
+                optimization_level=None, layout_method=None, routing_method=None,
+                seed_transpiler=None):
                 
     logger.info('transpile_and_bind_circuit()')
     st = time.time()
@@ -946,7 +880,8 @@ def transpile_and_bind_circuit(circuit, params, backend, basis_gates=None,
     if do_transpile_for_execute:
         logger.info('transpiling for execute')
         trans_qc = transpile(circuit, backend, basis_gates=basis_gates,
-                optimization_level=optimization_level, layout_method=layout_method, routing_method=routing_method) 
+                optimization_level=optimization_level, layout_method=layout_method, routing_method=routing_method,
+                seed_transpiler=seed_transpiler)
         
         # cache this transpiled circuit
         cached_circuits["last_circuit"] = trans_qc
@@ -1000,8 +935,9 @@ def transpile_multiple_times(circuit, params, backend, transpile_attempt_count,
             backend, 
             optimization_level=optimization_level,
             layout_method=layout_method,
-            routing_method=routing_method
-        ) for _ in range(transpile_attempt_count)
+            routing_method=routing_method,
+            seed_transpiler=seed,
+        ) for seed in range(transpile_attempt_count)
     ]
     
     best_op_count = []
