@@ -58,7 +58,7 @@ import metrics
 #### these variables are currently accessed as globals from user code
 
 # maximum number of active jobs
-max_jobs_active = 10000
+max_jobs_active = 10
 
 # job mode: False = wait, True = submit multiple jobs
 job_mode = False
@@ -374,9 +374,10 @@ def set_execution_target(backend_id='qasm_simulator',
         ###############################
         # otherwise, assume the backend_id is given only and assume it is IBM Cloud device
         else:
-            # need to import `Session` here to avoid the collision with
-            # `azure.quantum.job.session.Session`
-            from qiskit_ibm_runtime import Session
+            # If you want to import `Session`, you need to import it here
+            # to avoid the collision with `azure.quantum.job.session.Session`
+            # from qiskit_ibm_runtime import Session
+            from qiskit_ibm_runtime import Batch
             
             if use_ibm_quantum_platform or hub and group and project:
                 channel = "ibm_quantum"
@@ -410,7 +411,7 @@ def set_execution_target(backend_id='qasm_simulator',
                 if verbose:
                     print("... using sessions")
                 if session is None:
-                    session = Session(backend=backend)
+                    session = Batch(backend=backend)
             # otherwise, use Sampler without session
             else:
                 session = None
