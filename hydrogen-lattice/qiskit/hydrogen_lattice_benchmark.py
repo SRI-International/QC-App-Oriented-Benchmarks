@@ -1397,7 +1397,7 @@ def run(
                 minimizer_loop_index = 0
 
                 # Always start by enabling transpile ...
-                ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+                ex.set_transpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
 
                 # get the classically computed expected energy variables from solution object
                 doci_energy = float(next(value for key, value in solution if key == "doci_energy"))
@@ -1477,7 +1477,7 @@ def run(
                             # cache 1 at a time, we cannot yet implement caching.  Transpile every time for now.
                             cached_circuits = False
                             if cached_circuits:
-                                ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                                ex.set_transpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
                                 logger.info("**** First execution complete, disabling transpile")
 
                         # result array stores the multiple results we measure along different Pauli basis.
@@ -1515,7 +1515,7 @@ def run(
                                 # cache 1 at a time, we cannot yet implement caching.  Transpile every time for now.
                                 cached_circuits = False
                                 if cached_circuits:
-                                    ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                                    ex.set_transpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
                                     logger.info("**** First execution complete, disabling transpile")
      
                             # result array stores the multiple results we measure along different Pauli basis.

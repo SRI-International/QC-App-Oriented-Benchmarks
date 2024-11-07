@@ -1176,7 +1176,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                 start_iters_t = time.time()
 
                 # Always start by enabling transpile ...
-                ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+                ex.set_transpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
                     
                 logger.info('===============  Begin method 2 loop, enabling transpile')
                 
@@ -1217,7 +1217,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                     
                     # after first execution and thereafter, no need for transpilation if parameterized
                     if parameterized:
-                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                        ex.set_transpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
                         logger.info('**** First execution complete, disabling transpile')
                     #************************************************
                     
@@ -1282,7 +1282,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                 # DEVNOTE: this appears to NOT be needed, as we can turn these off after 
                 def callback(xk):
                     if parameterized:
-                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                        ex.set_transpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
 
                 opt_ts = time.time()
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
