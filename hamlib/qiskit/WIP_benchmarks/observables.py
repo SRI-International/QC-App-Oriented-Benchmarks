@@ -179,7 +179,7 @@ def group_commuting_terms_2(pauli_list):
     list: List of groups where each group is a list of commuting Pauli terms.
     """
     # Convert the list of Pauli strings to SparsePauliOp objects
-    paulis = [SparsePauliOp.from_list([(p, 1)]) for p, coeff in pauli_list]
+    paulis = [SparsePauliOp.from_list([(p, coeff)]) for p, coeff in pauli_list]
 
     print(paulis)
     
