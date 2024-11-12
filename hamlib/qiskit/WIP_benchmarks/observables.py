@@ -350,6 +350,10 @@ def estimate_expectation(backend, qc, H_terms, num_shots=10000):
     return total_energy
     
 # Function to estimate expectation value for an array of weighted Pauli strings
+# Note: This version (2) accepts an array of Pauli term arrays,
+# the first of which is the primary energy Hamiltonian. 
+# Other entries in the array are collections of terms for observables that are subsets of the primary.
+# The expectation value for these are calculated using the same measurment results as the primary.
 def estimate_expectation2(backend, qc, H_terms_multiple, num_shots=10000):
     
     # Function to estimate expectation value of a Pauli string
