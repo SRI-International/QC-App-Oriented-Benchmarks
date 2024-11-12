@@ -142,12 +142,12 @@ def group_commuting_terms(pauli_list):
     # Convert the list of Pauli strings to SparsePauliOp objects
     paulis = [SparsePauliOp.from_list([(p, 1)]) for p, coeff in pauli_list]
 
-    print(paulis)
+    if verbose: print(paulis)
     
     # Build the commutativity graph
     adjacency_matrix = build_commutativity_graph(paulis)
 
-    print(adjacency_matrix)
+    if verbose: print(adjacency_matrix)
     
     # Group commuting terms
     groups = []
@@ -181,12 +181,12 @@ def group_commuting_terms_2(pauli_list):
     # Convert the list of Pauli strings to SparsePauliOp objects
     paulis = [SparsePauliOp.from_list([(p, coeff)]) for p, coeff in pauli_list]
 
-    print(paulis)
+    if verbose: print(paulis)
     
     # Build the commutativity graph
     adjacency_matrix = build_commutativity_graph(paulis)
 
-    print(adjacency_matrix)
+    if verbose: print(adjacency_matrix)
     
     # Group commuting terms
     groups = []
@@ -212,7 +212,7 @@ def group_commuting_terms_2(pauli_list):
                 #print(f"    ... checking against: {k} {pauli_list[k]}")
                 if not adjacency_matrix[k, j]:
                     commuting = False
-                    print(f"    ... conflict, do not add to this group")
+                    if verbose: print(f"    ... conflict, do not add to this group")
                     break
 
             if commuting:
@@ -309,7 +309,7 @@ def append_hamiltonian_term_to_circuit(qc, params, pauli):
             is_diag = False
             
 # =========================================================================================
-# ESTIMATE EXPECTATION CALUE
+# ESTIMATE EXPECTATION VALUE
 
 # Estimate Expectation Value for Circuit with Hamiltonian
 
