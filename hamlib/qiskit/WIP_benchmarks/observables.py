@@ -425,4 +425,163 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
     measured_energy = result.values[0]
     
     return measured_energy
+  
+####################################################################################
+
+## DEVNOTE: the functions were recently moved from the CommutingTerms-TL notebook 
+## and need to be merged or organized with functions above
+
+# Create circuits and compute expectation values from commuting groups defining a Hamiltonian
+
+from qiskit import QuantumCircuit, transpile, assemble
+from qiskit_aer import Aer
+import numpy as np
+
+# Initialize the backend and the simulator
+backend = Aer.get_backend('qasm_simulator')
+
+# Function to create circuits for raw Hamiltonian
+def create_circuits_ham(num_qubits, ham):
+    circuits = []
+
+    for term, coeff in ham:
+        print(f"  ... {term}, {coeff}")
+        qc = QuantumCircuit(num_qubits)
+        for i, pauli in enumerate(term):
+            if pauli == 'X':
+                qc.h(i)
+            elif pauli == 'Y':
+                qc.sdg(i)
+                qc.h(i)
+        qc.measure_all()
+        circuits.append((qc, [(term, coeff)]))
+
+    return circuits
+
+# Create an individual circuit for each group, returned as list tuples of (circuit, group)
+def create_circuits(num_qubits, groups):
+    circuits = []
+    for group in groups:
+        qc = QuantumCircuit(num_qubits)
+
+        # create a merged term so we can create a single circuit for the group
+        merged_paulis = ['I'] * num_qubits
+        for term, coeff in group:
+            for i, pauli in enumerate(term):
+                if pauli != "I": merged_paulis[i] = pauli
+
+        merged_term = "".join(merged_paulis)
+        ###print(f"... merged_paulis = {merged_paulis}, merged_term = {merged_term}")
+         
+        for i, pauli in enumerate(merged_term):
+            if pauli == 'X':
+                qc.h(i)
+            elif pauli == 'Y':
+                qc.sdg(i)
+                qc.h(i)
+                    
+        qc.measure_all()
+        
+        circuits.append((qc, group))
+
+    return circuits
+
+# Calculate expectation value, or total_energy, from execution results
+# This function operates on tuples of (circuit, group)
+def calculate_expectation(num_qubits, results, circuits, is_commuting=False):
+    total_energy = 0
+    for (qc, group), result in zip(circuits, results.get_counts()):
+        #counts = result.get_counts()
+        counts = result
+        num_shots = sum(counts.values())
+        ###print(f"... got num_shots = {num_shots}: counts = {counts}")
+
+        # process commuting group differently from regular term; operate on merged term
+        if is_commuting:
+            merge_terms(num_qubits, group)
+            
+            for term, coeff in group:
+                ###print(f"--> for term: {term}, {coeff}")
+                
+                # Calculate the expectation value for each term
+                exp_val = get_expectation_term(term, counts)  
+                #exp_val /= num_shots
+                
+                total_energy += coeff * exp_val
+                ###print(f"  ******* exp_val = {exp_val} {coeff * exp_val}")
+
+        else:
+            for term, coeff in group:
+                ###print(f"--> for term: {term}, {coeff}")
+                
+                # Calculate the expectation value for each term
+                exp_val = get_expectation_term(term, counts)
+                
+                total_energy += coeff * exp_val
+                ###print(f"  ******* exp_val = {exp_val} {coeff * exp_val}")
+            
+    return total_energy
+
+# Calculate the expectation value for each term
+
+def get_expectation_term(term, counts):
+    exp_val = 0
+    total_counts = sum(counts.values())
+    N = len(term)  # Total number of qubits
+
+    for bitstring, count in counts.items():
+        parity = 1.0  # Initialize parity for this bitstring
+
+        for qubit_index, pauli in enumerate(term):
+            if pauli != 'I':
+                # Map qubit index to bitstring index (little-endian)
+                bit_index = N - 1 - qubit_index
+                bit_value = int(bitstring[bit_index])
+
+                # Map bit_value to eigenvalue: 0 -> +1, 1 -> -1
+                eigenvalue = 1 - 2 * bit_value  # 0 -> +1, 1 -> -1
+                parity *= eigenvalue
+
+        exp_val += parity * count
+
+    # Normalize by total number of shots to get the expectation value
+    return exp_val / total_counts
+
+''' This version attempt does not work properly with merged terms
+def get_expectation_term(term, counts):
+    # Identify the relevant qubits for the term
+    relevant_qubits = [i for i, pauli in enumerate(term) if pauli != 'I']
     
+    exp_val = 0
+    total_counts = sum(counts.values())
+    
+    for bitstring, count in counts.items():
+        print(f"... {bitstring} {count}")
+        
+        # Calculate the parity for only the relevant qubits
+        parity = (-1) ** sum(int(bitstring[i]) for i in relevant_qubits)
+        exp_val += parity * count
+
+        print(f"... parity = {parity} {exp_val}")
+    
+    # Normalize by total number of shots to get the expectation value
+    return exp_val / total_counts
+'''
+
+# Merge a group of commuting terms into a merged_term
+def merge_terms(num_qubits, group):
+    
+    merged_paulis = ['I'] * num_qubits
+    for term, coeff in group:
+        for i, pauli in enumerate(term):
+            if pauli != "I": merged_paulis[i] = pauli
+
+    ###print(f"... merged_paulis = {merged_paulis}")
+
+    merged_term = "".join(merged_paulis)
+    ###print(f"... merged_term = {merged_term}")
+
+    return merged_term
+
+
+  
