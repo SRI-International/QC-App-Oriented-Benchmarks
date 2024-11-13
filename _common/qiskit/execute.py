@@ -256,6 +256,7 @@ def set_execution_target(backend_id='qasm_simulator',
     global backend
     global sampler
     global session
+    global use_ibm_quantum_platform
     global use_sessions
     global session_count
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
@@ -381,7 +382,10 @@ def set_execution_target(backend_id='qasm_simulator',
                 Batch,
             )
 
-            if use_ibm_quantum_platform or hub and group and project:
+            # set use_ibm_quantum_platform if provided by user - NOTE: this will modify the global setting
+            use_ibm_quantum_platform = exec_options.get("use_ibm_quantum_platform", use_ibm_quantum_platform)
+
+            if use_ibm_quantum_platform:
                 channel = "ibm_quantum"
                 instance = f"{hub}/{group}/{project}"
             else:
