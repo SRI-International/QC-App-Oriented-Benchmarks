@@ -378,15 +378,15 @@ def set_execution_target(backend_id='qasm_simulator',
                 QiskitRuntimeService,
                 SamplerOptions,
                 SamplerV2,
-                Session
-                )
-            
-            if not use_ibm_quantum_platform:
-                channel = "ibm_cloud"
-                instance = None
-            else:
+                Batch,
+            )
+
+            if use_ibm_quantum_platform or hub and group and project:
                 channel = "ibm_quantum"
                 instance = f"{hub}/{group}/{project}"
+            else:
+                channel = "ibm_cloud"
+                instance = None
             print(f"... using Qiskit Runtime {channel=} {instance=}")
 
             backend_name = backend_id
@@ -521,6 +521,7 @@ def execute_circuit(circuit):
     shots = circuit["shots"]
     
     qc = circuit["qc"]
+    job_tags = [qc.name]
     
     # do the decompose before obtaining circuit metrics so we expand subcircuits to 2 levels
     # Comment this out here; ideally we'd generalize it here, but it is intended only to 
@@ -693,6 +694,10 @@ def execute_circuit(circuit):
                 st = time.time() 
 
                 if sampler:
+                    # set job tags if SamplerV2 on IBM Quantum Platform
+                    if hasattr(sampler, "options"):
+                        sampler.options.environment.job_tags = job_tags
+
                     # turn input into pub-like
                     job = sampler.run([trans_qc], shots=shots)
                 else:
