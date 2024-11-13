@@ -37,11 +37,6 @@ from qiskit import QuantumCircuit, transpile
 from qiskit.providers.jobstatus import JobStatus
 from qiskit.primitives import StatevectorSampler
 from qiskit_aer import Aer
-from qiskit_ibm_runtime import (
-    QiskitRuntimeService,
-    SamplerOptions,
-    SamplerV2,
-)
 
 # Noise Model imports
 from qiskit_aer.noise import NoiseModel, ReadoutError
@@ -374,17 +369,22 @@ def set_execution_target(backend_id='qasm_simulator',
         ###############################
         # otherwise, assume the backend_id is given only and assume it is IBM Cloud device
         else:
-            # If you want to import `Session`, you need to import it here
-            # to avoid the collision with `azure.quantum.job.session.Session`
-            # from qiskit_ibm_runtime import Session
-            from qiskit_ibm_runtime import Batch
-            
-            if use_ibm_quantum_platform or hub and group and project:
-                channel = "ibm_quantum"
-                instance = f"{hub}/{group}/{project}"
-            else:
+            # need to import `Session` here to avoid the collision with
+            # `azure.quantum.job.session.Session`
+
+            from qiskit_ibm_runtime import (
+                QiskitRuntimeService,
+                SamplerOptions,
+                SamplerV2,
+                Batch,
+            )
+
+            if not use_ibm_quantum_platform:
                 channel = "ibm_cloud"
                 instance = None
+            else:
+                channel = "ibm_quantum"
+                instance = f"{hub}/{group}/{project}"
             print(f"... using Qiskit Runtime {channel=} {instance=}")
 
             backend_name = backend_id

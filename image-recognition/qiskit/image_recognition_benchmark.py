@@ -1585,7 +1585,7 @@ def run(
                     # cache 1 at a time, we cannot yet implement caching.  Transpile every time.
                     cached_circuits = False
                     if cached_circuits:
-                        ex.set_tranpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
+                        ex.set_transpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
                         logger.info("  **** First execution complete, disabling transpile")
 
                 # result array stores the multiple results we measure along different Pauli basis.
@@ -1826,7 +1826,7 @@ def run(
             accuracy_this_iter = []
 
             # Always start by enabling transpile ...
-            ex.set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+            ex.set_transpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
 
             # dictionary to store the thetas_array for each batch
             thetas_array_batch = {} 
