@@ -388,7 +388,7 @@ def set_execution_target(backend_id='qasm_simulator',
                 instance = f"{hub}/{group}/{project}"
             else:
                 channel = "ibm_cloud"
-                instance = None
+                instance = f"{hub or ''}{group or ''}{project or ''}"
             print(f"... using Qiskit Runtime {channel=} {instance=}")
 
             backend_name = backend_id
