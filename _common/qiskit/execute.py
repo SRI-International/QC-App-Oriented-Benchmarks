@@ -53,7 +53,7 @@ import metrics
 #### these variables are currently accessed as globals from user code
 
 # maximum number of active jobs
-max_jobs_active = 3
+max_jobs_active = 10
 
 # job mode: False = wait, True = submit multiple jobs
 job_mode = False
@@ -256,6 +256,7 @@ def set_execution_target(backend_id='qasm_simulator',
     global backend
     global sampler
     global session
+    global use_ibm_quantum_platform
     global use_sessions
     global session_count
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
@@ -371,20 +372,23 @@ def set_execution_target(backend_id='qasm_simulator',
         else:
             # need to import `Session` here to avoid the collision with
             # `azure.quantum.job.session.Session`
-            
+
             from qiskit_ibm_runtime import (
                 QiskitRuntimeService,
                 SamplerOptions,
                 SamplerV2,
-                Session
-                )
-            
-            if not use_ibm_quantum_platform:
-                channel = "ibm_cloud"
-                instance = None
-            else:
+                Batch,
+            )
+
+            # set use_ibm_quantum_platform if provided by user - NOTE: this will modify the global setting
+            use_ibm_quantum_platform = exec_options.get("use_ibm_quantum_platform", use_ibm_quantum_platform)
+
+            if use_ibm_quantum_platform:
                 channel = "ibm_quantum"
                 instance = f"{hub}/{group}/{project}"
+            else:
+                channel = "ibm_cloud"
+                instance = f"{hub or ''}{group or ''}{project or ''}"
             print(f"... using Qiskit Runtime {channel=} {instance=}")
 
             backend_name = backend_id
@@ -410,8 +414,8 @@ def set_execution_target(backend_id='qasm_simulator',
             if use_sessions:
                 if verbose:
                     print("... using sessions")
-                session = Session(backend=backend)
-                session_count += 1
+                if session is None:
+                    session = Batch(backend=backend)
             # otherwise, use Sampler without session
             else:
                 session = None
@@ -519,6 +523,7 @@ def execute_circuit(circuit):
     shots = circuit["shots"]
     
     qc = circuit["qc"]
+    job_tags = [qc.name]
     
     # do the decompose before obtaining circuit metrics so we expand subcircuits to 2 levels
     # Comment this out here; ideally we'd generalize it here, but it is intended only to 
@@ -691,6 +696,10 @@ def execute_circuit(circuit):
                 st = time.time() 
 
                 if sampler:
+                    # set job tags if SamplerV2 on IBM Quantum Platform
+                    if hasattr(sampler, "options"):
+                        sampler.options.environment.job_tags = job_tags
+
                     # turn input into pub-like
                     job = sampler.run([trans_qc], shots=shots)
                 else:
@@ -1383,16 +1392,18 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
     # indicate we are done collecting metrics (called once at end of app)
     if report_end:
         metrics.end_metrics()
-        
-    # also, close any active session at end of the app
+
+
+def close_session():
+    # close any active session at end of the app
     global session
-    if report_end and session != None:
+    if session is not None:
         if verbose:
             print(f"... closing active session: {session_count}\n")
         
         session.close()
         session = None
-        
+
 
 # Check if any active jobs are complete - process if so
 # Before returning, launch any batched jobs that will keep active circuits < max
