@@ -490,6 +490,33 @@ def create_circuits(num_qubits, groups):
 
     return circuits
 
+# Create circuits for Hamiltonian, optionally optimized by use of commuting groups
+# Note: this version of the function is creating only the rotation portion of the circuit.
+def create_circuits_for_hamiltonian(num_qubits, ham_terms, use_commuting_groups=True):
+
+    # Create circuits from the Hamiltonian directly
+    if not use_commuting_groups:   
+        print("\n******** creating circuits from Hamiltonian:")
+        circuits = create_circuits_ham(num_qubits, ham_terms)
+    
+    # Convert the Hamiltonian to groups and create the circuits from the groups
+    else:   
+        print("\n******** creating commuting groups for the Hamiltonian and circuits from the groups:")
+        groups = group_commuting_terms_2(ham_terms)
+        for i, group in enumerate(groups):
+            print(f"Group {i+1}:")
+            for pauli, coeff in group:
+                print(f"  {pauli}: {coeff}")     
+        circuits = create_circuits(num_qubits, groups)
+
+    print(f"\n... constructed {len(circuits)} circuits for this Hamiltonian.")
+    return circuits
+
+
+   
+    
+###################################################################
+
 # Calculate expectation value, or total_energy, from execution results
 # This function operates on tuples of (circuit, group)
 def calculate_expectation(num_qubits, results, circuits, is_commuting=False):
