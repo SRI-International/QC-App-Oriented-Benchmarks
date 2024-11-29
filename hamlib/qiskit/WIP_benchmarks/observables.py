@@ -227,9 +227,15 @@ def group_commuting_terms_2(pauli_list):
 
 
 
-
 # ===========================================
-# Execution Functions
+# EXECUTION FUNCTIONS
+
+from qiskit import QuantumCircuit, transpile, assemble
+from qiskit_aer import Aer
+import numpy as np
+
+# Initialize the backend and the simulator
+backend = Aer.get_backend('qasm_simulator')
 
 # Here we define a function to perform the execution and return an array of measurements.
 # DEVNOTE: params argument not currently used, as the circuit is created with values defined; we don't use Parameter yet
@@ -249,48 +255,11 @@ def execute_circuit(qc, backend, num_shots, params):
             counts[k] = round(v * num_shots)
     
     return counts
-    
-# Define a function to compute the energy associated with the current set of paramters and 
-# one term of the Hamiltonian for the problem.
-# Also define a function to append basis rotations to the ansatz circuit for one term of the Hamiltonian operator.
-# The expecation_value function performs a computation of the energy of a single Pauli term of a Hamiltonian
-# from the measurements obtained from execution of the parameterized circuit.
 
-# Compute the expectation value from measurement results with respect to a single Pauli operator 
-def expectation_value(counts, nshots, pPauli):
-    
-    """
-    counts: Measured bistring counts. e.g. {'01':500, '10':500}
-    nshots: Total number of shots
-    Pauli:  The Pauli operator e.g. "XX"
-    """
-    
-    # initialize expectation value
-    exp_val = 0.
-    
-    # loop over measurement results
-    for measurement in counts:
-        # local parity
-        loc_parity = 1.
-        # loop over qubits
-        for pauli_ind, pauli in enumerate(reversed(pPauli)):
-            # skip identity
-            if pauli == 'I':
-                continue
-            # parity
-            loc_parity *= (-2 * float(measurement[::-1][pauli_ind]) + 1) # this turns 0 -> 1, 1 -> -1
-        
-        # accumulate expectation value
-        exp_val += loc_parity * counts[measurement]
-    
-    # normalization
-    exp_val /= nshots
-    
-    return exp_val
+# =========================================================================================
+# CIRCUIT CREATION FUNCTIONS
 
-
-
-# Append basis rotations to the ansatz circuit for one term of the Hamiltonian operator
+# Append basis rotations to the base circuit for one term of the Hamiltonian operator
 def append_hamiltonian_term_to_circuit(qc, params, pauli):
 
     # determine number of qubits from length of the pauli (this might need to improve)
@@ -307,140 +276,8 @@ def append_hamiltonian_term_to_circuit(qc, params, pauli):
             qc.sdg(target_qubit)
             qc.h(target_qubit)
             is_diag = False
-            
-# =========================================================================================
-# ESTIMATE EXPECTATION VALUE
-
-# Estimate Expectation Value for Circuit with Hamiltonian
-
-# Function to estimate expectation value for an array of weighted Pauli strings
-def estimate_expectation(backend, qc, H_terms, num_shots=10000):
-    
-    # Function to estimate expectation value of a Pauli string
-    def estimate_expectation_term(backend, qc, pauli_string, num_shots=10000):
-
-        # Make a clone of the original circuit since we append gates
-        # (may not be a reliable way to clone)
-        qc = qc.copy()
-
-        # append the gates for the current Pauli string
-        append_hamiltonian_term_to_circuit(qc, None, pauli_string)
-    
-        # Add measure gates
-        qc.measure_all()
-        
-        if verbose: print(f"... circuit with Pauli {pauli_string} =\n{qc}")
-
-        # execute the circuit on the backend to obtain counts
-        counts = execute_circuit(qc, backend, num_shots, None)
-        if verbose: print(f"... counts = {counts}")
-
-        # from the counts and pauli_string, compute the expectation
-        expectation = expectation_value(counts, num_shots, pauli_string)
-        
-        return expectation
-    
-    # Measure energy
-    total_energy = 0
-    for coeff, pauli_string in H_terms: 
-        exp_val = estimate_expectation_term(backend, qc, pauli_string)
-        total_energy += coeff * exp_val
-        if verbose: print(f"... exp value for pauli term = ({coeff}, {pauli_string}), exp = {exp_val}")
-
-    return total_energy
-    
-# Function to estimate expectation value for an array of weighted Pauli strings
-# Note: This version (2) accepts an array of Pauli term arrays,
-# the first of which is the primary energy Hamiltonian. 
-# Other entries in the array are collections of terms for observables that are subsets of the primary.
-# The expectation value for these are calculated using the same measurment results as the primary.
-def estimate_expectation2(backend, qc, H_terms_multiple, num_shots=10000):
-    
-    # Function to estimate expectation value of a Pauli string
-    def estimate_expectation_term(backend, qc, pauli_string, num_shots=10000):
-
-        # Make a clone of the original circuit since we append gates
-        # (may not be a reliable way to clone)
-        qc = qc.copy()
-
-        # append the gates for the current Pauli string
-        append_hamiltonian_term_to_circuit(qc, None, pauli_string)
-    
-        # Add measure gates
-        qc.measure_all()
-        
-        if verbose: print(f"... circuit with Pauli {pauli_string} =\n{qc}")
-
-        # execute the circuit on the backend to obtain counts
-        counts = execute_circuit(qc, backend, num_shots, None)
-        if verbose: print(f"... counts = {counts}")
-
-        # from the counts and pauli_string, compute the expectation
-        expectation = expectation_value(counts, num_shots, pauli_string)
-        
-        return expectation
-    
-    # Storage for observables
-    observables_store = []
-    # Storage of observables in dictionary format in a list
-    H_observables = []
-    
-    # Initialize the expectation values to 0.
-    for i in range(len(H_terms_multiple)):
-        observables_store.append(0)
-    
-    # Make dictionaries of Observables and store it in a list.
-    for j in range(len(H_terms_multiple)):
-        H_observables.append({pauli_term: coeff for coeff, pauli_term in H_terms_multiple[j]})
-    
-    #Iterate through each terms in Hamiltonian, which is the first element in H_observables.
-    for pauli_string, coeff in H_observables[0].items():  
-        
-        exp_val = estimate_expectation_term(backend, qc, pauli_string, num_shots=num_shots)
-        observables_store[0] += coeff * exp_val
-        
-        for i in range(1, len(H_observables)):
-            if pauli_string in H_observables[i]:
-                observables_store[i] += H_observables[i][pauli_string] * exp_val
-  
-        if verbose: print(f"... exp value for pauli term = ({coeff}, {pauli_string}), exp = {exp_val}")
-
-    return observables_store
-
-# Estimate Expectation Value for Circuit with Hamiltonian -- using Estimator Class 
-
-# Function to estimate expectation value for an array of weighted Pauli strings, using Estimator class
-def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
-
-    #print(f"... in estimate_expectation_with_estimator()")
-
-    # Convert to SparsePauliOp
-    H_op = convert_to_sparse_pauli_op(H_terms)
-
-    # Create an Estimator
-    estimator = Estimator()
-    
-    # Measure energy
-    job = estimator.run(qc, H_op)
-    result = job.result()
-    
-    measured_energy = result.values[0]
-    
-    return measured_energy
-  
-####################################################################################
-
-## DEVNOTE: the functions were recently moved from the CommutingTerms-TL notebook 
-## and need to be merged or organized with functions above
 
 # Create circuits and compute expectation values from commuting groups defining a Hamiltonian
-
-from qiskit import QuantumCircuit, transpile, assemble
-from qiskit_aer import Aer
-import numpy as np
-
-# Initialize the backend and the simulator
-backend = Aer.get_backend('qasm_simulator')
 
 # Function to create circuits for raw Hamiltonian
 def create_circuits_ham(num_qubits, ham):
@@ -511,8 +348,120 @@ def create_circuits_for_hamiltonian(num_qubits, ham_terms, use_commuting_groups=
     return circuits
 
 
-   
+     
+# =========================================================================================
+# ESTIMATE EXPECTATION VALUE
+  
+# Define a function to compute the energy associated with the current set of paramters and 
+# one term of the Hamiltonian for the problem.
+# Also define a function to append basis rotations to the ansatz circuit for one term of the Hamiltonian operator.
+# The expecation_value function performs a computation of the energy of a single Pauli term of a Hamiltonian
+# from the measurements obtained from execution of the parameterized circuit.    
+
+# Estimate Expectation Value for Circuit with Hamiltonian
+
+# Function to estimate expectation value for an array of weighted Pauli strings
+def estimate_expectation(backend, qc, H_terms, num_shots=10000):
     
+    # Measure energy
+    total_energy = 0
+    for coeff, pauli_string in H_terms: 
+        exp_val = estimate_expectation_term(backend, qc, pauli_string)
+        total_energy += coeff * exp_val
+        if verbose: print(f"... exp value for pauli term = ({coeff}, {pauli_string}), exp = {exp_val}")
+
+    return total_energy
+    
+# Function to estimate expectation value for an array of weighted Pauli strings
+# Note: This version (2) accepts an array of Pauli term arrays,
+# the first of which is the primary energy Hamiltonian. 
+# Other entries in the array are collections of terms for observables that are subsets of the primary.
+# The expectation value for these are calculated using the same measurment results as the primary.
+def estimate_expectation2(backend, qc, H_terms_multiple, num_shots=10000):
+    
+    # Storage for observables
+    observables_store = []
+    # Storage of observables in dictionary format in a list
+    H_observables = []
+    
+    # Initialize the expectation values to 0.
+    for i in range(len(H_terms_multiple)):
+        observables_store.append(0)
+    
+    # Make dictionaries of Observables and store it in a list.
+    for j in range(len(H_terms_multiple)):
+        H_observables.append({pauli_term: coeff for coeff, pauli_term in H_terms_multiple[j]})
+    
+    #Iterate through each terms in Hamiltonian, which is the first element in H_observables.
+    for pauli_string, coeff in H_observables[0].items():  
+        
+        exp_val = estimate_expectation_term(backend, qc, pauli_string, num_shots=num_shots)
+        observables_store[0] += coeff * exp_val
+        
+        for i in range(1, len(H_observables)):
+            if pauli_string in H_observables[i]:
+                observables_store[i] += H_observables[i][pauli_string] * exp_val
+  
+        if verbose: print(f"... exp value for pauli term = ({coeff}, {pauli_string}), exp = {exp_val}")
+
+    return observables_store
+
+# Function to estimate expectation value of a Pauli string
+def estimate_expectation_term(backend, qc, pauli_string, num_shots=10000):
+
+    # Make a clone of the original circuit since we append gates
+    # (may not be a reliable way to clone)
+    qc = qc.copy()
+
+    # append the gates for the current Pauli string
+    append_hamiltonian_term_to_circuit(qc, None, pauli_string)
+
+    # Add measure gates
+    qc.measure_all()
+    
+    if verbose: print(f"... circuit with Pauli {pauli_string} =\n{qc}")
+
+    # execute the circuit on the backend to obtain counts
+    counts = execute_circuit(qc, backend, num_shots, None)
+    if verbose: print(f"... counts = {counts}")
+
+    # from the counts and pauli_string, compute the expectation
+    expectation = expectation_value(counts, num_shots, pauli_string)
+    
+    return expectation
+
+# Compute the expectation value from measurement results with respect to a single Pauli operator 
+def expectation_value(counts, nshots, pPauli):
+    
+    """
+    counts: Measured bistring counts. e.g. {'01':500, '10':500}
+    nshots: Total number of shots
+    Pauli:  The Pauli operator e.g. "XX"
+    """
+    
+    # initialize expectation value
+    exp_val = 0.
+    
+    # loop over measurement results
+    for measurement in counts:
+        # local parity
+        loc_parity = 1.
+        # loop over qubits
+        for pauli_ind, pauli in enumerate(reversed(pPauli)):
+            # skip identity
+            if pauli == 'I':
+                continue
+            # parity
+            loc_parity *= (-2 * float(measurement[::-1][pauli_ind]) + 1) # this turns 0 -> 1, 1 -> -1
+        
+        # accumulate expectation value
+        exp_val += loc_parity * counts[measurement]
+    
+    # normalization
+    exp_val /= nshots
+    
+    return exp_val  
+
 ###################################################################
 
 # Calculate expectation value, or total_energy, from execution results
@@ -612,5 +561,27 @@ def merge_terms(num_qubits, group):
 
     return merged_term
 
+    
+####################################################################################
+           
+# Estimate Expectation Value for Circuit with Hamiltonian -- using Estimator Class 
 
+# Function to estimate expectation value for an array of weighted Pauli strings, using Estimator class
+def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
+
+    #print(f"... in estimate_expectation_with_estimator()")
+
+    # Convert to SparsePauliOp
+    H_op = convert_to_sparse_pauli_op(H_terms)
+
+    # Create an Estimator
+    estimator = Estimator()
+    
+    # Measure energy
+    job = estimator.run(qc, H_op)
+    result = job.result()
+    
+    measured_energy = result.values[0]
+    
+    return measured_energy
   
