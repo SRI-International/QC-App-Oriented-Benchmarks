@@ -396,15 +396,13 @@ def estimate_expectation2(backend, qc, H_terms_multiple, num_shots=10000):
     #Iterate through each terms in Hamiltonian, which is the first element in H_observables.
     for pauli_string, coeff in H_observables[0].items():  
         
-        exp_val = estimate_expectation_term(backend, qc, pauli_string)
-              
+        exp_val = estimate_expectation_term(backend, qc, pauli_string, num_shots=num_shots)
+        observables_store[0] += coeff * exp_val
+        
         for i in range(1, len(H_observables)):
             if pauli_string in H_observables[i]:
                 observables_store[i] += H_observables[i][pauli_string] * exp_val
-
-        
-        observables_store[0] += coeff * exp_val
-            
+  
         if verbose: print(f"... exp value for pauli term = ({coeff}, {pauli_string}), exp = {exp_val}")
 
     return observables_store
