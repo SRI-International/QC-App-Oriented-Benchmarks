@@ -348,15 +348,8 @@ def create_circuits_for_hamiltonian(num_qubits, ham_terms, use_commuting_groups=
     return circuits
 
 
-     
 # =========================================================================================
-# ESTIMATE EXPECTATION VALUE
-  
-# Define a function to compute the energy associated with the current set of paramters and 
-# one term of the Hamiltonian for the problem.
-# Also define a function to append basis rotations to the ansatz circuit for one term of the Hamiltonian operator.
-# The expecation_value function performs a computation of the energy of a single Pauli term of a Hamiltonian
-# from the measurements obtained from execution of the parameterized circuit.    
+# ESTIMATE EXPECTATION VALUE   
 
 # Estimate Expectation Value for Circuit with Hamiltonian
 
@@ -384,20 +377,22 @@ def estimate_expectation2(backend, qc, H_terms_multiple, num_shots=10000):
     # Storage of observables in dictionary format in a list
     H_observables = []
     
-    # Initialize the expectation values to 0.
+    # Initialize the expectation value of each Observable to 0.
     for i in range(len(H_terms_multiple)):
         observables_store.append(0)
     
-    # Make dictionaries of Observables and store it in a list.
+    # For each Observable, make a dictionary of its terms, keyed by pauli_string
     for j in range(len(H_terms_multiple)):
         H_observables.append({pauli_term: coeff for coeff, pauli_term in H_terms_multiple[j]})
     
-    #Iterate through each terms in Hamiltonian, which is the first element in H_observables.
-    for pauli_string, coeff in H_observables[0].items():  
+    # Iterate through terms of the first Hamiltonian and accumulate expectation for Observables
+    for pauli_string, coeff in H_observables[0].items():
         
+        # accumulate expectation for the primary Hamiltonian (first in list)
         exp_val = estimate_expectation_term(backend, qc, pauli_string, num_shots=num_shots)
         observables_store[0] += coeff * exp_val
         
+        # check the remaining observables; if this pauli_string is in a term, accumulate the value
         for i in range(1, len(H_observables)):
             if pauli_string in H_observables[i]:
                 observables_store[i] += H_observables[i][pauli_string] * exp_val
@@ -405,6 +400,11 @@ def estimate_expectation2(backend, qc, H_terms_multiple, num_shots=10000):
         if verbose: print(f"... exp value for pauli term = ({coeff}, {pauli_string}), exp = {exp_val}")
 
     return observables_store
+
+# Define a function to compute the energy associated with the current set of paramters and 
+# one term of the Hamiltonian for the problem.
+# The expecation_value function performs a computation of the energy of a single Pauli term of a Hamiltonian
+# from the measurements obtained from execution of the parameterized circuit.
 
 # Function to estimate expectation value of a Pauli string
 def estimate_expectation_term(backend, qc, pauli_string, num_shots=10000):
