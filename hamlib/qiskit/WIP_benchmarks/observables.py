@@ -260,110 +260,113 @@ def execute_circuit(qc, backend, num_shots, params):
 # =========================================================================================
 # CIRCUIT CREATION FUNCTIONS
 
-# Append basis rotations to the base circuit for one term of the Hamiltonian operator
-"""
-def append_hamiltonian_term_to_circuit(qc, params, pauli):
-
-    # determine number of qubits from length of the pauli (this might need to improve)
-    nqubit = len(pauli)
-
-    # append the basis rotations as needed to apply the pauli operator
-    is_diag = True     # whether this term is diagonal
-    for ii, p in enumerate(pauli):     
-        target_qubit = nqubit - ii - 1 
-        if (p == "X"):
-            is_diag = False
-            qc.h(target_qubit)
-        elif (p == "Y"):
-            qc.sdg(target_qubit)
-            qc.h(target_qubit)
-            is_diag = False
-"""           
-def append_hamiltonian_term_to_circuit(qc, params, pauli):
-
-    # determine number of qubits from length of the pauli (this might need to improve)
-    #nqubit = len(pauli)
-
-    # append the basis rotations as needed to apply the pauli operator
-    is_diag = True     # whether this term is diagonal (not used)
-    for i, p in enumerate(pauli):     
-        if (p == "X"):
-            is_diag = False
-            qc.h(i)
-        elif (p == "Y"):
-            qc.sdg(i)
-            qc.h(i)
-            is_diag = False
-
-# Create circuits and compute expectation values from commuting groups defining a Hamiltonian
-
-# Function to create circuits for raw Hamiltonian
-def create_circuits_ham(num_qubits, ham):
-    circuits = []
-
-    for term, coeff in ham:
-        print(f"  ... {term}, {coeff}")
-        qc = QuantumCircuit(num_qubits)
-        for i, pauli in enumerate(term):
-            if pauli == 'X':
-                qc.h(i)
-            elif pauli == 'Y':
-                qc.sdg(i)
-                qc.h(i)
-        qc.measure_all()
-        circuits.append((qc, [(term, coeff)]))
-
-    return circuits
-
-# Create an individual circuit for each group, returned as list tuples of (circuit, group)
-def create_circuits(num_qubits, groups):
-    circuits = []
-    for group in groups:
-        qc = QuantumCircuit(num_qubits)
-
-        # create a merged term so we can create a single circuit for the group
-        merged_paulis = ['I'] * num_qubits
-        for term, coeff in group:
-            for i, pauli in enumerate(term):
-                if pauli != "I": merged_paulis[i] = pauli
-
-        merged_term = "".join(merged_paulis)
-        ###print(f"... merged_paulis = {merged_paulis}, merged_term = {merged_term}")
-         
-        for i, pauli in enumerate(merged_term):
-            if pauli == 'X':
-                qc.h(i)
-            elif pauli == 'Y':
-                qc.sdg(i)
-                qc.h(i)
-                    
-        qc.measure_all()
-        
-        circuits.append((qc, group))
-
-    return circuits
-
-# Create circuits for Hamiltonian, optionally optimized by use of commuting groups
-# Note: this version of the function is creating only the rotation portion of the circuit.
 def create_circuits_for_hamiltonian(num_qubits, ham_terms, use_commuting_groups=True):
-
-    # Create circuits from the Hamiltonian directly
-    if not use_commuting_groups:   
-        print("\n******** creating circuits from Hamiltonian:")
-        circuits = create_circuits_ham(num_qubits, ham_terms)
+    """
+    Creates quantum circuits for a Hamiltonian, with optional optimization using commuting groups.
+    Note: this version of the function creates only the rotation portion of the circuit.
     
-    # Convert the Hamiltonian to groups and create the circuits from the groups
-    else:   
+    Args:
+        num_qubits (int): The number of qubits in the circuit.
+        ham_terms (list of tuples): The Hamiltonian represented as a list of tuples, 
+                                    where each tuple contains a Pauli string and a coefficient.
+        use_commuting_groups (bool): If True, groups commuting terms to optimize the circuit creation.
+
+    Returns:
+        list of tuples: A list where each element is a tuple (QuantumCircuit, group or [(term, coeff)]).
+    """
+    if not use_commuting_groups:
+        print("\n******** creating circuits from Hamiltonian:")
+        circuits = create_circuits_for_ham_terms(num_qubits, ham_terms)
+    else:
         print("\n******** creating commuting groups for the Hamiltonian and circuits from the groups:")
         groups = group_commuting_terms_2(ham_terms)
         for i, group in enumerate(groups):
             print(f"Group {i+1}:")
             for pauli, coeff in group:
-                print(f"  {pauli}: {coeff}")     
-        circuits = create_circuits(num_qubits, groups)
+                print(f"  {pauli}: {coeff}")
+        circuits = create_circuits_for_grouped_terms(num_qubits, groups)
 
     print(f"\n... constructed {len(circuits)} circuits for this Hamiltonian.")
     return circuits
+
+def create_circuits_for_ham_terms(num_qubits, ham):
+    """
+    Creates quantum circuits for measuring terms in a raw Hamiltonian.
+
+    Args:
+        num_qubits (int): The number of qubits in the circuit.
+        ham (list of tuples): The Hamiltonian represented as a list of tuples, 
+                              where each tuple contains a Pauli string and a coefficient.
+
+    Returns:
+        list of tuples: A list where each element is a tuple (QuantumCircuit, [(term, coeff)]).
+    """
+    circuits = []
+
+    for term, coeff in ham:
+        print(f"  ... {term}, {coeff}")
+        qc = QuantumCircuit(num_qubits)
+
+        append_hamiltonian_term_to_circuit(qc, None, term)
+
+        qc.measure_all()
+        circuits.append((qc, [(term, coeff)]))
+
+    return circuits
+
+def create_circuits_for_grouped_terms(num_qubits, groups):
+    """
+    Creates quantum circuits for groups of commuting terms in a Hamiltonian.
+
+    Args:
+        num_qubits (int): The number of qubits in the circuit.
+        groups (list of list of tuples): A list of groups, where each group is a list of tuples 
+                                         (term, coeff) representing commuting Hamiltonian terms.
+
+    Returns:
+        list of tuples: A list where each element is a tuple (QuantumCircuit, group).
+    """
+    circuits = []
+    for group in groups:
+        qc = QuantumCircuit(num_qubits)
+
+        # Merge Pauli terms into a single string to create one circuit per group
+        merged_paulis = ['I'] * num_qubits
+        for term, coeff in group:
+            for i, pauli in enumerate(term):
+                if pauli != "I":
+                    merged_paulis[i] = pauli
+
+        merged_term = "".join(merged_paulis)
+
+        append_hamiltonian_term_to_circuit(qc, None, merged_term)
+
+        qc.measure_all()
+        circuits.append((qc, group))
+
+    return circuits
+
+def append_hamiltonian_term_to_circuit(qc, params, pauli):
+    """
+    Appends basis rotations to a quantum circuit for a given term of the Hamiltonian operator.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to which the operations are appended.
+        params (None): Unused parameter, reserved for potential future use.
+        pauli (str): A string representing the Pauli operator (e.g., 'X', 'Y', 'Z', 'I') for each qubit.
+
+    Returns:
+        None
+    """
+    is_diag = True  # Tracks if the term is diagonal (currently unused)
+    for i, p in enumerate(pauli):
+        if p == "X":
+            is_diag = False
+            qc.h(i)
+        elif p == "Y":
+            qc.sdg(i)
+            qc.h(i)
+            is_diag = False
 
 
 # =========================================================================================
@@ -467,8 +470,8 @@ def expectation_value(counts, nshots, pPauli):
     for measurement in counts:
         # local parity
         loc_parity = 1.
-        # loop over qubits
-        #for pauli_ind, pauli in enumerate(reversed(pPauli)):
+        
+        # loop over bits of the pauli string
         for pauli_ind, pauli in enumerate(pPauli):
             # skip identity
             if pauli == 'I':
