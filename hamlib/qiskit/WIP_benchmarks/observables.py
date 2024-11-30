@@ -470,38 +470,27 @@ def expectation_value(counts, nshots, pPauli):
 
 # Calculate expectation value, or total_energy, from execution results
 # This function operates on tuples of (circuit, group)
-def calculate_expectation(num_qubits, results, circuits, is_commuting=False):
+#def calculate_expectation(num_qubits, results, circuits, is_commuting=False):
+def calculate_expectation(num_qubits, results, circuits):
     total_energy = 0
+    
+    # loop over each group, to accumulate observables in the the terms of the group
     for (qc, group), result in zip(circuits, results.get_counts()):
-        #counts = result.get_counts()
+    
         counts = result
         num_shots = sum(counts.values())
         ###print(f"... got num_shots = {num_shots}: counts = {counts}")
 
-        # process commuting group differently from regular term; operate on merged term
-        if is_commuting:
-            merge_terms(num_qubits, group)
+        # process each term in the current group
+        for term, coeff in group:
+            ###print(f"--> for term: {term}, {coeff}")
             
-            for term, coeff in group:
-                ###print(f"--> for term: {term}, {coeff}")
-                
-                # Calculate the expectation value for each term
-                exp_val = get_expectation_term(term, counts)  
-                #exp_val /= num_shots
-                
-                total_energy += coeff * exp_val
-                ###print(f"  ******* exp_val = {exp_val} {coeff * exp_val}")
-
-        else:
-            for term, coeff in group:
-                ###print(f"--> for term: {term}, {coeff}")
-                
-                # Calculate the expectation value for each term
-                exp_val = get_expectation_term(term, counts)
-                
-                total_energy += coeff * exp_val
-                ###print(f"  ******* exp_val = {exp_val} {coeff * exp_val}")
+            # Calculate the expectation value for each term
+            exp_val = get_expectation_term(term, counts)
             
+            total_energy += coeff * exp_val
+            ###print(f"  ******* exp_val = {exp_val} {coeff * exp_val}")
+                
     return total_energy
 
 # Calculate the expectation value for each term
@@ -528,42 +517,6 @@ def get_expectation_term(term, counts):
 
     # Normalize by total number of shots to get the expectation value
     return exp_val / total_counts
-
-''' This version attempt does not work properly with merged terms
-def get_expectation_term(term, counts):
-    # Identify the relevant qubits for the term
-    relevant_qubits = [i for i, pauli in enumerate(term) if pauli != 'I']
-    
-    exp_val = 0
-    total_counts = sum(counts.values())
-    
-    for bitstring, count in counts.items():
-        print(f"... {bitstring} {count}")
-        
-        # Calculate the parity for only the relevant qubits
-        parity = (-1) ** sum(int(bitstring[i]) for i in relevant_qubits)
-        exp_val += parity * count
-
-        print(f"... parity = {parity} {exp_val}")
-    
-    # Normalize by total number of shots to get the expectation value
-    return exp_val / total_counts
-'''
-
-# Merge a group of commuting terms into a merged_term
-def merge_terms(num_qubits, group):
-    
-    merged_paulis = ['I'] * num_qubits
-    for term, coeff in group:
-        for i, pauli in enumerate(term):
-            if pauli != "I": merged_paulis[i] = pauli
-
-    ###print(f"... merged_paulis = {merged_paulis}")
-
-    merged_term = "".join(merged_paulis)
-    ###print(f"... merged_term = {merged_term}")
-
-    return merged_term
 
     
 ####################################################################################
