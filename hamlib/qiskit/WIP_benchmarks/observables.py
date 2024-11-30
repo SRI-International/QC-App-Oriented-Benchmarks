@@ -232,6 +232,7 @@ def group_commuting_terms_2(pauli_list):
 
 from qiskit import QuantumCircuit, transpile, assemble
 from qiskit_aer import Aer
+from qiskit.primitives import Estimator
 import numpy as np
 
 # Initialize the backend and the simulator
