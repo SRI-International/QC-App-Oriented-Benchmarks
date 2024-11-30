@@ -358,8 +358,11 @@ def estimate_expectation(backend, qc, H_terms, num_shots=10000):
     
     # Measure energy
     total_energy = 0
+    
+    # Iterate through terms of the first Hamiltonian and accumulate expectation for energy
     for coeff, pauli_string in H_terms: 
-        exp_val = estimate_expectation_term(backend, qc, pauli_string)
+    
+        exp_val = estimate_expectation_term(backend, qc, pauli_string, num_shots=num_shots)
         total_energy += coeff * exp_val
         if verbose: print(f"... exp value for pauli term = ({coeff}, {pauli_string}), exp = {exp_val}")
 
