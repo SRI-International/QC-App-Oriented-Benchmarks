@@ -261,6 +261,7 @@ def execute_circuit(qc, backend, num_shots, params):
 # CIRCUIT CREATION FUNCTIONS
 
 # Append basis rotations to the base circuit for one term of the Hamiltonian operator
+"""
 def append_hamiltonian_term_to_circuit(qc, params, pauli):
 
     # determine number of qubits from length of the pauli (this might need to improve)
@@ -276,6 +277,22 @@ def append_hamiltonian_term_to_circuit(qc, params, pauli):
         elif (p == "Y"):
             qc.sdg(target_qubit)
             qc.h(target_qubit)
+            is_diag = False
+"""           
+def append_hamiltonian_term_to_circuit(qc, params, pauli):
+
+    # determine number of qubits from length of the pauli (this might need to improve)
+    #nqubit = len(pauli)
+
+    # append the basis rotations as needed to apply the pauli operator
+    is_diag = True     # whether this term is diagonal (not used)
+    for i, p in enumerate(pauli):     
+        if (p == "X"):
+            is_diag = False
+            qc.h(i)
+        elif (p == "Y"):
+            qc.sdg(i)
+            qc.h(i)
             is_diag = False
 
 # Create circuits and compute expectation values from commuting groups defining a Hamiltonian
@@ -451,7 +468,8 @@ def expectation_value(counts, nshots, pPauli):
         # local parity
         loc_parity = 1.
         # loop over qubits
-        for pauli_ind, pauli in enumerate(reversed(pPauli)):
+        #for pauli_ind, pauli in enumerate(reversed(pPauli)):
+        for pauli_ind, pauli in enumerate(pPauli):
             # skip identity
             if pauli == 'I':
                 continue
