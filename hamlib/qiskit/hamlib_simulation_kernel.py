@@ -229,7 +229,8 @@ def create_circuit(
     use_inverse_flag: bool = False,
     init_state: str = None,
     random_pauli_flag: bool = False,
-    random_init_flag: bool = False 
+    random_init_flag: bool = False,
+    append_measurements: bool = True
 ):
     """
     Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
@@ -326,7 +327,8 @@ def create_circuit(
 
         # convert_to_mirror_circuit adds its own measurement gates    
         if not (random_pauli_flag and method == 3):
-            circuit.measure_all()
+            if append_measurements:
+                circuit.measure_all()
     
         return circuit, bitstring, ham_op, evo if not use_inverse_flag else evo.inverse()
 
@@ -376,7 +378,8 @@ def HamiltonianSimulation(
             method: int = 1,
             use_inverse_flag: bool = False,
             random_pauli_flag = False,
-            random_init_flag = False
+            random_init_flag = False,
+            append_measurements = True,
         ) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
@@ -412,7 +415,8 @@ def HamiltonianSimulation(
         init_state=init_state,
         num_trotter_steps=K,
         random_pauli_flag=random_pauli_flag,
-        random_init_flag=random_init_flag
+        random_init_flag=random_init_flag,
+        append_measurements=append_measurements
         )
 
     # Save smaller circuit example for display

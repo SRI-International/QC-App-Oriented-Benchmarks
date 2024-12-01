@@ -618,25 +618,56 @@ def get_expectation_term(term, counts):
 
     
 ####################################################################################
+# HIGH-LEVEL FUNCTIONS
            
-# Estimate Expectation Value for Circuit with Hamiltonian -- using Estimator Class 
-
-# Function to estimate expectation value for an array of weighted Pauli strings, using Estimator class
 def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
+    """
+    Estimates the expectation value for a quantum circuit and Hamiltonian using the `Estimator` class.
 
-    #print(f"... in estimate_expectation_with_estimator()")
+    This function calculates the expectation value of a Hamiltonian represented by an array of weighted Pauli strings
+    by converting it into a `SparsePauliOp` and using the `Estimator` class for efficient computation.
 
-    # Convert to SparsePauliOp
+    Args:
+        backend (Backend): The quantum backend used for the estimation (not currently utilized in this function).
+        qc (QuantumCircuit): The parameterized quantum circuit representing the ansatz.
+        H_terms (list of tuples): The Hamiltonian represented as a list of (coefficient, Pauli string) tuples.
+        num_shots (int, optional): The number of shots (repeated measurements) to perform. Default is 10,000. 
+                                   (Not currently used in this function, as `Estimator` does not require it.)
+
+    Returns:
+        float: The measured energy (expectation value) of the Hamiltonian.
+
+    Example:
+        backend = Aer.get_backend('qasm_simulator')
+        qc = QuantumCircuit(3)
+        H_terms = [(0.5, "XXI"), (1.0, "ZZI")]
+        energy = estimate_expectation_with_estimator(backend, qc, H_terms)
+
+    Notes:
+        - The Hamiltonian terms are converted to a `SparsePauliOp` using `convert_to_sparse_pauli_op`.
+        - The `Estimator` class is used to calculate the expectation value efficiently.
+        - This method does not use shot-based sampling, and `num_shots` is included only for consistency with
+          other estimation functions.
+
+    Dependencies:
+        This function requires:
+        - `convert_to_sparse_pauli_op`: Converts the Hamiltonian terms into a `SparsePauliOp` object.
+        - `Estimator`: A class used to calculate expectation values.
+
+    Debugging:
+        Uncomment the print statement to trace function entry.
+    """
+    # Convert Hamiltonian terms to SparsePauliOp
     H_op = convert_to_sparse_pauli_op(H_terms)
 
-    # Create an Estimator
+    # Create an Estimator instance
     estimator = Estimator()
-    
-    # Measure energy
+
+    # Use the estimator to compute the expectation value
     job = estimator.run(qc, H_op)
     result = job.result()
-    
+
+    # Extract the measured energy (expectation value)
     measured_energy = result.values[0]
-    
+
     return measured_energy
-  
