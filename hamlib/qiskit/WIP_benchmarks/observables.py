@@ -260,13 +260,14 @@ def execute_circuit(qc, backend, num_shots, params):
 # =========================================================================================
 # CIRCUIT CREATION FUNCTIONS
 
-def create_circuits_for_hamiltonian(num_qubits, ham_terms, use_commuting_groups=True):
+def create_circuits_for_hamiltonian(num_qubits, qc, ham_terms, use_commuting_groups=True):
     """
     Creates quantum circuits for a Hamiltonian, with optional optimization using commuting groups.
     Note: this version of the function creates only the rotation portion of the circuit.
     
     Args:
         num_qubits (int): The number of qubits in the circuit.
+        qc (QuantumCircuit): The circuit to which we will append rotation gates.
         ham_terms (list of tuples): The Hamiltonian represented as a list of tuples, 
                                     where each tuple contains a Pauli string and a coefficient.
         use_commuting_groups (bool): If True, groups commuting terms to optimize the circuit creation.
@@ -274,9 +275,10 @@ def create_circuits_for_hamiltonian(num_qubits, ham_terms, use_commuting_groups=
     Returns:
         list of tuples: A list where each element is a tuple (QuantumCircuit, group or [(term, coeff)]).
     """
+    
     if not use_commuting_groups:
         print("\n******** creating circuits from Hamiltonian:")
-        circuits = create_circuits_for_ham_terms(num_qubits, ham_terms)
+        circuits = create_circuits_for_ham_terms(num_qubits, qc, ham_terms)
     else:
         print("\n******** creating commuting groups for the Hamiltonian and circuits from the groups:")
         groups = group_commuting_terms_2(ham_terms)
@@ -284,17 +286,18 @@ def create_circuits_for_hamiltonian(num_qubits, ham_terms, use_commuting_groups=
             print(f"Group {i+1}:")
             for pauli, coeff in group:
                 print(f"  {pauli}: {coeff}")
-        circuits = create_circuits_for_grouped_terms(num_qubits, groups)
+        circuits = create_circuits_for_grouped_terms(num_qubits, qc, groups)
 
     print(f"\n... constructed {len(circuits)} circuits for this Hamiltonian.")
     return circuits
 
-def create_circuits_for_ham_terms(num_qubits, ham):
+def create_circuits_for_ham_terms(num_qubits, qc, ham):
     """
     Creates quantum circuits for measuring terms in a raw Hamiltonian.
 
     Args:
         num_qubits (int): The number of qubits in the circuit.
+        qc (QuantumCircuit): The circuit to which we will append rotation gates.
         ham (list of tuples): The Hamiltonian represented as a list of tuples, 
                               where each tuple contains a Pauli string and a coefficient.
 
@@ -305,21 +308,27 @@ def create_circuits_for_ham_terms(num_qubits, ham):
 
     for term, coeff in ham:
         print(f"  ... {term}, {coeff}")
-        qc = QuantumCircuit(num_qubits)
+        
+        if qc is None:
+            qc = QuantumCircuit(num_qubits)
+            
+        # Make a clone of the original circuit since we append gates
+        qc2 = qc.copy()
 
-        append_hamiltonian_term_to_circuit(qc, None, term)
+        append_hamiltonian_term_to_circuit(qc2, None, term)
 
-        qc.measure_all()
-        circuits.append((qc, [(term, coeff)]))
+        qc2.measure_all()
+        circuits.append((qc2, [(term, coeff)]))
 
     return circuits
 
-def create_circuits_for_grouped_terms(num_qubits, groups):
+def create_circuits_for_grouped_terms(num_qubits, qc, groups):
     """
     Creates quantum circuits for groups of commuting terms in a Hamiltonian.
 
     Args:
         num_qubits (int): The number of qubits in the circuit.
+        qc (QuantumCircuit): The circuit to which we will append rotation gates.
         groups (list of list of tuples): A list of groups, where each group is a list of tuples 
                                          (term, coeff) representing commuting Hamiltonian terms.
 
@@ -328,7 +337,12 @@ def create_circuits_for_grouped_terms(num_qubits, groups):
     """
     circuits = []
     for group in groups:
-        qc = QuantumCircuit(num_qubits)
+    
+        if qc is None:
+            qc = QuantumCircuit(num_qubits)
+            
+        # Make a clone of the original circuit since we append gates
+        qc2 = qc.copy()
 
         # Merge Pauli terms into a single string to create one circuit per group
         merged_paulis = ['I'] * num_qubits
@@ -339,10 +353,10 @@ def create_circuits_for_grouped_terms(num_qubits, groups):
 
         merged_term = "".join(merged_paulis)
 
-        append_hamiltonian_term_to_circuit(qc, None, merged_term)
+        append_hamiltonian_term_to_circuit(qc2, None, merged_term)
 
-        qc.measure_all()
-        circuits.append((qc, group))
+        qc2.measure_all()
+        circuits.append((qc2, group))
 
     return circuits
 
