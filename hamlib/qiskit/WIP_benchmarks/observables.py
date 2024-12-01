@@ -382,7 +382,34 @@ def append_hamiltonian_term_to_circuit(qc, params, pauli):
             qc.h(i)
             is_diag = False
 
+###################################################################
+# CALCULATE EXPECTATION VALUE 
 
+# Calculate expectation value, or total_energy, from execution results
+# This function operates on tuples of (circuit, group)
+#def calculate_expectation(num_qubits, results, circuits, is_commuting=False):
+def calculate_expectation(num_qubits, results, circuits):
+    total_energy = 0
+    
+    # loop over each group, to accumulate observables in the the terms of the group
+    for (qc, group), result in zip(circuits, results.get_counts()):
+    
+        counts = result
+        num_shots = sum(counts.values())
+        ###print(f"... got num_shots = {num_shots}: counts = {counts}")
+
+        # process each term in the current group
+        for term, coeff in group:
+            ###print(f"--> for term: {term}, {coeff}")
+            
+            # Calculate the expectation value for each term
+            exp_val = get_expectation_term(term, counts)
+            
+            total_energy += coeff * exp_val
+            ###print(f"  ******* exp_val = {exp_val} {coeff * exp_val}")
+                
+    return total_energy
+    
 # =========================================================================================
 # ESTIMATE EXPECTATION VALUE   
 
@@ -464,19 +491,15 @@ def estimate_expectation_term(backend, qc, pauli_string, num_shots=10000):
     if verbose: print(f"... counts = {counts}")
 
     # from the counts and pauli_string, compute the expectation
-    expectation = expectation_value(counts, num_shots, pauli_string)
+    #expectation = expectation_value(counts, num_shots, pauli_string)
+    expectation = get_expectation_term(pauli_string, counts)
     
     return expectation
 
+"""
 # Compute the expectation value from measurement results with respect to a single Pauli operator 
 def expectation_value(counts, nshots, pPauli):
-    
-    """
-    counts: Measured bistring counts. e.g. {'01':500, '10':500}
-    nshots: Total number of shots
-    Pauli:  The Pauli operator e.g. "XX"
-    """
-    
+   
     # initialize expectation value
     exp_val = 0.
     
@@ -499,58 +522,85 @@ def expectation_value(counts, nshots, pPauli):
     # normalization
     exp_val /= nshots
     
-    return exp_val  
-
-###################################################################
-
-# Calculate expectation value, or total_energy, from execution results
-# This function operates on tuples of (circuit, group)
-#def calculate_expectation(num_qubits, results, circuits, is_commuting=False):
-def calculate_expectation(num_qubits, results, circuits):
-    total_energy = 0
-    
-    # loop over each group, to accumulate observables in the the terms of the group
-    for (qc, group), result in zip(circuits, results.get_counts()):
-    
-        counts = result
-        num_shots = sum(counts.values())
-        ###print(f"... got num_shots = {num_shots}: counts = {counts}")
-
-        # process each term in the current group
-        for term, coeff in group:
-            ###print(f"--> for term: {term}, {coeff}")
-            
-            # Calculate the expectation value for each term
-            exp_val = get_expectation_term(term, counts)
-            
-            total_energy += coeff * exp_val
-            ###print(f"  ******* exp_val = {exp_val} {coeff * exp_val}")
-                
-    return total_energy
+    return exp_val
 
 # Calculate the expectation value for each term
-
+"""
+"""
+# Compute the expectation value from measurement results with respect to a single Pauli operator 
 def get_expectation_term(term, counts):
     exp_val = 0
-    total_counts = sum(counts.values())
-    N = len(term)  # Total number of qubits
+    total_counts = sum(counts.values()) # total number of shots
+    num_qubits = len(term)              # Total number of qubits
 
+    # loop over measurement results
     for bitstring, count in counts.items():
         parity = 1.0  # Initialize parity for this bitstring
 
+        # loop over each element of the pauli term
         for qubit_index, pauli in enumerate(term):
-            if pauli != 'I':
-                # Map qubit index to bitstring index (little-endian)
-                bit_index = N - 1 - qubit_index
-                bit_value = int(bitstring[bit_index])
+        
+            # skip identity
+            if pauli == 'I':
+                continue
+                
+            # Map qubit index to bitstring index (little-endian) and get bit value
+            bit_index = num_qubits - 1 - qubit_index
+            bit_value = int(bitstring[bit_index])
 
-                # Map bit_value to eigenvalue: 0 -> +1, 1 -> -1
-                eigenvalue = 1 - 2 * bit_value  # 0 -> +1, 1 -> -1
-                parity *= eigenvalue
+            # Map bit_value to eigenvalue: 0 -> +1, 1 -> -1
+            eigenvalue = 1 - 2 * bit_value
+            parity *= eigenvalue
 
         exp_val += parity * count
 
     # Normalize by total number of shots to get the expectation value
+    return exp_val / total_counts
+"""
+
+def get_expectation_term(term, counts):
+    """
+    Computes the expectation value of a measurement outcome with respect to a single Pauli operator.
+
+    Args:
+        term (str): A string representing a Pauli operator (e.g., 'XXI', 'ZZI', 'III'), 
+                    where each character corresponds to the Pauli operator ('X', 'Y', 'Z', or 'I') 
+                    acting on a specific qubit.
+        counts (dict): A dictionary containing measurement results as keys (bitstrings) and 
+                       their corresponding counts as values.
+
+    Returns:
+        float: The expectation value of the measurement results with respect to the specified Pauli term.
+
+    Example:
+        term = "ZZI"
+        counts = {"000": 500, "011": 300, "101": 200}
+        result = get_expectation_term(term, counts)
+    """
+    exp_val = 0
+    total_counts = sum(counts.values())  # Total number of measurement shots
+    num_qubits = len(term)  # Total number of qubits in the system
+
+    # Loop over all measurement results
+    for bitstring, count in counts.items():
+        parity = 1.0  # Initialize parity for the current bitstring
+
+        # Iterate over each qubit and its corresponding Pauli operator
+        for qubit_index, pauli in enumerate(term):
+            if pauli == 'I':  # Skip identity operators, as they do not affect the parity
+                continue
+
+            # Map qubit index to bitstring index (little-endian order) and extract bit value
+            bit_index = num_qubits - 1 - qubit_index
+            bit_value = int(bitstring[bit_index])
+
+            # Map bit value (0 or 1) to eigenvalue (+1 or -1)
+            eigenvalue = 1 - 2 * bit_value
+            parity *= eigenvalue  # Update parity based on the eigenvalue
+
+        exp_val += parity * count  # Weighted sum of parities based on counts
+
+    # Normalize by the total number of measurement shots
     return exp_val / total_counts
 
     
