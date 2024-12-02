@@ -386,7 +386,7 @@ def append_hamiltonian_term_to_circuit(qc, params, pauli):
 # =========================================================================================
 # CALCULATE EXPECTATION VALUE (GROUPS)
 
-def calculate_expectation(num_qubits, results, circuits):
+def calculate_expectation(num_qubits, results, circuits, term_contributions=None):
     """
     Calculates the total energy (expectation value) from measurement results and provided circuits.
 
@@ -398,6 +398,7 @@ def calculate_expectation(num_qubits, results, circuits):
         results (Result): The results object containing measurement counts from circuit execution.
         circuits (list of tuples): A list where each element is a tuple of the form (QuantumCircuit, group),
                                    where `group` is a list of (Pauli term, coefficient).
+        term_contributions (dict): Optional dictionary in which to place the contribution value of each term.
 
     Returns:
         float: The total energy (expectation value) for the Hamiltonian.
@@ -407,20 +408,41 @@ def calculate_expectation(num_qubits, results, circuits):
         results = execute(circuits, backend)
         energy = calculate_expectation(3, results, circuits)
     """
-    total_energy = 0
+    total_exp = 0
 
     # Loop over each circuit and its corresponding measurement results
     for (qc, group), result in zip(circuits, results.get_counts()):
         counts = result
-        num_shots = sum(counts.values())
 
         # Process each Pauli term in the current group
         for term, coeff in group:
             exp_val = get_expectation_term(term, counts)
-            total_energy += coeff * exp_val
+            total_exp += coeff * exp_val
+            
+            # if dict provided, save the contribution from each term
+            if term_contributions is not None:
+                term_contributions[term] = exp_val
 
-    return total_energy
+    return total_exp
 
+def calculate_expectation_from_contributions(ham_terms, term_contributions):
+
+    total_exp = 0
+    
+    if term_contributions is None:
+        return total_exp
+
+    # Process each Pauli term in the current group
+    for term, coeff in ham_terms:
+        exp_val = term_contributions.get(term)
+        
+        if exp_val is None:
+            exp_val = 0
+            print(f"WARN: term not found in term_contributions: {term}")
+            
+        total_exp += coeff * exp_val
+            
+    return total_exp
 
 # =========================================================================================
 # ESTIMATE EXPECTATION VALUE
