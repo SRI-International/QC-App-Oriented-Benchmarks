@@ -125,50 +125,8 @@ def build_commutativity_graph(pauli_list):
     
     return adjacency_matrix
 
-# Function to group commuting terms - this version does not produce qubit-wise groups
-# The third and fith Pauli strings do not commute. The adjacency matrix indicates that they do not.
-# So, why do they appear in the same group? This code is buggy
-
-def group_commuting_terms(pauli_list):
-    """
-    Group commuting Pauli terms.
-    
-    Args:
-    pauli_list (list): List of tuples where each tuple contains a Pauli string and a coefficient.
-    
-    Returns:
-    list: List of groups where each group is a list of commuting Pauli terms.
-    """
-    # Convert the list of Pauli strings to SparsePauliOp objects
-    paulis = [SparsePauliOp.from_list([(p, 1)]) for p, coeff in pauli_list]
-
-    if verbose: print(paulis)
-    
-    # Build the commutativity graph
-    adjacency_matrix = build_commutativity_graph(paulis)
-
-    if verbose: print(adjacency_matrix)
-    
-    # Group commuting terms
-    groups = []
-    ungrouped_indices = set(range(len(paulis)))
-    
-    while ungrouped_indices:
-        current_group = []
-        i = ungrouped_indices.pop()
-        current_group.append(pauli_list[i])
-        
-        for j in ungrouped_indices.copy():
-            if adjacency_matrix[i, j]:
-                current_group.append(pauli_list[j])
-                ungrouped_indices.remove(j)
-        
-        groups.append(current_group)
-    
-    return groups
-
 # Function to group commuting terms into qubit-wise commuting groups
-def group_commuting_terms_2(pauli_list):
+def group_commuting_terms(pauli_list):
     """
     Group commuting Pauli terms.
     
@@ -281,7 +239,7 @@ def create_circuits_for_hamiltonian(num_qubits, qc, ham_terms, use_commuting_gro
         circuits = create_circuits_for_ham_terms(num_qubits, qc, ham_terms)
     else:
         print("\n******** creating commuting groups for the Hamiltonian and circuits from the groups:")
-        groups = group_commuting_terms_2(ham_terms)
+        groups = group_commuting_terms(ham_terms)
         for i, group in enumerate(groups):
             print(f"Group {i+1}:")
             for pauli, coeff in group:
@@ -426,7 +384,29 @@ def calculate_expectation(num_qubits, results, circuits, term_contributions=None
     return total_exp
 
 def calculate_expectation_from_contributions(ham_terms, term_contributions):
+    """
+    Computes the total expectation value from precomputed term contributions.
 
+    This function uses a Hamiltonian represented as a list of Pauli terms with coefficients and combines
+    them with the provided expectation values for each term to calculate the total expectation value.
+
+    Args:
+        ham_terms (list of tuples): A list where each element is a tuple of the form (Pauli term, coefficient).
+                                    Each Pauli term is expected to match the keys in `term_contributions`.
+        term_contributions (dict): A dictionary mapping Pauli terms to their corresponding expectation values.
+                                   If a term is missing, its contribution is assumed to be zero, and a warning is logged.
+
+    Returns:
+        float: The total expectation value for the Hamiltonian.
+
+    Note:
+        If `term_contributions` is None, the function returns 0. Logs a warning for each missing term.
+
+    Example:
+        ham_terms = [("XX", 0.5), ("ZZ", -0.3)]
+        term_contributions = {"XX": 0.8, "ZZ": 0.6}
+        energy = calculate_expectation_from_contributions(ham_terms, term_contributions)
+    """
     total_exp = 0
     
     if term_contributions is None:
