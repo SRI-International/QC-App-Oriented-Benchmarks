@@ -30,6 +30,9 @@ global_rinst = None
 global_h = None
 global_pbc_val = None
 
+filename = None
+dataset_name_template = None
+        
 # Saved circuits and subcircuits for display
 QC_ = None
 QCI_ = None
@@ -37,14 +40,28 @@ HAM_ = None
 EVO_ = None
 INV_ = None
 
+import hamlib_utils
 
 from hamlib_utils import (
     process_hamiltonian_file,
+    create_full_filenames,
+    construct_dataset_name,
     needs_normalization,
     normalize_data_format,
     parse_hamiltonian_to_sparsepauliop,
-    determine_qubit_count,
+    determine_qubit_count
 )
+
+def initialize():
+
+    # Initialize default parameters in HamLib kernel module
+    global_U = None
+    global_enc = None
+    global_ratio = None
+    global_rinst = None
+    global_h = None
+    global_pbc_val = None
+
 
 def set_default_parameter_values(filename):
     """
@@ -94,6 +111,27 @@ def set_default_parameter_values(filename):
     else:
         print("No such hamiltonian is available.")
 
+# get key infomation about the selected Hamiltonian
+# DEVNOTE: Error handling here can be improved by simply returning False or raising exception
+def get_hamiltonian_info(hamiltonian_name=None, init_state=None, K=None, t=None):
+    global filename, dataset_name_template
+    try:
+        filename = create_full_filenames(hamiltonian_name)
+        dataset_name_template = construct_dataset_name(filename)
+    except ValueError:
+        print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian_name}")
+        return
+    
+    if dataset_name_template == "File key not found in data":
+        print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian_name}")
+        return
+    
+    # Set default parameter values for the hamiltonians
+    set_default_parameter_values(filename)
+        
+    # assume default init_state if not given
+    if init_state == None:
+        init_state = "checkerboard"
 
 def process_data(data):
     """
@@ -105,9 +143,15 @@ def process_data(data):
     Returns:
         tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits.
     """
+    if verbose: print(f"... Hamiltonian data = {data}")
+    
     if needs_normalization(data) == "Yes":
         data = normalize_data_format(data)
+        if verbose: print(f"  ... normalized data = {data}")
+    
     parsed_pauli_list = parse_hamiltonian_to_sparsepauliop(data)
+    if verbose: print(f"... parsed_pauli_list = {parsed_pauli_list}")
+    
     num_qubits = determine_qubit_count(parsed_pauli_list)
     hamiltonian = sparse_pauliop(parsed_pauli_list, num_qubits)
     return hamiltonian, num_qubits
