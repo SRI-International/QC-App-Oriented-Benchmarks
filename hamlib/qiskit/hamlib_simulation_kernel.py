@@ -113,7 +113,7 @@ def set_default_parameter_values(filename):
 
 # get key infomation about the selected Hamiltonian
 # DEVNOTE: Error handling here can be improved by simply returning False or raising exception
-def get_hamiltonian_info(hamiltonian_name=None, init_state=None, K=None, t=None):
+def get_hamiltonian_info(hamiltonian_name=None):
     global filename, dataset_name_template
     try:
         filename = create_full_filenames(hamiltonian_name)
@@ -128,10 +128,6 @@ def get_hamiltonian_info(hamiltonian_name=None, init_state=None, K=None, t=None)
     
     # Set default parameter values for the hamiltonians
     set_default_parameter_values(filename)
-        
-    # assume default init_state if not given
-    if init_state == None:
-        init_state = "checkerboard"
 
 def process_data(data):
     """
