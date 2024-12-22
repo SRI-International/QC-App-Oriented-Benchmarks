@@ -372,8 +372,23 @@ def calculate_expectation(num_qubits, results, circuits, term_contributions=None
     total_exp = 0
 
     # Loop over each circuit and its corresponding measurement results
-    for (qc, group), result in zip(circuits, results.get_counts()):
-        counts = result
+    if len(circuits) > 1:
+        for (qc, group), result in zip(circuits, results.get_counts()):
+            counts = result
+
+            # Process each Pauli term in the current group
+            for term, coeff in group:
+                exp_val = get_expectation_term(term, counts)
+                total_exp += coeff * exp_val
+                
+                # if dict provided, save the contribution from each term
+                if term_contributions is not None:
+                    term_contributions[term] = exp_val
+                    
+    # results object has different structure when only one circuit, process specially here
+    else:
+        counts = results.get_counts()
+        group = circuits[0][1]
 
         # Process each Pauli term in the current group
         for term, coeff in group:
@@ -705,7 +720,19 @@ def estimate_expectation_plus(backend, qc, ham_terms, use_commuting_groups=True,
     # Execute all of the circuits to obtain array of result objects
     ts3 = time.time()
     results = backend.run(transpiled_circuits).result()
-   
+    
+    """ debugging when single circuit
+    print(f"... results = {results}")
+    # Loop over each circuit and its corresponding measurement results
+    if len(circuits) > 1:
+        for (qc, group), result in zip(circuits, results.get_counts()):
+            counts = result
+            print(counts, flush=True)
+    else:
+        counts = results.get_counts()
+        print(counts, flush=True)
+    """
+    
     # Compute the total energy for the Hamiltonian
     ts4 = time.time()
     term_contributions = {}
