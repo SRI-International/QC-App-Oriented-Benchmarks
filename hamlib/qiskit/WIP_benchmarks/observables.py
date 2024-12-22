@@ -24,6 +24,9 @@ from qiskit.quantum_info import SparsePauliOp
 '''
 
 verbose = False
+verbose_circuits = False
+
+verbose_time = True
 
 noise_model = None
 
@@ -674,7 +677,56 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
 
     return measured_energy
 
+# =========================================================================================
+# ESTIMATE EXPECTATION VALUE - NEW 
+
+# The code in this section is work-in-progress, building on code in the test notebooks
+
+# Estimate expectation, advanced version, similar to Estimator, but customizable
+
+def estimate_expectation_plus(backend, qc, ham_terms, use_commuting_groups=True, num_shots=10000):
     
+    num_qubits = qc.num_qubits
+
+    # Create circuits from the Hamiltonian
+    ts0 = time.time()
+    circuits = create_circuits_for_hamiltonian(num_qubits, qc, ham_terms, use_commuting_groups)
+    ts1 = time.time()
+    
+    if verbose_circuits:
+        for circuit in circuits:
+            print(circuit)
+            print(circuit[0])  
+    
+    # Compile and execute the circuits
+    ts2 = time.time()
+    transpiled_circuits = transpile([circuit for circuit, group in circuits], backend)
+
+    # Execute all of the circuits to obtain array of result objects
+    ts3 = time.time()
+    results = backend.run(transpiled_circuits).result()
+   
+    # Compute the total energy for the Hamiltonian
+    ts4 = time.time()
+    term_contributions = {}
+    total_energy = calculate_expectation(num_qubits, results, circuits,
+                                    term_contributions=term_contributions)
+    ts5 = time.time()
+    
+    if verbose_time:
+        print(f"... circuit creation time = {round(ts1 - ts0, 3)}")
+        print(f"... transpilation time = {round(ts3 - ts2, 3)}")
+        print(f"... execution time = {round(ts4 - ts3, 3)}")
+        print(f"... expectation time = {round(ts5 - ts4, 3)}") 
+        print(f"... total time = {round((ts5 - ts2) + (ts1 - ts0), 3)}")
+        print("")
+        
+    #print(f"Total Energy: {total_energy}")#print("")
+    #print(f"Term Contributions: {term_contributions}")
+     
+    return total_energy, term_contributions
+
+   
 ####################################################################################
 # FROM OBSERVABLES GENERALIZED
 
