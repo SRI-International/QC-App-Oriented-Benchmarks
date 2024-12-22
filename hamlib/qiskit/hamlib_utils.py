@@ -33,7 +33,7 @@ hamiltonians = [
     HamLibData('Fermi-Hubbard-1D', 'FH_D-1.hdf5', f'{_base_url}condensedmatter/fermihubbard/FH_D-1.zip'),
     HamLibData('Bose-Hubbard-1D', 'BH_D-1_d-4.hdf5', f'{_base_url}condensedmatter/bosehubbard/BH_D-1_d-4.zip'),
     HamLibData('Heisenberg', 'heis.hdf5', f'{_base_url}condensedmatter/heisenberg/heis.zip'),
-    HamLibData('Max3Sat', 'random_max3sat-hams.hdf5', f'{_base_url}binaryoptimization/max3sat/random/random_max3sat-hams.hdf5.zip')
+    HamLibData('Max3Sat', 'random_max3sat-hams.hdf5', f'{_base_url}binaryoptimization/max3sat/random/random_max3sat-hams.zip')
 ]
 
 def create_full_filenames(hamiltonian_name):
@@ -185,6 +185,9 @@ def download_and_extract(filename, url):
     Returns:
         str: The path to the extracted file.
     """
+    if verbose:
+        print(f"... download_and_extract({filename},{url})", flush=True)
+        
     download_dir = "downloaded_hamlib_files"
     os.makedirs(download_dir, exist_ok=True)
     local_zip_path = os.path.join(download_dir, os.path.basename(url))
