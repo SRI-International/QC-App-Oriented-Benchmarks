@@ -256,6 +256,50 @@ def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
     circuit.barrier()
     return circuit
 
+#####################################################################################
+
+def get_hamlib_operator(
+    n_spins: int,
+):
+    """
+    Return the quantum operator associated with the current HamLib hdf5 filename and dataset name.
+
+    Steps:
+        1. Extract Hamiltonian data from an HDF5 file.
+        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
+
+    Returns:
+        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
+    """
+    global dataset_name_template, filename
+    global global_h, global_pbc_val
+    global global_U, global_enc
+    global global_ratio, global_rinst
+    global QCI_, INV_
+
+    # Replace placeholders with actual n_qubits value: n_spins
+    dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
+    dataset_name_template = dataset_name_template.replace("{h}", str(global_h)).replace("{pbc_val}", str(global_pbc_val))
+    dataset_name_template = dataset_name_template.replace("{U}", str(global_U)).replace("{enc}", str(global_enc))
+    dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
+
+    if verbose:
+        print(f"Trying dataset: {dataset_name}")  # Debug print
+    
+    ham_op = None
+    num_qubits = 0
+    
+    data = process_hamiltonian_file(filename, dataset_name)
+    if data is not None:
+        # print(f"Using dataset: {dataset_name}")
+        # print("Raw Hamiltonian Data: ", data)
+        
+        # get the Hamiltonian operator as SparsePauliOp and its size from the data
+        ham_op, num_qubits = process_data(data)
+    
+    return ham_op, num_qubits
+
+
 def create_circuit(
     n_spins: int,
     time: float = 1,
@@ -279,29 +323,11 @@ def create_circuit(
     Returns:
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
-    global dataset_name_template, filename
-    global global_h, global_pbc_val
-    global global_U, global_enc
-    global global_ratio, global_rinst
     global QCI_, INV_
 
-    # Replace placeholders with actual n_qubits value: n_spins
-    dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
-    dataset_name_template = dataset_name_template.replace("{h}", str(global_h)).replace("{pbc_val}", str(global_pbc_val))
-    dataset_name_template = dataset_name_template.replace("{U}", str(global_U)).replace("{enc}", str(global_enc))
-    dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
-
-    if verbose:
-        print(f"Trying dataset: {dataset_name}")  # Debug print
-
-    data = process_hamiltonian_file(filename, dataset_name)
-    if data is not None:
-        # print(f"Using dataset: {dataset_name}")
-        # print("Raw Hamiltonian Data: ", data)
-        
-        # get the Hamiltonian operator as SparsePauliOp and its size from the data
-        ham_op, num_qubits = process_data(data)
-
+    ham_op, num_qubits = get_hamlib_operator(n_spins)
+    if ham_op is not None:
+    
         # print("Number of qubits:", num_qubits)
         if verbose:
             print(f"... Evolution operator = {ham_op}")
@@ -468,8 +494,7 @@ def HamiltonianSimulation(
     # return both the circuit created, the bitstring, and the Hamiltonian operator
     # if random_pauli_flag is false or method isn't 3, bitstring will be None
     return qc2, bitstring, ham_op
-        
-
+    
     
 ############### Circuit Drawer
 
@@ -503,5 +528,4 @@ def kernel_draw(hamiltonian: str = "hamlib", method: int = 1):
                 print(f"  WARNING: cannot display inverse circuit.")
     else:
         print("  ... circuit too large!")
-
 
