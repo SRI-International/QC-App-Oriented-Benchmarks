@@ -297,21 +297,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     skip_qubits = max(1, skip_qubits)
 
     # get key infomation about the selected Hamiltonian
-    # DEVNOTE: Error handling here can be improved by simply returning False or raising exception
-    try:
-        hamlib_simulation_kernel.filename = create_full_filenames(hamiltonian)
-        hamlib_simulation_kernel.dataset_name_template = construct_dataset_name(hamlib_simulation_kernel.filename)
-    except ValueError:
-        print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian}")
-        return
-    
-    if hamlib_simulation_kernel.dataset_name_template == "File key not found in data":
-        print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian}")
-        return
-    
-    # Set default parameter values for the hamiltonians
-    hamlib_simulation_kernel.set_default_parameter_values(hamlib_simulation_kernel.filename)
-        
+    # this function reads the HamLib file content for the specified Hamiltonian
+    hamlib_simulation_kernel.get_hamiltonian_info(hamiltonian_name=hamiltonian)
+
     # assume default init_state if not given
     if init_state == None:
         init_state = "checkerboard"

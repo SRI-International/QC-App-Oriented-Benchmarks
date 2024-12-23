@@ -11,12 +11,6 @@ In this case, method 3 is used to create a mirror circuit for scalability.
 '''
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
-import h5py
-import re
-import os
-import requests
-import zipfile
-import json
 from qiskit.quantum_info import SparsePauliOp, Pauli
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
@@ -53,6 +47,7 @@ from hamlib_utils import (
 )
 
 def initialize():
+    global global_U, global_enc, global_ratio, global_rinst, global_h, global_pbc_val
 
     # Initialize default parameters in HamLib kernel module
     global_U = None
