@@ -33,8 +33,49 @@ hamiltonians = [
     HamLibData('Fermi-Hubbard-1D', 'FH_D-1.hdf5', f'{_base_url}condensedmatter/fermihubbard/FH_D-1.zip'),
     HamLibData('Bose-Hubbard-1D', 'BH_D-1_d-4.hdf5', f'{_base_url}condensedmatter/bosehubbard/BH_D-1_d-4.zip'),
     HamLibData('Heisenberg', 'heis.hdf5', f'{_base_url}condensedmatter/heisenberg/heis.zip'),
-    HamLibData('Max3Sat', 'random_max3sat-hams.hdf5', f'{_base_url}binaryoptimization/max3sat/random/random_max3sat-hams.zip')
+    HamLibData('Max3Sat', 'random_max3sat-hams.hdf5', f'{_base_url}binaryoptimization/max3sat/random/random_max3sat-hams.zip'),
+    HamLibData('H2', 'H2.hdf5', f'{_base_url}chemistry/electronic/standard/H2.zip'),
+    HamLibData('LiH', 'LiH.hdf5', f'{_base_url}chemistry/electronic/standard/LiH.zip'),
 ]
+
+def parse_through_hdf5(func):
+    """
+    Decorator function that iterates through an HDF5 file and performs
+    the action specified by â€˜ func â€˜ on the internal and leaf nodes in the
+    HDF5 file.
+    """
+
+    def wrapper(obj, path='/', key=None):
+        if type(obj) in [h5py._hl.group.Group, h5py._hl.files.File]:
+            for ky in obj.keys():
+                func(obj, path, key=ky, leaf=False)
+                wrapper(obj=obj[ky], path=path + ky + '/', key=ky)
+        elif type(obj) is h5py._hl.dataset.Dataset:
+            func(obj, path, key=None, leaf=True)
+    return wrapper
+
+
+def print_hdf5_structure(fname_hdf5: str):
+    """
+    Print the path structure of the HDF5 file.
+
+    Args
+    ----
+    fname_hdf5 ( str ) : full path where HDF5 file is stored
+    """
+
+    @parse_through_hdf5
+    def action(obj, path='/', key=None, leaf=False):
+        if key is not None:
+            print(
+                (path.count('/') - 1) * '\t', '-', key, ':', path + key + '/'
+            )
+        if leaf:
+            print((path.count('/') - 1) * '\t', '[^^ DATASET ^^]')
+
+    with h5py.File(fname_hdf5, 'r') as f:
+        action(f['/'])
+
 
 def create_full_filenames(hamiltonian_name):
     """
@@ -77,6 +118,7 @@ def extract_dataset_hdf5(filename, dataset_name):
             if verbose:
                 print(f"Dataset {dataset_name} not found in the file.")
     return data
+
 
 def needs_normalization(data):
     """
@@ -220,7 +262,9 @@ def process_hamiltonian_file(filename, dataset_name):
     Returns:
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
-
+    if verbose:
+        print(f"... process_hamiltonian_filename({filename},{dataset_name})")
+    
     ham_files = [h.file_name for h in hamiltonians]
     
     if filename in ham_files:
@@ -232,7 +276,10 @@ def process_hamiltonian_file(filename, dataset_name):
     else:
         raise ValueError(f"No URL mapping found for filename: {filename}")
     data = extract_dataset_hdf5(hdf5_file_path, dataset_name)
-    # print(data)
+    
+    if verbose:
+        print(data)
+        
     return data
 
 def construct_dataset_name(file_key):
@@ -275,6 +322,104 @@ def construct_dataset_name(file_key):
 
     return '_'.join(dataset_parts)
 
+def extract_variable_tree(file_input):
+    """
+    Extracts the tree of available variable values from HDF5 files specified in the input.
+
+    Args:
+        file_input (list): A list of strings, each containing a function name, file path, 
+                           and optionally a fixed variable with its value separated by colons.
+
+    Returns:
+        dict: A tree of dictionar eswhere keys are function names and values are dictionaries
+              of variables and their possible values.
+    """
+    ##print(f"... extract_variable_tree({file_input})")
+    
+    results = {}
+
+    for entry in file_input:
+        parts = entry.split(':')
+        ##print(parts)
+        function_name, file_path = parts[0], parts[1]
+        
+        # Check if a fixed variable and value are provided
+        if len(parts) > 2:
+            fixed_var_value = parts[2]
+            fixed_variable, fixed_value = fixed_var_value.split('=')
+        else:
+            fixed_variable, fixed_value = None, None
+
+        # Dictionary to hold variables and their values
+        variable_values = {}
+        
+        # tree of variables and values
+        #vartree = { "test": { "test2": {} } }
+        vartree = {}
+
+        #try:
+        if True:
+            with h5py.File(file_path, 'r') as file:
+                for item in file.keys():
+                    ##print(f"  ... item = {item}")
+                    # Assume the format includes instance names in item or its attributes
+                    instance_name = item.split(':')[0] if ':' in item else item
+                    
+                    # parse the dataset name into a collection of variables
+                    variables = parse_instance_variables(instance_name)
+                    ##print(f"    ... variables = {variables}")
+                    
+                    # build and an array of variable values for each unique variable
+                    if fixed_variable is None or variables.get(fixed_variable) == fixed_value:
+                        for var, val in variables.items():
+                            if var not in variable_values:
+                                variable_values[var] = set()
+                            variable_values[var].add(val)
+                    
+                    node0 = node = vartree
+                    for var, val in variables.items():
+                        
+                        ##print(f"  ... {var} = {val}")
+                        #print(f"    ... node(1) = {node}")
+                        """
+                        if node is None:
+                            print("... creating empty node")
+                            node = {}
+                        """
+                        
+                        if var not in node:
+                            ##print(f"*************** created empty dict for {var}")
+                            node[var] = {}
+                        
+                        if val not in node[var]:
+                            node[var][val] = {}
+                        
+                        #print(f"    ... node(2) = {node}")
+                         
+                        node = node[var][val]
+                        #print(f"    ... node(3) = {node}")
+                        
+                    #print(node0)
+                        
+                ##print(f"... vartree:")  
+                ##print(vartree)
+                    
+        #except Exception as e:
+            #print(f"Error processing file {file_path}: {e}")
+
+        # Store the results
+        if variable_values:
+            results[function_name] = variable_values
+    
+    # Print the results
+    for function_name, variables in results.items():
+        ##print(f"{function_name}:")
+        for var, values in variables.items():
+            # Use a sorting method that safely handles mixed data types
+            sorted_values = sorted(values, key=lambda x: (is_numeric(x), float(x) if is_numeric(x) else x))
+            ##print(f"  {var}: {sorted_values}")
+
+
 def extract_variable_ranges(file_input):
     """
     Extracts the ranges of variable values from HDF5 files specified in the input.
@@ -291,6 +436,7 @@ def extract_variable_ranges(file_input):
 
     for entry in file_input:
         parts = entry.split(':')
+        print(parts)
         function_name, file_path = parts[0], parts[1]
         
         # Check if a fixed variable and value are provided
@@ -306,10 +452,11 @@ def extract_variable_ranges(file_input):
         try:
             with h5py.File(file_path, 'r') as file:
                 for item in file.keys():
+                    #print(f"  ... item = {item}")
                     # Assuming the format includes instance names in item or its attributes
                     instance_name = item.split(':')[0] if ':' in item else item
                     variables = parse_instance_variables(instance_name)
-
+                    #print(f"    ... variables = {variables}")
                     if fixed_variable is None or variables.get(fixed_variable) == fixed_value:
                         for var, val in variables.items():
                             if var not in variable_values:
@@ -421,7 +568,9 @@ def view_hdf5_structure():
         "fermi-hubbard:downloaded_hamlib_files/FH_D-1.hdf5",
         "max3sat:downloaded_hamlib_files/random_max3sat-hams.hdf5",
         "heis:downloaded_hamlib_files/heis.hdf5",
-        "bh:downloaded_hamlib_files/BH_D-1_d-4.hdf5"
+        "bh:downloaded_hamlib_files/BH_D-1_d-4.hdf5",
+        "H2:downloaded_hamlib_files/H2.hdf5",
+        "LiH:downloaded_hamlib_files/LiH.hdf5",
         # Add more entries as needed
     ]
     for entry in file_input:
@@ -429,10 +578,18 @@ def view_hdf5_structure():
         filename = parts[1]  # Extract the full path of the file
         base_filename = os.path.basename(filename)  # Extract the base filename
 
+        #print(f"... structure of: {filename}")
+        #print_hdf5_structure(fname_hdf5=filename)
+        #print("   end --- ")
+        
         if not os.path.exists(filename):
             process_hamiltonian_file(base_filename, "")
+    
     extract_variable_ranges(file_input)
     generate_json_for_hdf5_input(file_input)
+    
+    # DEVNOTE: this produces lots of output, so it is commented out for now
+    ## extract_variable_tree(file_input)
 
 
 #######################
