@@ -322,6 +322,10 @@ def construct_dataset_name(file_key):
 
     return '_'.join(dataset_parts)
 
+
+####################################################
+# HAMLIB INSPECTOR FUNCTIONS
+
 def extract_variable_tree(file_input):
     """
     Extracts the tree of available variable values from HDF5 files specified in the input.

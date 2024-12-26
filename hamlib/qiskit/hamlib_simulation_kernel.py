@@ -17,15 +17,16 @@ from qiskit.circuit.library import PauliEvolutionGate
 
 verbose = False
 
+# global vars that specify the current hdf5 filename, dataset template, and parameters set by the user
+dataset_name_template = ""
+filename = ""
+
 global_U = None
 global_enc = None
 global_ratio = None
 global_rinst = None
 global_h = None
 global_pbc_val = None
-
-filename = None
-dataset_name_template = None
         
 # Saved circuits and subcircuits for display
 QC_ = None
@@ -106,6 +107,18 @@ def set_default_parameter_values(filename):
     else:
         print("No such hamiltonian is available.")
 
+# Get the actual dataset name by applying parameters to the dataset_name_template
+def get_current_dataset_name(n_spins):
+    global dataset_name_template
+    
+    dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
+    dataset_name_template = dataset_name_template.replace("{h}", str(global_h)).replace("{pbc_val}", str(global_pbc_val))
+    dataset_name_template = dataset_name_template.replace("{U}", str(global_U)).replace("{enc}", str(global_enc))
+    dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins))
+    
+    return dataset_name
+    
+            
 # get key infomation about the selected Hamiltonian
 # DEVNOTE: Error handling here can be improved by simply returning False or raising exception
 def get_hamiltonian_info(hamiltonian_name=None):
@@ -124,17 +137,17 @@ def get_hamiltonian_info(hamiltonian_name=None):
     # Set default parameter values for the hamiltonians
     set_default_parameter_values(filename)
 
-def process_data(data):
+def process_data_0(data):
     """
-    Process the given data to construct a Hamiltonian in the form of a SparsePauliOp and determine the number of qubits.
+    Process the given data to construct a Hamiltonian in the form of a SparsePauliList and determine the number of qubits.
 
     Args:
         data (str or bytes): The Hamiltonian data to be processed. Can be a string or bytes.
 
     Returns:
-        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits.
+        tuple: A tuple containing the Hamiltonian as a SparsePauliList and the number of qubits.
     """
-    if verbose: print(f"... Hamiltonian data = {data}")
+    if verbose: print(f"... parsing Hamiltonian data = {data}")
     
     if needs_normalization(data) == "Yes":
         data = normalize_data_format(data)
@@ -144,10 +157,29 @@ def process_data(data):
     if verbose: print(f"... parsed_pauli_list = {parsed_pauli_list}")
     
     num_qubits = determine_qubit_count(parsed_pauli_list)
+    if verbose: print(f"... num_qubits = {num_qubits}Q")
+
+    return parsed_pauli_list, num_qubits
+    
+def process_data(data):
+    """
+    Process the given data to construct a Hamiltonian in the form of a SparsePauliOp and determine the number of qubits.
+
+    Args:
+        data (str or bytes): The Hamiltonian data to be processed. Can be a string or bytes.
+
+    Returns:
+        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits.
+        
+    NOTE: this function os provided for backwards compatility, as other benchmarks are using it.
+    """
+    
+    parsed_pauli_list, num_qubits = process_data_0(data)
+    
     hamiltonian = sparse_pauliop(parsed_pauli_list, num_qubits)
     return hamiltonian, num_qubits
-
-
+    
+    
 def sparse_pauliop(terms, num_qubits):
     """
     Construct a SparsePauliOp from a list of Pauli terms and the number of qubits.
@@ -194,13 +226,13 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
         found_valid_dataset = False
 
         while n_spins <= max_qubits:
-            dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
-            dataset_name_template = dataset_name_template.replace("{h}", str(global_h)).replace("{pbc_val}", str(global_pbc_val))
-            dataset_name_template = dataset_name_template.replace("{U}", str(global_U)).replace("{enc}", str(global_enc))
-            dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins))
-            # print(f"Checking dataset: {dataset_name}")
+            dataset_name = get_current_dataset_name(n_spins)
 
+            if verbose:
+                print(f"Checking dataset: {dataset_name}")
+                
             data = process_hamiltonian_file(filename, dataset_name)
+            
             if data is not None:
                 # print(f"Valid dataset found for n_spins = {n_spins}")
                 if "{n_qubits/2}" in dataset_name_template:
@@ -227,10 +259,55 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
         
     return valid_qubits  
 
-# In hamiltonian_simulation_kernel.py
 
-dataset_name_template = ""
-filename = ""
+#####################################################################################
+
+def get_hamlib_operator(
+    n_spins: int,
+):
+    """
+    Return the quantum operator associated with the current HamLib hdf5 filename and dataset name.
+
+    Steps:
+        1. Extract Hamiltonian data from an HDF5 file.
+        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
+
+    Returns:
+        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
+    """
+    global dataset_name_template, filename
+    global global_h, global_pbc_val
+    global global_U, global_enc
+    global global_ratio, global_rinst
+    global QCI_, INV_
+
+    # Replace placeholders with actual n_qubits value: n_spins (and other params)
+    dataset_name = get_current_dataset_name(n_spins)
+
+    if verbose:
+        print(f"Trying dataset: {dataset_name}")  # Debug print
+    
+    ham_op = None
+    num_qubits = 0
+    
+    data = process_hamiltonian_file(filename, dataset_name)
+    
+    # print(f"Using dataset: {dataset_name}")
+    # print("Raw Hamiltonian Data: ", data)
+        
+    if data is not None:
+        
+        # get the Hamiltonian operator as SparsePauliList and its size from the data       
+        parsed_pauli_list, num_qubits = process_data_0(data)
+    
+        # convert the SparsePauliList to a SparsePauliOp object
+        ham_op = sparse_pauliop(parsed_pauli_list, num_qubits)
+            
+    return ham_op, num_qubits
+
+
+#####################################################################################
+# KERNEL FUNCTIONS
 
 def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
     """
@@ -255,51 +332,8 @@ def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
         circuit.append(evo, range(operator.num_qubits))
     circuit.barrier()
     return circuit
-
-#####################################################################################
-
-def get_hamlib_operator(
-    n_spins: int,
-):
-    """
-    Return the quantum operator associated with the current HamLib hdf5 filename and dataset name.
-
-    Steps:
-        1. Extract Hamiltonian data from an HDF5 file.
-        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
-
-    Returns:
-        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
-    """
-    global dataset_name_template, filename
-    global global_h, global_pbc_val
-    global global_U, global_enc
-    global global_ratio, global_rinst
-    global QCI_, INV_
-
-    # Replace placeholders with actual n_qubits value: n_spins
-    dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
-    dataset_name_template = dataset_name_template.replace("{h}", str(global_h)).replace("{pbc_val}", str(global_pbc_val))
-    dataset_name_template = dataset_name_template.replace("{U}", str(global_U)).replace("{enc}", str(global_enc))
-    dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
-
-    if verbose:
-        print(f"Trying dataset: {dataset_name}")  # Debug print
     
-    ham_op = None
-    num_qubits = 0
     
-    data = process_hamiltonian_file(filename, dataset_name)
-    if data is not None:
-        # print(f"Using dataset: {dataset_name}")
-        # print("Raw Hamiltonian Data: ", data)
-        
-        # get the Hamiltonian operator as SparsePauliOp and its size from the data
-        ham_op, num_qubits = process_data(data)
-    
-    return ham_op, num_qubits
-
-
 def create_circuit(
     n_spins: int,
     time: float = 1,
