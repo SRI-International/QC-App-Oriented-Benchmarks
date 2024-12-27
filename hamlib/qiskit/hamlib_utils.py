@@ -119,6 +119,30 @@ def extract_dataset_hdf5(filename, dataset_name):
                 print(f"Dataset {dataset_name} not found in the file.")
     return data
 
+def process_hamlib_data(data):
+    """
+    Process the given data to construct a Hamiltonian in the form of a SparsePauliList and determine the number of qubits.
+
+    Args:
+        data (str or bytes): The Hamiltonian data to be processed. Can be a string or bytes.
+
+    Returns:
+        tuple: A tuple containing the Hamiltonian as a SparsePauliList and the number of qubits.
+    """
+    if verbose: print(f"... parsing Hamiltonian data = {data}")
+    
+    if needs_normalization(data) == "Yes":
+        data = normalize_data_format(data)
+        if verbose: print(f"  ... normalized data = {data}")
+    
+    parsed_pauli_list = parse_hamiltonian_to_sparsepauliop(data)
+    if verbose: print(f"... parsed_pauli_list = {parsed_pauli_list}")
+    
+    num_qubits = determine_qubit_count(parsed_pauli_list)
+    if verbose: print(f"... num_qubits = {num_qubits}Q")
+
+    return parsed_pauli_list, num_qubits
+ 
 
 def needs_normalization(data):
     """
