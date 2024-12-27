@@ -118,8 +118,8 @@ def get_hamlib_sparsepaulilist(
 
     Steps:
         1. Determine the dataset that matches the given arguments.
-        1. Extract Hamiltonian data from an HDF5 file.
-        2. Process the data to obtain a SparsePauliList.
+        2. Extract Hamiltonian data from an HDF5 file.
+        3. Process the data to obtain a SparsePauliList.
 
     Returns:
         tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
@@ -264,25 +264,30 @@ def get_current_dataset_name(n_spins):
 #####################################################################################
 # KERNEL UTILITY FUNCTIONS
 
-# DEVNOTE: this should not be called from the outside
-def process_data(data):
+def get_hamlib_sparsepauliop(
+    hamiltonian_name: str,
+    n_spins: int,
+):
     """
-    Process the given data to construct a Hamiltonian in the form of a SparsePauliOp and determine the number of qubits.
+    Return the quantum operator associated with the given Hamiltonian and parameters.
 
-    Args:
-        data (str or bytes): The Hamiltonian data to be processed. Can be a string or bytes.
+    Steps:
+        1. Determine the dataset that matches the given arguments.
+        2. Extract Hamiltonian data from an HDF5 file.
+        3. Process the data to obtain a SparsePauliOp and determine the number of qubits.
 
     Returns:
-        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits.
-        
-    NOTE: this function os provided for backwards compatility, as other benchmarks are using it.
+        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
     """
-    
-    parsed_pauli_list, num_qubits = process_hamlib_data(data)
-    
-    hamiltonian = sparse_pauliop(parsed_pauli_list, num_qubits)
-    return hamiltonian, num_qubits
 
+    # get the list of Pauli terms for the given Hamiltonian
+    parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist(hamiltonian_name, n_spins)
+	
+    # convert the SparsePauliList to a SparsePauliOp object
+    ham_op = sparse_pauliop(parsed_pauli_list, num_qubits)
+	
+    return ham_op, num_qubits
+    
 # DEVNOTE: this function should not be needed or called externally.  
 # However, it is being used below by the create_circuit function. 
 # The create_circuit function should just accept the ham terms as an arg
@@ -331,7 +336,26 @@ def sparse_pauliop(terms, num_qubits):
     
     hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
     return hamiltonian
-   
+ 
+# DEVNOTE: this should not be called from the outside
+def process_data(data):
+    """
+    Process the given data to construct a Hamiltonian in the form of a SparsePauliOp and determine the number of qubits.
+
+    Args:
+        data (str or bytes): The Hamiltonian data to be processed. Can be a string or bytes.
+
+    Returns:
+        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits.
+        
+    NOTE: this function os provided for backwards compatility, as other benchmarks are using it.
+    """
+    
+    parsed_pauli_list, num_qubits = process_hamlib_data(data)
+    
+    hamiltonian = sparse_pauliop(parsed_pauli_list, num_qubits)
+    return hamiltonian, num_qubits 
+    
     
 #####################################################################################
 # KERNEL FUNCTIONS
