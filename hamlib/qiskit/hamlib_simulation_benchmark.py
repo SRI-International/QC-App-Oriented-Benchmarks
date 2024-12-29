@@ -27,7 +27,7 @@ import metrics as metrics
 
 import hamlib_simulation_kernel
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
-from hamlib_simulation_kernel import initial_state, create_circuit   # would like to remove these
+from hamlib_simulation_kernel import initial_state, create_circuit, create_circuit_from_op   # would like to remove these
 from hamlib_utils import create_full_filenames, construct_dataset_name
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
 
@@ -345,7 +345,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         # Determine number of circuits to execute for this group
         num_circuits = max(1, max_circuits)
         
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        #print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+          
+        # read the HamLib file content for the specified Hamiltonian and return a SparsePauliOp
+        ham_op, _ = hamlib_simulation_kernel.get_hamlib_sparsepauliop(hamiltonian, num_qubits)
         
         #######################################################################
 
@@ -357,18 +360,19 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
 
             #used to store random pauli correct bitstrings
             global bitstring_dict
-
-            # create the HamLibSimulation kernel, random pauli bitstring, and the associated Hamiltonian operator
-            qc, bitstring, ham_op = HamiltonianSimulation(
-                num_qubits, 
-                K=K, t=t,
-                hamiltonian = hamiltonian, 
+            
+            # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
+            qc, bitstring = HamiltonianSimulation(
+                num_qubits = num_qubits,
+                ham_op = ham_op,                 
+                K = K,
+                t = t,         
                 init_state = init_state,
                 method = method, 
                 use_inverse_flag = use_inverse_flag,
                 random_pauli_flag = random_pauli_flag, 
                 random_init_flag = random_init_flag)
-
+               
             bitstring_dict[qc.name] = bitstring
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
