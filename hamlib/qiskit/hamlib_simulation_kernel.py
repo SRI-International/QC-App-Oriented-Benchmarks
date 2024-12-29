@@ -124,7 +124,7 @@ def get_hamlib_sparsepaulilist(
     Returns:
         tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
     """
-    print(f"****************** get_hamlib_sparsepaulilist({hamiltonian_name}, {n_spins})")
+    ##print(f"****************** get_hamlib_sparsepaulilist({hamiltonian_name}, {n_spins})")
     
     get_hamiltonian_info(hamiltonian_name=hamiltonian_name)
     
@@ -147,7 +147,7 @@ def get_hamlib_sparsepaulilist_current(
     """
     global filename
     
-    print(f"****************** get_hamlib_sparsepaulilist_current({n_spins})")
+    ##print(f"****************** get_hamlib_sparsepaulilist_current({n_spins})")
 
     # Replace placeholders with actual n_qubits value: n_spins (and other params)
     dataset_name = get_current_dataset_name(n_spins, True)
@@ -265,8 +265,8 @@ def get_current_dataset_name(n_spins, div_by_2):
         dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
     else:
         dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins))
-    print(f"*****================ dataset_name_template = {dataset_name_template}")
-    print(f"*****============= dataset_name = {dataset_name}")
+    #print(f"*****================ dataset_name_template = {dataset_name_template}")
+    #print(f"*****============= dataset_name = {dataset_name}")
     
     return dataset_name
     
@@ -290,7 +290,7 @@ def get_hamlib_sparsepauliop(
         tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
     """
 
-    print(f"****************** get_hamlib_sparsepauliop({hamiltonian_name}, {n_spins})")
+    #print(f"****************** get_hamlib_sparsepauliop({hamiltonian_name}, {n_spins})")
     
     # get the list of Pauli terms for the given Hamiltonian
     parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist(hamiltonian_name, n_spins)
@@ -317,7 +317,7 @@ def get_hamlib_operator(
         tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
     """
 
-    print(f"****************** get_hamlib_operator({n_spins})")
+    #print(f"****************** get_hamlib_operator({n_spins})")
     
     # get the list of Pauli terms for the currently specified Hamiltonian
     parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist_current(n_spins)
