@@ -17,16 +17,190 @@ from dataclasses import dataclass
 
 verbose = False
 
+# Base URL for all HamLib content
+_base_url = 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/'
+
+# Short names for useful Hamiltonians, with known paths, for convenience
+_known_hamlib_paths = {
+    "TFIM": "condensedmatter/tfim/tfim",
+    "tfim": "condensedmatter/tfim/tfim",
+    "Fermi-Hubbard-1D": "condensedmatter/fermihubbard/FH_D-1",
+    "FH_D-1": "condensedmatter/fermihubbard/FH_D-1",
+    "Bose-Hubbard-1D": "condensedmatter/bosehubbard/BH_D-1_d-4",
+    "BH_D-1_d-4": "condensedmatter/bosehubbard/BH_D-1_d-4",
+    "Heisenberg": "condensedmatter/heisenberg/heis",
+    "heis": "condensedmatter/heisenberg/heis",
+    "Max3Sat": "binaryoptimization/max3sat/random/random_max3sat-hams",
+    "random_max3sat-hams": "binaryoptimization/max3sat/random/random_max3sat-hams",
+    "H2": "chemistry/electronic/standard/H2",
+    "LiH": "chemistry/electronic/standard/LiH",
+}
+
+# The currently loaded Hamiltonian datasets, from hdf5 file
+active_hamiltonian_datasets = None
+
+#####################################################################################
+# HAMLIB READER
+
+def load_from_file(filename: str):
+    if verbose:
+        print(f"\n... hamlib_utils.load_from_file({filename})")
+
+    # if filename is known short name, get pathname
+    pathname = filename
+    if filename in _known_hamlib_paths:
+        pathname = _known_hamlib_paths[filename] 
+
+    fullname = f"{_base_url}{pathname}.zip"
+    if verbose:
+        print(f"  ... fullname = {fullname}")
+        
+    # Download the HamLib zip file and extract the hdf5 file from wihin
+    try:
+        extracted_path = download_and_extract(filename, fullname)
+        if verbose:
+            print(f"  ... extracted_path = {extracted_path}")
+            
+    except Exception:
+        extracted_path = None
+        print(f"ERROR: can not download the requested HamLib file from: {fullname}")
+        return
+        
+    # Assuming the HDF5 file is located directly inside the extracted folder
+    hdf5_file_path = os.path.join(extracted_path, os.path.basename(filename)) + ".hdf5"
+    if verbose:
+        print(f"  ... hdf5_file_path = {hdf5_file_path}")
+
+    global active_hamiltonian_datasets
+    active_hamiltonian_datasets = {}
+        
+    # Open the HDF5 file
+    with h5py.File(hdf5_file_path, 'r') as file:
+
+        
+        # scan all the datasets (not doing anything with them here)
+        count = 0
+        for dataset_name in file.keys():
+            count += 1
+            #print(f"  ... dataset_name = {dataset_name}")
+            dataset = file[dataset_name]
+            if "nqubits" in dataset.attrs:
+                pass
+                #print(f"    ... num_qubits = {dataset.attrs['nqubits']}")
+                ###for attr_name, attr_value in dataset.attrs.items():
+                    ###print(f"    ... attribute: {attr_name} = {attr_value}")
+            
+            # Copy attributes
+            attributes = {attr_name: attr_value for attr_name, attr_value in dataset.attrs.items()}
+            
+            # Copy data
+            data = dataset[()] if dataset.shape == () else dataset[:]
+        
+            # Store dataset and attributes in a dictionary
+            active_hamiltonian_datasets[dataset_name] = {
+                "data": data,
+                "attributes": attributes
+            }
+            
+        if verbose:
+            print(f"... loaded {count} datasets.")
+        
+    return None
+
+def find_dataset_for_params(num_qubits: int = 0, params: dict[str, str] = None):
+
+    if active_hamiltonian_datasets is None:
+        print(f"ERROR: find_dataset_for_params(), no HamLib file is active.")
+        return None
+        
+    if verbose:
+        print(f"... find_dataset_for_params({num_qubits}, {params})")
+
+    # scan all the datasets to find a match on all parameters and num_qubits
+    count = 0
+    for dataset_name in active_hamiltonian_datasets.keys():
+        
+        #print(f"  ... *********************** dataset_name = {dataset_name}")
+        dataset = active_hamiltonian_datasets[dataset_name]
+        
+        if "nqubits" not in dataset["attributes"]:
+            continue
+        
+        if (num_qubits != dataset["attributes"]["nqubits"]):
+            continue
+        
+        found = True
+        for param, value in params.items():
+            #print(f"  ... testing {param} = {value}")
+            
+            if value != "":
+                substr = f"{param}-{value}"
+            else:
+                substr = f"{param}"
+            
+            if substr not in  dataset_name:
+                #print("    ... skipping this one")
+                found = False
+                break
+                
+        if not found:
+            continue
+                       
+        if verbose:
+            print(f"  ... matching dataset_name = {dataset_name}")
+         
+        data = dataset["data"]
+        
+        count += 1
+    
+    if verbose:
+        print(f"  ... found {count} datasets.")
+ 
+ 
+def download_and_extract(filename, url):
+    """
+    Download a file from a given URL and unzip it.
+
+    Args:
+        filename (str): The name of the file to be downloaded.
+        url (str): The URL to download the file from.
+
+    Returns:
+        str: The path to the extracted file.
+    """
+    if verbose:
+        print(f"  ... download_and_extract({filename},{url})", flush=True)
+        
+    download_dir = "downloaded_hamlib_files"
+    os.makedirs(download_dir, exist_ok=True)
+    local_zip_path = os.path.join(download_dir, os.path.basename(url))
+    
+    # Download the file
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(local_zip_path, 'wb') as file:
+            file.write(response.content)
+        # print(f"Downloaded {local_zip_path} successfully.")
+    else:
+        raise Exception(f"Failed to download from {url}.")
+
+    # Unzip the file
+    with zipfile.ZipFile(local_zip_path, 'r') as zip_ref:
+        zip_ref.extractall(download_dir)
+        # print(f"Extracted to {download_dir}.")
+    
+    # Return the path to the directory containing the extracted files
+    return download_dir
+ 
+ 
+#####################################################################################
+# CURRENT VERSION - HAMLIB PROCESSING
 
 @dataclass
 class HamLibData:
     name: str
     file_name: str
     url: str
-
-
-_base_url = 'https://portal.nersc.gov/cfs/m888/dcamps/hamlib/'
-
 
 hamiltonians = [
     HamLibData('TFIM', 'tfim.hdf5', f'{_base_url}condensedmatter/tfim/tfim.zip'),
@@ -37,6 +211,8 @@ hamiltonians = [
     HamLibData('H2', 'H2.hdf5', f'{_base_url}chemistry/electronic/standard/H2.zip'),
     HamLibData('LiH', 'LiH.hdf5', f'{_base_url}chemistry/electronic/standard/LiH.zip'),
 ]
+
+# These two functions come from hamlib_snippets.py example code:
 
 def parse_through_hdf5(func):
     """
@@ -76,6 +252,10 @@ def print_hdf5_structure(fname_hdf5: str):
     with h5py.File(fname_hdf5, 'r') as f:
         action(f['/'])
 
+###################################################################
+
+# The following code developed for HamLib Simulatioin Benchmark
+# (Improvements in progress)
 
 def create_full_filenames(hamiltonian_name):
     """
@@ -240,40 +420,7 @@ def determine_qubit_count(terms):
                 max_qubit = max_in_term
     return max_qubit + 1  # Since qubit indices start at 0
 
-def download_and_extract(filename, url):
-    """
-    Download a file from a given URL and unzip it.
 
-    Args:
-        filename (str): The name of the file to be downloaded.
-        url (str): The URL to download the file from.
-
-    Returns:
-        str: The path to the extracted file.
-    """
-    if verbose:
-        print(f"... download_and_extract({filename},{url})", flush=True)
-        
-    download_dir = "downloaded_hamlib_files"
-    os.makedirs(download_dir, exist_ok=True)
-    local_zip_path = os.path.join(download_dir, os.path.basename(url))
-    
-    # Download the file
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(local_zip_path, 'wb') as file:
-            file.write(response.content)
-        # print(f"Downloaded {local_zip_path} successfully.")
-    else:
-        raise Exception(f"Failed to download from {url}.")
-
-    # Unzip the file
-    with zipfile.ZipFile(local_zip_path, 'r') as zip_ref:
-        zip_ref.extractall(download_dir)
-        # print(f"Extracted to {download_dir}.")
-    
-    # Return the path to the directory containing the extracted files
-    return download_dir
 
 def process_hamiltonian_file(filename, dataset_name):
     """
@@ -296,7 +443,7 @@ def process_hamiltonian_file(filename, dataset_name):
         extracted_path = download_and_extract(filename, url)
         # Assuming the HDF5 file is located directly inside the extracted folder
         hdf5_file_path = os.path.join(extracted_path, filename)
-        # print('hdf5_file_path', hdf5_file_path)
+        # print('  ... hdf5_file_path', hdf5_file_path)
     else:
         raise ValueError(f"No URL mapping found for filename: {filename}")
     data = extract_dataset_hdf5(hdf5_file_path, dataset_name)

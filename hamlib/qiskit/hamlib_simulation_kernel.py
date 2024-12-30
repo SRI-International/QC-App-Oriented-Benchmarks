@@ -239,7 +239,6 @@ def get_hamiltonian_info(hamiltonian_name=None):
     try:
         filename = create_full_filenames(hamiltonian_name)
         dataset_name_template = construct_dataset_name(filename)
-        print(f"*=*=*=*=*=*=* dataset_name_template = {dataset_name_template}")
     except ValueError:
         print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian_name}")
         return
