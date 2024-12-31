@@ -175,7 +175,7 @@ def get_hamlib_sparsepaulilist(
     parsed_pauli_list = parse_hamiltonian_to_sparsepauliop(data)
     if verbose: print(f"  ... parsed_pauli_list = {parsed_pauli_list}")
     
-    return parsed_pauli_list
+    return parsed_pauli_list, dataset_name
 
 def get_valid_qubits(min_qubits, max_qubits, skip_qubits, params: dict[str, str] = None):
     """
@@ -203,7 +203,7 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits, params: dict[str, str]
     valid_qubits.sort()  # Sorting the qubits for consistent order
     
     if verbose:
-        print(f"Final valid qubits: {valid_qubits}")
+        print(f"... final valid qubits: {valid_qubits}")
         
     return valid_qubits  
     

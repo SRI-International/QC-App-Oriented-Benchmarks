@@ -357,6 +357,11 @@ def run(min_qubits: int = 2,
     valid_qubits = hamlib_utils.get_valid_qubits(min_qubits, max_qubits, skip_qubits, hamiltonian_params)
     #print(f"... valid = {valid_qubits}")
     
+    if len(valid_qubits) < 1:
+        print(f"ERROR: No matching datasets for the requested Hamiltonian name and parameters.")
+        print(f"       Terminating this benchmark.")
+        return
+    
     for num_qubits in valid_qubits:
     
         # Reset random seed
@@ -371,8 +376,9 @@ def run(min_qubits: int = 2,
         #ham_op, _ = hamlib_simulation_kernel.get_hamlib_sparsepauliop(hamiltonian, num_qubits)
         
         # return a sparse Pauli list of terms queried from the open HamLib file
-        parsed_pauli_list = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
+        parsed_pauli_list, dataset_name = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
                                                                 params=hamiltonian_params)
+        print(f"... dataset_name = {dataset_name}")
         #print(f"... parsed_pauli_list = \n{parsed_pauli_list}")
         
         # convert the SparsePauliList to a SparsePauliOp object
