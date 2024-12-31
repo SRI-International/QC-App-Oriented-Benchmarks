@@ -43,6 +43,30 @@ active_hamiltonian_datasets = None
 # HAMLIB READER
 
 def load_from_file(filename: str):
+    """
+    Loads and processes a Hamiltonian library (HamLib) file.
+
+    This function checks whether the given `filename` corresponds to a known short name
+    or a direct path. It then constructs a full URL to download a zipped HamLib file,
+    extracts the HDF5 file within it, and loads its datasets and metadata into the 
+    global variable `active_hamiltonian_datasets`.
+
+    Args:
+        filename (str): The name or path of the HamLib file to load. If the name is a 
+            known short name, it is resolved to its full path.
+
+    Returns:
+        None: All datasets and their metadata are stored in the global variable 
+        `active_hamiltonian_datasets`.
+
+    Raises:
+        Exception: If the HamLib file cannot be downloaded or extracted.
+
+    Notes:
+        - The function assumes that the HDF5 file is directly located in the root of 
+          the extracted folder.
+        - The datasets' data and attributes are stored in memory for later use.
+    """
     if verbose:
         print(f"\n... hamlib_utils.load_from_file({filename})")
 
@@ -67,7 +91,7 @@ def load_from_file(filename: str):
         return
         
     # Assuming the HDF5 file is located directly inside the extracted folder
-    hdf5_file_path = os.path.join(extracted_path, os.path.basename(filename)) + ".hdf5"
+    hdf5_file_path = os.path.join(extracted_path, os.path.basename(pathname)) + ".hdf5"
     if verbose:
         print(f"  ... hdf5_file_path = {hdf5_file_path}")
 
@@ -76,8 +100,7 @@ def load_from_file(filename: str):
         
     # Open the HDF5 file
     with h5py.File(hdf5_file_path, 'r') as file:
-
-        
+      
         # scan all the datasets (not doing anything with them here)
         count = 0
         for dataset_name in file.keys():
@@ -108,7 +131,32 @@ def load_from_file(filename: str):
     return None
 
 def find_dataset_for_params(num_qubits: int = 0, params: dict[str, str] = None):
+    """
+    Searches for datasets matching the specified number of qubits and parameters.
 
+    This function scans the global `active_hamiltonian_datasets` to find datasets 
+    that match the provided `num_qubits` and the key-value pairs in `params`. It 
+    checks for matching attributes and verifies whether the dataset name contains 
+    the required parameter substrings.
+
+    Args:
+        num_qubits (int): The number of qubits to match in the dataset attributes.
+            Default is 0 (no specific qubit requirement).
+        params (dict[str, str]): A dictionary of parameter names and values to match. 
+            If a value is an empty string, only the parameter name is checked.
+
+    Returns:
+        dict: A dictionary of matching datasets are returned and printed if `verbose` is True.
+
+    Raises:
+        ValueError: If no Hamiltonian file is currently active.
+
+    Notes:
+        - The function assumes that datasets in `active_hamiltonian_datasets` contain
+          a valid "nqubits" attribute.
+        - The matching logic requires dataset names to contain substrings in the form 
+          "param-value" for parameters with non-empty values, or "param" for empty values.
+    """
     if active_hamiltonian_datasets is None:
         print(f"ERROR: find_dataset_for_params(), no HamLib file is active.")
         return None
@@ -116,6 +164,8 @@ def find_dataset_for_params(num_qubits: int = 0, params: dict[str, str] = None):
     if verbose:
         print(f"... find_dataset_for_params({num_qubits}, {params})")
 
+    matching_hamiltonian_datasets = {}
+    
     # scan all the datasets to find a match on all parameters and num_qubits
     count = 0
     for dataset_name in active_hamiltonian_datasets.keys():
@@ -148,6 +198,8 @@ def find_dataset_for_params(num_qubits: int = 0, params: dict[str, str] = None):
                        
         if verbose:
             print(f"  ... matching dataset_name = {dataset_name}")
+            
+        matching_hamiltonian_datasets[dataset_name] = dataset
          
         data = dataset["data"]
         
@@ -156,7 +208,9 @@ def find_dataset_for_params(num_qubits: int = 0, params: dict[str, str] = None):
     if verbose:
         print(f"  ... found {count} datasets.")
  
- 
+    return matching_hamiltonian_datasets
+    
+    
 def download_and_extract(filename, url):
     """
     Download a file from a given URL and unzip it.

@@ -54,6 +54,8 @@ def initialize():
     global_rinst = None
     global_h = None
     global_pbc_val = None
+    
+    hamlib_utils.active_hamiltonian_datasets = None
 
 
 def set_default_parameter_values(filename):
@@ -103,6 +105,53 @@ def set_default_parameter_values(filename):
         global_h = None
     else:
         print("No such hamiltonian is available.")
+
+def get_params_from_globals(hamiltonian_name):
+    """
+    This function is provided to enable backwards compatilibility of an earlier approach
+    to specifying the parameters to be used for selecting a Hamiltonian from HamLib.
+    
+    NOTE: This function is used internally and will be removed in the near future.
+    Once removed, the setting of parameters via the global variables will no longer work.
+    
+    Returns:
+        dict: A dictiionary of Hamiltonian parameters and their values.
+    """
+    params = {}
+    
+    if hamiltonian_name == "TFIM" or hamiltonian_name == "Heisenberg":
+        if global_h != None:
+            params["h"] = global_h
+        if global_pbc_val != None:
+            params["1D-grid"] = global_pbc_val
+
+    elif hamiltonian_name == "Max3Sat":
+        if global_ratio != None:
+            params["ratio"] = global_ratio
+        if global_rinst != None:
+            params["rinst"] = global_rinst
+
+    elif hamiltonian_name == "Fermi-Hubbard-1D":
+        if global_U != None:
+            params["U"] = global_U
+        if global_enc != None:
+            params["enc"] = global_enc
+        if global_pbc_val != None:
+            params["1D-grid"] = global_pbc_val
+
+    elif hamiltonian_name == "Bose-Hubbard-1D":
+        if global_U != None:
+            params["U"] = global_U
+        if global_enc != None:
+            params["enc"] = global_enc
+        if global_pbc_val != None:
+            params["1D-grid"] = global_pbc_val
+    
+    if verbose:
+        print(f"... get_params_from_globals() ==> {params}")
+        
+    return params
+    
 
 #####################################################################################
 # PUBLIC API FUNCTIONS
