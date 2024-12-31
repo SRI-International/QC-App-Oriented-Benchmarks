@@ -25,10 +25,9 @@ sys.path[1:1] = ["../_common"]
 import execute as ex
 import metrics as metrics
 
-import hamlib_simulation_kernel
+import hamlib_simulation_kernel, hamlib_utils
 from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
 from hamlib_simulation_kernel import initial_state, create_circuit, create_circuit_from_op   # would like to remove these
-from hamlib_utils import create_full_filenames, construct_dataset_name
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
 
 
@@ -228,9 +227,14 @@ def print_top_measurements(label, counts, top_n):
 
 ############### Benchmark Loop
 
-def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
-        skip_qubits: int = 1, num_shots: int = 100,
-        hamiltonian: str = "TFIM", method: int = 1,
+def run(min_qubits: int = 2, 
+        max_qubits: int = 8, 
+        max_circuits: int = 1,
+        skip_qubits: int = 1, 
+        num_shots: int = 100,
+        hamiltonian: str = "TFIM", 
+        hamiltonian_params: dict = None,
+        method: int = 1,
         random_pauli_flag: bool = False, 
         random_init_flag: bool = False, 
         use_inverse_flag: bool = False,
@@ -257,6 +261,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
                            - "random_max3sat-hams": Random Max 3-SAT Hamiltonians for binary optimization problems.
                            - "FH_D-1": Fermi-Hubbard model in 1D
                            - "BH_D-1_d-4": Bose-Hubbard model in 1D
+        hamiltonian_params (dict): A dictionary of parameters for the given Hamiltonian name.
         method (int): Method for fidelity checking. 
                       Options include:
                       - 1: Noiseless Trotterized Quantum Simulation.
@@ -295,6 +300,16 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     min_qubits = min(max(2, min_qubits), max_qubits)
     if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even (DEVNOTE: is this True?)
     skip_qubits = max(1, skip_qubits)
+    
+    hamiltonian_name = hamiltonian
+    
+    if verbose: print(f"... hamiltonian_params = {hamiltonian_params}")
+    if hamiltonian_params is None:
+        hamiltonian_params = hamlib_simulation_kernel.get_params_from_globals(hamiltonian_name)
+        if verbose: print(f"... global hamiltonian_params = {hamiltonian_params}")
+    
+    # load the HamLib file for the given hamiltonian name
+    hamlib_utils.load_from_file(filename=hamiltonian_name)
 
     # get key infomation about the selected Hamiltonian
     # this function reads the HamLib file content for the specified Hamiltonian
@@ -336,7 +351,12 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     # for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
     
     # for HamLib, determine available widths and loop over those 
-    valid_qubits = get_valid_qubits(min_qubits, max_qubits, skip_qubits)
+    ####valid_qubits = get_valid_qubits(min_qubits, max_qubits, skip_qubits)
+    ####print(f"... valid = {valid_qubits}")
+    
+    valid_qubits = hamlib_utils.get_valid_qubits(min_qubits, max_qubits, skip_qubits, hamiltonian_params)
+    #print(f"... valid = {valid_qubits}")
+    
     for num_qubits in valid_qubits:
     
         # Reset random seed
@@ -345,11 +365,21 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         # Determine number of circuits to execute for this group
         num_circuits = max(1, max_circuits)
         
-        #print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
           
         # read the HamLib file content for the specified Hamiltonian and return a SparsePauliOp
-        ham_op, _ = hamlib_simulation_kernel.get_hamlib_sparsepauliop(hamiltonian, num_qubits)
+        #ham_op, _ = hamlib_simulation_kernel.get_hamlib_sparsepauliop(hamiltonian, num_qubits)
         
+        # return a sparse Pauli list of terms queried from the open HamLib file
+        parsed_pauli_list = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
+                                                                params=hamiltonian_params)
+        #print(f"... parsed_pauli_list = \n{parsed_pauli_list}")
+        
+        # convert the SparsePauliList to a SparsePauliOp object
+        ham_op = hamlib_simulation_kernel.sparse_pauliop(parsed_pauli_list, num_qubits)
+        #print(f"... ham_op = \n{ham_op}")
+        #print("")
+    
         #######################################################################
 
         # in the case of random paulis, method = 3: loop over multiple random pauli circuits

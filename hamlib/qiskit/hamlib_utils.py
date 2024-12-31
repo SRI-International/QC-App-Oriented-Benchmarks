@@ -176,6 +176,36 @@ def get_hamlib_sparsepaulilist(
     if verbose: print(f"  ... parsed_pauli_list = {parsed_pauli_list}")
     
     return parsed_pauli_list
+
+def get_valid_qubits(min_qubits, max_qubits, skip_qubits, params: dict[str, str] = None):
+    """
+    Get an array of valid qubits within the specified range, removing duplicates.
+
+    Returns:
+        list: A list of valid qubits.
+    """ 
+    if verbose:
+        print(f"... get_valid_qubits({min_qubits}, {max_qubits}, {skip_qubits}, {params}")
+    
+    # Create an array with the given min, max, and skip values
+    qubit_candidates = list(range(min_qubits, max_qubits + 1, skip_qubits))
+    valid_qubits_set = set()  # Use a set to avoid duplicates
+
+    # check each candidate qubit width to see if a dataset exists for the fiven parameters
+    for qubits in qubit_candidates:   
+        datasets = find_dataset_for_params(qubits, params)
+        
+        # if found, add this qubit_width to the list
+        if datasets is not None and len(datasets) > 0:
+            valid_qubits_set.add(qubits)
+    
+    valid_qubits = list(valid_qubits_set)  # Convert set to list to remove duplicates
+    valid_qubits.sort()  # Sorting the qubits for consistent order
+    
+    if verbose:
+        print(f"Final valid qubits: {valid_qubits}")
+        
+    return valid_qubits  
     
     
 #####################################################################################
