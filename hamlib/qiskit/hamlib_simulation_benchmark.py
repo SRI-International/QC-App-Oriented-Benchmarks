@@ -382,7 +382,7 @@ def run(min_qubits: int = 2,
         #print(f"... parsed_pauli_list = \n{parsed_pauli_list}")
         
         # convert the SparsePauliList to a SparsePauliOp object
-        ham_op = hamlib_simulation_kernel.sparse_pauliop(parsed_pauli_list, num_qubits)
+        #ham_op = hamlib_simulation_kernel.sparse_pauliop(parsed_pauli_list, num_qubits)
         #print(f"... ham_op = \n{ham_op}")
         #print("")
     
@@ -400,7 +400,8 @@ def run(min_qubits: int = 2,
             # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
             qc, bitstring = HamiltonianSimulation(
                 num_qubits = num_qubits,
-                ham_op = ham_op,                 
+                #ham_op = ham_op, 
+                ham_op = parsed_pauli_list ,               
                 K = K,
                 t = t,         
                 init_state = init_state,

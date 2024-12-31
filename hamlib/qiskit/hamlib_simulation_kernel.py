@@ -338,7 +338,8 @@ def get_hamlib_sparsepauliop(
         tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
     """
 
-    #print(f"****************** get_hamlib_sparsepauliop({hamiltonian_name}, {n_spins})")
+    if verbose:
+        print(f"... get_hamlib_sparsepauliop({hamiltonian_name}, {n_spins})")
     
     # get the list of Pauli terms for the given Hamiltonian
     parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist(hamiltonian_name, n_spins)
@@ -417,8 +418,84 @@ def process_data(data):
     
     hamiltonian = sparse_pauliop(parsed_pauli_list, num_qubits)
     return hamiltonian, num_qubits 
+
+
+#####################################################################################
+# CONVERSION FUNCTIONS   
+
+from typing import Union, List, Tuple, Dict
+from qiskit.quantum_info import SparsePauliOp
+
+def convert_simple_to_sparse_pauli_op(simple_terms: List[Tuple[str, complex]]) -> SparsePauliOp:
+    """
+    Converts a list of simple Pauli terms to a SparsePauliOp.
+    Args:
+        simple_terms: List of tuples where each tuple contains a Pauli string and a coefficient.
+    Returns:
+        A SparsePauliOp object.
+    """
+    return SparsePauliOp.from_list(simple_terms)
+
+def convert_sparse_to_sparse_pauli_op(sparse_terms: List[Tuple[Dict[int, str], complex]]) -> SparsePauliOp:
+    """
+    Converts a list of sparse Pauli terms to a SparsePauliOp.
+    Args:
+        sparse_terms: List of tuples where each tuple contains a dict of qubit indices and Pauli operators,
+                      and a coefficient.
+    Returns:
+        A SparsePauliOp object.
+    """
+    # Convert sparse terms to simple terms for SparsePauliOp conversion
+    simple_terms = []
+    for term, coeff in sparse_terms:
+        max_qubit = max(term.keys(), default=-1)
+        pauli_string = ['I'] * (max_qubit + 1)  # Create an identity string of appropriate length
+        for qubit, pauli in term.items():
+            pauli_string[qubit] = pauli
+        simple_terms.append(("".join(pauli_string), coeff))
     
+    return SparsePauliOp.from_list(simple_terms)
+
+def ensure_sparsepauliop(
+    input_data: Union[
+        List[Tuple[str, complex]],
+        List[Tuple[Dict[int, str], complex]],
+        SparsePauliOp
+    ],
+    num_qubits: int = 0
+) -> SparsePauliOp:
+    """
+    Processes the input data, which can be one of:
+    - An array of simple tuples (List[Tuple[str, complex]]).
+    - An array of sparse tuples (List[Tuple[Dict[int, str], complex]]).
+    - A SparsePauliOp object.
     
+    If the input is an array of simple tuples, it is converted to a SparsePauliOp.
+    If the input is an array of sparse tuples, it is converted to a SparsePauliOp via an intermediate step.
+    If it is already a SparsePauliOp, it is returned as-is.
+    
+    Args:
+        input_data: Input data to process.
+    
+    Returns:
+        A SparsePauliOp object.
+    """
+    if isinstance(input_data, SparsePauliOp):
+        # If already SparsePauliOp, return it directly
+        return input_data
+    elif isinstance(input_data, list):
+        # Check if the first element indicates a simple or sparse format
+        if all(isinstance(term[0], str) for term in input_data):
+            return convert_simple_to_sparse_pauli_op(input_data)
+        elif all(isinstance(term[0], dict) for term in input_data):
+            #return convert_sparse_to_sparse_pauli_op(input_data)
+            return sparse_pauliop(input_data, num_qubits)
+        else:
+            raise ValueError("Inconsistent format in the input list.")
+    else:
+        raise TypeError("Input must be a list of tuples or a SparsePauliOp.")
+
+  
 #####################################################################################
 # KERNEL FUNCTIONS
 
@@ -448,7 +525,12 @@ def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
     
     
 def create_circuit_from_op(
-    ham_op: SparsePauliOp = None,
+    #ham_op: SparsePauliOp = None,
+    ham_op: Union[
+        List[Tuple[str, complex]],
+        List[Tuple[Dict[int, str], complex]],
+        SparsePauliOp
+    ] = None,
     num_qubits: int = 0,
     time: float = 1,
     num_trotter_steps: int = 5,
@@ -480,6 +562,9 @@ def create_circuit_from_op(
     # print("Number of qubits:", num_qubits)
     if verbose:
         print(f"... Evolution operator = {ham_op}")
+    
+    # convert from any form to SparsePauliOp
+    ham_op = ensure_sparsepauliop(ham_op, num_qubits)
 
     # Build the evolution gate
     # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
@@ -676,7 +761,12 @@ def initial_state(n_spins: int, init_state: str = "checker") -> QuantumCircuit:
 
 def HamiltonianSimulation(
             num_qubits: int = 0,
-            ham_op: SparsePauliOp = None, 
+            #ham_op: SparsePauliOp = None, 
+            ham_op: Union[
+                List[Tuple[str, complex]],
+                List[Tuple[Dict[int, str], complex]],
+                SparsePauliOp
+            ] = None,
             K: int = 5, t: float = 1.0,
             init_state = None,
             method: int = 1,
