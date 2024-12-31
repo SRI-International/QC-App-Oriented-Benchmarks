@@ -40,7 +40,7 @@ _known_hamlib_paths = {
 active_hamiltonian_datasets = None
 
 #####################################################################################
-# HAMLIB READER
+# HAMLIB READER - API FUNCTIONS
 
 def load_from_file(filename: str):
     """
@@ -130,6 +130,57 @@ def load_from_file(filename: str):
         
     return None
 
+def get_hamlib_sparsepaulilist(
+    num_qubits: int = 0,
+    params: dict[str, str] = None
+):
+    """
+    Return a quantum Hamiltonian as a sparse Pauli list given the Hamiltonian name,
+    the number of qubits, and an associated set of parameter values.
+    From the number of qubits and parameters, the specific dataset is selected and processed.
+
+    Steps:
+        1. Determine the dataset that matches the given arguments.
+        2. Extract Hamiltonian data from an HDF5 file.
+        3. Process the data to obtain a SparsePauliList.
+
+    Returns:
+        tuple: A tuple containing the Hamiltonian as a sparse Pauli list.
+    """
+    if verbose:
+        print(f"... get_hamlib_sparsepaulilist({num_qubits}, {params})")
+        
+    if active_hamiltonian_datasets is None:
+        print(f"ERROR: get_hamlib_sparsepaulilist(), no HamLib file is active.")
+        return None
+    
+    datasets = find_dataset_for_params(num_qubits=num_qubits, params=params)
+    
+    if not datasets:
+        print(f"ERROR: get_hamlib_sparsepaulilist(), no datasets found matching the criteria.")
+        return None
+        
+    if len(datasets) > 1:
+        print(f"WARNING: get_hamlib_sparsepaulilist(), multiple datasets found matching the criteria, using the first.")
+    
+    dataset_name, dataset = next(iter(datasets.items()))
+    data = dataset["data"]
+    
+    if verbose: print(f"  ... raw Hamiltonian data = {data}")
+    
+    if needs_normalization(data) == "Yes":
+        data = normalize_data_format(data)
+        if verbose: print(f"    ... normalized Hamiltonian data = {data}")
+    
+    parsed_pauli_list = parse_hamiltonian_to_sparsepauliop(data)
+    if verbose: print(f"  ... parsed_pauli_list = {parsed_pauli_list}")
+    
+    return parsed_pauli_list
+    
+    
+#####################################################################################
+# HAMLIB READER - INTERNAL FUNCTIONS
+
 def find_dataset_for_params(num_qubits: int = 0, params: dict[str, str] = None):
     """
     Searches for datasets matching the specified number of qubits and parameters.
@@ -200,8 +251,6 @@ def find_dataset_for_params(num_qubits: int = 0, params: dict[str, str] = None):
             print(f"  ... matching dataset_name = {dataset_name}")
             
         matching_hamiltonian_datasets[dataset_name] = dataset
-         
-        data = dataset["data"]
         
         count += 1
     
@@ -246,27 +295,89 @@ def download_and_extract(filename, url):
     # Return the path to the directory containing the extracted files
     return download_dir
  
- 
+def needs_normalization(data):
+    """
+    Determine if the given data needs normalization.
+
+    Args:
+        data (str or bytes): The data to be checked. Can be a string or bytes.
+
+    Returns:
+        str: "Yes" if the data needs normalization, "No" otherwise.
+    """
+    if isinstance(data, bytes):
+        data = data.decode()
+    # Check if the data matches the format that does not need normalization
+    if re.search(r'\(\s*-?\d+(\.\d+)?(\+|\-)?\d*?j?\s*\)\s*\[.*?\]', data):
+        return "No"
+    else:
+        return "Yes"
+
+def normalize_data_format(data):
+    """
+    Normalize the format of the given data.
+
+    Args:
+        data (str or bytes): The data to be normalized. Can be a string or bytes.
+
+    Returns:
+        bytes: The normalized data as a byte string.
+    """
+    if isinstance(data, bytes):
+        data = data.decode()
+    normalized_data = []
+    terms = data.split('+')
+    for term in terms:
+        term = term.strip()
+        if term:
+            match = re.match(r'(\S+)\s*\[(.*?)\]', term)
+            if match:
+                coeff = match.group(1)
+                ops = match.group(2).strip()
+                normalized_term = f"({coeff}) [{ops}]"
+                normalized_data.append(normalized_term)
+    return ' +\n'.join(normalized_data).encode()
+    
+def parse_hamiltonian_to_sparsepauliop(data):
+    """
+    Parse the Hamiltonian string into a list of SparsePauliOp terms.
+
+    Args:
+        data (str or bytes): The Hamiltonian data to be parsed. Can be a string or bytes.
+
+    Returns:
+        list: A list of tuples, where each tuple contains a dictionary representing the Pauli operators and 
+              their corresponding qubit indices, and a complex coefficient.
+    """
+    if isinstance(data, bytes):
+        data = data.decode()
+    
+    terms = re.findall(r'\(([^)]+)\)\s*\[(.*?)\]', data)
+    
+    parsed_pauli_list = []
+
+    for coeff, ops in terms:
+        coeff = complex(coeff.strip())
+        ops_list = ops.split()
+        pauli_dict = {}
+
+        for op in ops_list:
+            match = re.match(r'([XYZ])(\d+)', op)
+            if match:
+                pauli_op = match.group(1)
+                qubit_index = int(match.group(2))
+                pauli_dict[qubit_index] = pauli_op
+
+        parsed_pauli_list.append((pauli_dict, coeff))
+    
+    return parsed_pauli_list
+
+    
 #####################################################################################
 # CURRENT VERSION - HAMLIB PROCESSING
 
-@dataclass
-class HamLibData:
-    name: str
-    file_name: str
-    url: str
-
-hamiltonians = [
-    HamLibData('TFIM', 'tfim.hdf5', f'{_base_url}condensedmatter/tfim/tfim.zip'),
-    HamLibData('Fermi-Hubbard-1D', 'FH_D-1.hdf5', f'{_base_url}condensedmatter/fermihubbard/FH_D-1.zip'),
-    HamLibData('Bose-Hubbard-1D', 'BH_D-1_d-4.hdf5', f'{_base_url}condensedmatter/bosehubbard/BH_D-1_d-4.zip'),
-    HamLibData('Heisenberg', 'heis.hdf5', f'{_base_url}condensedmatter/heisenberg/heis.zip'),
-    HamLibData('Max3Sat', 'random_max3sat-hams.hdf5', f'{_base_url}binaryoptimization/max3sat/random/random_max3sat-hams.zip'),
-    HamLibData('H2', 'H2.hdf5', f'{_base_url}chemistry/electronic/standard/H2.zip'),
-    HamLibData('LiH', 'LiH.hdf5', f'{_base_url}chemistry/electronic/standard/LiH.zip'),
-]
-
-# These two functions come from hamlib_snippets.py example code:
+# These two functions come from hamlib_snippets.py example code.
+# (not currently used at all)
 
 def parse_through_hdf5(func):
     """
@@ -306,9 +417,29 @@ def print_hdf5_structure(fname_hdf5: str):
     with h5py.File(fname_hdf5, 'r') as f:
         action(f['/'])
 
-###################################################################
+#####################################################################################
+# CURRENT VERSION - HAMLIB PROCESSING
 
-# The following code developed for HamLib Simulatioin Benchmark
+# Much of this is obsolete now, with the new code above.
+# It will be removed later.
+
+@dataclass
+class HamLibData:
+    name: str
+    file_name: str
+    url: str
+
+hamiltonians = [
+    HamLibData('TFIM', 'tfim.hdf5', f'{_base_url}condensedmatter/tfim/tfim.zip'),
+    HamLibData('Fermi-Hubbard-1D', 'FH_D-1.hdf5', f'{_base_url}condensedmatter/fermihubbard/FH_D-1.zip'),
+    HamLibData('Bose-Hubbard-1D', 'BH_D-1_d-4.hdf5', f'{_base_url}condensedmatter/bosehubbard/BH_D-1_d-4.zip'),
+    HamLibData('Heisenberg', 'heis.hdf5', f'{_base_url}condensedmatter/heisenberg/heis.zip'),
+    HamLibData('Max3Sat', 'random_max3sat-hams.hdf5', f'{_base_url}binaryoptimization/max3sat/random/random_max3sat-hams.zip'),
+    HamLibData('H2', 'H2.hdf5', f'{_base_url}chemistry/electronic/standard/H2.zip'),
+    HamLibData('LiH', 'LiH.hdf5', f'{_base_url}chemistry/electronic/standard/LiH.zip'),
+]
+
+# The following code developed for HamLib Simulation Benchmark
 # (Improvements in progress)
 
 def create_full_filenames(hamiltonian_name):
@@ -376,84 +507,8 @@ def process_hamlib_data(data):
     if verbose: print(f"... num_qubits = {num_qubits}Q")
 
     return parsed_pauli_list, num_qubits
- 
 
-def needs_normalization(data):
-    """
-    Determine if the given data needs normalization.
 
-    Args:
-        data (str or bytes): The data to be checked. Can be a string or bytes.
-
-    Returns:
-        str: "Yes" if the data needs normalization, "No" otherwise.
-    """
-    if isinstance(data, bytes):
-        data = data.decode()
-    # Check if the data matches the format that does not need normalization
-    if re.search(r'\(\s*-?\d+(\.\d+)?(\+|\-)?\d*?j?\s*\)\s*\[.*?\]', data):
-        return "No"
-    else:
-        return "Yes"
-
-def normalize_data_format(data):
-    """
-    Normalize the format of the given data.
-
-    Args:
-        data (str or bytes): The data to be normalized. Can be a string or bytes.
-
-    Returns:
-        bytes: The normalized data as a byte string.
-    """
-    if isinstance(data, bytes):
-        data = data.decode()
-    normalized_data = []
-    terms = data.split('+')
-    for term in terms:
-        term = term.strip()
-        if term:
-            match = re.match(r'(\S+)\s*\[(.*?)\]', term)
-            if match:
-                coeff = match.group(1)
-                ops = match.group(2).strip()
-                normalized_term = f"({coeff}) [{ops}]"
-                normalized_data.append(normalized_term)
-    return ' +\n'.join(normalized_data).encode()
-
-def parse_hamiltonian_to_sparsepauliop(data):
-    """
-    Parse the Hamiltonian string into a list of SparsePauliOp terms.
-
-    Args:
-        data (str or bytes): The Hamiltonian data to be parsed. Can be a string or bytes.
-
-    Returns:
-        list: A list of tuples, where each tuple contains a dictionary representing the Pauli operators and 
-              their corresponding qubit indices, and a complex coefficient.
-    """
-    if isinstance(data, bytes):
-        data = data.decode()
-    
-    terms = re.findall(r'\(([^)]+)\)\s*\[(.*?)\]', data)
-    
-    parsed_pauli_list = []
-
-    for coeff, ops in terms:
-        coeff = complex(coeff.strip())
-        ops_list = ops.split()
-        pauli_dict = {}
-
-        for op in ops_list:
-            match = re.match(r'([XYZ])(\d+)', op)
-            if match:
-                pauli_op = match.group(1)
-                qubit_index = int(match.group(2))
-                pauli_dict[qubit_index] = pauli_op
-
-        parsed_pauli_list.append((pauli_dict, coeff))
-    
-    return parsed_pauli_list
 
 def determine_qubit_count(terms):
     """
@@ -550,6 +605,9 @@ def construct_dataset_name(file_key):
 
 ####################################################
 # HAMLIB INSPECTOR FUNCTIONS
+
+# The functions below are independent of the above and are used for viewing the content of the hdf5 files.
+# Some could be consolidated, or use the code above.
 
 def extract_variable_tree(file_input):
     """
