@@ -152,13 +152,13 @@ def get_hamlib_sparsepaulilist(
         
     if active_hamiltonian_datasets is None:
         print(f"ERROR: get_hamlib_sparsepaulilist(), no HamLib file is active.")
-        return None
+        return None, None
     
     datasets = find_dataset_for_params(num_qubits=num_qubits, params=params)
     
     if not datasets:
         print(f"ERROR: get_hamlib_sparsepaulilist(), no datasets found matching the criteria.")
-        return None
+        return None, None
         
     if len(datasets) > 1:
         print(f"WARNING: get_hamlib_sparsepaulilist(), multiple datasets found matching the criteria, using the first.")

@@ -240,6 +240,10 @@ def ensure_sparse_pauli_op(
     if verbose:
         print(f"  ... ensure_sparse_pauli_op({input_data}, {num_qubits})")
         
+    if input_data is None or num_qubits < 1:
+        #return SparsePauliOp.from_list([], num_qubits=num_qubits)
+        return None     # this is a better indicator of invalid terms, for now
+        
     if isinstance(input_data, SparsePauliOp):
         # If already SparsePauliOp, return it directly
         return input_data
