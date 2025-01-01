@@ -344,18 +344,8 @@ def run(min_qubits: int = 2,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
-    # Execute Benchmark Program N times for multiple circuit sizes
-    # Accumulate metrics asynchronously as circuits complete
-
-    # comment out the normal way to doing this
-    # for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
-    
-    # for HamLib, determine available widths and loop over those 
-    ####valid_qubits = get_valid_qubits(min_qubits, max_qubits, skip_qubits)
-    ####print(f"... valid = {valid_qubits}")
-    
+    # build list of qubit sizes within the specificed range for which a Hamiltonian is available
     valid_qubits = hamlib_utils.get_valid_qubits(min_qubits, max_qubits, skip_qubits, hamiltonian_params)
-    #print(f"... valid = {valid_qubits}")
     
     if len(valid_qubits) < 1:
         print(f"ERROR: No matching datasets for the requested Hamiltonian name and parameters.")
@@ -371,21 +361,12 @@ def run(min_qubits: int = 2,
         num_circuits = max(1, max_circuits)
         
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
-          
-        # read the HamLib file content for the specified Hamiltonian and return a SparsePauliOp
-        #ham_op, _ = hamlib_simulation_kernel.get_hamlib_sparsepauliop(hamiltonian, num_qubits)
         
         # return a sparse Pauli list of terms queried from the open HamLib file
-        parsed_pauli_list, dataset_name = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
+        sparse_pauli_terms, dataset_name = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
                                                                 params=hamiltonian_params)
         print(f"... dataset_name = {dataset_name}")
-        #print(f"... parsed_pauli_list = \n{parsed_pauli_list}")
-        
-        # convert the SparsePauliList to a SparsePauliOp object
-        #ham_op = hamlib_simulation_kernel.to_sparse_pauliop(parsed_pauli_list, num_qubits)
-        #print(f"... ham_op = \n{ham_op}")
-        #print("")
-    
+
         #######################################################################
 
         # in the case of random paulis, method = 3: loop over multiple random pauli circuits
@@ -400,8 +381,7 @@ def run(min_qubits: int = 2,
             # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
             qc, bitstring = HamiltonianSimulation(
                 num_qubits = num_qubits,
-                #ham_op = ham_op, 
-                ham_op = parsed_pauli_list ,               
+                ham_op = sparse_pauli_terms ,               
                 K = K,
                 t = t,         
                 init_state = init_state,
