@@ -172,10 +172,10 @@ def get_hamlib_sparsepaulilist(
         data = normalize_data_format(data)
         if verbose: print(f"    ... normalized Hamiltonian data = {data}")
     
-    parsed_pauli_list = parse_hamiltonian_to_sparsepauliop(data)
-    if verbose: print(f"  ... parsed_pauli_list = {parsed_pauli_list}")
+    sparse_pauli_terms = parse_hamiltonian_to_sparse_pauli_terms(data)
+    if verbose: print(f"  ... sparse_pauli_terms = {sparse_pauli_terms}")
     
-    return parsed_pauli_list, dataset_name
+    return sparse_pauli_terms, dataset_name
 
 def get_valid_qubits(min_qubits, max_qubits, skip_qubits, params: dict[str, str] = None):
     """
@@ -368,7 +368,7 @@ def normalize_data_format(data):
                 normalized_data.append(normalized_term)
     return ' +\n'.join(normalized_data).encode()
     
-def parse_hamiltonian_to_sparsepauliop(data):
+def parse_hamiltonian_to_sparse_pauli_terms(data):
     """
     Parse the Hamiltonian string into a list of SparsePauliOp terms.
 
@@ -530,7 +530,7 @@ def process_hamlib_data(data):
         data = normalize_data_format(data)
         if verbose: print(f"  ... normalized data = {data}")
     
-    parsed_pauli_list = parse_hamiltonian_to_sparsepauliop(data)
+    parsed_pauli_list = parse_hamiltonian_to_sparse_pauli_terms(data)
     if verbose: print(f"... parsed_pauli_list = {parsed_pauli_list}")
     
     num_qubits = determine_qubit_count(parsed_pauli_list)

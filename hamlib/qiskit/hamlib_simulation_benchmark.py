@@ -381,7 +381,7 @@ def run(min_qubits: int = 2,
             # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
             qc, bitstring = HamiltonianSimulation(
                 num_qubits = num_qubits,
-                ham_op = sparse_pauli_terms ,               
+                ham_op = sparse_pauli_terms,               
                 K = K,
                 t = t,         
                 init_state = init_state,

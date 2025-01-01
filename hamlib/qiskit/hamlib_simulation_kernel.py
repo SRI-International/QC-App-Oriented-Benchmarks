@@ -10,10 +10,13 @@ The "method" argument indicates the type of fidelity comparison that will be don
 In this case, method 3 is used to create a mirror circuit for scalability.
 '''
 
+from typing import Union, List, Tuple, Dict
+
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.quantum_info import SparsePauliOp, Pauli
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
+
 
 verbose = False
 
@@ -345,7 +348,7 @@ def get_hamlib_sparsepauliop(
     parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist(hamiltonian_name, n_spins)
 	
     # convert the SparsePauliList to a SparsePauliOp object
-    ham_op = to_sparse_pauliop(parsed_pauli_list, num_qubits)
+    ham_op = ensure_sparse_pauli_op(parsed_pauli_list, num_qubits)
 	
     return ham_op, num_qubits
     
@@ -372,33 +375,9 @@ def get_hamlib_operator(
     parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist_current(n_spins)
 	
     # convert the SparsePauliList to a SparsePauliOp object
-    ham_op = to_sparse_pauliop(parsed_pauli_list, num_qubits)
+    ham_op = ensure_sparse_pauli_op(parsed_pauli_list, num_qubits)
 	
     return ham_op, num_qubits
-
-def to_sparse_pauliop(terms, num_qubits):
-    """
-    Construct a SparsePauliOp from a list of Pauli terms and the number of qubits.
-
-    Args:
-        terms (list): A list of tuples, where each tuple contains a dictionary representing the Pauli operators and 
-                      their corresponding qubit indices, and a complex coefficient.
-        num_qubits (int): The total number of qubits.
-
-    Returns:
-        SparsePauliOp: The Hamiltonian represented as a SparsePauliOp.
-    """
-    pauli_list = []
-    
-    for pauli_dict, coefficient in terms:
-        label = ['I'] * num_qubits  # Start with identity on all qubits
-        for qubit, pauli_op in pauli_dict.items():
-            label[qubit] = pauli_op
-        label = ''.join(label)
-        pauli_list.append((label, coefficient))
-    
-    hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
-    return hamiltonian
  
 # DEVNOTE: this should not be called from the outside
 def process_data(data):
@@ -416,15 +395,12 @@ def process_data(data):
     
     parsed_pauli_list, num_qubits = process_hamlib_data(data)
     
-    hamiltonian = to_sparse_pauliop(parsed_pauli_list, num_qubits)
+    hamiltonian = ensure_sparse_pauli_op(parsed_pauli_list, num_qubits)
     return hamiltonian, num_qubits 
 
 
 #####################################################################################
 # CONVERSION FUNCTIONS   
-
-from typing import Union, List, Tuple, Dict
-from qiskit.quantum_info import SparsePauliOp
 
 def convert_simple_to_sparse_pauli_op(simple_terms: List[Tuple[str, complex]]) -> SparsePauliOp:
     """
@@ -436,6 +412,7 @@ def convert_simple_to_sparse_pauli_op(simple_terms: List[Tuple[str, complex]]) -
     """
     return SparsePauliOp.from_list(simple_terms)
 
+# This version does NOT account for num_qubits
 def convert_sparse_to_sparse_pauli_op(sparse_terms: List[Tuple[Dict[int, str], complex]]) -> SparsePauliOp:
     """
     Converts a list of sparse Pauli terms to a SparsePauliOp.
@@ -456,7 +433,32 @@ def convert_sparse_to_sparse_pauli_op(sparse_terms: List[Tuple[Dict[int, str], c
     
     return SparsePauliOp.from_list(simple_terms)
 
-def ensure_sparsepauliop(
+# This version DOES account for num_qubits
+def convert_sparse_pauli_terms_to_sparse_pauliop(sparse_pauli_terms, num_qubits):
+    """
+    Construct a SparsePauliOp from a list of sparse Pauli terms and the number of qubits.
+
+    Args:
+        sparse_pauli_terms (list): A list of tuples, where each tuple contains a dictionary representing the Pauli operators and 
+                      their corresponding qubit indices, and a complex coefficient.
+        num_qubits (int): The total number of qubits.
+
+    Returns:
+        SparsePauliOp: The Hamiltonian represented as a SparsePauliOp.
+    """
+    pauli_list = []
+    
+    for pauli_dict, coefficient in sparse_pauli_terms:
+        label = ['I'] * num_qubits  # Start with identity on all qubits
+        for qubit, pauli_op in pauli_dict.items():
+            label[qubit] = pauli_op
+        label = ''.join(label)
+        pauli_list.append((label, coefficient))
+    
+    hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
+    return hamiltonian
+    
+def ensure_sparse_pauli_op(
     input_data: Union[
         List[Tuple[str, complex]],
         List[Tuple[Dict[int, str], complex]],
@@ -489,7 +491,7 @@ def ensure_sparsepauliop(
             return convert_simple_to_sparse_pauli_op(input_data)
         elif all(isinstance(term[0], dict) for term in input_data):
             #return convert_sparse_to_sparse_pauli_op(input_data)
-            return to_sparse_pauliop(input_data, num_qubits)
+            return convert_sparse_pauli_terms_to_sparse_pauliop(input_data, num_qubits)
         else:
             raise ValueError("Inconsistent format in the input list.")
     else:
@@ -564,7 +566,7 @@ def create_circuit_from_op(
         print(f"... Evolution operator = {ham_op}")
     
     # convert from any form to SparsePauliOp
-    ham_op = ensure_sparsepauliop(ham_op, num_qubits)
+    ham_op = ensure_sparse_pauli_op(ham_op, num_qubits)
 
     # Build the evolution gate
     # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
@@ -780,7 +782,7 @@ def HamiltonianSimulation(
 
     Args:
         num_qubits (int): Number of qubits.
-        ham_op (SparsePauliOp): SparsePauliOp representation of the Hamiltonian. 
+        ham_op (Union): Term, Sparse Term, or SparsePauliOp representation of the Hamiltonian. 
         K (int): The Trotterization order.
         t (float): Duration of simulation.
         method (int): Type of comparison for fidelity
@@ -824,73 +826,8 @@ def HamiltonianSimulation(
 
     # return both the circuit created, the bitstring, and the Hamiltonian operator
     # if random_pauli_flag is false or method isn't 3, bitstring will be None
-    return qc2, bitstring
-  
-  
-def HamiltonianSimulation_Old(
-            n_spins: int,
-            hamiltonian: str, 
-            K: int = 5, t: float = 1.0,
-            init_state = None,
-            method: int = 1,
-            use_inverse_flag: bool = False,
-            random_pauli_flag = False,
-            random_init_flag = False,
-            append_measurements = True,
-        ) -> QuantumCircuit:
-    """
-    Construct a Qiskit circuit for Hamiltonian simulation.
+    return qc2, bitstring    
 
-    Args:
-        n_spins (int): Number of spins (qubits).
-        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        K (int): The Trotterization order.
-        t (float): Duration of simulation.
-        method (int): Type of comparison for fidelity
-        random_pauli_flag (bool): Insert random Pauli gates if method 3
-
-    Returns:
-        QuantumCircuit: The constructed Qiskit circuit.
-    """
-    num_qubits = n_spins
-    circuit_id = f"{K}-{t}"
-
-    # Allocate qubits
-    qr = QuantumRegister(n_spins)
-    cr = ClassicalRegister(n_spins)
-    qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{circuit_id}")
-
-    hamiltonian = hamiltonian.strip().lower()
-    
-    # create the quantum circuit for this Hamiltonian, along with the correct pauli bstring,
-    # the operator and trotter evolution circuit
-    qc, bitstring, ham_op, evo = create_circuit(
-        n_spins=n_spins,
-        time=t,
-        method=method,
-        use_inverse_flag=use_inverse_flag,
-        init_state=init_state,
-        num_trotter_steps=K,
-        random_pauli_flag=random_pauli_flag,
-        random_init_flag=random_init_flag,
-        append_measurements=append_measurements
-        )
-
-    # Save smaller circuit example for display
-    global QC_, HAM_, EVO_, INV_
-    if n_spins <= 6:
-        QC_ = qc
-        HAM_ = ham_op
-        EVO_ = evo
-        #INV_ = inv
-            
-    # Collapse the sub-circuits used in this benchmark (for Qiskit)
-    qc2 = qc.decompose().decompose()
-
-    # return both the circuit created, the bitstring, and the Hamiltonian operator
-    # if random_pauli_flag is false or method isn't 3, bitstring will be None
-    return qc2, bitstring, ham_op
-    
     
 ############### Circuit Drawer
 
