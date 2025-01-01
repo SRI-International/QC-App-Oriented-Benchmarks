@@ -413,7 +413,8 @@ def run(min_qubits: int = 2,
     kernel_draw(hamiltonian, method)
        
     # Plot metrics for all circuit sizes
-    options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
+    base_ham_name = os.path.basename(hamiltonian)
+    options = {"ham": base_ham_name, "method":method, "shots": num_shots, "reps": max_circuits}   
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
