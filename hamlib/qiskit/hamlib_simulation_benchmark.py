@@ -142,13 +142,9 @@ def analyze_and_print_result(
             
         ts = time.time()
 
-        # DEVNOTE: ideally, we can remove these next two lines by performing this code in the run() loop        
+        # DEVNOTE: ideally, we can remove this next line somehow      
         # create quantum circuit with initial state
         qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
-        
-        # get Hamiltonian operator by creating entire circuit (DEVNOTE: no longer needed, since we have H terms)
-        #_, _, _ = create_circuit_from_op(num_qubits=num_qubits,
-                            #ham_op = sparse_pauli_terms, init_state=init_state)
                             
         # compute the expected  distribution after exact evolution
         correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
