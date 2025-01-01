@@ -26,8 +26,8 @@ import execute as ex
 import metrics as metrics
 
 import hamlib_simulation_kernel, hamlib_utils
-from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, get_valid_qubits
-from hamlib_simulation_kernel import initial_state, create_circuit, create_circuit_from_op   # would like to remove these
+from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw
+from hamlib_simulation_kernel import initial_state
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
 
 
@@ -37,6 +37,9 @@ benchmark_name = "Hamiltonian Simulation"
 np.random.seed(0)
 
 verbose = False
+
+# save sparse_pauli_terms after creation, for use by method 2 comparison
+sparse_pauli_terms = None
 
 # contains the correct bitstring for a random pauli circuit
 bitstring_dict = {}
@@ -143,12 +146,13 @@ def analyze_and_print_result(
         # create quantum circuit with initial state
         qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
         
-        # get Hamiltonian operator by creating entire circuit (DEVNOTE: need to not require whole circuit)
-        _, _, ham_op, _ = create_circuit(n_spins=num_qubits, init_state=init_state)
-        
+        # get Hamiltonian operator by creating entire circuit (DEVNOTE: no longer needed, since we have H terms)
+        #_, _, _ = create_circuit_from_op(num_qubits=num_qubits,
+                            #ham_op = sparse_pauli_terms, init_state=init_state)
+                            
         # compute the expected  distribution after exact evolution
         correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
-                hamiltonian_op=ham_op,
+                hamiltonian_op=hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
                 time=1.0)
                 
         if verbose:
@@ -171,7 +175,7 @@ def analyze_and_print_result(
         
     else:
         raise ValueError("Method is not 1 or 2 or 3, or hamiltonian is not valid.")
-
+        
     if verbose:
         print_top_measurements(f"Correct dist = ", correct_dist, 100)
 
@@ -303,6 +307,7 @@ def run(min_qubits: int = 2,
     
     hamiltonian_name = hamiltonian
     
+    # if Hamiltonian params is not passed in, use the (deprecated) global settings
     if verbose: print(f"... hamiltonian_params = {hamiltonian_params}")
     if hamiltonian_params is None:
         hamiltonian_params = hamlib_simulation_kernel.get_params_from_globals(hamiltonian_name)
@@ -310,10 +315,6 @@ def run(min_qubits: int = 2,
     
     # load the HamLib file for the given hamiltonian name
     hamlib_utils.load_from_file(filename=hamiltonian_name)
-
-    # get key infomation about the selected Hamiltonian
-    # this function reads the HamLib file content for the specified Hamiltonian
-    hamlib_simulation_kernel.get_hamiltonian_info(hamiltonian_name=hamiltonian)
 
     # assume default init_state if not given
     if init_state == None:
@@ -343,6 +344,12 @@ def run(min_qubits: int = 2,
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
+    
+    # DEVNOTE: this is necessary, since we get the Hamiltonian pauli terms when circuit execution is launched.
+    # need to wait until it completes since we need to have access to those terms.  They are currently global.
+    # Need to fix this
+    if method == 2:
+        ex.max_jobs_active = 1
 
     # build list of qubit sizes within the specificed range for which a Hamiltonian is available
     valid_qubits = hamlib_utils.get_valid_qubits(min_qubits, max_qubits, skip_qubits, hamiltonian_params)
@@ -353,6 +360,7 @@ def run(min_qubits: int = 2,
         return
     
     for num_qubits in valid_qubits:
+        global sparse_pauli_terms
     
         # Reset random seed
         np.random.seed(0)

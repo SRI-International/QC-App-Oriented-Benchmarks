@@ -17,8 +17,30 @@ from qiskit.quantum_info import SparsePauliOp, Pauli
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
 
+import hamlib_utils
+from hamlib_utils import (
+    process_hamiltonian_file,
+    create_full_filenames,
+    construct_dataset_name,
+    process_hamlib_data
+)
 
 verbose = False
+
+# Saved circuits and subcircuits for display
+QC_ = None
+QCI_ = None
+HAM_ = None
+EVO_ = None
+INV_ = None
+
+
+#####################################################################################
+# GLOBAL SETTINGS FOR PARAMETERS
+
+# These will be deprecated and removed soon.
+# Need to first convert all the notebooks to pass in the parameter array.
+# (and possibly figure out when to do the active_hamiltonian_datasets initialize to None.)
 
 # global vars that specify the current hdf5 filename, dataset template, and parameters set by the user
 dataset_name_template = ""
@@ -31,22 +53,6 @@ global_rinst = None
 global_h = None
 global_pbc_val = None
         
-# Saved circuits and subcircuits for display
-QC_ = None
-QCI_ = None
-HAM_ = None
-EVO_ = None
-INV_ = None
-
-import hamlib_utils
-
-from hamlib_utils import (
-    process_hamiltonian_file,
-    create_full_filenames,
-    construct_dataset_name,
-    process_hamlib_data
-)
-
 def initialize():
     global global_U, global_enc, global_ratio, global_rinst, global_h, global_pbc_val
 
@@ -59,7 +65,6 @@ def initialize():
     global_pbc_val = None
     
     hamlib_utils.active_hamiltonian_datasets = None
-
 
 def set_default_parameter_values(filename):
     """
@@ -155,250 +160,6 @@ def get_params_from_globals(hamiltonian_name):
         
     return params
     
-
-#####################################################################################
-# PUBLIC API FUNCTIONS
-
-def get_hamlib_sparsepaulilist(
-    hamiltonian_name: str, 
-    n_spins: int,
-):
-    """
-    Return a quantum Hamiltonian as a sparse Pauli list given the Hamiltonian name,
-    the number of qubits, and an associated set of parameter values.
-    From the number of qubits and parameters, the specific dataset is selected and processed.
-
-    Steps:
-        1. Determine the dataset that matches the given arguments.
-        2. Extract Hamiltonian data from an HDF5 file.
-        3. Process the data to obtain a SparsePauliList.
-
-    Returns:
-        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
-    """
-    ##print(f"****************** get_hamlib_sparsepaulilist({hamiltonian_name}, {n_spins})")
-    
-    get_hamiltonian_info(hamiltonian_name=hamiltonian_name)
-    
-    parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist_current(n_spins)
-	
-    return parsed_pauli_list, num_qubits
-	
-def get_hamlib_sparsepaulilist_current(
-    n_spins: int,
-):
-    """
-    Return the quantum operator associated with the current HamLib hdf5 filename and dataset name.
-
-    Steps:
-        1. Extract Hamiltonian data from an HDF5 file.
-        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
-
-    Returns:
-        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
-    """
-    global filename
-    
-    ##print(f"****************** get_hamlib_sparsepaulilist_current({n_spins})")
-
-    # Replace placeholders with actual n_qubits value: n_spins (and other params)
-    dataset_name = get_current_dataset_name(n_spins, True)
-
-    if verbose:
-        print(f"Trying dataset: {dataset_name}")  # Debug print
-    
-    data = process_hamiltonian_file(filename, dataset_name)
-    
-    # print(f"Using dataset: {dataset_name}")
-    # print("Raw Hamiltonian Data: ", data)
-     
-    parsed_pauli_list = None
-    num_qubits = 0
-    
-    if data is not None:
-        
-        # get the Hamiltonian operator as SparsePauliList and its size from the data       
-        parsed_pauli_list, num_qubits = process_hamlib_data(data)
-            
-    return parsed_pauli_list, num_qubits
-  
-
-def get_valid_qubits(min_qubits, max_qubits, skip_qubits):
-    """
-    Get an array of valid qubits within the specified range, removing duplicates.
-
-    Returns:
-        list: A list of valid qubits.
-    """
-    global dataset_name_template, filename
-
-    # Create an array with the given min, max, and skip values
-    qubit_candidates = list(range(min_qubits, max_qubits + 1, skip_qubits))
-    valid_qubits_set = set()  # Use a set to avoid duplicates
-
-    ### print(f"************ dataset_name_template (0) = {dataset_name_template}")
-    for qubits in qubit_candidates:
-        initial_n_spins = qubits // 2 if "{n_qubits/2}" in dataset_name_template else qubits
-        n_spins = initial_n_spins
-
-        # print(f"Starting check for qubits = {qubits}, initial n_spins = {n_spins}")
-
-        found_valid_dataset = False
-
-        while n_spins <= max_qubits:
-            dataset_name = get_current_dataset_name(n_spins, False)
-            ### print(f"************ {n_spins}: dataset_name_template = {dataset_name_template}")
-
-            if verbose:
-                print(f"Checking dataset: {dataset_name}")
-                
-            data = process_hamiltonian_file(filename, dataset_name)
-            
-            if data is not None:
-                # print(f"Valid dataset found for n_spins = {n_spins}")
-                if "{n_qubits/2}" in dataset_name_template:
-                    valid_qubits_set.add(n_spins * 2)  # Add the original qubits value
-                else:
-                    valid_qubits_set.add(qubits)
-                found_valid_dataset = True
-                break
-            else:
-                # print(f"Dataset not available for n_spins = {n_spins}. Trying next value...")
-                n_spins += 1
-                if n_spins >= (qubits + skip_qubits) // 2 if "{n_qubits/2}" in dataset_name_template else (qubits + skip_qubits):
-                    print(f"No valid dataset found for qubits = {qubits}")
-                    break
-
-        if found_valid_dataset:
-            continue  # Move to the next candidate in the original skip sequence
-
-    valid_qubits = list(valid_qubits_set)  # Convert set to list to remove duplicates
-    valid_qubits.sort()  # Sorting the qubits for consistent order
-    
-    if verbose:
-        print(f"Final valid qubits: {valid_qubits}")
-        
-    return valid_qubits  
-
-
-#####################################################################################
-# INTERNAL SUPPORTING FUNCTIONS
-
-# get key infomation about the selected Hamiltonian
-# DEVNOTE: Error handling here can be improved by simply returning False or raising exception
-def get_hamiltonian_info(hamiltonian_name=None):
-    global filename, dataset_name_template
-    try:
-        filename = create_full_filenames(hamiltonian_name)
-        dataset_name_template = construct_dataset_name(filename)
-    except ValueError:
-        print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian_name}")
-        return
-    
-    if dataset_name_template == "File key not found in data":
-        print(f"ERROR: cannot load HamLib data for Hamiltonian: {hamiltonian_name}")
-        return
-    
-    # Set default parameter values for the hamiltonians
-    set_default_parameter_values(filename)
-    
-# Get the actual dataset name by applying parameters to the dataset_name_template
-def get_current_dataset_name(n_spins, div_by_2):
-    global dataset_name_template
-    
-    dataset_name_template = dataset_name_template.replace("{ratio}", str(global_ratio)).replace("{rinst}", str(global_rinst))
-    dataset_name_template = dataset_name_template.replace("{h}", str(global_h)).replace("{pbc_val}", str(global_pbc_val))
-    dataset_name_template = dataset_name_template.replace("{U}", str(global_U)).replace("{enc}", str(global_enc))
-    
-    # DEVNOTE: problem here ... other code depends on the dataset_name_template being modifed,
-    # but not the n_qubits variable ... this needs to be looked at.
-    if div_by_2:
-        dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins // 2))
-    else:
-        dataset_name = dataset_name_template.replace("{n_qubits}", str(n_spins)).replace("{n_qubits/2}", str(n_spins))
-    #print(f"*****================ dataset_name_template = {dataset_name_template}")
-    #print(f"*****============= dataset_name = {dataset_name}")
-    
-    return dataset_name
-    
- 
-#####################################################################################
-# KERNEL UTILITY FUNCTIONS
-
-def get_hamlib_sparsepauliop(
-    hamiltonian_name: str,
-    n_spins: int,
-):
-    """
-    Return the quantum operator associated with the given Hamiltonian and parameters.
-
-    Steps:
-        1. Determine the dataset that matches the given arguments.
-        2. Extract Hamiltonian data from an HDF5 file.
-        3. Process the data to obtain a SparsePauliOp and determine the number of qubits.
-
-    Returns:
-        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
-    """
-
-    if verbose:
-        print(f"... get_hamlib_sparsepauliop({hamiltonian_name}, {n_spins})")
-    
-    # get the list of Pauli terms for the given Hamiltonian
-    parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist(hamiltonian_name, n_spins)
-	
-    # convert the SparsePauliList to a SparsePauliOp object
-    ham_op = ensure_sparse_pauli_op(parsed_pauli_list, num_qubits)
-	
-    return ham_op, num_qubits
-    
-# DEVNOTE: this function should not be needed or called externally.  
-# However, it is being used below by the create_circuit function. 
-# The create_circuit function should just accept the ham terms as an arg
-def get_hamlib_operator(
-    n_spins: int,
-):
-    """
-    Return the quantum operator associated with the current HamLib hdf5 filename and dataset name.
-
-    Steps:
-        1. Extract Hamiltonian data from an HDF5 file.
-        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
-
-    Returns:
-        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits required.
-    """
-
-    #print(f"****************** get_hamlib_operator({n_spins})")
-    
-    # get the list of Pauli terms for the currently specified Hamiltonian
-    parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist_current(n_spins)
-	
-    # convert the SparsePauliList to a SparsePauliOp object
-    ham_op = ensure_sparse_pauli_op(parsed_pauli_list, num_qubits)
-	
-    return ham_op, num_qubits
- 
-# DEVNOTE: this should not be called from the outside
-def process_data(data):
-    """
-    Process the given data to construct a Hamiltonian in the form of a SparsePauliOp and determine the number of qubits.
-
-    Args:
-        data (str or bytes): The Hamiltonian data to be processed. Can be a string or bytes.
-
-    Returns:
-        tuple: A tuple containing the Hamiltonian as a SparsePauliOp and the number of qubits.
-        
-    NOTE: this function os provided for backwards compatility, as other benchmarks are using it.
-    """
-    
-    parsed_pauli_list, num_qubits = process_hamlib_data(data)
-    
-    hamiltonian = ensure_sparse_pauli_op(parsed_pauli_list, num_qubits)
-    return hamiltonian, num_qubits 
-
-
 #####################################################################################
 # CONVERSION FUNCTIONS   
 
@@ -482,6 +243,9 @@ def ensure_sparse_pauli_op(
     Returns:
         A SparsePauliOp object.
     """
+    if verbose:
+        print(f"  ... ensure_sparse_pauli_op({input_data}, {num_qubits})")
+        
     if isinstance(input_data, SparsePauliOp):
         # If already SparsePauliOp, return it directly
         return input_data
@@ -527,13 +291,12 @@ def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
     
     
 def create_circuit_from_op(
-    #ham_op: SparsePauliOp = None,
+    num_qubits: int = 0,
     ham_op: Union[
         List[Tuple[str, complex]],
         List[Tuple[Dict[int, str], complex]],
         SparsePauliOp
-    ] = None,
-    num_qubits: int = 0,
+    ] = None, 
     time: float = 1,
     num_trotter_steps: int = 5,
     method: int = 1,
@@ -629,104 +392,6 @@ def create_circuit_from_op(
 
     return circuit, bitstring, evo if not use_inverse_flag else evo.inverse()
 
-def create_circuit(
-    n_spins: int,
-    time: float = 1,
-    num_trotter_steps: int = 5,
-    method: int = 1,
-    use_inverse_flag: bool = False,
-    init_state: str = None,
-    random_pauli_flag: bool = False,
-    random_init_flag: bool = False,
-    append_measurements: bool = True
-):
-    """
-    Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
-
-    Steps:
-        1. Extract Hamiltonian data from an HDF5 file.
-        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
-        3. Build a quantum circuit with an initial state and an evolution gate based on the Hamiltonian.
-        4. Measure all qubits and print the circuit details.
-
-    Returns:
-        tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
-    """
-    global QCI_, INV_
-
-    ham_op, num_qubits = get_hamlib_operator(n_spins)
-    if ham_op is not None:
-    
-        # print("Number of qubits:", num_qubits)
-        if verbose:
-            print(f"... Evolution operator = {ham_op}")
-
-        # Build the evolution gate
-        # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
-        evo_label = "e^-iHt"
-        evo = PauliEvolutionGate(ham_op, time=time/num_trotter_steps, label=evo_label)
-
-        # Plug it into a circuit
-        circuit = QuantumCircuit(ham_op.num_qubits)
-        circuit_without_initial_state = QuantumCircuit(ham_op.num_qubits)
-        
-        # first create and append the initial_state
-        # init_state = "checkerboard"
-        i_state = initial_state(num_qubits, init_state)
-        circuit.append(i_state, range(ham_op.num_qubits))
-        circuit.barrier()
-        
-        if n_spins <= 6:
-            QCI_ = i_state
-        
-        # Append K trotter steps
-        circuit = create_trotter_steps(num_trotter_steps,
-                evo if not use_inverse_flag else evo.inverse(),
-                ham_op,
-                circuit)
-                
-        circuit_without_initial_state = create_trotter_steps(num_trotter_steps,
-                evo if not use_inverse_flag else evo.inverse(),
-                ham_op,
-                circuit_without_initial_state)
-
-        # Append K Trotter steps of inverse, if method 3
-        inv = None
-        bitstring = None
-
-        if method == 3: 
-    
-            # if not adding random Paulis, just create simple inverse Trotter steps
-            if not random_pauli_flag:
-                inv = evo.inverse()
-                inv.name = "e^iHt"
-                circuit = create_trotter_steps(num_trotter_steps, inv, ham_op, circuit)
-                if n_spins <= 6:
-                    INV_ = inv
-     
-            # if adding Paulis, do that here, with code from pyGSTi
-            else:
-                from pygsti_mirror import convert_to_mirror_circuit
-               
-                # if random init flag state is set, then discard the inital state input and use a completely (harr) random one
-                if random_init_flag:
-                    circuit, bitstring = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli = True, init_state=None)
-                else: 
-                    init_state = initial_state(n_spins, init_state)
-                    circuit, bitstring = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli = True, init_state=init_state)
-
-        # convert_to_mirror_circuit adds its own measurement gates    
-        if not (random_pauli_flag and method == 3):
-            if append_measurements:
-                circuit.measure_all()
-    
-        return circuit, bitstring, ham_op, evo if not use_inverse_flag else evo.inverse()
-
-    else:
-        # print(f"Dataset not available for n_spins = {n_spins}.")
-        return None, None, None, None
-
-
 
 ############### Initial Circuit Definition
 
@@ -762,21 +427,20 @@ def initial_state(n_spins: int, init_state: str = "checker") -> QuantumCircuit:
 ############### Hamiltonian Circuit Definition
 
 def HamiltonianSimulation(
-            num_qubits: int = 0,
-            #ham_op: SparsePauliOp = None, 
-            ham_op: Union[
-                List[Tuple[str, complex]],
-                List[Tuple[Dict[int, str], complex]],
-                SparsePauliOp
-            ] = None,
-            K: int = 5, t: float = 1.0,
-            init_state = None,
-            method: int = 1,
-            use_inverse_flag: bool = False,
-            random_pauli_flag = False,
-            random_init_flag = False,
-            append_measurements = True,
-        ) -> QuantumCircuit:
+        num_qubits: int = 0,
+        ham_op: Union[
+            List[Tuple[str, complex]],
+            List[Tuple[Dict[int, str], complex]],
+            SparsePauliOp
+        ] = None,
+        K: int = 5, t: float = 1.0,
+        init_state = None,
+        method: int = 1,
+        use_inverse_flag: bool = False,
+        random_pauli_flag = False,
+        random_init_flag = False,
+        append_measurements = True,
+    ) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
 
@@ -801,8 +465,8 @@ def HamiltonianSimulation(
     # create the quantum circuit for this Hamiltonian, along with the correct pauli bstring,
     # the operator and trotter evolution circuit
     qc, bitstring, evo = create_circuit_from_op(
-        ham_op=ham_op,
         num_qubits=num_qubits,
+        ham_op=ham_op,
         time=t,
         method=method,
         use_inverse_flag=use_inverse_flag,
