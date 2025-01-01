@@ -382,7 +382,7 @@ def run(min_qubits: int = 2,
         #print(f"... parsed_pauli_list = \n{parsed_pauli_list}")
         
         # convert the SparsePauliList to a SparsePauliOp object
-        #ham_op = hamlib_simulation_kernel.sparse_pauliop(parsed_pauli_list, num_qubits)
+        #ham_op = hamlib_simulation_kernel.to_sparse_pauliop(parsed_pauli_list, num_qubits)
         #print(f"... ham_op = \n{ham_op}")
         #print("")
     

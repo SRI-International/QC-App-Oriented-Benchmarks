@@ -345,7 +345,7 @@ def get_hamlib_sparsepauliop(
     parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist(hamiltonian_name, n_spins)
 	
     # convert the SparsePauliList to a SparsePauliOp object
-    ham_op = sparse_pauliop(parsed_pauli_list, num_qubits)
+    ham_op = to_sparse_pauliop(parsed_pauli_list, num_qubits)
 	
     return ham_op, num_qubits
     
@@ -372,11 +372,11 @@ def get_hamlib_operator(
     parsed_pauli_list, num_qubits = get_hamlib_sparsepaulilist_current(n_spins)
 	
     # convert the SparsePauliList to a SparsePauliOp object
-    ham_op = sparse_pauliop(parsed_pauli_list, num_qubits)
+    ham_op = to_sparse_pauliop(parsed_pauli_list, num_qubits)
 	
     return ham_op, num_qubits
 
-def sparse_pauliop(terms, num_qubits):
+def to_sparse_pauliop(terms, num_qubits):
     """
     Construct a SparsePauliOp from a list of Pauli terms and the number of qubits.
 
@@ -416,7 +416,7 @@ def process_data(data):
     
     parsed_pauli_list, num_qubits = process_hamlib_data(data)
     
-    hamiltonian = sparse_pauliop(parsed_pauli_list, num_qubits)
+    hamiltonian = to_sparse_pauliop(parsed_pauli_list, num_qubits)
     return hamiltonian, num_qubits 
 
 
@@ -489,7 +489,7 @@ def ensure_sparsepauliop(
             return convert_simple_to_sparse_pauli_op(input_data)
         elif all(isinstance(term[0], dict) for term in input_data):
             #return convert_sparse_to_sparse_pauli_op(input_data)
-            return sparse_pauliop(input_data, num_qubits)
+            return to_sparse_pauliop(input_data, num_qubits)
         else:
             raise ValueError("Inconsistent format in the input list.")
     else:
