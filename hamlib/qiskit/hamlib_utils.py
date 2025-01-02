@@ -245,6 +245,9 @@ def find_dataset_for_params(num_qubits: int = 0, params: dict[str, str] = None):
     if verbose:
         print(f"... find_dataset_for_params({num_qubits}, {params})")
 
+    if params is None:
+        params = {}
+        
     matching_hamiltonian_datasets = {}
     
     # scan all the datasets to find a match on all parameters and num_qubits
