@@ -303,11 +303,8 @@ def run(min_qubits: int = 2,
     
     hamiltonian_name = hamiltonian
     
-    # if Hamiltonian params is not passed in, use the (deprecated) global settings
-    if verbose: print(f"... hamiltonian_params = {hamiltonian_params}")
-    if hamiltonian_params is None:
-        hamiltonian_params = hamlib_simulation_kernel.get_params_from_globals(hamiltonian_name)
-        if verbose: print(f"... global hamiltonian_params = {hamiltonian_params}")
+    if verbose:
+        print(f"... hamiltonian and params = {hamiltonian_name}, {hamiltonian_params}")
     
     # load the HamLib file for the given hamiltonian name
     hamlib_utils.load_from_file(filename=hamiltonian_name)
