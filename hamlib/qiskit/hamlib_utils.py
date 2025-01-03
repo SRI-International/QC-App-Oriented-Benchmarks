@@ -33,7 +33,7 @@ hamiltonians = [
     HamLibData('Fermi-Hubbard-1D', 'FH_D-1.hdf5', f'{_base_url}condensedmatter/fermihubbard/FH_D-1.zip'),
     HamLibData('Bose-Hubbard-1D', 'BH_D-1_d-4.hdf5', f'{_base_url}condensedmatter/bosehubbard/BH_D-1_d-4.zip'),
     HamLibData('Heisenberg', 'heis.hdf5', f'{_base_url}condensedmatter/heisenberg/heis.zip'),
-    HamLibData('Max3Sat', 'random_max3sat-hams.hdf5', f'{_base_url}binaryoptimization/max3sat/random/random_max3sat-hams.hdf5.zip')
+    HamLibData('Max3Sat', 'random_max3sat-hams.hdf5', f'{_base_url}binaryoptimization/max3sat/random/random_max3sat-hams.zip')
 ]
 
 def create_full_filenames(hamiltonian_name):
