@@ -481,6 +481,7 @@ if __name__ == '__main__':
     ex.verbose = args.verbose
     verbose = args.verbose
     hamlib_simulation_kernel.verbose = args.verbose
+    hamlib_utils.verbose = args.verbose
     
     if args.data_suffix is not None:
         metrics.data_suffix = args.data_suffix
