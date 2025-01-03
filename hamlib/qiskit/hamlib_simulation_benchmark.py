@@ -431,6 +431,7 @@ def get_args():
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", "-c", default=1, help="Maximum circuit repetitions", type=int)     
     parser.add_argument("--hamiltonian", "-ham", default="TFIM", help="Name of Hamiltonian", type=str)
+    parser.add_argument("--parameters", "-params", default=None, help="Hamiltonian parameters, e.g 'enc:bk,h:2'")  
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Data File Suffix", type=str)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
@@ -441,24 +442,36 @@ def get_args():
     parser.add_argument("--do_sqrt_fidelity", "-sqrt", action="store_true", help="Return square root of fidelities")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="Gen random paulis")
     parser.add_argument("--random_init_flag", "-rani", action="store_true", help="Gen random initialization")
-    parser.add_argument("--init_state", "-init", default=None, help="initial state")
-    parser.add_argument("--global_h", "-param_h", default=None, help="paramater h")
-    parser.add_argument("--global_U", "-param_U", default=None, help="paramater U")
-    parser.add_argument("--global_enc", "-param_enc", default=None, help="paramater enc")
-    parser.add_argument("--global_pbc_val", "-param_pbc_val", default=None, help="paramater pbc_val")
-    parser.add_argument("--global_ratio", "-param_ratio", default=None, help="paramater ratio")
-    parser.add_argument("--global_rinst", "-param_rinst", default=None, help="paramater rinst")      
+    parser.add_argument("--init_state", "-init", default=None, help="initial state")    
     return parser.parse_args()
- 
+    
+def parse_name_value_pairs(input_string: str) -> dict[str, str]:
+    """
+    Parses a string of name-value pairs separated by colons and commas.
+
+    Args:
+        input_string (str): Input string, e.g., "name1:value1,name2:,name3:value3".
+
+    Returns:
+        dict[str, str]: Dictionary of name, value entries. If the value is missing, it defaults to an empty string.
+    """
+    pairs = input_string.split(",")  # Split into individual pairs
+    result = {}
+    for pair in pairs:
+        if ":" in pair:
+            name, value = pair.split(":", 1)  # Split name and value
+            result[name] = value
+        else:
+            # If there's no colon, the value is empty
+            result[name] = ''
+    return result
+
 # if main, execute method
 if __name__ == '__main__':   
     args = get_args()
-    hamlib_simulation_kernel.global_U = args.global_U
-    hamlib_simulation_kernel.global_enc = args.global_enc
-    hamlib_simulation_kernel.global_ratio = args.global_ratio
-    hamlib_simulation_kernel.global_rinst = args.global_rinst
-    hamlib_simulation_kernel.global_h = args.global_h
-    hamlib_simulation_kernel.global_pbc_val = args.global_pbc_val
+    hamiltonian_params = None
+    if args.parameters is not None:
+        hamiltonian_params = parse_name_value_pairs(args.parameters)
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
@@ -479,6 +492,7 @@ if __name__ == '__main__':
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots=args.num_shots,
         hamiltonian=args.hamiltonian,
+        hamiltonian_params=hamiltonian_params,
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
         random_init_flag=args.random_init_flag,
