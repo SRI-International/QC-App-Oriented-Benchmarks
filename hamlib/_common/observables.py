@@ -782,12 +782,12 @@ noise_model = None
 # Set numpy print options to format floating point numbers
 np.set_printoptions(precision=3, suppress=True)
 
-verbose = False
+###verbose = False
 
 # Observable Helper Functions
-import observables as obs
+###import observables as obs
 
-obs.verbose = False
+###obs.verbose = False
 
 """
 Perform Simple Time Evolution of a Quantum State
@@ -892,8 +892,8 @@ def estimate_energy_classical(initial_state, H_terms, t=1.0):
     if verbose: print(f"Test circuit = \n", qc)
        
     # Obtain, by executing the circuit on the backend and compute the expectation value, the energy
-    total_energy = obs.estimate_expectation(backend, qc, H_terms, num_shots=10000)
-    #total_energy = obs.estimate_expectation_with_estimator(backend, qc, H_terms)
+    total_energy = estimate_expectation(backend, qc, H_terms, num_shots=10000)
+    #total_energy = estimate_expectation_with_estimator(backend, qc, H_terms)
   
     return total_energy
 
@@ -918,7 +918,7 @@ def create_pauli_evolution_circuit(pauli_terms, time=1.0):
     num_qubits = len(pauli_terms[0][1])  # Length of any Pauli string
     
     # Convert to SparsePauliOp
-    sparse_pauli_op = obs.convert_to_sparse_pauli_op(pauli_terms)
+    sparse_pauli_op = convert_to_sparse_pauli_op(pauli_terms)
     
     # Create the PauliEvolutionGate
     evo_gate = PauliEvolutionGate(sparse_pauli_op, time=time)

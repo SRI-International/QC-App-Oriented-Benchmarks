@@ -18,18 +18,46 @@ import time
 import math
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
-sys.path[1:1] = ["../_common"]
+sys.path[1:1] = ["_common"]
 
-import execute as ex
-import metrics as metrics
-
-import hamlib_simulation_kernel, hamlib_utils
-from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw
-from hamlib_simulation_kernel import initial_state
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
 
+############### Configure API
+# 
+# Configure the QED-C Benchmark package for use with the given API
+def qedc_benchmarks_init(api: str = "qiskit"):
+
+    if api == None: api = "qiskit"
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
+    sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
+
+    up_dir = os.path.abspath(os.path.join(current_dir, ".."))
+    common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
+    sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
+    
+    api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
+    sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
+
+    import execute as ex
+    globals()["ex"] = ex
+
+    import metrics as metrics
+    globals()["metrics"] = metrics
+
+    import hamlib_utils as hamlib_utils
+    globals()["hamlib_utils"] = hamlib_utils
+    
+    import hamlib_simulation_kernel as hamlib_simulation_kernel
+    globals()["hamlib_simulation_kernel"] = hamlib_simulation_kernel
+    
+    from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw
+    globals()["HamiltonianSimulation"] = HamiltonianSimulation
+    globals()["kernel_draw"] = kernel_draw
+        
+    return HamiltonianSimulation, kernel_draw
+    
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
@@ -290,6 +318,9 @@ def run(min_qubits: int = 2,
         None
     """
     
+    # configure the QED-C Benchmark package for use with the given API
+    HamilatonianSimulation, kernel_draw = qedc_benchmarks_init(api)
+    
     print(f"{benchmark_name} Benchmark Program - Qiskit")
     
     # Create context identifier
@@ -421,8 +452,8 @@ def run(min_qubits: int = 2,
 import argparse
 def get_args():
     parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
-    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
-    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
     parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
     parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
     parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits (min = max = N)", type=int)
@@ -475,7 +506,7 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    #PhaseEstimation, kernel_draw = qedc_benchmarks_init(args.api)
+    HamiltonianSimulation, kernel_draw = qedc_benchmarks_init(args.api)
     
     # special argument handling
     ex.verbose = args.verbose
