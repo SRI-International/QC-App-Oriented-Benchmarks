@@ -23,7 +23,11 @@ sys.path[1:1] = ["_common"]
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
 
 ############### Configure API
-# 
+#
+## DEVNOTE: This functiion may be more complicated than is needed; simplify if possible
+## It is basically used to perform imports relative to the existing path and using subdirectories
+## based on the "api" on which the benchmark executes.
+
 # Configure the QED-C Benchmark package for use with the given API
 def qedc_benchmarks_init(api: str = "qiskit"):
 
@@ -52,10 +56,12 @@ def qedc_benchmarks_init(api: str = "qiskit"):
     import hamlib_simulation_kernel as hamlib_simulation_kernel
     globals()["hamlib_simulation_kernel"] = hamlib_simulation_kernel
     
-    from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw
+    # there must be a better way to do this
+    from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, initial_state
     globals()["HamiltonianSimulation"] = HamiltonianSimulation
     globals()["kernel_draw"] = kernel_draw
-        
+    globals()["initial_state"] = initial_state
+    
     return HamiltonianSimulation, kernel_draw
     
 
