@@ -197,6 +197,8 @@ import numpy as np
 
 # Initialize the backend and the simulator
 backend = Aer.get_backend('qasm_simulator')
+#backend = Aer.get_backend('statevector_simulator')
+noise_model = None
 
 # Here we define a function to perform the execution and return an array of measurements.
 # DEVNOTE: params argument not currently used, as the circuit is created with values defined; we don't use Parameter yet
@@ -775,127 +777,9 @@ import scipy as sc
 import matplotlib.pyplot as plt
 
 
-backend = Aer.get_backend('qasm_simulator')
-#backend = Aer.get_backend('statevector_simulator')
-noise_model = None
-
 # Set numpy print options to format floating point numbers
 np.set_printoptions(precision=3, suppress=True)
-
-###verbose = False
-
-# Observable Helper Functions
-###import observables as obs
-
-###obs.verbose = False
-
-"""
-Perform Simple Time Evolution of a Quantum State
-This function operates on an initial state for the specified time under the action of a given Hamiltonian. This is an extremely simplifed version, which only works for very small times, e.g. 0.01
-"""
-
-# Simulate time evolution (this is a simplified version)
-def time_evolve_simple(initial_state, hamiltonian, time):
-
-    # In a real scenario, you'd use a more sophisticated time evolution method
-    # This is a simple first-order approximation  
-    evolved_state = initial_state - 1j * time * np.dot(hamiltonian, initial_state)
- 
-    return evolved_state / np.linalg.norm(evolved_state)
-
-"""
-Compute theoretical energy from Hamiltonian and initial state
-"""
-def compute_theoretical_energy(initial_state, H_terms, t=1.0):
-    
-    # Create the Hamiltonian matrix
-    H_matrix = sum(coeff * Operator(Pauli(pauli)) for coeff, pauli in H_terms)
-
-    # Simulate time evolution
-    final_state = time_evolve_simple(initial_state, H_matrix, t)
-    #print(f"... final_state = {final_state}")
-
-    theoretical_energy = np.real(np.dot(np.conj(final_state), np.dot(H_matrix, final_state)))
-
-    return theoretical_energy
-    
-"""
-Compute theoretical energy from Hamiltonian and initial state (2nd version)
-This version is returning an array of classically computed exact energies, one for each step of evolution over time.
-"""
-def compute_theoretical_energy2(initial_state, H, time, step_size):
-
-    if H is None:
-        return [None]
-        
-    # Create the Hamiltonian matrix (array form)
-    H_array = H.to_matrix()
-
-    # need to convert to Statevector so the evolve() function can be used
-    initial_state = Statevector(initial_state)
-    
-    # use this if string is passed for initialization
-    #initial_state = Statevector.from_label("001100")
-
-    # We define a slightly denser time mesh
-    exact_times = np.arange(0, time+step_size, step_size)
-    
-    # We compute the exact evolution using the exp
-    exact_evolution = [initial_state]
-    exp_H = sc.linalg.expm(-1j * step_size * H_array)
-    for time in exact_times[1:]:
-        print('.', end="")
-        exact_evolution.append(exact_evolution[-1].evolve(exp_H))
-
-    # Having the exact state vectors, we compute the exact evolution of our operators’ expectation values.
-    exact_energy = np.real([sv.expectation_value(H) for sv in exact_evolution])
-    
-    return exact_energy, exact_times
-
-"""
-Create Classical Test Evolution Circuit
-Create a circuit that will be measured and that will have its energy computed against a specific Hamiltonian.
-We start with an initial state and apply classical simple time evolution to it.
-The resulting state will be used to initialize the simplest quantum circuit with that state on its output.
-"""
-def create_classical_test_circuit(initial_state, H_terms, t=1.0):
-    
-    n_qubits = len(H_terms[0][1])
-    qc = QuantumCircuit(n_qubits)
-    
-    # Create the Hamiltonian matrix
-    H_matrix = sum(coeff * Operator(Pauli(pauli)) for coeff, pauli in H_terms)
-    
-    # Simulate time evolution
-    final_state = time_evolve_simple(initial_state, H_matrix, t)
-
-    if verbose:
-        print(f"... initial_state = {initial_state}")
-        print(f"... H = {H_matrix}")
-        print(f"... final_state = {final_state}")
-
-        #print(f"... H * final_state = {np.dot(H_matrix, final_state)}")
-        #print(f"... conf of final_state = {np.conj(final_state)}")
-
-    # Initialize the circuit with the given state vector
-    qc.initialize(final_state, qc.qubits)
-
-    return qc, final_state
-    
-"""
-Estimate Energy Classically
-Create a classical circuit initialized to the initial state and its energy computed against a specific Hamiltonian.
-"""
-def estimate_energy_classical(initial_state, H_terms, t=1.0):
-    
-    qc, final_state = create_classical_test_circuit(initial_state, H_terms, t=t)
-    if verbose: print(f"Test circuit = \n", qc)
-       
-    # Obtain, by executing the circuit on the backend and compute the expectation value, the energy
-    total_energy = estimate_expectation(backend, qc, H_terms, num_shots=10000)
-    #total_energy = estimate_expectation_with_estimator(backend, qc, H_terms)
-  
-    return total_energy
+   
 
 """
 Define Pauli Evolution Circuit¶
