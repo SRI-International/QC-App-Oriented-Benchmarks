@@ -18,18 +18,136 @@ import scipy as sc
 import numpy as np
 from scipy.linalg import expm
 
-from qiskit.quantum_info import Statevector
-
 # Set numpy print options to format floating point numbers
 np.set_printoptions(precision=3, suppress=True)
 
 verbose = False
-   
+
+##########################################################
+
 """
 Compute theoretical energies from Hamiltonian and initial state.
 This version is returning an array of classically computed exact energies, one for each step of evolution over time.
 """
-def compute_theoretical_energies(initial_state, H, time, step_size):
+
+# Define the Pauli matrices and the computational basis states for a single qubit.
+# Pauli matrices as numpy arrays
+
+I = np.array([[1, 0], [0, 1]], dtype=complex)  # Identity matrix
+X = np.array([[0, 1], [1, 0]], dtype=complex)  # Pauli-X matrix
+Y = np.array([[0, -1j], [1j, 0]], dtype=complex)  # Pauli-Y matrix
+Z = np.array([[1, 0], [0, -1]], dtype=complex)  # Pauli-Z matrix
+
+# Qubit basis states
+Zero = np.array([1, 0], dtype=complex)  # |0⟩ state
+One = np.array([0, 1], dtype=complex)   # |1⟩ state
+
+# Define a function to compute the tensor product of multiple matrices or vectors.
+def tensor_product(*matrices):
+    """Compute the tensor product of a sequence of matrices or vectors."""
+    result = matrices[0]
+    for m in matrices[1:]:
+        result = np.kron(result, m)
+    return result
+    
+      
+def compute_theoretical_energies(initial_state, pauli_terms, time, step_size):
+    """
+    Compute the theoretical energies by evolving a quantum state under a Hamiltonian using NumPy.
+
+    Args:
+        initial_state (array-like): Initial state vector as a NumPy array.
+        pauli_terms (array): Array of Pauli terms in the form [(term, coeff), ...].
+        time (float): Total evolution time.
+        step_size (float): Time step size.
+
+    Returns:
+        tuple: (exact_energy, exact_times)
+            - exact_energy (list): Expectation values of the Hamiltonian over time.
+            - exact_times (np.ndarray): Time steps for the evolution.
+    """
+    if pauli_terms is None:
+        return [None]
+        
+    if verbose:
+        print(f"... compute_theoretical_energies({pauli_terms})")
+     
+    # Determine the number of qubits
+    num_qubits = len(pauli_terms[0][0])  # Length of any Pauli string
+    
+    # create empty matrix of required size
+    H_matrix = np.zeros((2**num_qubits, 2**num_qubits), dtype=complex)
+    
+    # build the matrix from the pauli terms and coefficients
+    for pauli, coeff in pauli_terms:
+        for i, p in enumerate(pauli):
+            pass
+
+        # Build the tensor product for the current Pauli string
+        pauli_matrices = []
+        for p in pauli:
+            if p == 'I':
+                pauli_matrices.append(I)
+            elif p == 'X':
+                pauli_matrices.append(X)
+            elif p == 'Y':
+                pauli_matrices.append(Y)
+            elif p == 'Z':
+                pauli_matrices.append(Z)
+            else:
+                raise ValueError(f"Invalid Pauli operator: {p}")
+
+        # Compute the tensor product and add to the Hamiltonian
+        term_matrix = tensor_product(*pauli_matrices)  
+        H_matrix += coeff * term_matrix
+    
+    # Ensure initial_state is a normalized complex vector
+    initial_state = np.array(initial_state, dtype=complex)
+    initial_state /= np.linalg.norm(initial_state)
+
+    # Define a time mesh
+    exact_times = np.arange(0, time + step_size, step_size)
+
+    # Compute the exponential of the Hamiltonian for each time step
+    exp_H = expm(-1j * step_size * H_matrix)
+
+    # Initialize the state evolution list
+    exact_evolution = [initial_state]
+
+    # Perform the time evolution
+    for t in exact_times[1:]:
+        print('.', end="")
+        
+        # Evolve the state using matrix multiplication
+        # NOTE: next line could written as next_state = exp_H @ exact_evolution[-1]
+        next_state = np.dot(exp_H, exact_evolution[-1])     
+        exact_evolution.append(next_state)
+
+    # Compute the expectation values of the Hamiltonian
+    exact_energy = [
+        np.real(np.vdot(state, np.dot(H_matrix, state))) for state in exact_evolution
+    ]
+
+    return exact_energy, exact_times
+
+
+##########################################################
+##########################################################
+# API-DEPENDENT FUNCTIONS
+
+try:
+    from qiskit import QuantumCircuit 
+    from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
+    from qiskit.quantum_info import Statevector
+
+except Exception as ex:
+    print("WARNING: Qiskit-dependent compute observable value functions are not available")
+    
+# The functions below are not currently used in the benchmarks.
+# However, we retain them here for reference and possible future use.
+
+# This function takes a SparsePauliOp and converts to StateVector for evolution
+def compute_theoretical_energies_spo_sv(initial_state, H, time, step_size):
 
     if H is None:
         return [None]
@@ -61,9 +179,11 @@ def compute_theoretical_energies(initial_state, H, time, step_size):
     exact_energy = np.real([sv.expectation_value(H) for sv in exact_evolution])
     
     return exact_energy, exact_times
-    
 
-def compute_theoretical_energies2(initial_state, H, time, step_size):
+##################################
+    
+# This function takes a SparsePauliOp and implicitly converts to matrix as needed
+def compute_theoretical_energies_spo_mat(initial_state, H, time, step_size):
     """
     Compute the theoretical energies by evolving a quantum state under a Hamiltonian using NumPy.
 
@@ -117,126 +237,13 @@ def compute_theoretical_energies2(initial_state, H, time, step_size):
     ]
 
     return exact_energy, exact_times
-
-##########################################################
-
-# Define the Pauli matrices and the computational basis states for a single qubit.
-# Pauli matrices as numpy arrays
-
-I = np.array([[1, 0], [0, 1]], dtype=complex)  # Identity matrix
-X = np.array([[0, 1], [1, 0]], dtype=complex)  # Pauli-X matrix
-Y = np.array([[0, -1j], [1j, 0]], dtype=complex)  # Pauli-Y matrix
-Z = np.array([[1, 0], [0, -1]], dtype=complex)  # Pauli-Z matrix
-
-# Qubit basis states
-Zero = np.array([1, 0], dtype=complex)  # |0⟩ state
-One = np.array([0, 1], dtype=complex)   # |1⟩ state
-
-# Define a function to compute the tensor product of multiple matrices or vectors.
-def tensor_product(*matrices):
-    """Compute the tensor product of a sequence of matrices or vectors."""
-    result = matrices[0]
-    for m in matrices[1:]:
-        result = np.kron(result, m)
-    return result
-    
-      
-def compute_theoretical_energies22(initial_state, H, time, step_size):
-    """
-    Compute the theoretical energies by evolving a quantum state under a Hamiltonian using NumPy.
-
-    Args:
-        initial_state (array-like): Initial state vector as a NumPy array.
-        H (np.ndarray): Hamiltonian matrix (Hermitian).
-        time (float): Total evolution time.
-        step_size (float): Time step size.
-
-    Returns:
-        tuple: (exact_energy, exact_times)
-            - exact_energy (list): Expectation values of the Hamiltonian over time.
-            - exact_times (np.ndarray): Time steps for the evolution.
-    """
-    if H is None:
-        return [None]
-        
-    #print(f"... in cte22, H = ")
-     
-    # Determine the number of qubits
-    num_qubits = len(H[0][0])  # Length of any Pauli string
-    #print(f"... in cte22, num_qubits = {num_qubits}")
-    
-    #for pauli, coeff in H:
-        #print(f"  {pauli}: {coeff}")
-    
-    H_matrix = np.zeros((2**num_qubits, 2**num_qubits), dtype=complex)
-    #print(f"... initial matrix = \n{H_matrix}")
-    
-    for pauli, coeff in H:
-        #print(f"  {pauli}: {coeff}")
-        for i, p in enumerate(pauli):
-            #print(f"    {i}: {p}")
-            pass
-
-        # Build the tensor product for the current Pauli string
-        pauli_matrices = []
-        for p in pauli:
-            if p == 'I':
-                pauli_matrices.append(I)
-            elif p == 'X':
-                pauli_matrices.append(X)
-            elif p == 'Y':
-                pauli_matrices.append(Y)
-            elif p == 'Z':
-                pauli_matrices.append(Z)
-            else:
-                raise ValueError(f"Invalid Pauli operator: {p}")
-
-        # Compute the tensor product and add to the Hamiltonian
-        term_matrix = tensor_product(*pauli_matrices)
-        #print(f"    Term matrix:\n{term_matrix}")
-        
-        H_matrix += coeff * term_matrix
-        
-    #print(f"... actual matrix = \n{H_matrix}")
-    
-    # Ensure initial_state is a normalized complex vector
-    initial_state = np.array(initial_state, dtype=complex)
-    initial_state /= np.linalg.norm(initial_state)
-
-    #print(f"... initial state = {initial_state}")
-
-    # Define a time mesh
-    exact_times = np.arange(0, time + step_size, step_size)
-
-    # Compute the exponential of the Hamiltonian for each time step
-    #print(f"... in cte2, -1j * step_size * H_matrix = {-1j * step_size * H_matrix}")
-    exp_H = expm(-1j * step_size * H_matrix)
-    
-    #print(f"... in cte2, exp_H = {exp_H}")
-
-    # Initialize the state evolution list
-    exact_evolution = [initial_state]
-
-    # Perform the time evolution
-    for t in exact_times[1:]:
-        print('.', end="")
-        
-        # Evolve the state using matrix multiplication
-        # NOTE: next line could written as next_state = exp_H @ exact_evolution[-1]
-        next_state = np.dot(exp_H, exact_evolution[-1])     
-        exact_evolution.append(next_state)
-
-    # Compute the expectation values of the Hamiltonian
-    exact_energy = [
-        np.real(np.vdot(state, np.dot(H_matrix, state))) for state in exact_evolution
-    ]
-
-    return exact_energy, exact_times
-    
-##########################################################
+ 
+##################################
    
+# This function takes a SparsePauliOp and computes observable value from the start at each time step
+# It is much slower than the similar but faster compute_theoretical_energies() currently in use
 
-def compute_theoretical_energies2x(initial_state, H, time, step_size):
+def compute_theoretical_energies_spo_slow(initial_state, H, time, step_size):
     """
     Compute the theoretical energies by evolving a quantum state under a Hamiltonian using NumPy.
 
@@ -285,12 +292,10 @@ def compute_theoretical_energies2x(initial_state, H, time, step_size):
 
     return exact_energy, exact_times
     
+####################################
 
-from qiskit import QuantumCircuit 
-from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
-
-
-def compute_theoretical_energies3(initial_state, H, time, step_size):
+# This function takes a SparsePauliOp and uses the SciPyRealEvolver to compute the observable value
+def compute_theoretical_energies_spo_scipy(initial_state, H, time, step_size):
     """
     Compute the theoretical energies by evolving a quantum state under a Hamiltonian using NumPy.
 
@@ -327,9 +332,7 @@ def compute_theoretical_energies3(initial_state, H, time, step_size):
     
     # We compute the exact evolution using the exp
     exact_evolution = [Statevector(initial_state)]
-    
-    
-    
+     
     #exp_H = sc.linalg.expm(-1j * step_size * H_array)
     for time in exact_times[1:]:
         print('.', end="")
@@ -352,10 +355,8 @@ def compute_theoretical_energies3(initial_state, H, time, step_size):
         
     return exact_energy, exact_times
     
-    
-
-# this is taken from the hamiltonian_exact.py file
-def compute_theoretical_energy3(qc_initial, n_spins: int, hamiltonian_op = None, time: float = 1.0):
+# this is taken from the (deprecated) hamiltonian_exact.py file, for reference
+def compute_theoretical_energy_scipy(qc_initial, n_spins: int, hamiltonian_op = None, time: float = 1.0):
     """
     Perform exact Hamiltonian simulation using classical matrix evolution.
 
