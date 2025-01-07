@@ -774,8 +774,6 @@ from qiskit.quantum_info import Statevector
 from qiskit.circuit.library import PauliEvolutionGate
 
 import scipy as sc
-import matplotlib.pyplot as plt
-
 
 # Set numpy print options to format floating point numbers
 np.set_printoptions(precision=3, suppress=True)

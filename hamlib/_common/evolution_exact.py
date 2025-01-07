@@ -137,10 +137,6 @@ def compute_theoretical_energies(initial_state, pauli_terms, time, step_size):
     
     # ensure initial_state is a normalized complex vector
     initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
-    
-    # ensure initial_state is a normalized complex vector
-    #initial_state = np.array(initial_state, dtype=complex)
-    #initial_state /= np.linalg.norm(initial_state)
 
     # Define a time mesh
     exact_times = np.arange(0, time + step_size, step_size)
