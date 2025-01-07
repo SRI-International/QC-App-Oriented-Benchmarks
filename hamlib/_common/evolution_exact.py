@@ -6,6 +6,10 @@ evolution_exact.py - Evolution Exact Functions
 """
 This module provides functions to classically compute the value of observables during Hamiltonian evolution,
 serving as a reliable reference for benchmarking estimates obtained from quantum simulations.
+
+Note that only the first of the compute functions is in use currently and is the most efficient.
+It is also independent of any quantum programming API.
+The others are maintained here for reference and may be removed later.d 
 """
 
 import copy
@@ -24,11 +28,6 @@ np.set_printoptions(precision=3, suppress=True)
 verbose = False
 
 ##########################################################
-
-"""
-Compute theoretical energies from Hamiltonian and initial state.
-This version is returning an array of classically computed exact energies, one for each step of evolution over time.
-"""
 
 # Define the Pauli matrices and the computational basis states for a single qubit.
 # Pauli matrices as numpy arrays
@@ -49,8 +48,43 @@ def tensor_product(*matrices):
     for m in matrices[1:]:
         result = np.kron(result, m)
     return result
+
+# Define a function to generate the initial state vector from a binary string, e.g., '110' for (|110⟩).
+def generate_initial_state(state_str):
+    """Generate the initial state from a binary string, e.g., '110' for |110⟩."""
+    state = [One if bit == '1' else Zero for bit in state_str]
+    return tensor_product(*state)
+ 
+# Ensure that the initial state is a valid state vector (array)
+def ensure_valid_state(initial_state, num_qubits = None): 
+
+    # if initial_state is None or "", generate |00> state
+    if initial_state is None or (isinstance(initial_state, str) and initial_state == ""):
+        initial_state = np.zeros((2**num_qubits), dtype=complex)
+        initial_state[0] = 1  # Set the amplitude for |00> state
     
-      
+    # if initial_state is a string turn it into a vector
+    if isinstance(initial_state, str):
+        if initial_state == "checkerboard" or initial_state == "neele":
+            initial_state = ""
+            for k in range(0, num_qubits):
+                initial_state += "0" if k % 2 == 1 else "1"
+                
+            print(f"... initial_state (check) = {initial_state}")
+        
+        initial_state = generate_initial_state(initial_state)
+
+    # ensure initial_state is a normalized complex vector
+    initial_state = np.array(initial_state, dtype=complex)
+    initial_state /= np.linalg.norm(initial_state)
+    
+    return initial_state
+    
+"""
+Compute theoretical energies from Hamiltonian and initial state.
+This version is returning an array of classically computed exact energies, one for each step of evolution over time.
+"""
+   
 def compute_theoretical_energies(initial_state, pauli_terms, time, step_size):
     """
     Compute the theoretical energies by evolving a quantum state under a Hamiltonian using NumPy.
@@ -101,9 +135,12 @@ def compute_theoretical_energies(initial_state, pauli_terms, time, step_size):
         term_matrix = tensor_product(*pauli_matrices)  
         H_matrix += coeff * term_matrix
     
-    # Ensure initial_state is a normalized complex vector
-    initial_state = np.array(initial_state, dtype=complex)
-    initial_state /= np.linalg.norm(initial_state)
+    # ensure initial_state is a normalized complex vector
+    initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
+    
+    # ensure initial_state is a normalized complex vector
+    #initial_state = np.array(initial_state, dtype=complex)
+    #initial_state /= np.linalg.norm(initial_state)
 
     # Define a time mesh
     exact_times = np.arange(0, time + step_size, step_size)
@@ -155,15 +192,17 @@ def compute_theoretical_energies_spo_sv(initial_state, H, time, step_size):
     # Create the Hamiltonian matrix (array form)
     H_array = H.to_matrix()
     
+    num_qubits = H.num_qubits
+    
     #print(f"matrix = {H_array}")
+    
+    # ensure initial_state is a normalized complex vector
+    initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
 
     # need to convert to Statevector so the evolve() function can be used
     initial_state = Statevector(initial_state)
     
     #print(f"... initial state = {initial_state}")
-    
-    # use this if string is passed for initialization
-    #initial_state = Statevector.from_label("001100")
 
     # We define a slightly denser time mesh
     exact_times = np.arange(0, time+step_size, step_size)

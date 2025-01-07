@@ -13,12 +13,19 @@ H_terms = [
     ('XIII', 0.7)
 ]
 
+print("")
 print(H_terms)
 
 # initialize 0 state based on width of first term's Pauli string
 dimension = len(H_terms[0][0])
 initial_state = np.zeros((2**dimension), dtype=complex)
 initial_state[0] = 1  # Set the amplitude for |00> state
+
+# for testing string initialization
+# initial_state = "checkerboard"
+# initial_state = "0000"
+# initial_state = ""
+
 print(initial_state)
 
 #############################
@@ -69,17 +76,12 @@ try:
         for pauli_string, coeff in pauli_terms:
             coeffs.append(coeff)
             paulis.append(pauli_string)
-                    
-        #print(paulis)
-        #print(coeffs)
         
         return SparsePauliOp(paulis, coeffs)
     
     sparse_pauli_op = convert_to_sparse_pauli_op(H_terms)
-
     print(sparse_pauli_op)
-   
-    
+      
     # Compute the theoretical energy using an exact computation
     theoretical_energies_exact, time_values = evolution_exact.compute_theoretical_energies_spo_sv(
             initial_state,
