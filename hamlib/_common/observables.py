@@ -682,42 +682,31 @@ def estimate_expectation_plus(backend, qc, pauli_terms, use_commuting_groups=Tru
             pauli_terms,
             use_commuting_groups
         )
-
+    
     # generate an array of circuits, one for each pauli_string in list
     circuits = create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
-      
+       
     ts1 = time.time()
-    
-    # bundle the circuits with the corresponding sets of terms (one or multiple)
-    circuits = list(zip(circuits, pauli_term_groups))
-    #for circuit in circuits: print(circuit)
-        
-    if verbose: print(f"\n... constructed {len(circuits)} circuits for this Hamiltonian.")
-    
+  
+    if verbose:
+        print(f"\n... constructed {len(circuits)} circuits for this Hamiltonian.")
     if verbose_circuits:
-        for circuit in circuits:
+        for circuit, group in list(zip(circuits, pauli_term_groups)):
+            print(group)
             print(circuit)
-            print(circuit[0])  
     
     # Compile and execute the circuits
     ts2 = time.time()
-    transpiled_circuits = transpile([circuit for circuit, group in circuits], backend)
+    transpiled_circuits = transpile(circuits, backend)
 
     # Execute all of the circuits to obtain array of result objects
     ts3 = time.time()
     results = backend.run(transpiled_circuits).result()
     
-    """ debugging when single circuit
-    print(f"... results = {results}")
-    # Loop over each circuit and its corresponding measurement results
-    if len(circuits) > 1:
-        for (qc, group), result in zip(circuits, results.get_counts()):
-            counts = result
-            print(counts, flush=True)
-    else:
-        counts = results.get_counts()
-        print(counts, flush=True)
-    """
+    
+    # bundle the circuits with the corresponding sets of terms (one or multiple)
+    circuits = list(zip(circuits, pauli_term_groups))
+    #for circuit in circuits: print(circuit)
     
     # Compute the total energy for the Hamiltonian
     ts4 = time.time()
