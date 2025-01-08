@@ -740,7 +740,7 @@ def estimate_expectation_plus(backend, qc, ham_terms, use_commuting_groups=True,
 
     # Create circuits from the Hamiltonian
     ts0 = time.time()
-    circuits = create_circuits_for_hamiltonian(num_qubits, qc, ham_terms, use_commuting_groups)
+    circuits = create_circuits_for_hamiltonian(qc, num_qubits, ham_terms, use_commuting_groups)
     ts1 = time.time()
     
     if verbose_circuits:
