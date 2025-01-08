@@ -221,45 +221,7 @@ def execute_circuit(qc, backend, num_shots, params):
 
 
 # =========================================================================================
-# CIRCUIT CREATION FUNCTIONS
-
-def create_circuits_for_hamiltonian(
-        qc: QuantumCircuit,
-        num_qubits: int,
-        pauli_terms: list,
-        use_commuting_groups: bool = True
-    ):
-    """
-    Constructs quantum circuits for a Hamiltonian, optionally optimizing using commuting groups.
-    This function focuses solely on generating the rotation portion of the circuits.
-    If no QuantumCircuit argment is provided, an empty circuit will be created before appending to it.
-
-    Args:
-        qc (QuantumCircuit): The base quantum circuit to which rotation gates will be appended.
-        num_qubits (int): Number of qubits in the circuit.
-        pauli_terms (list of tuples): Hamiltonian terms as a list of (Pauli string, coefficient) tuples.
-        use_commuting_groups (bool): If True, groups commuting Pauli terms to optimize circuit creation.
-
-    Returns:
-        list of tuples: Each tuple contains a QuantumCircuit and the corresponding group of terms, 
-                        either a single term or a set of commuting terms.
-    """
-    
-    pauli_term_groups, pauli_str_list = group_pauli_terms_for_execution(
-            num_qubits,
-            pauli_terms,
-            use_commuting_groups
-        )
-
-    # generate an array of circuits, one for each pauli_string in list
-    circuits = create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
-        
-    # bundle the circuits with the corresponding sets of terms (one or multiple)
-    circuits = list(zip(circuits, pauli_term_groups))
-    for circuit in circuits: print(circuit)
-        
-    if verbose: print(f"\n... constructed {len(circuits)} circuits for this Hamiltonian.")
-    return circuits
+# PAULI TERM OPTIMIZATION FUNCTIONS
 
 def group_pauli_terms_for_execution(
         num_qubits: int,
@@ -707,14 +669,30 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
 
 # Estimate expectation, advanced version, similar to Estimator, but customizable
 
-def estimate_expectation_plus(backend, qc, ham_terms, use_commuting_groups=True, num_shots=10000):
+def estimate_expectation_plus(backend, qc, pauli_terms, use_commuting_groups=True, num_shots=10000):
     
     num_qubits = qc.num_qubits
 
     # Create circuits from the Hamiltonian
-    ts0 = time.time()
-    circuits = create_circuits_for_hamiltonian(qc, num_qubits, ham_terms, use_commuting_groups)
+    ts0 = time.time()  
+    
+    # groups Pauli terms for quantum execution, optionally combining commuting terms into groups.
+    pauli_term_groups, pauli_str_list = group_pauli_terms_for_execution(
+            num_qubits,
+            pauli_terms,
+            use_commuting_groups
+        )
+
+    # generate an array of circuits, one for each pauli_string in list
+    circuits = create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
+      
     ts1 = time.time()
+    
+    # bundle the circuits with the corresponding sets of terms (one or multiple)
+    circuits = list(zip(circuits, pauli_term_groups))
+    #for circuit in circuits: print(circuit)
+        
+    if verbose: print(f"\n... constructed {len(circuits)} circuits for this Hamiltonian.")
     
     if verbose_circuits:
         for circuit in circuits:
