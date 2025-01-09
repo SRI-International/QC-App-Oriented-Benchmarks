@@ -676,12 +676,9 @@ def estimate_expectation_plus(backend, qc, pauli_terms, use_commuting_groups=Tru
     # Create circuits from the Hamiltonian
     ts0 = time.time()  
     
-    # groups Pauli terms for quantum execution, optionally combining commuting terms into groups.
+    # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
     pauli_term_groups, pauli_str_list = group_pauli_terms_for_execution(
-            num_qubits,
-            pauli_terms,
-            use_commuting_groups
-        )
+            num_qubits, pauli_terms, use_commuting_groups)
     
     # generate an array of circuits, one for each pauli_string in list
     circuits = create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
