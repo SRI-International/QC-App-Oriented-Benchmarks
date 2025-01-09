@@ -704,11 +704,6 @@ def estimate_expectation_plus(backend, qc, pauli_terms, use_commuting_groups=Tru
     ts3 = time.time()
     results = backend.run(transpiled_circuits).result()
     
-    
-    # bundle the circuits with the corresponding sets of terms (one or multiple)
-    #circuits = list(zip(circuits, pauli_term_groups))
-    #for circuit in circuits: print(circuit)
-    
     # Compute the total energy for the Hamiltonian
     ts4 = time.time()
     term_contributions = {}
