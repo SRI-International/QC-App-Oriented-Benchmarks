@@ -336,9 +336,7 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
     
     # Compute the total energy for the Hamiltonian
     ts3 = time.time()
-    term_contributions = {}
-    total_energy = calculate_expectation(num_qubits, results, circuits, pauli_term_groups,
-                                    term_contributions=term_contributions)
+    total_energy, term_contributions = calculate_expectation(num_qubits, results, circuits, pauli_term_groups)
     ts4 = time.time()
     
     if verbose_time:
@@ -354,7 +352,7 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
     return total_energy, term_contributions
 
 
-def calculate_expectation(num_qubits, results, circuits, pauli_term_groups, term_contributions=None):
+def calculate_expectation(num_qubits, results, circuits, pauli_term_groups):
     """
     Calculates the total expectation value (energy) from measurement results and provided circuits.
 
@@ -373,7 +371,8 @@ def calculate_expectation(num_qubits, results, circuits, pauli_term_groups, term
         float: The total expectation value of the Hamiltonian.
     """
     total_exp = 0
-
+    term_contributions = {}
+    
     # bundle the circuits with the corresponding sets of terms (one or multiple)
     circuits = list(zip(circuits, pauli_term_groups))
     #for circuit in circuits: print(circuit)
@@ -388,9 +387,8 @@ def calculate_expectation(num_qubits, results, circuits, pauli_term_groups, term
                 exp_val = get_expectation_term(term, counts)
                 total_exp += coeff * exp_val
                 
-                # if dict provided, save the contribution from each term
-                if term_contributions is not None:
-                    term_contributions[term] = exp_val
+                # save the contribution from each term
+                term_contributions[term] = exp_val
                     
     # results object has different structure when only one circuit, process specially here
     else:
@@ -406,7 +404,7 @@ def calculate_expectation(num_qubits, results, circuits, pauli_term_groups, term
             if term_contributions is not None:
                 term_contributions[term] = exp_val
 
-    return total_exp
+    return total_exp, term_contributions
 
 def calculate_expectation_from_contributions(ham_terms, term_contributions):
     """
