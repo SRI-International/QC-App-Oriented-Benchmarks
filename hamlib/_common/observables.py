@@ -368,7 +368,10 @@ def calculate_expectation(num_qubits, results, circuits, pauli_term_groups):
         term_contributions (dict, optional): Dictionary to store the contribution of each term.
 
     Returns:
-        float: The total expectation value of the Hamiltonian.
+        tuple: A tuple containing:
+            - total_energy (float): The computed total energy of the Hamiltonian.
+            - term_contributions (dict): A dictionary with individual Pauli terms as keys
+              and their respective contributions to the total energy as values.
     """
     total_exp = 0
     term_contributions = {}
