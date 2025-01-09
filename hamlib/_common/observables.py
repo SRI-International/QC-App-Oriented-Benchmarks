@@ -317,7 +317,7 @@ def merge_pauli_terms(group: list, num_qubits: int):
 # =========================================================================================
 # CALCULATE EXPECTATION VALUE (GROUPS)
 
-def calculate_expectation(num_qubits, results, circuits, term_contributions=None):
+def calculate_expectation(num_qubits, results, circuits, pauli_term_groups, term_contributions=None):
     """
     Calculates the total energy (expectation value) from measurement results and provided circuits.
 
@@ -327,8 +327,8 @@ def calculate_expectation(num_qubits, results, circuits, term_contributions=None
     Args:
         num_qubits (int): The number of qubits in the circuit.
         results (Result): The results object containing measurement counts from circuit execution.
-        circuits (list of tuples): A list where each element is a tuple of the form (QuantumCircuit, group),
-                                   where `group` is a list of (Pauli term, coefficient).
+        circuits (list of QuantumCircuits): A list of Quantum Circuits
+        pauli_term_groups (list): A list of Pauli terms as a tuple of (pauli, coeff)
         term_contributions (dict): Optional dictionary in which to place the contribution value of each term.
 
     Returns:
@@ -341,6 +341,10 @@ def calculate_expectation(num_qubits, results, circuits, term_contributions=None
     """
     total_exp = 0
 
+    # bundle the circuits with the corresponding sets of terms (one or multiple)
+    circuits = list(zip(circuits, pauli_term_groups))
+    #for circuit in circuits: print(circuit)
+    
     # Loop over each circuit and its corresponding measurement results
     if len(circuits) > 1:
         for (qc, group), result in zip(circuits, results.get_counts()):
@@ -702,13 +706,13 @@ def estimate_expectation_plus(backend, qc, pauli_terms, use_commuting_groups=Tru
     
     
     # bundle the circuits with the corresponding sets of terms (one or multiple)
-    circuits = list(zip(circuits, pauli_term_groups))
+    #circuits = list(zip(circuits, pauli_term_groups))
     #for circuit in circuits: print(circuit)
     
     # Compute the total energy for the Hamiltonian
     ts4 = time.time()
     term_contributions = {}
-    total_energy = calculate_expectation(num_qubits, results, circuits,
+    total_energy = calculate_expectation(num_qubits, results, circuits, pauli_term_groups,
                                     term_contributions=term_contributions)
     ts5 = time.time()
     
