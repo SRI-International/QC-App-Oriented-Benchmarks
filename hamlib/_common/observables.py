@@ -26,7 +26,7 @@ from qiskit.quantum_info import SparsePauliOp
 verbose = False
 verbose_circuits = False
 
-verbose_time = True
+verbose_time = False
 
 noise_model = None
 
@@ -256,9 +256,10 @@ def group_pauli_terms_for_execution(
           consistency for expectation function submission.
     """
     if not use_commuting_groups:
-        if verbose: print("\n******** creating circuits from Hamiltonian pauli terms:")
-        for term in pauli_terms:
-            print(term)
+        if verbose:
+            print("\n******** creating circuits from Hamiltonian pauli terms:")
+            for term in pauli_terms:
+                print(term)
         
         # create an array of groups, with one term in each group
         # (for consisency in submitting to expectation functions)
@@ -268,16 +269,18 @@ def group_pauli_terms_for_execution(
         pauli_str_list, _ = zip(*pauli_terms)
   
     else:
-        if verbose: print("\n******** creating commuting groups for the Hamiltonian and circuits from the groups:")
+        if verbose:
+            print("\n******** creating commuting groups for the Hamiltonian and circuits from the groups:")
         
         # create an array of groups, by combining commuting terms
         pauli_term_groups = group_commuting_terms(pauli_terms)
         
-        print("... created pauli_term_groups:")
-        for i, group in enumerate(pauli_term_groups):
-            print(f"Group {i+1}:")
-            for pauli, coeff in group:
-                print(f"  {pauli}: {coeff}")
+        if verbose:
+            print("... created pauli_term_groups:")
+            for i, group in enumerate(pauli_term_groups):
+                print(f"Group {i+1}:")
+                for pauli, coeff in group:
+                    print(f"  {pauli}: {coeff}")
         
         # for each group, create a merged pauli string from all the terms in the group
         pauli_str_list = []
@@ -452,68 +455,6 @@ def estimate_expectation(backend, qc, H_terms, num_shots=10000):
             print(f"... exp value for pauli term = ({coeff}, {pauli_string}), exp = {exp_val}")
 
     return total_energy
-
-
-# =========================================================================================
-# ESTIMATE EXPECTATION VALUE FOR MULTIPLE OBSERVABLES
-
-def estimate_expectation_multiple(backend, qc, H_terms_multiple, num_shots=10000):
-    """
-    Estimates the expectation values for a primary Hamiltonian and additional observables.
-
-    This function calculates the expectation values for a list of Pauli term collections, 
-    where the first collection represents the primary Hamiltonian, and subsequent collections 
-    represent additional observables. The same measurement results are used for all observables.
-
-    Args:
-        backend (Backend): The quantum backend to execute the circuit (e.g., simulator or quantum device).
-        qc (QuantumCircuit): The parameterized quantum circuit.
-        H_terms_multiple (list of lists of tuples): A list of Hamiltonian representations, where each 
-                                                    representation is a list of (coefficient, Pauli string) tuples.
-        num_shots (int, optional): The number of shots (repeated measurements) to perform. Default is 10,000.
-
-    Returns:
-        list of float: A list of expectation values, where the first value corresponds to the primary Hamiltonian,
-                       and subsequent values correspond to additional observables.
-
-    Example:
-        backend = Aer.get_backend('qasm_simulator')
-        qc = QuantumCircuit(3)
-        H_terms_multiple = [
-            [(0.5, "XXI"), (1.0, "ZZI")],  # Primary Hamiltonian
-            [(0.2, "XXI")],                # Observable 1
-            [(0.3, "ZZI")]                 # Observable 2
-        ]
-        expectations = estimate_expectation_multiple(backend, qc, H_terms_multiple, num_shots=10000)
-    """
-    # Storage for observables
-    observables_store = []
-    H_observables = []
-
-    # Initialize expectation values for each observable
-    for _ in range(len(H_terms_multiple)):
-        observables_store.append(0)
-
-    # Convert each observable's terms into a dictionary for easier access
-    for terms in H_terms_multiple:
-        H_observables.append({pauli_term: coeff for coeff, pauli_term in terms})
-
-    # Iterate through terms of the primary Hamiltonian
-    for pauli_string, coeff in H_observables[0].items():
-        exp_val = estimate_expectation_term(backend, qc, pauli_string, num_shots=num_shots)
-
-        # Accumulate expectation for the primary Hamiltonian
-        observables_store[0] += coeff * exp_val
-
-        # Accumulate expectation for additional observables
-        for i in range(1, len(H_observables)):
-            if pauli_string in H_observables[i]:
-                observables_store[i] += H_observables[i][pauli_string] * exp_val
-
-        if verbose:
-            print(f"... exp value for pauli term = ({coeff}, {pauli_string}), exp = {exp_val}")
-
-    return observables_store
 
 # =========================================================================================
 # EXPECTATION VALUE SUPPORT FUNCTIONS
@@ -702,7 +643,7 @@ def estimate_expectation_plus(backend, qc, pauli_terms, use_commuting_groups=Tru
 
     # Execute all of the circuits to obtain array of result objects
     ts3 = time.time()
-    results = backend.run(transpiled_circuits).result()
+    results = backend.run(transpiled_circuits, shots=num_shots).result()
     
     # Compute the total energy for the Hamiltonian
     ts4 = time.time()
