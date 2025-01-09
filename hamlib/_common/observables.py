@@ -5,23 +5,11 @@ Observable Computation Function Library - Qiskit Version
 This module includes helper funtions for computing observables from a Hamiltonian.
 '''
 
-from qiskit.quantum_info import Pauli, SparsePauliOp
 from itertools import combinations
-import numpy as np
-
-'''
 import numpy as np
 import copy
 
-from qiskit import QuantumCircuit, transpile
-from qiskit_aer import Aer
-from qiskit.primitives import Estimator
-
-from qiskit.quantum_info import Operator, Pauli
-
-from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import SparsePauliOp
-'''
 
 verbose = False
 verbose_circuits = False
@@ -186,40 +174,6 @@ def group_commuting_terms(pauli_list):
     
     return groups
 
-
-# ===========================================
-# EXECUTION FUNCTIONS
-
-from qiskit import QuantumCircuit, transpile, assemble
-from qiskit_aer import Aer
-from qiskit.primitives import Estimator
-import numpy as np
-
-# Initialize the backend and the simulator
-backend = Aer.get_backend('qasm_simulator')
-#backend = Aer.get_backend('statevector_simulator')
-noise_model = None
-
-# Here we define a function to perform the execution and return an array of measurements.
-# DEVNOTE: params argument not currently used, as the circuit is created with values defined; we don't use Parameter yet
-
-# Execute a quantum circuit with the specified parameters on the given backend system
-def execute_circuit(qc, backend, num_shots, params):
-     
-    # Execute the quantum circuit to obtain the probability distribution associated with the current parameters
-    result = backend.run(qc, shots=num_shots, noise_model=noise_model).result()
-    
-    # get the measurement counts from the result object
-    counts = result.get_counts(qc)
-    
-    # For the statevector simulator, need to scale counts to num_shots
-    if str(backend) == 'statevector_simulator':
-        for k, v in counts.items():
-            counts[k] = round(v * num_shots)
-    
-    return counts
-
-
 # =========================================================================================
 # PAULI TERM OPTIMIZATION FUNCTIONS
 
@@ -330,7 +284,7 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
 
     This function computes the total energy of a Hamiltonian represented by Pauli terms
     through quantum execution. It groups the Pauli terms (optionally by commuting groups),
-    generates circuits, transpiles and executes them, and calculates the resulting expectation values.
+    generates circuits, executes them, and calculates the resulting expectation values.
 
     Args:
         backend: The quantum backend to execute the circuits on.
@@ -375,28 +329,23 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
         for circuit, group in list(zip(circuits, pauli_term_groups)):
             print(group)
             print(circuit)
-    
-    # Compile and execute the circuits
-    ts2 = time.time()
-    transpiled_circuits = transpile(circuits, backend)
 
     # Execute all of the circuits to obtain array of result objects
-    ts3 = time.time()
-    results = backend.run(transpiled_circuits, shots=num_shots).result()
+    ts2 = time.time()
+    results = execute_circuits(circuits, backend, num_shots, params=None)
     
     # Compute the total energy for the Hamiltonian
-    ts4 = time.time()
+    ts3 = time.time()
     term_contributions = {}
     total_energy = calculate_expectation(num_qubits, results, circuits, pauli_term_groups,
                                     term_contributions=term_contributions)
-    ts5 = time.time()
+    ts4 = time.time()
     
     if verbose_time:
         print(f"... circuit creation time = {round(ts1 - ts0, 3)}")
-        print(f"... transpilation time = {round(ts3 - ts2, 3)}")
-        print(f"... execution time = {round(ts4 - ts3, 3)}")
-        print(f"... expectation time = {round(ts5 - ts4, 3)}") 
-        print(f"... total time = {round((ts5 - ts2) + (ts1 - ts0), 3)}")
+        print(f"... execution time = {round(ts3 - ts2, 3)}")
+        print(f"... expectation time = {round(ts4 - ts3, 3)}") 
+        print(f"... total elapsed time = {round((ts4 - ts2) + (ts1 - ts0), 3)}")
         print("")
         
     #print(f"Total Energy: {total_energy}")#print("")
@@ -581,7 +530,7 @@ import copy
 from math import sin, cos, pi
 import time
 
-from qiskit import QuantumCircuit, transpile
+from qiskit import QuantumCircuit
 from qiskit_aer import Aer
 from qiskit.primitives import Estimator
 
@@ -749,3 +698,42 @@ def append_hamiltonian_term_to_circuit(qc, params, pauli):
             qc.h(i)
             is_diag = False
 
+
+# ===========================================
+# EXECUTION FUNCTIONS
+
+from qiskit import QuantumCircuit
+from qiskit_aer import Aer
+from qiskit.primitives import Estimator
+import numpy as np
+
+# Initialize the backend and the simulator
+backend = Aer.get_backend('qasm_simulator')
+#backend = Aer.get_backend('statevector_simulator')
+noise_model = None
+
+# Here we define a function to perform the execution and return an array of measurements.
+# DEVNOTE: params argument not currently used, as the circuit is created with values defined; we don't use Parameter yet
+
+# Execute a quantum circuit with the specified parameters on the given backend system
+def execute_circuit(qc, backend, num_shots, params):
+     
+    # Execute the quantum circuit to obtain the probability distribution associated with the current parameters
+    result = backend.run(qc, shots=num_shots, noise_model=noise_model).result()
+    
+    # get the measurement counts from the result object
+    counts = result.get_counts(qc)
+    
+    # For the statevector simulator, need to scale counts to num_shots
+    if str(backend) == 'statevector_simulator':
+        for k, v in counts.items():
+            counts[k] = round(v * num_shots)
+    
+    return counts
+
+# Execute a list of quantum circuits with the specified parameters on the given backend system
+def execute_circuits(circuits, backend, num_shots: int, params=None):
+
+    results = backend.run(circuits, shots=num_shots).result()
+    
+    return results
