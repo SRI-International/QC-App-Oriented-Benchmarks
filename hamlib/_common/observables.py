@@ -8,8 +8,13 @@ This module includes helper funtions for computing observables from a Hamiltonia
 from itertools import combinations
 import numpy as np
 import copy
+import sys
+import time
 
 from qiskit.quantum_info import SparsePauliOp
+
+sys.path[1:1] = ["..//qiskit"]
+import hamlib_simulation_kernel as kernel
 
 verbose = False
 verbose_circuits = False
@@ -453,7 +458,7 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
             num_qubits, pauli_terms, use_commuting_groups)
     
     # generate an array of circuits, one for each pauli_string in list
-    circuits = create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
+    circuits = kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
        
     ts1 = time.time()
   
@@ -520,184 +525,7 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
     return measured_energy
 
 
-   
-####################################################################################
-# FROM OBSERVABLES GENERALIZED
-
-import numpy as np
-import copy
-from math import sin, cos, pi
-import time
-
-from qiskit import QuantumCircuit
-from qiskit_aer import Aer
-from qiskit.primitives import Estimator
-
-from qiskit.quantum_info import Operator, Pauli
-from qiskit.quantum_info import SparsePauliOp
-from qiskit.quantum_info import Statevector
-from qiskit.circuit.library import PauliEvolutionGate
-
-import scipy as sc
-
-# Set numpy print options to format floating point numbers
-np.set_printoptions(precision=3, suppress=True)
-   
-
-"""
-Define Pauli Evolution Circuit¶
-This function is used to create a circuit, given an array of Pauli terms, that performs Trotterized state evolution for time t.
-"""
-
-def create_pauli_evolution_circuit(pauli_terms, time=1.0):
-    """
-    Create a QuantumCircuit with PauliEvolution gate from Pauli terms.
-    
-    Args:
-    pauli_terms (list): List of tuples, each containing (coefficient, Pauli string)
-    time (float): Evolution time (default is 1.0)
-    
-    Returns:
-    QuantumCircuit: Circuit with PauliEvolution gate
-    """
-    
-    # Determine the number of qubits
-    num_qubits = len(pauli_terms[0][1])  # Length of any Pauli string
-    
-    # Convert to SparsePauliOp
-    sparse_pauli_op = convert_to_sparse_pauli_op(pauli_terms)
-    
-    # Create the PauliEvolutionGate
-    evo_gate = PauliEvolutionGate(sparse_pauli_op, time=time)
-    
-    # Create a quantum circuit and apply the evolution gate
-    qc = QuantumCircuit(num_qubits)
-    qc.append(evo_gate, range(num_qubits))
-    
-    return qc
-    
-"""
-Create Quantum Test Evolution Circuit
-Here, we create a circuit that will be measured and that will have its energy computed against a specific Hamiltonian. We start with an initial state and apply quantum Hamiltonian evolution to it. The resulting state will be used for testing in subsequent cells.
-
-We create it using a generated quantum circuit to perform the evolution.
-"""
-
-def create_quantum_test_circuit(initial_state, H_terms, step, step_size):
-
-    initial_state = normalize(np.array(initial_state))
-    
-    n_qubits = len(H_terms[0][1])
-    qc = QuantumCircuit(n_qubits)
-
-    # Initialize the circuit with the given state vector
-    qc.initialize(initial_state, qc.qubits)
-    
-    qc_ev = create_pauli_evolution_circuit(H_terms, time = step_size)
-    
-    if verbose: print(f"... evolution circuit = \n{qc_ev}")
-
-    # Need to decompose here, so we do not have references to PauliEvolution gates, which cannot be copied
-    qc_ev = qc_ev.decompose().decompose()
-
-    # use compose, instead of append, so that the copy used in expectation computation can function correctly
-    for k in range(step):
-        qc.compose(qc_ev, inplace=True)
-    
-    if verbose: print(f"... after compose, saved circuit = \n{qc}")
-    
-    return qc
-
-def normalize(array):
-    # Calculate the sum of squares of the elements
-    sum_of_squares = np.sum(np.square(array))
-    # Calculate the normalization factor
-    normalization_factor = np.sqrt(sum_of_squares)
-    # Normalize the array
-    normalized_array = array / normalization_factor
-    return normalized_array
-
-
-######################## KERNEL FUNCTIONS
-
-# These functions all belong down in the kernel file
-
-def create_circuits_for_pauli_terms(qc: QuantumCircuit, num_qubits: int, pauli_str_list: list):
-    """
-    Creates quantum circuits for measuring terms in a raw Hamiltonian.
-    If a circuit is passed in, a copy is made, otherwise and empty circuit is created for each pauli string.
-    Then, the rotations and the measurements are appended to the circuit and all the circuits are returned in a list.
-
-    Args:
-        num_qubits (int): The number of qubits in the circuit.
-        qc (QuantumCircuit): The circuit to which we will append rotation gates.
-        pauli_str_list (list of tuples): The Hamiltonian represented as a list of tuples, 
-                              where each tuple contains a Pauli string and a coefficient.
-
-    Returns:
-        list of tuples: A list where each element is a tuple (QuantumCircuit, [(term, coeff)]).
-    """
-    circuits = []
-
-    for pauli_str in pauli_str_list:
-        if verbose: print(f"  ... create_circuits_for_pauli_term: {pauli_str}")
-        
-        # append the rotations specific to each pauli and the measurements
-        qc2 = append_measurement_circuit_for_term(qc, num_qubits, pauli_str)
-    
-        circuits.append(qc2)
-        
-    return circuits
-   
-def append_measurement_circuit_for_term(qc: QuantumCircuit, num_qubits: int, term: str):
-    """
-    Creates quantum circuits for groups of commuting terms in a Hamiltonian.
-
-    Args:
-        num_qubits (int): The number of qubits in the circuit.
-        qc (QuantumCircuit): The circuit to which we will append rotation gates.
-        groups (list of list of tuples): A list of groups, where each group is a list of tuples 
-                                         (term, coeff) representing commuting Hamiltonian terms.
-
-    Returns:
-        list of tuples: A list where each element is a tuple (QuantumCircuit, group).
-    """
-    # if no circuit passed in, create one
-    if qc is None:
-        qc = QuantumCircuit(num_qubits)
-         
-    # Make a clone of the original circuit since we append gates
-    qc2 = qc.copy()
-
-    append_hamiltonian_term_to_circuit(qc2, None, term)
-
-    qc2.measure_all()
-
-    return qc2
-          
-def append_hamiltonian_term_to_circuit(qc, params, pauli):
-    """
-    Appends basis rotations to a quantum circuit for a given term of the Hamiltonian operator.
-
-    Args:
-        qc (QuantumCircuit): The quantum circuit to which the operations are appended.
-        params (None): Unused parameter, reserved for potential future use.
-        pauli (str): A string representing the Pauli operator (e.g., 'X', 'Y', 'Z', 'I') for each qubit.
-
-    Returns:
-        None
-    """
-    is_diag = True  # Tracks if the term is diagonal (currently unused)
-    for i, p in enumerate(pauli):
-        if p == "X":
-            is_diag = False
-            qc.h(i)
-        elif p == "Y":
-            qc.sdg(i)
-            qc.h(i)
-            is_diag = False
-
-
+  
 # ===========================================
 # EXECUTION FUNCTIONS
 
