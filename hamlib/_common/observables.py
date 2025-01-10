@@ -336,7 +336,8 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
     
     # Compute the total energy for the Hamiltonian
     ts3 = time.time()
-    total_energy, term_contributions = calculate_expectation(num_qubits, results, pauli_term_groups)
+    total_energy, term_contributions = calculate_expectation_from_measurements(
+                                            num_qubits, results, pauli_term_groups)
     ts4 = time.time()
     
     if verbose_time:
@@ -352,7 +353,7 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
     return total_energy, term_contributions
 
 
-def calculate_expectation(num_qubits, results, pauli_term_groups):
+def calculate_expectation_from_measurements(num_qubits, results, pauli_term_groups):
     """
     Calculates the total expectation value (energy) from measurement results and provided pauli_term_groups.
 
@@ -403,15 +404,15 @@ def calculate_expectation(num_qubits, results, pauli_term_groups):
 
     return total_exp, term_contributions
     
-def calculate_expectation_from_contributions(ham_terms, term_contributions):
+def calculate_expectation_from_contributions(term_contributions: dict, pauli_terms: list):
     """
     Computes the total expectation value from precomputed term contributions.
 
-    Args:
-        ham_terms (list of tuples): A list of Pauli terms with coefficients, where each element is 
-                                    a tuple of the form (Pauli term, coefficient).
+    Args:    
         term_contributions (dict): A dictionary mapping Pauli terms to their corresponding 
-                                   expectation values. Missing terms are assumed to have a value of zero.
+                                   expectation values. Missing terms are assumed to have a value of zero.                            
+        pauli_terms (list of tuples): A list of Pauli terms with coefficients, where each element is 
+                                    a tuple of the form (Pauli term, coefficient).
 
     Returns:
         float: The total expectation value for the Hamiltonian.
@@ -425,7 +426,7 @@ def calculate_expectation_from_contributions(ham_terms, term_contributions):
         return total_exp
 
     # Process each Pauli term in the current group
-    for term, coeff in ham_terms:
+    for term, coeff in pauli_terms:
         exp_val = term_contributions.get(term)
         
         if exp_val is None:
