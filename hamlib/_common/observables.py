@@ -272,11 +272,146 @@ def merge_pauli_terms(group: list, num_qubits: int):
 
 
 # ####################################################################################
-# ESTIMATE EXPECTATION VALUE 
+# CALCULATE EXPECTATION VALUE FUNCTIONS
 
-# The code in this section is work-in-progress, building on code in the test notebooks
+# These functions compute expectation values from either measurement results or 
+# from the term contributions returned from the measurement function.
+
+def calculate_expectation_from_measurements(num_qubits, results, pauli_term_groups):
+    """
+    Calculates the total expectation value (energy) from measurement results and provided pauli_term_groups.
+
+    This function processes measurement results for a set of quantum circuits, each corresponding to
+    a group of Pauli terms, to compute the expectation value of a Hamiltonian. Optionally, it can store
+    the contribution of each term in a dictionary.
+
+    Args:
+        num_qubits (int): Number of qubits in the circuit.
+        results (Result): Results object containing measurement counts from circuit execution.
+        pauli_term_groups (list): Groups of Pauli terms as tuples of (pauli, coeff).
+
+    Returns:
+        tuple: A tuple containing:
+            - total_energy (float): The computed total energy of the Hamiltonian.
+            - term_contributions (dict): A dictionary with individual Pauli terms as keys
+              and their respective contributions to the total energy as values.
+    """
+    total_exp = 0
+    term_contributions = {}
+   
+    # Loop over each group and its corresponding measurement results
+    if len(pauli_term_groups) > 1:
+        for group, result in zip(pauli_term_groups, results.get_counts()):
+            counts = result
+
+            # Process each Pauli term in the current group
+            for term, coeff in group:
+                exp_val = get_expectation_term(term, counts)
+                total_exp += coeff * exp_val
+                
+                # save the contribution from each term
+                term_contributions[term] = exp_val
+                    
+    # results object has different structure when only one circuit, process specially here
+    else:
+        counts = results.get_counts()
+        group = pauli_term_groups[0]
+
+        # Process each Pauli term in the current group
+        for term, coeff in group:
+            exp_val = get_expectation_term(term, counts)
+            total_exp += coeff * exp_val
+            
+            # if dict provided, save the contribution from each term
+            term_contributions[term] = exp_val
+
+    return total_exp, term_contributions
+    
+def calculate_expectation_from_contributions(term_contributions: dict, pauli_terms: list):
+    """
+    Computes the total expectation value from precomputed term contributions.
+
+    Args:    
+        term_contributions (dict): A dictionary mapping Pauli terms to their corresponding 
+                                   expectation values. Missing terms are assumed to have a value of zero.                            
+        pauli_terms (list of tuples): A list of Pauli terms with coefficients, where each element is 
+                                    a tuple of the form (Pauli term, coefficient).
+
+    Returns:
+        float: The total expectation value for the Hamiltonian.
+
+    Note:
+        If `term_contributions` is None, the function returns 0 and logs a warning for missing terms.
+    """
+    total_exp = 0
+    
+    if term_contributions is None:
+        return total_exp
+
+    # Process each Pauli term in the current group
+    for term, coeff in pauli_terms:
+        exp_val = term_contributions.get(term)
+        
+        if exp_val is None:
+            exp_val = 0
+            print(f"WARN: term not found in term_contributions: {term}")
+            
+        total_exp += coeff * exp_val
+            
+    return total_exp
+
+# ####################################
+# EXPECTATION VALUE SUPPORT FUNCTIONS
+ 
+# This function may also be used from custom expectation functions that use diagonalization, etc.
+ 
+def get_expectation_term(term, counts):
+    """
+    Computes the expectation value of a measurement outcome with respect to a single Pauli operator.
+
+    Args:
+        term (str): A string representing a Pauli operator (e.g., 'XXI', 'ZZI', 'III'), 
+                    where each character corresponds to the Pauli operator ('X', 'Y', 'Z', or 'I') 
+                    acting on a specific qubit.
+        counts (dict): A dictionary containing measurement results as keys (bitstrings) and 
+                       their corresponding counts as values.
+
+    Returns:
+        float: The expectation value of the measurement results with respect to the specified Pauli term.
+    """
+    exp_val = 0
+    total_counts = sum(counts.values())  # Total number of measurement shots
+    num_qubits = len(term)  # Total number of qubits in the system
+
+    # Loop over all measurement results
+    for bitstring, count in counts.items():
+        parity = 1.0  # Initialize parity for the current bitstring
+
+        # Iterate over each qubit and its corresponding Pauli operator
+        for qubit_index, pauli in enumerate(term):
+            if pauli == 'I':  # Skip identity operators, as they do not affect the parity
+                continue
+
+            # Map qubit index to bitstring index (little-endian order) and extract bit value
+            bit_index = num_qubits - 1 - qubit_index
+            bit_value = int(bitstring[bit_index])
+
+            # Map bit value (0 or 1) to eigenvalue (+1 or -1)
+            eigenvalue = 1 - 2 * bit_value
+            parity *= eigenvalue  # Update parity based on the eigenvalue
+
+        exp_val += parity * count  # Weighted sum of parities based on counts
+
+    # Normalize by the total number of measurement shots
+    return exp_val / total_counts
+
+    
+####################################################################################
+# HIGH-LEVEL ESTIMATION FUNCTIONS
 
 # Estimate expectation, advanced version, similar to Estimator, but customizable
+# The functions below rely on access to a quantum kernel to create the circuits and
+# an execution module to execute the circuits, both of which are dependent on the target API.
 
 def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=True, num_shots=10000):
     """
@@ -352,138 +487,7 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
      
     return total_energy, term_contributions
 
-
-def calculate_expectation_from_measurements(num_qubits, results, pauli_term_groups):
-    """
-    Calculates the total expectation value (energy) from measurement results and provided pauli_term_groups.
-
-    This function processes measurement results for a set of quantum circuits, each corresponding to
-    a group of Pauli terms, to compute the expectation value of a Hamiltonian. Optionally, it can store
-    the contribution of each term in a dictionary.
-
-    Args:
-        num_qubits (int): Number of qubits in the circuit.
-        results (Result): Results object containing measurement counts from circuit execution.
-        pauli_term_groups (list): Groups of Pauli terms as tuples of (pauli, coeff).
-        term_contributions (dict, optional): Dictionary to store the contribution of each term.
-
-    Returns:
-        tuple: A tuple containing:
-            - total_energy (float): The computed total energy of the Hamiltonian.
-            - term_contributions (dict): A dictionary with individual Pauli terms as keys
-              and their respective contributions to the total energy as values.
-    """
-    total_exp = 0
-    term_contributions = {}
-   
-    # Loop over each group and its corresponding measurement results
-    if len(pauli_term_groups) > 1:
-        for group, result in zip(pauli_term_groups, results.get_counts()):
-            counts = result
-
-            # Process each Pauli term in the current group
-            for term, coeff in group:
-                exp_val = get_expectation_term(term, counts)
-                total_exp += coeff * exp_val
-                
-                # save the contribution from each term
-                term_contributions[term] = exp_val
-                    
-    # results object has different structure when only one circuit, process specially here
-    else:
-        counts = results.get_counts()
-        group = pauli_term_groups[0]
-
-        # Process each Pauli term in the current group
-        for term, coeff in group:
-            exp_val = get_expectation_term(term, counts)
-            total_exp += coeff * exp_val
-            
-            # if dict provided, save the contribution from each term
-            term_contributions[term] = exp_val
-
-    return total_exp, term_contributions
-    
-def calculate_expectation_from_contributions(term_contributions: dict, pauli_terms: list):
-    """
-    Computes the total expectation value from precomputed term contributions.
-
-    Args:    
-        term_contributions (dict): A dictionary mapping Pauli terms to their corresponding 
-                                   expectation values. Missing terms are assumed to have a value of zero.                            
-        pauli_terms (list of tuples): A list of Pauli terms with coefficients, where each element is 
-                                    a tuple of the form (Pauli term, coefficient).
-
-    Returns:
-        float: The total expectation value for the Hamiltonian.
-
-    Note:
-        If `term_contributions` is None, the function returns 0 and logs a warning for missing terms.
-    """
-    total_exp = 0
-    
-    if term_contributions is None:
-        return total_exp
-
-    # Process each Pauli term in the current group
-    for term, coeff in pauli_terms:
-        exp_val = term_contributions.get(term)
-        
-        if exp_val is None:
-            exp_val = 0
-            print(f"WARN: term not found in term_contributions: {term}")
-            
-        total_exp += coeff * exp_val
-            
-    return total_exp
-
-# ####################################
-# EXPECTATION VALUE SUPPORT FUNCTIONS
-   
-def get_expectation_term(term, counts):
-    """
-    Computes the expectation value of a measurement outcome with respect to a single Pauli operator.
-
-    Args:
-        term (str): A string representing a Pauli operator (e.g., 'XXI', 'ZZI', 'III'), 
-                    where each character corresponds to the Pauli operator ('X', 'Y', 'Z', or 'I') 
-                    acting on a specific qubit.
-        counts (dict): A dictionary containing measurement results as keys (bitstrings) and 
-                       their corresponding counts as values.
-
-    Returns:
-        float: The expectation value of the measurement results with respect to the specified Pauli term.
-    """
-    exp_val = 0
-    total_counts = sum(counts.values())  # Total number of measurement shots
-    num_qubits = len(term)  # Total number of qubits in the system
-
-    # Loop over all measurement results
-    for bitstring, count in counts.items():
-        parity = 1.0  # Initialize parity for the current bitstring
-
-        # Iterate over each qubit and its corresponding Pauli operator
-        for qubit_index, pauli in enumerate(term):
-            if pauli == 'I':  # Skip identity operators, as they do not affect the parity
-                continue
-
-            # Map qubit index to bitstring index (little-endian order) and extract bit value
-            bit_index = num_qubits - 1 - qubit_index
-            bit_value = int(bitstring[bit_index])
-
-            # Map bit value (0 or 1) to eigenvalue (+1 or -1)
-            eigenvalue = 1 - 2 * bit_value
-            parity *= eigenvalue  # Update parity based on the eigenvalue
-
-        exp_val += parity * count  # Weighted sum of parities based on counts
-
-    # Normalize by the total number of measurement shots
-    return exp_val / total_counts
-
-    
-####################################################################################
-# HIGH-LEVEL ESTIMATION FUNCTIONS
-           
+ 
 def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
     """
     Estimates the expectation value of a quantum circuit and Hamiltonian using the `Estimator` class.
