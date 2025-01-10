@@ -74,72 +74,28 @@ def swap_pauli_list(pauli_terms):
 # ===========================================
 # COMMUTING GROUP FUNCTIONS
 
-#Extract Qubit-wise Commuting Groups from a Hamiltonian
-
-def pauli_commutes(pauli1, pauli2):
-    """
-    Check if two Pauli operators commute using their string representations.
-    
-    Args:
-    pauli1 (SparsePauliOp): First Pauli operator.
-    pauli2 (SparsePauliOp): Second Pauli operator.
-    
-    Returns:
-    bool: True if pauli1 and pauli2 commute, False otherwise.
-    """
-    pauli_str1 = pauli1.paulis[0].to_label()
-    pauli_str2 = pauli2.paulis[0].to_label()
-    
-    for i in range(len(pauli_str1)):
-        if pauli_str1[i] != 'I' and pauli_str2[i] != 'I' and pauli_str1[i] != pauli_str2[i]:
-            return False
-    return True
-
-def build_commutativity_graph(pauli_list):
-    """
-    Build a commutativity graph where nodes represent Pauli operators,
-    and edges represent commutation relations between them.
-    
-    Args:
-    pauli_list (list of SparsePauliOp): List of Pauli operators.
-    
-    Returns:
-    np.ndarray: Adjacency matrix of the commutativity graph.
-    """
-    num_terms = len(pauli_list)
-    adjacency_matrix = np.zeros((num_terms, num_terms), dtype=bool)
-    
-    for i, j in combinations(range(num_terms), 2):
-        if pauli_commutes(pauli_list[i], pauli_list[j]):
-            adjacency_matrix[i, j] = True
-            adjacency_matrix[j, i] = True
-    
-    return adjacency_matrix
+# Extract Qubit-wise Commuting Groups from a Hamiltonian
 
 # Function to group commuting terms into qubit-wise commuting groups
-def group_commuting_terms(pauli_list):
+def group_commuting_terms(pauli_terms):
     """
     Group commuting Pauli terms.
     
     Args:
-    pauli_list (list): List of tuples where each tuple contains a Pauli string and a coefficient.
+    pauli_terms (list): List of tuples where each tuple contains a Pauli string and a coefficient.
     
     Returns:
     list: List of groups where each group is a list of commuting Pauli terms.
     """
-    # Convert the list of Pauli strings to SparsePauliOp objects
-    paulis = [SparsePauliOp.from_list([(p, coeff)]) for p, coeff in pauli_list]
-
-    if verbose: print(paulis)
+    if verbose:
+        print(f"... group_commuting_terms({pauli_terms})")
     
     # Build the commutativity graph
-    adjacency_matrix = build_commutativity_graph(paulis)
-
-    #if verbose: print(adjacency_matrix)
+    adjacency_matrix = build_commutativity_graph(pauli_terms)
     
     # Group commuting terms
     groups = []
-    ungrouped_indices = set(range(len(paulis)))
+    ungrouped_indices = set(range(len(pauli_terms)))
 
     # loop over all the terms, looking for those that can be grouped
     while ungrouped_indices:
@@ -148,17 +104,17 @@ def group_commuting_terms(pauli_list):
 
         # make the first item in the ungrouped list into the new current group
         i = ungrouped_indices.pop()
-        current_group.append(pauli_list[i])
+        current_group.append(pauli_terms[i])
         current_group_indices.append(i)
-        #print(f"\n... visit ungrouped_index: {i} {pauli_list[i]}")
+        #print(f"\n... visit ungrouped_index: {i} {pauli_terms[i]}")
 
         # we need to check that the candidate term commutes with all the terms in the current group
         for j in ungrouped_indices.copy():
-            #print(f"  ... compare to ungrouped_index: {j} {pauli_list[j]}")
+            #print(f"  ... compare to ungrouped_index: {j} {pauli_terms[j]}")
 
             commuting = True
             for k in current_group_indices:
-                #print(f"    ... checking against: {k} {pauli_list[k]}")
+                #print(f"    ... checking against: {k} {pauli_terms[k]}")
                 if not adjacency_matrix[k, j]:
                     commuting = False
                     #if verbose: print(f"    ... conflict, do not add to this group")
@@ -166,13 +122,56 @@ def group_commuting_terms(pauli_list):
 
             if commuting:
                 #print(f"    ... commutes, add to this grouop")
-                current_group.append(pauli_list[j])
+                current_group.append(pauli_terms[j])
                 current_group_indices.append(j)
                 ungrouped_indices.remove(j)
         
         groups.append(current_group)
     
     return groups
+
+def build_commutativity_graph(pauli_terms):
+    """
+    Build a commutativity graph where nodes represent Pauli operators,
+    and edges represent commutation relations between them.
+    
+    Args:
+    pauli_terms (list): List of tuples where each tuple contains a Pauli string and a coefficient.
+    
+    Returns:
+    np.ndarray: Adjacency matrix of the commutativity graph.
+    """
+    num_terms = len(pauli_terms)
+    adjacency_matrix = np.zeros((num_terms, num_terms), dtype=bool)
+    
+    for i, j in combinations(range(num_terms), 2):
+        pauli_str1 = pauli_terms[i][0]
+        pauli_str2 = pauli_terms[j][0]
+        
+        if pauli_commutes(pauli_str1, pauli_str2):
+            adjacency_matrix[i, j] = True
+            adjacency_matrix[j, i] = True
+    
+    #if verbose: print(adjacency_matrix)
+    
+    return adjacency_matrix
+
+def pauli_commutes(pauli_str1, pauli_str2):
+    """
+    Check if two Pauli operators commute using their string representations.
+    
+    Args:
+    pauli_str1 (str): Pauli string of first Pauli operator.
+    pauli_str2 (str): Pauli string of second Pauli operator.
+    
+    Returns:
+    bool: True if pauli1 and pauli2 commute, False otherwise.
+    """
+    for i in range(len(pauli_str1)):
+        if pauli_str1[i] != 'I' and pauli_str2[i] != 'I' and pauli_str1[i] != pauli_str2[i]:
+            return False
+    return True
+
 
 # =========================================================================================
 # PAULI TERM OPTIMIZATION FUNCTIONS
