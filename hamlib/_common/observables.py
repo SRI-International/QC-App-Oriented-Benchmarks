@@ -336,7 +336,7 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
     
     # Compute the total energy for the Hamiltonian
     ts3 = time.time()
-    total_energy, term_contributions = calculate_expectation(num_qubits, results, circuits, pauli_term_groups)
+    total_energy, term_contributions = calculate_expectation(num_qubits, results, pauli_term_groups)
     ts4 = time.time()
     
     if verbose_time:
@@ -352,9 +352,9 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
     return total_energy, term_contributions
 
 
-def calculate_expectation(num_qubits, results, circuits, pauli_term_groups):
+def calculate_expectation(num_qubits, results, pauli_term_groups):
     """
-    Calculates the total expectation value (energy) from measurement results and provided circuits.
+    Calculates the total expectation value (energy) from measurement results and provided pauli_term_groups.
 
     This function processes measurement results for a set of quantum circuits, each corresponding to
     a group of Pauli terms, to compute the expectation value of a Hamiltonian. Optionally, it can store
@@ -363,7 +363,6 @@ def calculate_expectation(num_qubits, results, circuits, pauli_term_groups):
     Args:
         num_qubits (int): Number of qubits in the circuit.
         results (Result): Results object containing measurement counts from circuit execution.
-        circuits (list): List of quantum circuits corresponding to the Pauli term groups.
         pauli_term_groups (list): Groups of Pauli terms as tuples of (pauli, coeff).
         term_contributions (dict, optional): Dictionary to store the contribution of each term.
 
@@ -375,14 +374,10 @@ def calculate_expectation(num_qubits, results, circuits, pauli_term_groups):
     """
     total_exp = 0
     term_contributions = {}
-    
-    # bundle the circuits with the corresponding sets of terms (one or multiple)
-    circuits = list(zip(circuits, pauli_term_groups))
-    #for circuit in circuits: print(circuit)
-    
-    # Loop over each circuit and its corresponding measurement results
-    if len(circuits) > 1:
-        for (qc, group), result in zip(circuits, results.get_counts()):
+   
+    # Loop over each group and its corresponding measurement results
+    if len(pauli_term_groups) > 1:
+        for group, result in zip(pauli_term_groups, results.get_counts()):
             counts = result
 
             # Process each Pauli term in the current group
@@ -396,7 +391,7 @@ def calculate_expectation(num_qubits, results, circuits, pauli_term_groups):
     # results object has different structure when only one circuit, process specially here
     else:
         counts = results.get_counts()
-        group = circuits[0][1]
+        group = pauli_term_groups[0]
 
         # Process each Pauli term in the current group
         for term, coeff in group:
@@ -404,11 +399,10 @@ def calculate_expectation(num_qubits, results, circuits, pauli_term_groups):
             total_exp += coeff * exp_val
             
             # if dict provided, save the contribution from each term
-            if term_contributions is not None:
-                term_contributions[term] = exp_val
+            term_contributions[term] = exp_val
 
     return total_exp, term_contributions
-
+    
 def calculate_expectation_from_contributions(ham_terms, term_contributions):
     """
     Computes the total expectation value from precomputed term contributions.
