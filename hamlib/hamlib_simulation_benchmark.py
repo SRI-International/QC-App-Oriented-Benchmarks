@@ -53,6 +53,9 @@ def qedc_benchmarks_init(api: str = "qiskit"):
     import hamlib_utils as hamlib_utils
     globals()["hamlib_utils"] = hamlib_utils
     
+    import observables as observables
+    globals()["observables"] = observables
+    
     import hamlib_simulation_kernel as hamlib_simulation_kernel
     globals()["hamlib_simulation_kernel"] = hamlib_simulation_kernel
     
@@ -269,6 +272,7 @@ def run(min_qubits: int = 2,
         hamiltonian: str = "TFIM", 
         hamiltonian_params: dict = None,
         method: int = 1,
+        do_observables = False,
         random_pauli_flag: bool = False, 
         random_init_flag: bool = False, 
         use_inverse_flag: bool = False,
@@ -404,6 +408,9 @@ def run(min_qubits: int = 2,
         sparse_pauli_terms, dataset_name = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
                                                                 params=hamiltonian_params)
         print(f"... dataset_name = {dataset_name}")
+        if verbose:
+            print(f"... hamiltonian_params = \n{hamiltonian_params}")
+            print(f"... sparse_pauli_terms = {sparse_pauli_terms}")
 
         #######################################################################
 
@@ -412,7 +419,7 @@ def run(min_qubits: int = 2,
         for circuit_id in range(num_circuits):
 
             ts = time.time()
-
+            
             #used to store random pauli correct bitstrings
             global bitstring_dict
             
@@ -423,17 +430,53 @@ def run(min_qubits: int = 2,
                 K = K,
                 t = t,         
                 init_state = init_state,
+                append_measurements = False if do_observables else True,
                 method = method, 
                 use_inverse_flag = use_inverse_flag,
                 random_pauli_flag = random_pauli_flag, 
                 random_init_flag = random_init_flag)
                
             bitstring_dict[qc.name] = bitstring
-                    
-            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+            
+            if not do_observables:
+            
+                metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
-            # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
+                # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
+                ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
+            else:
+        
+                # Flag to control optimize by use of commuting groups
+                use_commuting_groups = True
+                
+                pauli_terms = convert_sparse_to_full(sparse_pauli_terms, num_qubits=num_qubits)
+
+                # groups Pauli terms for quantum execution, optionally combining commuting terms into groups.
+                pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                        num_qubits, pauli_terms, use_commuting_groups)
+
+                # generate an array of circuits, one for each pauli_string in list
+                circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
+                
+                if verbose:                 
+                    for circuit, group in list(zip(circuits, pauli_term_groups)):
+                        print(group)
+                        #print(circuit)
+                  
+                # Initialize simulator backend
+                from qiskit_aer import Aer
+                backend = Aer.get_backend('qasm_simulator')
+               
+                # Execute all of the circuits to obtain array of result objects
+                results = backend.run(circuits, num_shots=10000).result()
+                
+                # Compute the total energy for the Hamiltonian
+                total_energy, term_contributions = observables.calculate_expectation_from_measurements(
+                                                            num_qubits, results, pauli_term_groups)
+
+                print(f"... total execution time = {round(time.time()-ts, 3)}")
+                print(f"Total Energy: {total_energy}")
+                print(f"Term Contributions: {term_contributions}")
         
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
@@ -452,6 +495,23 @@ def run(min_qubits: int = 2,
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
+def convert_sparse_to_full(sparse_pauli_terms, num_qubits: int = 0):
+
+    # If num_qubits not given, determine the number of qubits from the sparse format
+    if num_qubits <= 0:
+        num_qubits = 1 + max(max(term.keys()) for term, _ in sparse_pauli_terms) if sparse_pauli_terms else 0
+    
+    # Function to convert a single sparse term to full form
+    def convert_term(term):
+        full_term = ['I'] * num_qubits  # Initialize all qubits with 'I'
+        for qubit, pauli in term.items():
+            full_term[qubit] = pauli         # Set the specified Pauli term
+        return ''.join(full_term)
+    
+    # Convert all terms
+    return [(convert_term(term), coeff) for term, coeff in sparse_pauli_terms]
+
+
 #######################
 # MAIN
 
@@ -468,6 +528,7 @@ def get_args():
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", "-c", default=1, help="Maximum circuit repetitions", type=int)     
     parser.add_argument("--hamiltonian", "-ham", default="TFIM", help="Name of Hamiltonian", type=str)
+    parser.add_argument("--do_observables", "-obs", action="store_true", help="Compute observable values")
     parser.add_argument("--parameters", "-params", default=None, help="Hamiltonian parameters, e.g 'enc:bk,h:2'")  
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Data File Suffix", type=str)
@@ -531,6 +592,7 @@ if __name__ == '__main__':
         num_shots=args.num_shots,
         hamiltonian=args.hamiltonian,
         hamiltonian_params=hamiltonian_params,
+        do_observables=args.do_observables,
         method=args.method,
         random_pauli_flag=args.random_pauli_flag,
         random_init_flag=args.random_init_flag,
