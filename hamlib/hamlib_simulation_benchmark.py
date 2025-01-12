@@ -468,7 +468,7 @@ def run(min_qubits: int = 2,
                 backend = Aer.get_backend('qasm_simulator')
                
                 # Execute all of the circuits to obtain array of result objects
-                results = backend.run(circuits, num_shots=10000).result()
+                results = backend.run(circuits, num_shots=num_shots).result()
                 
                 # Compute the total energy for the Hamiltonian
                 total_energy, term_contributions = observables.calculate_expectation_from_measurements(
