@@ -96,9 +96,7 @@ def compute_theoretical_energies(initial_state, pauli_terms, time, step_size):
         step_size (float): Time step size.
 
     Returns:
-        tuple: (exact_energy, exact_times)
-            - exact_energy (list): Expectation values of the Hamiltonian over time.
-            - exact_times (np.ndarray): Time steps for the evolution.
+        exact_energies (list): Expectation values of the Hamiltonian over time.
     """
     if pauli_terms is None:
         return [None]
@@ -157,11 +155,11 @@ def compute_theoretical_energies(initial_state, pauli_terms, time, step_size):
         exact_evolution.append(next_state)
 
     # Compute the expectation values of the Hamiltonian
-    exact_energy = [
+    exact_energies = [
         np.real(np.vdot(state, np.dot(H_matrix, state))) for state in exact_evolution
     ]
 
-    return exact_energy, exact_times
+    return exact_energies
 
 
 ##########################################################
@@ -211,9 +209,9 @@ def compute_theoretical_energies_spo_sv(initial_state, H, time, step_size):
         exact_evolution.append(exact_evolution[-1].evolve(exp_H))
 
     # Having the exact state vectors, we compute the exact evolution of our operators’ expectation values.
-    exact_energy = np.real([sv.expectation_value(H) for sv in exact_evolution])
+    exact_energies = np.real([sv.expectation_value(H) for sv in exact_evolution])
     
-    return exact_energy, exact_times
+    return exact_energies
 
 ##################################
     
@@ -229,9 +227,7 @@ def compute_theoretical_energies_spo_mat(initial_state, H, time, step_size):
         step_size (float): Time step size.
 
     Returns:
-        tuple: (exact_energy, exact_times)
-            - exact_energy (list): Expectation values of the Hamiltonian over time.
-            - exact_times (np.ndarray): Time steps for the evolution.
+        list (float): Expectation values of the Hamiltonian over time.
     """
     if H is None:
         return [None]
@@ -267,11 +263,11 @@ def compute_theoretical_energies_spo_mat(initial_state, H, time, step_size):
         exact_evolution.append(next_state)
 
     # Compute the expectation values of the Hamiltonian
-    exact_energy = [
+    exact_energies = [
         np.real(np.vdot(state, np.dot(H, state))) for state in exact_evolution
     ]
 
-    return exact_energy, exact_times
+    return exact_energies
  
 ##################################
    
@@ -289,9 +285,7 @@ def compute_theoretical_energies_spo_slow(initial_state, H, time, step_size):
         step_size (float): Time step size.
 
     Returns:
-        tuple: (exact_energy, exact_times)
-            - exact_energy (list): Expectation values of the Hamiltonian over time.
-            - exact_times (np.ndarray): Time steps for the evolution.
+        exact_energies (list): Expectation values of the Hamiltonian over time.
     """
     if H is None:
         return [None]
@@ -321,11 +315,11 @@ def compute_theoretical_energies_spo_slow(initial_state, H, time, step_size):
         exact_evolution.append(next_state)
 
     # Compute the expectation values of the Hamiltonian
-    exact_energy = [
+    exact_energies = [
         np.real(np.vdot(state, np.dot(H, state))) for state in exact_evolution
     ]
 
-    return exact_energy, exact_times
+    return exact_energies
     
 ####################################
 
@@ -341,9 +335,7 @@ def compute_theoretical_energies_spo_scipy(initial_state, H, time, step_size):
         step_size (float): Time step size.
 
     Returns:
-        tuple: (exact_energy, exact_times)
-            - exact_energy (list): Expectation values of the Hamiltonian over time.
-            - exact_times (np.ndarray): Time steps for the evolution.
+        exact_energies (list): Expectation values of the Hamiltonian over time.
     """
     if H is None:
         return [None]
@@ -382,13 +374,13 @@ def compute_theoretical_energies_spo_scipy(initial_state, H, time, step_size):
         exact_evolution.append(next_state)
 
     # Having the exact state vectors, we compute the exact evolution of our operators’ expectation values.
-    #exact_energy = np.real([sv.expectation_value(H) for sv in exact_evolution])
-    exact_energy = []
+    #exact_energies = np.real([sv.expectation_value(H) for sv in exact_evolution])
+    exact_energies = []
     for state in exact_evolution:
         #print(f"... state = {state}")
-        exact_energy.append(state.expectation_value(H))
+        exact_energies.append(state.expectation_value(H))
         
-    return exact_energy, exact_times
+    return exact_energies
     
 # this is taken from the (deprecated) hamiltonian_exact.py file, for reference
 def compute_theoretical_energy_scipy(qc_initial, n_spins: int, hamiltonian_op = None, time: float = 1.0):

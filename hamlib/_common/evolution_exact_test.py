@@ -36,7 +36,7 @@ print(initial_state)
 total_evolution_time = 0.5
 
 # Compute the theoretical energy using an exact computation
-theoretical_energies_exact, time_values = evolution_exact.compute_theoretical_energies(
+theoretical_energies_exact = evolution_exact.compute_theoretical_energies(
         initial_state,
         H_terms,
         total_evolution_time,
@@ -44,7 +44,7 @@ theoretical_energies_exact, time_values = evolution_exact.compute_theoretical_en
 
 print("")
 print(f"For evolution time = {total_evolution_time}:")
-print(f"  Theoretical energy (exact): {theoretical_energies_exact[0]}")
+print(f"  Theoretical energy (exact): {theoretical_energies_exact}")
 print("")
 
 #############################
@@ -83,7 +83,7 @@ try:
     print(sparse_pauli_op)
       
     # Compute the theoretical energy using an exact computation
-    theoretical_energies_exact, time_values = evolution_exact.compute_theoretical_energies_spo_sv(
+    theoretical_energies_exact = evolution_exact.compute_theoretical_energies_spo_sv(
             initial_state,
             sparse_pauli_op,
             total_evolution_time,
@@ -91,7 +91,7 @@ try:
 
     print("")
     print(f"For evolution time = {total_evolution_time}:")
-    print(f"  Theoretical energy (exact): {theoretical_energies_exact[0]}")
+    print(f"  Theoretical energy (exact): {theoretical_energies_exact}")
     print("")
     
     
