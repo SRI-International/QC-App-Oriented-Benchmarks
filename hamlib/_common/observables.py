@@ -10,6 +10,7 @@ import numpy as np
 import copy
 import sys
 import time
+from typing import Union, List, Tuple, Dict
 
 from qiskit.quantum_info import SparsePauliOp
 
@@ -25,6 +26,8 @@ noise_model = None
 
 # ===========================================
 # CONVERT TO SPARSE PAULI OP
+
+# This is only needed for the high-level estimate_expectation_value, which will be moved out soon.
 
 def convert_to_sparse_pauli_op(pauli_terms):
     """
@@ -212,7 +215,10 @@ def group_pauli_terms_for_execution(
           and each group's Pauli strings are merged using `merge_pauli_terms()`.
         - When `use_commuting_groups` is False, each term is treated as its own group, ensuring 
           consistency for expectation function submission.
-    """
+    """ 
+    # Ensure that the pauli_terms are in 'full' format, not 'sparse' - convert it necessary
+    pauli_terms = ensure_pauli_terms(pauli_terms, num_qubits=num_qubits)
+       
     if not use_commuting_groups:
         if verbose:
             print("\n******** creating circuits from Hamiltonian pauli terms:")
@@ -248,7 +254,6 @@ def group_pauli_terms_for_execution(
             
     return pauli_term_groups, pauli_str_list
     
-
 def merge_pauli_terms(group: list, num_qubits: int):
     """
     Merges a group of Pauli terms into a single Pauli string.
@@ -274,6 +279,61 @@ def merge_pauli_terms(group: list, num_qubits: int):
     merged_term = "".join(merged_paulis)
     return merged_term
 
+
+def ensure_pauli_terms(
+    input_data: Union[
+        List[Tuple[str, complex]],
+        List[Tuple[Dict[int, str], complex]]
+    ],
+    num_qubits: int = 0
+) -> list:
+    """
+    Processes the input data, which can be one of:
+    - An array of simple tuples (List[Tuple[str, complex]]).
+    - An array of sparse tuples (List[Tuple[Dict[int, str], complex]]).
+    
+    If the input is an array of simple tuples, do nothing.
+    If the input is an array of sparse tuples, it is converted to a list of simple tuples.
+    
+    Args:
+        input_data: Input data to process.
+    
+    Returns:
+        A simple Pauli terms list.
+    """
+    if verbose:
+        print(f"  ... ensure_pauli_terms({input_data}, {num_qubits})")
+        
+    if input_data is None or num_qubits < 1:
+        return None
+        
+    if isinstance(input_data, list):
+        # Check if the first element indicates a simple or sparse format
+        if all(isinstance(term[0], str) for term in input_data):
+            return input_data
+        elif all(isinstance(term[0], dict) for term in input_data):
+            return convert_sparse_to_full(input_data, num_qubits=num_qubits)
+        else:
+            raise ValueError("Inconsistent format in the input list.")
+    else:
+        raise TypeError("Input must be a list of strings or tuples")
+
+def convert_sparse_to_full(sparse_pauli_terms, num_qubits: int = 0):
+
+    # If num_qubits not given, determine the number of qubits from the sparse format
+    if num_qubits <= 0:
+        num_qubits = 1 + max(max(term.keys()) for term, _ in sparse_pauli_terms) if sparse_pauli_terms else 0
+    
+    # Function to convert a single sparse term to full form
+    def convert_term(term):
+        full_term = ['I'] * num_qubits  # Initialize all qubits with 'I'
+        for qubit, pauli in term.items():
+            full_term[qubit] = pauli         # Set the specified Pauli term
+        return ''.join(full_term)
+    
+    # Convert all terms
+    return [(convert_term(term), coeff) for term, coeff in sparse_pauli_terms]
+    
 
 # ####################################################################################
 # CALCULATE EXPECTATION VALUE FUNCTIONS

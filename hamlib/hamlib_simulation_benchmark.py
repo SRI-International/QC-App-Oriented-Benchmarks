@@ -448,12 +448,10 @@ def run(min_qubits: int = 2,
         
                 # Flag to control optimize by use of commuting groups
                 use_commuting_groups = True
-                
-                pauli_terms = convert_sparse_to_full(sparse_pauli_terms, num_qubits=num_qubits)
 
                 # groups Pauli terms for quantum execution, optionally combining commuting terms into groups.
                 pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
-                        num_qubits, pauli_terms, use_commuting_groups)
+                        num_qubits, sparse_pauli_terms, use_commuting_groups)
 
                 # generate an array of circuits, one for each pauli_string in list
                 circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
@@ -493,23 +491,6 @@ def run(min_qubits: int = 2,
     base_ham_name = os.path.basename(hamiltonian)
     options = {"ham": base_ham_name, "method":method, "shots": num_shots, "reps": max_circuits}   
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
-
-
-def convert_sparse_to_full(sparse_pauli_terms, num_qubits: int = 0):
-
-    # If num_qubits not given, determine the number of qubits from the sparse format
-    if num_qubits <= 0:
-        num_qubits = 1 + max(max(term.keys()) for term, _ in sparse_pauli_terms) if sparse_pauli_terms else 0
-    
-    # Function to convert a single sparse term to full form
-    def convert_term(term):
-        full_term = ['I'] * num_qubits  # Initialize all qubits with 'I'
-        for qubit, pauli in term.items():
-            full_term[qubit] = pauli         # Set the specified Pauli term
-        return ''.join(full_term)
-    
-    # Convert all terms
-    return [(convert_term(term), coeff) for term, coeff in sparse_pauli_terms]
 
 
 #######################
