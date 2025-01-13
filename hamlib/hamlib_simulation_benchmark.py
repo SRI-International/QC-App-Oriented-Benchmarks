@@ -471,11 +471,12 @@ def run(min_qubits: int = 2,
                 # Compute the total energy for the Hamiltonian
                 total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                             num_qubits, results, pauli_term_groups)
-
+                print("************")
                 print(f"... total execution time = {round(time.time()-ts, 3)}")
                 print(f"Total Energy: {total_energy}")
                 print(f"Term Contributions: {term_contributions}")
-        
+                print("")
+                
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
     
