@@ -180,11 +180,11 @@ def analyze_and_print_result(
             print(f"... begin exact computation for id={type} ...")
             
         ts = time.time()
-
+        
         # DEVNOTE: ideally, we can remove this next line somehow      
         # create quantum circuit with initial state
         qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
-                            
+        """                  
         # compute the expected  distribution after exact evolution
         #correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
         correct_dist, correct_exp = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
@@ -198,11 +198,12 @@ def analyze_and_print_result(
         """        
         correct_exp, correct_dist = evolution_exact.compute_expectation_exact_spo_scipy(
                 init_state, 
+                qc_initial,
                 num_qubits,
                 hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
                 1.0            # time
                 )
-             
+            
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
         print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
@@ -211,7 +212,7 @@ def analyze_and_print_result(
         print(f"Expectation = {correct_exp}")
         
         ###### Test of the newer evolution_eact code:
-        
+        """
         ts = time.time()
         
         expectation, distribution = evolution_exact.compute_expectation_exact(
@@ -228,9 +229,10 @@ def analyze_and_print_result(
         #print_top_measurements(f"Correct dist (2) = ", distribution, 100)
         print(f"Expectation (2) = {expectation}")
         
-        correct_exp = expectation
-        correct_dist = distribution
-        """ 
+        #correct_exp = expectation
+        #correct_dist = distribution
+        
+        """
 
     # for method 3, compute expected distribution from the initial state
     elif method == 3: 

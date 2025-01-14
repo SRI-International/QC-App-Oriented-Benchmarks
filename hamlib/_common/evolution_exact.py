@@ -470,7 +470,7 @@ Compute theoretical energy from Hamiltonian and initial state.
 This version is returning a single classically computed exact energy, and the asociated distribution.
 """
 
-def compute_expectation_exact_spo_scipy(initial_state, num_qubits, H, time):
+def compute_expectation_exact_spo_scipy(initial_state, qc_initial, num_qubits, H, time):
     """
     Compute the theoretical energy by evolving a quantum state under a Hamiltonian using NumPy.
 
@@ -486,35 +486,28 @@ def compute_expectation_exact_spo_scipy(initial_state, num_qubits, H, time):
     """
     if H is None:
         return [None]
+    
+    if not qc_initial:
+    
+        # ensure initial_state is a normalized complex vector
+        initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
+
+        # Ensure initial_state is a normalized complex vector
+        #initial_state = np.array(initial_state, dtype=complex)
+        #initial_state /= np.linalg.norm(initial_state)
+
+        #print(f"... initial state = {initial_state}")
         
-    # ensure initial_state is a normalized complex vector
-    initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
-
-    # Ensure initial_state is a normalized complex vector
-    #initial_state = np.array(initial_state, dtype=complex)
-    #initial_state /= np.linalg.norm(initial_state)
-
-    #print(f"... initial state = {initial_state}")
-    
-    qc_initial = QuantumCircuit(num_qubits)
-    
-    # Initialize the circuit with the given state vector
-    qc_initial.initialize(initial_state, qc_initial.qubits)
-    
-    #time_problem = TimeEvolutionProblem(hamiltonian_op, time, initial_state=qc_initial)
-    #time_problem = TimeEvolutionProblem(hamiltonian_op, time, initial_state=initial_state)
-    
-    # We compute the exact evolution using the exp
-    #exact_evolution = [Statevector(initial_state)]
-     
-    #exp_H = sc.linalg.expm(-1j * step_size * H_array)
+        qc_initial = QuantumCircuit(num_qubits)
+        
+        # Initialize the circuit with the given state vector
+        qc_initial.initialize(initial_state, qc_initial.qubits)
         
     # Evolve the state using SciPyRealEvolver
     time_problem = TimeEvolutionProblem(H, time, initial_state=qc_initial)
     evolved_state = SciPyRealEvolver(num_timesteps=1).evolve(time_problem).evolved_state      
 
     # Having the exact state vector, we compute the exact evolution of our operators’ expectation value.
-    #exact_expectations = np.real([sv.expectation_value(H) for sv in exact_evolution])
     exact_expectation = np.real(evolved_state.expectation_value(H))
     
     # Compute the probabilities as the squared magnitudes of the state vector
@@ -523,9 +516,18 @@ def compute_expectation_exact_spo_scipy(initial_state, num_qubits, H, time):
     probability_distribution = {
         format(i, f'0{num_qubits}b'): prob for i, prob in enumerate(probabilities)
     }
-    
+    """ old code for reference, while testing
     return exact_expectation, probability_distribution
 
+    time_problem = TimeEvolutionProblem(hamiltonian_op, time, initial_state=qc_initial)
+    result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
+    
+    return result.evolved_state.probabilities_dict(), result.evolved_state.expectation_value(hamiltonian_op)
+    """
+    
+    # use this code
+    hamiltonian_op = H
+    return evolved_state.expectation_value(hamiltonian_op), evolved_state.probabilities_dict()
     
 # this is taken from the (deprecated) hamiltonian_exact.py file, for reference
 # It takes a QuantumCircuit as input and is no loger used.
