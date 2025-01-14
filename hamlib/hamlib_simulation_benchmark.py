@@ -22,6 +22,8 @@ sys.path[1:1] = ["_common"]
 
 from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
 
+import evolution_exact
+
 ############### Configure API
 #
 ## DEVNOTE: This functiion may be more complicated than is needed; simplify if possible
@@ -184,12 +186,51 @@ def analyze_and_print_result(
         qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
                             
         # compute the expected  distribution after exact evolution
-        correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
+        #correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
+        correct_dist, correct_exp = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
                 hamiltonian_op=hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
                 time=1.0)
                 
+        # DEVNOTE: the following code is WIP ... 
+        # it is for testing the new versions of exact expectation and distribution calculations.
+        # The compute_expectation_exact_spo_scipy version is resulting in slightly lower values for fidelity.
+        # while the new compute_expectation_exact version is way too slow.  Still debugging.
+        """        
+        correct_exp, correct_dist = evolution_exact.compute_expectation_exact_spo_scipy(
+                init_state, 
+                num_qubits,
+                hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
+                1.0            # time
+                )
+             
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
+        print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
+        
+        #print_top_measurements(f"Correct dist = ", correct_dist, 100)
+        print(f"Expectation = {correct_exp}")
+        
+        ###### Test of the newer evolution_eact code:
+        
+        ts = time.time()
+        
+        expectation, distribution = evolution_exact.compute_expectation_exact(
+                init_state,
+                observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
+                1.0            # time
+                )
+        
+        if verbose:
+            print(f"... exact computation time (2) = {round((time.time() - ts), 3)} sec")  
+            
+        print(f"... exact computation time (2) = {round((time.time() - ts), 3)} sec")
+        
+        #print_top_measurements(f"Correct dist (2) = ", distribution, 100)
+        print(f"Expectation (2) = {expectation}")
+        
+        correct_exp = expectation
+        correct_dist = distribution
+        """ 
 
     # for method 3, compute expected distribution from the initial state
     elif method == 3: 

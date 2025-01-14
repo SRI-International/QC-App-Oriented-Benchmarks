@@ -161,6 +161,86 @@ def compute_expectations_exact(initial_state, pauli_terms, time, step_size):
 
     return exact_expectations
 
+"""
+Compute theoretical energy from Hamiltonian and initial state.
+This version is returning a single classically computed exact energy, and the asociated distribution.
+"""
+   
+def compute_expectation_exact(initial_state, pauli_terms, time):
+    """
+    Compute the theoretical energy by evolving a quantum state under a Hamiltonian using NumPy.
+
+    Args:
+        initial_state (array-like): Initial state vector as a NumPy array.
+        pauli_terms (array): Array of Pauli terms in the form [(term, coeff), ...].
+        time (float): Total evolution time.
+
+    Returns:
+        exact_expectation (float): Expectation value of the Hamiltonian over given time.
+        probability_distribution (dict): Probability distribution of the Hamiltonian at the given time.
+    """
+    if pauli_terms is None:
+        return [None]
+        
+    if verbose:
+        print(f"... compute_expectation_exact({pauli_terms})")
+     
+    # Determine the number of qubits
+    num_qubits = len(pauli_terms[0][0])  # Length of any Pauli string
+    
+    # create empty matrix of required size
+    H_matrix = np.zeros((2**num_qubits, 2**num_qubits), dtype=complex)
+    
+    # build the matrix from the pauli terms and coefficients
+    for pauli, coeff in pauli_terms:
+        for i, p in enumerate(pauli):
+            pass
+
+        # Build the tensor product for the current Pauli string
+        pauli_matrices = []
+        for p in pauli:
+            if p == 'I':
+                pauli_matrices.append(I)
+            elif p == 'X':
+                pauli_matrices.append(X)
+            elif p == 'Y':
+                pauli_matrices.append(Y)
+            elif p == 'Z':
+                pauli_matrices.append(Z)
+            else:
+                raise ValueError(f"Invalid Pauli operator: {p}")
+
+        # Compute the tensor product and add to the Hamiltonian
+        term_matrix = tensor_product(*pauli_matrices)  
+        H_matrix += coeff * term_matrix
+    
+    # ensure initial_state is a normalized complex vector
+    initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
+
+    #print(f"    ... **** finished making matrix and initial_state")
+
+    # Compute the exponential of the Hamiltonian for each time step
+    exp_H = expm(-1j * time * H_matrix)
+    
+    #print(f"    ... **** finished computing the exponential of the Hamiltonian for time")
+
+    # Perform the time evolution 
+    # Evolve the state using matrix multiplication
+    # NOTE: next line could written as evolved_state = exp_H @ exact_evolution[-1]
+    evolved_state = np.dot(exp_H, initial_state)     
+
+    # Compute the expectation values of the Hamiltonian
+    exact_expectation = np.real(np.vdot(evolved_state, np.dot(H_matrix, evolved_state)))
+
+    # Compute the probabilities as the squared magnitudes of the state vector
+    probabilities = np.abs(evolved_state)**2
+    # Create a dictionary keyed by bitstrings
+    proability_distribution = {
+        format(i, f'0{num_qubits}b'): prob for i, prob in enumerate(probabilities)
+    }
+        
+    return exact_expectation, proability_distribution
+
 
 ##########################################################
 ##########################################################
@@ -324,12 +404,13 @@ def compute_expectations_exact_spo_slow(initial_state, H, time, step_size):
 ####################################
 
 # This function takes a SparsePauliOp and uses the SciPyRealEvolver to compute the observable value
-def compute_expectations_exact_spo_scipy(initial_state, H, time, step_size):
+def compute_expectations_exact_spo_scipy(initial_state, num_qubits, H, time, step_size):
     """
     Compute the theoretical energies by evolving a quantum state under a Hamiltonian using NumPy.
 
     Args:
         initial_state (array-like): Initial state vector as a NumPy array.
+        num_qubits (int): Number of qubits
         H (np.ndarray): Hamiltonian matrix (Hermitian).
         time (float): Total evolution time.
         step_size (float): Time step size.
@@ -349,7 +430,7 @@ def compute_expectations_exact_spo_scipy(initial_state, H, time, step_size):
     # Define a time mesh
     exact_times = np.arange(0, time + step_size, step_size)
     
-    qc_initial = QuantumCircuit(10)
+    qc_initial = QuantumCircuit(num_qubits)
     
     # Initialize the circuit with the given state vector
     qc_initial.initialize(initial_state, qc_initial.qubits)
@@ -378,11 +459,76 @@ def compute_expectations_exact_spo_scipy(initial_state, H, time, step_size):
     exact_expectations = []
     for state in exact_evolution:
         #print(f"... state = {state}")
-        exact_expectations.append(state.expectation_value(H))
+        exact_expectations.append(np.real(state.expectation_value(H)))
         
     return exact_expectations
+
+# This function takes a SparsePauliOp and uses the SciPyRealEvolver to compute the observable value
+
+"""
+Compute theoretical energy from Hamiltonian and initial state.
+This version is returning a single classically computed exact energy, and the asociated distribution.
+"""
+
+def compute_expectation_exact_spo_scipy(initial_state, num_qubits, H, time):
+    """
+    Compute the theoretical energy by evolving a quantum state under a Hamiltonian using NumPy.
+
+    Args:
+        initial_state (array-like): Initial state vector as a NumPy array.
+        num_qubits (int): Number of qubits
+        H (np.ndarray): Hamiltonian matrix (Hermitian).
+        time (float): Total evolution time.
+
+    Returns:
+        exact_expectation (float): Expectation value of the Hamiltonian over time.
+        probability_distribution (dict): Probability distribution of the Hamiltonian at the given time.
+    """
+    if H is None:
+        return [None]
+        
+    # ensure initial_state is a normalized complex vector
+    initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
+
+    # Ensure initial_state is a normalized complex vector
+    #initial_state = np.array(initial_state, dtype=complex)
+    #initial_state /= np.linalg.norm(initial_state)
+
+    #print(f"... initial state = {initial_state}")
+    
+    qc_initial = QuantumCircuit(num_qubits)
+    
+    # Initialize the circuit with the given state vector
+    qc_initial.initialize(initial_state, qc_initial.qubits)
+    
+    #time_problem = TimeEvolutionProblem(hamiltonian_op, time, initial_state=qc_initial)
+    #time_problem = TimeEvolutionProblem(hamiltonian_op, time, initial_state=initial_state)
+    
+    # We compute the exact evolution using the exp
+    #exact_evolution = [Statevector(initial_state)]
+     
+    #exp_H = sc.linalg.expm(-1j * step_size * H_array)
+        
+    # Evolve the state using SciPyRealEvolver
+    time_problem = TimeEvolutionProblem(H, time, initial_state=qc_initial)
+    evolved_state = SciPyRealEvolver(num_timesteps=1).evolve(time_problem).evolved_state      
+
+    # Having the exact state vector, we compute the exact evolution of our operators’ expectation value.
+    #exact_expectations = np.real([sv.expectation_value(H) for sv in exact_evolution])
+    exact_expectation = np.real(evolved_state.expectation_value(H))
+    
+    # Compute the probabilities as the squared magnitudes of the state vector
+    probabilities = np.abs(evolved_state)**2
+    # Create a dictionary keyed by bitstrings
+    probability_distribution = {
+        format(i, f'0{num_qubits}b'): prob for i, prob in enumerate(probabilities)
+    }
+    
+    return exact_expectation, probability_distribution
+
     
 # this is taken from the (deprecated) hamiltonian_exact.py file, for reference
+# It takes a QuantumCircuit as input and is no loger used.
 def compute_theoretical_energy_scipy(qc_initial, n_spins: int, hamiltonian_op = None, time: float = 1.0):
     """
     Perform exact Hamiltonian simulation using classical matrix evolution.

@@ -28,6 +28,29 @@ initial_state[0] = 1  # Set the amplitude for |00> state
 
 print(initial_state)
 
+def convert_to_sparse_pauli_op(pauli_terms):
+    """
+    Convert an array of (coefficient, pauli string) tuples into a SparsePauliOp.
+    
+    Args:
+    pauli_terms (list): List of tuples, each containing (coeff, pauli)
+    
+    Returns:
+    SparsePauliOp: Qiskit SparsePauliOp representation of the Hamiltonian
+    """
+         
+    if (pauli_terms is None):
+        return None
+    
+    coeffs = []
+    paulis = []
+
+    for pauli_string, coeff in pauli_terms:
+        coeffs.append(coeff)
+        paulis.append(pauli_string)
+    
+    return SparsePauliOp(paulis, coeffs)
+        
 #############################
 
 # TEST 1
@@ -55,29 +78,6 @@ try:
     from qiskit import QuantumCircuit 
     from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
     from qiskit.quantum_info import Statevector, SparsePauliOp
-
-    def convert_to_sparse_pauli_op(pauli_terms):
-        """
-        Convert an array of (coefficient, pauli string) tuples into a SparsePauliOp.
-        
-        Args:
-        pauli_terms (list): List of tuples, each containing (coeff, pauli)
-        
-        Returns:
-        SparsePauliOp: Qiskit SparsePauliOp representation of the Hamiltonian
-        """
-             
-        if (pauli_terms is None):
-            return None
-        
-        coeffs = []
-        paulis = []
-
-        for pauli_string, coeff in pauli_terms:
-            coeffs.append(coeff)
-            paulis.append(pauli_string)
-        
-        return SparsePauliOp(paulis, coeffs)
     
     sparse_pauli_op = convert_to_sparse_pauli_op(H_terms)
     print(sparse_pauli_op)
@@ -93,9 +93,67 @@ try:
     print(f"For evolution time = {total_evolution_time}:")
     print(f"  Theoretical energy (exact): {theoretical_energies_exact}")
     print("")
+       
+except Exception as ex:
+    print("WARNING: Qiskit-dependent compute observable value functions are not available")
+    print(f"Exception: {ex}") 
+
+#############################
+
+# TEST 3
+
+try:
+    from qiskit import QuantumCircuit 
+    from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
+    from qiskit.quantum_info import Statevector, SparsePauliOp
+
     
+    sparse_pauli_op = convert_to_sparse_pauli_op(H_terms)
+    print(sparse_pauli_op)
+      
+    # Compute the theoretical energy using an exact computation
+    theoretical_energies_exact = evolution_exact.compute_expectations_exact_spo_scipy(
+            initial_state,
+            4,
+            sparse_pauli_op,
+            total_evolution_time,
+            total_evolution_time)
+
+    print("")
+    print(f"For evolution time = {total_evolution_time}:")
+    print(f"  Theoretical energies (exact): {theoretical_energies_exact}")
+    print("")
+      
+except Exception as ex:
+    print("WARNING: Qiskit-dependent compute observable value functions are not available")
+    print(f"Exception: {ex}") 
+
+#############################
+
+# TEST 4
+
+try:
+    from qiskit import QuantumCircuit 
+    from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
+    from qiskit.quantum_info import Statevector, SparsePauliOp
+    
+    sparse_pauli_op = convert_to_sparse_pauli_op(H_terms)
+    print(sparse_pauli_op)
+      
+    # Compute the theoretical energy using an exact computation
+    theoretical_energy_exact, distribution = evolution_exact.compute_expectation_exact_spo_scipy(
+            initial_state,
+            4,
+            sparse_pauli_op,
+            total_evolution_time)
+
+    print("")
+    print(f"For evolution time = {total_evolution_time}:")
+    print(f"  Theoretical energy (exact): {theoretical_energy_exact}")
+    print(f"  Probability Distribution (exact): {distribution}")
+    print("")
     
 except Exception as ex:
     print("WARNING: Qiskit-dependent compute observable value functions are not available")
     print(f"Exception: {ex}") 
-    
+       
