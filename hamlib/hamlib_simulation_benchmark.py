@@ -209,7 +209,7 @@ def analyze_and_print_result(
         print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
         
         #print_top_measurements(f"Correct dist = ", correct_dist, 100)
-        print(f"Expectation = {correct_exp}")
+        #print(f"Expectation = {correct_exp}")
         
         ###### Test of the newer evolution_eact code:
         """
@@ -565,7 +565,8 @@ def get_args():
     parser.add_argument("--do_sqrt_fidelity", "-sqrt", action="store_true", help="Return square root of fidelities")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="Gen random paulis")
     parser.add_argument("--random_init_flag", "-rani", action="store_true", help="Gen random initialization")
-    parser.add_argument("--init_state", "-init", default=None, help="initial state")    
+    parser.add_argument("--init_state", "-init", default=None, help="initial state")  
+    parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")    
     return parser.parse_args()
     
 def parse_name_value_pairs(input_string: str) -> dict[str, str]:
@@ -589,6 +590,31 @@ def parse_name_value_pairs(input_string: str) -> dict[str, str]:
             result[name] = ''
     return result
 
+def do_run(args):
+
+    # execute benchmark program
+    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
+        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
+        num_shots=args.num_shots,
+        hamiltonian=args.hamiltonian,
+        hamiltonian_params=hamiltonian_params,
+        do_observables=args.do_observables,
+        method=args.method,
+        random_pauli_flag=args.random_pauli_flag,
+        random_init_flag=args.random_init_flag,
+        use_inverse_flag=args.use_inverse_flag,
+        do_sqrt_fidelity=args.do_sqrt_fidelity,
+        init_state = args.init_state,
+        K = args.num_steps,
+        t = args.time,
+        #theta=args.theta,
+        backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
+        #api=args.api
+        )
+
+import cProfile
+
 # if main, execute method
 if __name__ == '__main__':   
     args = get_args()
@@ -611,24 +637,12 @@ if __name__ == '__main__':
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
-    # execute benchmark program
-    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
-        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
-        num_shots=args.num_shots,
-        hamiltonian=args.hamiltonian,
-        hamiltonian_params=hamiltonian_params,
-        do_observables=args.do_observables,
-        method=args.method,
-        random_pauli_flag=args.random_pauli_flag,
-        random_init_flag=args.random_init_flag,
-        use_inverse_flag=args.use_inverse_flag,
-        do_sqrt_fidelity=args.do_sqrt_fidelity,
-        init_state = args.init_state,
-        K = args.num_steps,
-        t = args.time,
-        #theta=args.theta,
-        backend_id=args.backend_id,
-        exec_options = {"noise_model" : None} if args.nonoise else {},
-        #api=args.api
-        )
+    # Execute the benchmark, with profiling if requested
+    if args.profile:
+        print("\n... running benchmark with cProfile for performance profiling ...\n")
+        cProfile.run('do_run(args)', sort='cumtime')
+    else:
+        do_run(args)
+        
+    
 
