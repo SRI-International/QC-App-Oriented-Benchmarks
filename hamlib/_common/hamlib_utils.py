@@ -42,7 +42,7 @@ active_hamiltonian_datasets = None
 #####################################################################################
 # HAMLIB READER - API FUNCTIONS
 
-def load_from_file(filename: str):
+def load_hamlib_file(filename: str):
     """
     Loads and processes a Hamiltonian library (HamLib) file.
 
@@ -68,7 +68,7 @@ def load_from_file(filename: str):
         - The datasets' data and attributes are stored in memory for later use.
     """
     if verbose:
-        print(f"\n... hamlib_utils.load_from_file({filename})")
+        print(f"\n... hamlib_utils.load_hamlib_file({filename})")
 
     # if filename is known short name, get pathname
     pathname = filename
@@ -149,7 +149,7 @@ def get_hamlib_sparsepaulilist(
     """
     if verbose:
         print(f"... get_hamlib_sparsepaulilist({num_qubits}, {params})")
-        
+  
     if active_hamiltonian_datasets is None:
         print(f"ERROR: get_hamlib_sparsepaulilist(), no HamLib file is active.")
         return None, None
