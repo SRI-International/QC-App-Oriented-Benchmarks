@@ -418,7 +418,7 @@ def set_execution_target(backend_id='qasm_simulator',
                     print("... using sessions")
                 if session is None:
                     session = Session(backend=backend)
-            # otherwise, use Sampler without session
+            # otherwise, use Sampler in Batch mode
             else:
                 session = Batch(backend=backend)
 
