@@ -379,6 +379,7 @@ def set_execution_target(backend_id='qasm_simulator',
                 SamplerOptions,
                 SamplerV2,
                 Batch,
+                Session,
             )
 
             # set use_ibm_quantum_platform if provided by user - NOTE: this will modify the global setting
@@ -416,10 +417,10 @@ def set_execution_target(backend_id='qasm_simulator',
                 if verbose:
                     print("... using sessions")
                 if session is None:
-                    session = Batch(backend=backend)
+                    session = Session(backend=backend)
             # otherwise, use Sampler without session
             else:
-                session = None
+                session = Batch(backend=backend)
 
             # set Sampler options
             options_dict = exec_options.get("sampler_options", None)
