@@ -54,6 +54,7 @@ import metrics
 
 # maximum number of active jobs
 max_jobs_active = 10
+max_jobs_active = 10
 
 # job mode: False = wait, True = submit multiple jobs
 job_mode = False
@@ -370,11 +371,9 @@ def set_execution_target(backend_id='qasm_simulator',
         ###############################
         # otherwise, assume the backend_id is given only and assume it is IBM Cloud device
         else:
-            # If you want to import `Session`, you need to import it here
-            # to avoid the collision with `azure.quantum.job.session.Session`
-            # from qiskit_ibm_runtime import Session
-            from qiskit_ibm_runtime import Batch
-            
+            # need to import `Session` here to avoid the collision with
+            # `azure.quantum.job.session.Session`
+
             from qiskit_ibm_runtime import (
                 QiskitRuntimeService,
                 SamplerOptions,
@@ -1394,16 +1393,18 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
     # indicate we are done collecting metrics (called once at end of app)
     if report_end:
         metrics.end_metrics()
-        
-    # also, close any active session at end of the app
+
+
+def close_session():
+    # close any active session at end of the app
     global session
-    if report_end and session != None:
+    if session is not None:
         if verbose:
             print(f"... closing active session: {session_count}\n")
         
         session.close()
         session = None
-        
+
 
 # Check if any active jobs are complete - process if so
 # Before returning, launch any batched jobs that will keep active circuits < max
