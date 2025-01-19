@@ -211,7 +211,7 @@ def analyze_and_print_result(
         #print_top_measurements(f"Correct dist = ", correct_dist, 100)
         #print(f"Expectation = {correct_exp}")
         
-        ###### Test of the newer evolution_eact code:
+        ###### Test of the newer evolution_exact code:
         """
         ts = time.time()
         
@@ -391,7 +391,7 @@ def run(min_qubits: int = 2,
         print(f"... hamiltonian and params = {hamiltonian_name}, {hamiltonian_params}")
     
     # load the HamLib file for the given hamiltonian name
-    hamlib_utils.load_from_file(filename=hamiltonian_name)
+    hamlib_utils.load_hamlib_file(filename=hamiltonian_name)
 
     # assume default init_state if not given
     if init_state == None:
@@ -492,7 +492,7 @@ def run(min_qubits: int = 2,
                 # Flag to control optimize by use of commuting groups
                 use_commuting_groups = True
 
-                # groups Pauli terms for quantum execution, optionally combining commuting terms into groups.
+                # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
                 pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
                         num_qubits, sparse_pauli_terms, use_commuting_groups)
 
