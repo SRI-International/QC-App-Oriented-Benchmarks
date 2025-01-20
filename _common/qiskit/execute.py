@@ -54,7 +54,6 @@ import metrics
 
 # maximum number of active jobs
 max_jobs_active = 10
-max_jobs_active = 10
 
 # job mode: False = wait, True = submit multiple jobs
 job_mode = False
