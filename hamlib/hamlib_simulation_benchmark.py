@@ -206,7 +206,7 @@ def analyze_and_print_result(
             
         if verbose:
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
-        print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
+        #print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
         
         #print_top_measurements(f"Correct dist = ", correct_dist, 100)
         #print(f"Expectation = {correct_exp}")
@@ -514,11 +514,59 @@ def run(min_qubits: int = 2,
                 # Compute the total energy for the Hamiltonian
                 total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                             num_qubits, results, pauli_term_groups)
-                print("************")
+                
                 print(f"... total execution time = {round(time.time()-ts, 3)}")
-                print(f"Total Energy: {total_energy}")
-                print(f"Term Contributions: {term_contributions}")
+                
+                ############ compute exact expectation
+                
+                if verbose:
+                    print(f"... begin exact computation for id={type} ...")
+                    
+                ts = time.time()
+                
+                # DEVNOTE: ideally, we can remove this next line somehow      
+                # create quantum circuit with initial state
+                qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
+                """                  
+                # compute the expected  distribution after exact evolution
+                #correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
+                correct_dist, correct_exp = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
+                        hamiltonian_op=hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
+                        time=1.0)
+                        
+                # DEVNOTE: the following code is WIP ... 
+                # it is for testing the new versions of exact expectation and distribution calculations.
+                # The compute_expectation_exact_spo_scipy version is resulting in slightly lower values for fidelity.
+                # while the new compute_expectation_exact version is way too slow.  Still debugging.
+                """        
+                correct_exp, correct_dist = evolution_exact.compute_expectation_exact_spo_scipy(
+                        init_state, 
+                        qc_initial,
+                        num_qubits,
+                        hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
+                        1.0            # time
+                        )
+                    
+                #if verbose:
+                print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
+                
+                #print_top_measurements(f"Correct dist = ", correct_dist, 100)
+                 
+                ############ report results 
+                
+                simulation_quality = round(total_energy / correct_exp, 3)
+                
+                #print("************")
                 print("")
+                print(f"    Expectation: {round(np.real(correct_exp), 4)}")
+                if verbose: print(f"    Term Contributions: {term_contributions}")
+                print(f"    Total Energy: {round(np.real(total_energy), 4)}")
+                
+                #print("") 
+                print(f"    ==> Simulation Quality: {np.real(simulation_quality)}")
+                
+                print("")
+ 
                 
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
