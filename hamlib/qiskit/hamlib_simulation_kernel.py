@@ -409,7 +409,8 @@ def create_circuit_from_op(
     # Build the evolution gate
     # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
     evo_label = "e^-iHt"
-    evo = PauliEvolutionGate(ham_op, time=time/num_trotter_steps, label=evo_label)
+    time_step = time/num_trotter_steps if num_trotter_steps > 0 else 0.0
+    evo = PauliEvolutionGate(ham_op, time=time_step, label=evo_label)
 
     # Plug it into a circuit
     circuit = QuantumCircuit(ham_op.num_qubits)
