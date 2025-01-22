@@ -13,6 +13,7 @@ import os
 import requests
 import zipfile
 import json
+from typing import Dict, Optional   # for backwards compat <= py 3.10
 from dataclasses import dataclass
 
 verbose = False
@@ -132,7 +133,8 @@ def load_hamlib_file(filename: str):
 
 def get_hamlib_sparsepaulilist(
     num_qubits: int = 0,
-    params: dict[str, str] = None
+    #params: dict[str, str] = None
+    params: Optional[Dict[str, str]] = None
 ):
     """
     Return a quantum Hamiltonian as a sparse Pauli list given the Hamiltonian name,
@@ -177,7 +179,10 @@ def get_hamlib_sparsepaulilist(
     
     return sparse_pauli_terms, dataset_name
 
-def get_valid_qubits(min_qubits, max_qubits, skip_qubits, params: dict[str, str] = None):
+def get_valid_qubits(min_qubits, max_qubits, skip_qubits,
+        #params: dict[str, str] = None
+        params: Optional[Dict[str, str]] = None
+        ):
     """
     Get an array of valid qubits within the specified range, removing duplicates.
 
@@ -211,7 +216,10 @@ def get_valid_qubits(min_qubits, max_qubits, skip_qubits, params: dict[str, str]
 #####################################################################################
 # HAMLIB READER - INTERNAL FUNCTIONS
 
-def find_dataset_for_params(num_qubits: int = 0, params: dict[str, str] = None):
+def find_dataset_for_params(num_qubits: int = 0,
+        #params: dict[str, str] = None
+        params: Optional[Dict[str, str]] = None
+        ):
     """
     Searches for datasets matching the specified number of qubits and parameters.
 

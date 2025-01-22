@@ -17,6 +17,7 @@ import sys
 import time
 import math
 import numpy as np
+from typing import Dict, Optional   # for backwards compat <= py 3.10
 
 sys.path[1:1] = ["_common"]
 
@@ -617,7 +618,7 @@ def get_args():
     parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")    
     return parser.parse_args()
     
-def parse_name_value_pairs(input_string: str) -> dict[str, str]:
+def parse_name_value_pairs(input_string: str) -> Dict[str, str]:
     """
     Parses a string of name-value pairs separated by colons and commas.
 
