@@ -70,7 +70,7 @@ def ensure_valid_state(initial_state, num_qubits = None):
             for k in range(0, num_qubits):
                 initial_state += "0" if k % 2 == 1 else "1"
                 
-            print(f"... initial_state (check) = {initial_state}")
+            #print(f"... initial_state (check) = {initial_state}")
         
         initial_state = generate_initial_state(initial_state)
 
