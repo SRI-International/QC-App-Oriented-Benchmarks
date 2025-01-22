@@ -414,12 +414,15 @@ def set_execution_target(backend_id='qasm_simulator',
             # if use sessions, setup runtime service, Session, and Sampler
             if use_sessions:
                 if verbose:
-                    print("... using sessions")
+                    print("... using session")
                 if session is None:
                     session = Session(backend=backend)
             # otherwise, use Sampler in Batch mode
             else:
-                session = Batch(backend=backend)
+                if verbose:
+                    print("... using batch")
+                if session is None:
+                    session = Batch(backend=backend)
 
             # set Sampler options
             options_dict = exec_options.get("sampler_options", None)
