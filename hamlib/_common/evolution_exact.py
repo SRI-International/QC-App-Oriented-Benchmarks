@@ -14,13 +14,15 @@ The others are maintained here for reference and may be removed later.d
 
 import copy
 from math import sin, cos, pi
-import time
+import time as timefuns
 
 import numpy as np
 import scipy as sc
 
 import numpy as np
 from scipy.linalg import expm
+from scipy.sparse.linalg import expm_multiply
+from scipy.sparse import csr_matrix, identity, kron
 
 # Set numpy print options to format floating point numbers
 np.set_printoptions(precision=3, suppress=True)
@@ -28,33 +30,50 @@ np.set_printoptions(precision=3, suppress=True)
 verbose = False
 
 ##########################################################
+# LINEAR ALGEBRA FUNCTIONS
 
 # Define the Pauli matrices and the computational basis states for a single qubit.
 # Pauli matrices as numpy arrays
 
-I = np.array([[1, 0], [0, 1]], dtype=complex)  # Identity matrix
-X = np.array([[0, 1], [1, 0]], dtype=complex)  # Pauli-X matrix
-Y = np.array([[0, -1j], [1j, 0]], dtype=complex)  # Pauli-Y matrix
-Z = np.array([[1, 0], [0, -1]], dtype=complex)  # Pauli-Z matrix
-
 # Qubit basis states
-Zero = np.array([1, 0], dtype=complex)  # |0⟩ state
-One = np.array([0, 1], dtype=complex)   # |1⟩ state
+Zero = csr_matrix([[1], [0]], dtype=complex)  # |0⟩ state as a sparse column vector
+One = csr_matrix([[0], [1]], dtype=complex)  # |1⟩ state as a sparse column vector
 
-# Define a function to compute the tensor product of multiple matrices or vectors.
+# Predefine sparse Pauli matrices
+I = identity(2, format='csr', dtype=complex)
+X = csr_matrix([[0, 1], [1, 0]], dtype=complex)
+Y = csr_matrix([[0, -1j], [1j, 0]], dtype=complex)
+Z = csr_matrix([[1, 0], [0, -1]], dtype=complex)
+
+# Pauli matrix map for convenience
+PAULI_MAP = {'I': I, 'X': X, 'Y': Y, 'Z': Z}
+
 def tensor_product(*matrices):
-    """Compute the tensor product of a sequence of matrices or vectors."""
+    """Efficient sparse tensor product."""
     result = matrices[0]
     for m in matrices[1:]:
-        result = np.kron(result, m)
+        result = kron(result, m, format='csr')
     return result
 
-# Define a function to generate the initial state vector from a binary string, e.g., '110' for (|110⟩).
+
+##########################################################
+# INITIAL STATE FUNCTIONS
+    
 def generate_initial_state(state_str):
-    """Generate the initial state from a binary string, e.g., '110' for |110⟩."""
+    """
+    Generate the initial state as a sparse vector from a binary string, e.g., '110' for |110⟩.
+    
+    Args:
+        state_str (str): A binary string representing the desired initial state (e.g., '110').
+
+    Returns:
+        csr_matrix: A sparse vector representing the initial quantum state.
+    """
+    # Map '0' to |0⟩ (Zero) and '1' to |1⟩ (One)
     state = [One if bit == '1' else Zero for bit in state_str]
+    # Compute the tensor product of the qubits
     return tensor_product(*state)
- 
+    
 # Ensure that the initial state is a valid state vector (array)
 def ensure_valid_state(initial_state, num_qubits = None): 
 
@@ -69,16 +88,93 @@ def ensure_valid_state(initial_state, num_qubits = None):
             initial_state = ""
             for k in range(0, num_qubits):
                 initial_state += "0" if k % 2 == 1 else "1"
-                
-            #print(f"... initial_state (check) = {initial_state}")
-        
+                        
         initial_state = generate_initial_state(initial_state)
-
+         
+        # Convert to dense for general use; DEVNOTE: could use sparse state later
+        dense_state = initial_state.toarray()
+        initial_state = dense_state
+    
     # ensure initial_state is a normalized complex vector
     initial_state = np.array(initial_state, dtype=complex)
     initial_state /= np.linalg.norm(initial_state)
     
     return initial_state
+
+    
+##########################################################
+# HAMILTONIAN MATRIX FUNCTIONS
+ 
+def build_hamiltonian(num_qubits, pauli_terms):
+    """
+    Build the Hamiltonian matrix.
+    
+    Args:
+        num_qubits (int): Number of qubits.
+        pauli_terms (list): List of tuples [(pauli_string, coefficient)].
+
+    Returns:
+        csr_matrix: The Hamiltonian as a matrix.
+    """  
+
+    # create empty matrix of required size
+    H_matrix = np.zeros((2**num_qubits, 2**num_qubits), dtype=complex)
+    
+    # build the matrix from the pauli terms and coefficients
+    for pauli, coeff in pauli_terms:
+        for i, p in enumerate(pauli):
+            pass
+
+        # Build the tensor product for the current Pauli string
+        pauli_matrices = []
+        for p in pauli:
+            if p == 'I':
+                pauli_matrices.append(I)
+            elif p == 'X':
+                pauli_matrices.append(X)
+            elif p == 'Y':
+                pauli_matrices.append(Y)
+            elif p == 'Z':
+                pauli_matrices.append(Z)
+            else:
+                raise ValueError(f"Invalid Pauli operator: {p}")
+
+        # Compute the tensor product and add to the Hamiltonian
+        term_matrix = tensor_product(*pauli_matrices)  
+        H_matrix += coeff * term_matrix
+        
+    return H_matrix
+
+
+
+def build_sparse_hamiltonian(num_qubits, pauli_terms):
+    """
+    Build the Hamiltonian as a sparse matrix.
+    
+    Args:
+        num_qubits (int): Number of qubits.
+        pauli_terms (list): List of tuples [(pauli_string, coefficient)].
+
+    Returns:
+        csr_matrix: The Hamiltonian as a sparse matrix.
+    """
+    # Start with an empty sparse matrix
+    H_sparse = csr_matrix((2**num_qubits, 2**num_qubits), dtype=complex)
+
+    # Build the Hamiltonian
+    for pauli, coeff in pauli_terms:
+        # Build the tensor product for the current Pauli string
+        pauli_matrices = [PAULI_MAP[p] for p in pauli]
+        term_matrix = tensor_product(*pauli_matrices)
+
+        # Add the term to the Hamiltonian
+        H_sparse += coeff * term_matrix
+
+    return H_sparse
+  
+
+##########################################################
+# COMPUTE EXACT EXPECTATION FUNCTIONS 
     
 """
 Compute theoretical energies from Hamiltonian and initial state.
@@ -106,59 +202,47 @@ def compute_expectations_exact(initial_state, pauli_terms, time, step_size):
      
     # Determine the number of qubits
     num_qubits = len(pauli_terms[0][0])  # Length of any Pauli string
-    
-    # create empty matrix of required size
-    H_matrix = np.zeros((2**num_qubits, 2**num_qubits), dtype=complex)
-    
-    # build the matrix from the pauli terms and coefficients
-    for pauli, coeff in pauli_terms:
-        for i, p in enumerate(pauli):
-            pass
 
-        # Build the tensor product for the current Pauli string
-        pauli_matrices = []
-        for p in pauli:
-            if p == 'I':
-                pauli_matrices.append(I)
-            elif p == 'X':
-                pauli_matrices.append(X)
-            elif p == 'Y':
-                pauli_matrices.append(Y)
-            elif p == 'Z':
-                pauli_matrices.append(Z)
-            else:
-                raise ValueError(f"Invalid Pauli operator: {p}")
-
-        # Compute the tensor product and add to the Hamiltonian
-        term_matrix = tensor_product(*pauli_matrices)  
-        H_matrix += coeff * term_matrix
+    ts = timefuns.time()
+    
+    # Build the sparse Hamiltonian
+    H_matrix = build_sparse_hamiltonian(num_qubits, pauli_terms)
+    
+    matrix_time = round(timefuns.time()-ts, 3)
+    if verbose:
+        print(f"... matrix creation time = {matrix_time} sec")
     
     # ensure initial_state is a normalized complex vector
     initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
 
-    # Define a time mesh
+    initial_time = round(timefuns.time()-ts, 3)
+    if verbose:
+        print(f"... matrix and initial state time = {initial_time} sec")
+
+    # Define a time array
     exact_times = np.arange(0, time + step_size, step_size)
+     
+    # Assume H_matrix and initial_state are defined
+    H_matrix_sparse = csr_matrix(H_matrix)  # Convert H to sparse format if large
+    
+    # Compute the exponential of the Hamiltonian for each time step  
+    exact_evolution = expm_multiply(
+            -1j * step_size * H_matrix_sparse, initial_state,
+            start = 0,
+            stop = time + step_size,
+            num = exact_times.size
+            )
 
-    # Compute the exponential of the Hamiltonian for each time step
-    exp_H = expm(-1j * step_size * H_matrix)
-
-    # Initialize the state evolution list
-    exact_evolution = [initial_state]
-
-    # Perform the time evolution
-    for t in exact_times[1:]:
-        print('.', end="")
+    # Compute the expectation values of the Hamiltonian at multiple steps
+    exact_expectations = []
+    for evolved_state in exact_evolution:
+    
+        # Compute expectation value
+        H_psi = H_matrix_sparse @ evolved_state  # Sparse matrix-vector product
+        exact_expectation = np.real(np.vdot(evolved_state, H_psi))  # Inner product 
+    
+        exact_expectations.append(exact_expectation)
         
-        # Evolve the state using matrix multiplication
-        # NOTE: next line could written as next_state = exp_H @ exact_evolution[-1]
-        next_state = np.dot(exp_H, exact_evolution[-1])     
-        exact_evolution.append(next_state)
-
-    # Compute the expectation values of the Hamiltonian
-    exact_expectations = [
-        np.real(np.vdot(state, np.dot(H_matrix, state))) for state in exact_evolution
-    ]
-
     return exact_expectations
 
 """
@@ -188,50 +272,32 @@ def compute_expectation_exact(initial_state, pauli_terms, time):
     # Determine the number of qubits
     num_qubits = len(pauli_terms[0][0])  # Length of any Pauli string
     
-    # create empty matrix of required size
-    H_matrix = np.zeros((2**num_qubits, 2**num_qubits), dtype=complex)
+    ts = timefuns.time()
     
-    # build the matrix from the pauli terms and coefficients
-    for pauli, coeff in pauli_terms:
-        for i, p in enumerate(pauli):
-            pass
-
-        # Build the tensor product for the current Pauli string
-        pauli_matrices = []
-        for p in pauli:
-            if p == 'I':
-                pauli_matrices.append(I)
-            elif p == 'X':
-                pauli_matrices.append(X)
-            elif p == 'Y':
-                pauli_matrices.append(Y)
-            elif p == 'Z':
-                pauli_matrices.append(Z)
-            else:
-                raise ValueError(f"Invalid Pauli operator: {p}")
-
-        # Compute the tensor product and add to the Hamiltonian
-        term_matrix = tensor_product(*pauli_matrices)  
-        H_matrix += coeff * term_matrix
+    # Build the sparse Hamiltonian
+    H_matrix = build_sparse_hamiltonian(num_qubits, pauli_terms)
+    
+    matrix_time = round(timefuns.time()-ts, 3)
+    if verbose:
+        print(f"... matrix creation time = {matrix_time} sec")
     
     # ensure initial_state is a normalized complex vector
     initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
 
-    #print(f"    ... **** finished making matrix and initial_state")
-
-    # Compute the exponential of the Hamiltonian for each time step
-    exp_H = expm(-1j * time * H_matrix)
+    initial_time = round(timefuns.time()-ts, 3)
+    if verbose:
+        print(f"... matrix and initial state time = {initial_time} sec")
     
-    #print(f"    ... **** finished computing the exponential of the Hamiltonian for time")
+    # Compute the exponential of the Hamiltonian for each time step  
+    # Assume H_matrix and initial_state are defined
 
-    # Perform the time evolution 
-    # Evolve the state using matrix multiplication
-    # NOTE: next line could written as evolved_state = exp_H @ exact_evolution[-1]
-    evolved_state = np.dot(exp_H, initial_state)     
+    H_matrix_sparse = csr_matrix(H_matrix)  # Convert H to sparse format if large
+    evolved_state = expm_multiply(-1j * time * H_matrix_sparse, initial_state)
 
-    # Compute the expectation values of the Hamiltonian
-    exact_expectation = np.real(np.vdot(evolved_state, np.dot(H_matrix, evolved_state)))
-
+    # Compute expectation value
+    H_psi = H_matrix_sparse @ evolved_state  # Sparse matrix-vector product
+    exact_expectation = np.real(np.vdot(evolved_state, H_psi))  # Inner product 
+    
     # Compute the probabilities as the squared magnitudes of the state vector
     probabilities = np.abs(evolved_state)**2
     # Create a dictionary keyed by bitstrings
