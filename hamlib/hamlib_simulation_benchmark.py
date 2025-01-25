@@ -179,24 +179,16 @@ def analyze_and_print_result(
     elif method == 2:
         if verbose:
             print(f"... begin exact computation for id={type} ...")
-            
-        ts = time.time()
         
-        # DEVNOTE: ideally, we can remove this next line somehow      
+        ################ Using the previous evolution_exact code:
+        # the plan is to remove this code and use the new once it is validated.
+        
+        ts = time.time()
+            
         # create quantum circuit with initial state
         qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
-        """                  
-        # compute the expected  distribution after exact evolution
-        #correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
-        correct_dist, correct_exp = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
-                hamiltonian_op=hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                time=1.0)
-                
-        # DEVNOTE: the following code is WIP ... 
-        # it is for testing the new versions of exact expectation and distribution calculations.
-        # The compute_expectation_exact_spo_scipy version is resulting in slightly lower values for fidelity.
-        # while the new compute_expectation_exact version is way too slow.  Still debugging.
-        """        
+        
+        # apply the Hamiltonian operator to initial state to get expectation/distribution
         correct_exp, correct_dist = evolution_exact.compute_expectation_exact_spo_scipy(
                 init_state, 
                 qc_initial,
@@ -204,16 +196,17 @@ def analyze_and_print_result(
                 hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
                 1.0            # time
                 )
-            
+        
         if verbose:
+            print("")
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
-        #print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
+            print(f"Correct expectation = {correct_exp}")
+            #print_top_measurements(f"Correct dist = ", correct_dist, 100)
+            print("")
         
-        #print_top_measurements(f"Correct dist = ", correct_dist, 100)
-        #print(f"Expectation = {correct_exp}")
+        ################ Test of the newer evolution_exact code:
         
-        ###### Test of the newer evolution_exact code:
-        """
+        """ not used yet; see comment below ...
         ts = time.time()
         
         expectation, distribution = evolution_exact.compute_expectation_exact(
@@ -223,16 +216,17 @@ def analyze_and_print_result(
                 )
         
         if verbose:
-            print(f"... exact computation time (2) = {round((time.time() - ts), 3)} sec")  
-            
-        print(f"... exact computation time (2) = {round((time.time() - ts), 3)} sec")
+            print("")
+            print(f"... exact computation time (2) = {round((time.time() - ts), 3)} sec")
+            print(f"Correct expectation (2) = {expectation}")
+            print_top_measurements(f"Correct dist (2) = ", distribution, 100)
+            print("")
         
-        #print_top_measurements(f"Correct dist (2) = ", distribution, 100)
-        print(f"Expectation (2) = {expectation}")
-        
-        #correct_exp = expectation
-        #correct_dist = distribution
-        
+        # DEVNOTE: we cannot use the result of the new method yet.
+        # There is some difference between the distributions that are produced;
+        # this needs more investigation. New method produces lower fidelities.
+        ## correct_exp = expectation
+        ## correct_dist = distribution
         """
 
     # for method 3, compute expected distribution from the initial state
@@ -295,7 +289,7 @@ def print_top_measurements(label, counts, top_n):
     
     print("{", end=" ")
     for i, (measurement, count) in enumerate(top_counts):
-        print(f"'{measurement}': {round(count,6)}", end="")
+        print(f"'{measurement}': {np.round(count,6)}", end="")
         if i < len(top_counts) - 1:
             print(",", end=" ")
     
@@ -383,7 +377,7 @@ def run(min_qubits: int = 2,
     # Validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
-    if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even (DEVNOTE: is this True?)
+    #if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even (DEVNOTE: is this True? - NO!)
     skip_qubits = max(1, skip_qubits)
     
     hamiltonian_name = hamiltonian
@@ -515,6 +509,7 @@ def run(min_qubits: int = 2,
                 # Compute the total energy for the Hamiltonian
                 total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                             num_qubits, results, pauli_term_groups)
+                total_energy = np.real(total_energy)
                 
                 print(f"... total execution time = {round(time.time()-ts, 3)}")
                 
@@ -522,49 +517,66 @@ def run(min_qubits: int = 2,
                 
                 if verbose:
                     print(f"... begin exact computation for id={type} ...")
-                    
-                ts = time.time()
+                      
+                ################ Using the previous evolution_exact code:
+                # the plan is to remove this code and use the new once it is validated.
                 
-                # DEVNOTE: ideally, we can remove this next line somehow      
+                ts = time.time()
+                     
                 # create quantum circuit with initial state
                 qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
-                """                  
-                # compute the expected  distribution after exact evolution
-                #correct_dist = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
-                correct_dist, correct_exp = HamiltonianSimulationExact(qc_initial, n_spins=num_qubits,
-                        hamiltonian_op=hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                        time=1.0)
-                        
-                # DEVNOTE: the following code is WIP ... 
-                # it is for testing the new versions of exact expectation and distribution calculations.
-                # The compute_expectation_exact_spo_scipy version is resulting in slightly lower values for fidelity.
-                # while the new compute_expectation_exact version is way too slow.  Still debugging.
-                """        
-                correct_exp, correct_dist = evolution_exact.compute_expectation_exact_spo_scipy(
+                
+                # apply the Hamiltonian operator to initial state to get expectation/distribution
+                correct_exp, _ = evolution_exact.compute_expectation_exact_spo_scipy(
                         init_state, 
                         qc_initial,
                         num_qubits,
                         hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
                         1.0            # time
                         )
+                correct_exp = np.real(correct_exp)
                     
                 #if verbose:
                 print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
-                
-                #print_top_measurements(f"Correct dist = ", correct_dist, 100)
                  
-                ############ report results 
+                 
+                ################ Test of the newer evolution_exact code:
+   
+   
+                """ not used yet; see comment below ...
+                """
+                ts = time.time()
                 
+                expectation, _ = evolution_exact.compute_expectation_exact(
+                        init_state,
+                        observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
+                        1.0            # time
+                        )
+                
+                #if verbose:
+                print("")
+                print("*** Testing new version of exact code:")
+                print(f"... exact computation time (2) = {round((time.time() - ts), 3)} sec")
+                print(f"    Correct expectation (2) = {expectation}")
+                print("")
+                
+                # DEVNOTE: we cannot use the result of the new method yet.
+                ## correct_exp = expectation
+
+                    
+        
+                ############ report results 
+                    
                 simulation_quality = round(total_energy / correct_exp, 3)
                 
                 #print("************")
                 print("")
-                print(f"    Expectation: {round(np.real(correct_exp), 4)}")
+                print(f"    Expectation: {round(correct_exp, 4)}")
                 if verbose: print(f"    Term Contributions: {term_contributions}")
-                print(f"    Total Energy: {round(np.real(total_energy), 4)}")
+                print(f"    Total Energy: {round(total_energy, 4)}")
                 
                 #print("") 
-                print(f"    ==> Simulation Quality: {np.real(simulation_quality)}")
+                print(f"    ==> Simulation Quality: {simulation_quality}")
                 
                 print("")
  
@@ -614,7 +626,7 @@ def get_args():
     parser.add_argument("--do_sqrt_fidelity", "-sqrt", action="store_true", help="Return square root of fidelities")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="Gen random paulis")
     parser.add_argument("--random_init_flag", "-rani", action="store_true", help="Gen random initialization")
-    parser.add_argument("--init_state", "-init", default=None, help="initial state")  
+    parser.add_argument("--init_state", "-init", default=None, help="initial state", type=str)  
     parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")    
     return parser.parse_args()
     

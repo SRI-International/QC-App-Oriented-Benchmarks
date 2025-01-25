@@ -146,7 +146,6 @@ def build_hamiltonian(num_qubits, pauli_terms):
     return H_matrix
 
 
-
 def build_sparse_hamiltonian(num_qubits, pauli_terms):
     """
     Build the Hamiltonian as a sparse matrix.
@@ -290,22 +289,28 @@ def compute_expectation_exact(initial_state, pauli_terms, time):
     
     # Compute the exponential of the Hamiltonian for each time step  
     # Assume H_matrix and initial_state are defined
-
-    H_matrix_sparse = csr_matrix(H_matrix)  # Convert H to sparse format if large
+    H_matrix_sparse = H_matrix  # this is a sparse matrix
+    
+    # evolve the initial state by this matrix
     evolved_state = expm_multiply(-1j * time * H_matrix_sparse, initial_state)
-
+    
     # Compute expectation value
     H_psi = H_matrix_sparse @ evolved_state  # Sparse matrix-vector product
     exact_expectation = np.real(np.vdot(evolved_state, H_psi))  # Inner product 
     
     # Compute the probabilities as the squared magnitudes of the state vector
     probabilities = np.abs(evolved_state)**2
+    
     # Create a dictionary keyed by bitstrings
-    proability_distribution = {
+    probability_distribution = {
         format(i, f'0{num_qubits}b'): prob for i, prob in enumerate(probabilities)
     }
+    
+    # values in distribution items are arrays of len 1; collapse to single values
+    for bitstring, count in probability_distribution.items():
+        probability_distribution[bitstring] = count[0]
         
-    return exact_expectation, proability_distribution
+    return exact_expectation, probability_distribution
 
 
 ##########################################################
