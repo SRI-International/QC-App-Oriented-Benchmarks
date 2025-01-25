@@ -180,11 +180,11 @@ def analyze_and_print_result(
         if verbose:
             print(f"... begin exact computation for id={type} ...")
         
+        ts = time.time()
+        
         ################ Using the previous evolution_exact code:
         # the plan is to remove this code and use the new once it is validated.
-        
-        ts = time.time()
-            
+        """
         # create quantum circuit with initial state
         qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
         
@@ -194,40 +194,25 @@ def analyze_and_print_result(
                 qc_initial,
                 num_qubits,
                 hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                1.0            # time
+                1.0        # time (hardocded to match default benchmark)
+                )
+        """
+        ################ Test of the newer evolution_exact code:
+        
+        correct_exp, correct_dist = evolution_exact.compute_expectation_exact(
+                init_state,
+                observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
+                1.0        # time (hardocded to match default benchmark)
                 )
         
+        # report details if verbose mode
         if verbose:
             print("")
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
             print(f"Correct expectation = {correct_exp}")
             #print_top_measurements(f"Correct dist = ", correct_dist, 100)
             print("")
-        
-        ################ Test of the newer evolution_exact code:
-        
-        """ not used yet; see comment below ...
-        ts = time.time()
-        
-        expectation, distribution = evolution_exact.compute_expectation_exact(
-                init_state,
-                observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
-                1.0            # time
-                )
-        
-        if verbose:
-            print("")
-            print(f"... exact computation time (2) = {round((time.time() - ts), 3)} sec")
-            print(f"Correct expectation (2) = {expectation}")
-            print_top_measurements(f"Correct dist (2) = ", distribution, 100)
-            print("")
-        
-        # DEVNOTE: we cannot use the result of the new method yet.
-        # There is some difference between the distributions that are produced;
-        # this needs more investigation. New method produces lower fidelities.
-        ## correct_exp = expectation
-        ## correct_dist = distribution
-        """
+            
 
     # for method 3, compute expected distribution from the initial state
     elif method == 3: 
