@@ -517,11 +517,14 @@ def run(min_qubits: int = 2,
                 
                 if verbose:
                     print(f"... begin exact computation for id={type} ...")
-                      
+                
+                ts = time.time()
+                
+                """ no longer used ...                
                 ################ Using the previous evolution_exact code:
                 # the plan is to remove this code and use the new once it is validated.
                 
-                ts = time.time()
+                # 250125 (TL): confirmed this old code is giving erroneous values for BH and H2
                      
                 # create quantum circuit with initial state
                 qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
@@ -532,54 +535,39 @@ def run(min_qubits: int = 2,
                         qc_initial,
                         num_qubits,
                         hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                        1.0            # time
+                        t        # time
                         )
                 correct_exp = np.real(correct_exp)
-                    
+                """
+                
+                ################ Using newer evolution_exact code:
+                
+                correct_exp, _ = evolution_exact.compute_expectation_exact(
+                        init_state,
+                        observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
+                        t        # time
+                        )
+                
+                ############ report results 
+                
                 #if verbose:
                 print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
                  
-                 
-                ################ Test of the newer evolution_exact code:
-   
-   
-                """ not used yet; see comment below ...
-                """
-                ts = time.time()
+                if correct_exp != 0.0:  
+                    simulation_quality = round(total_energy / correct_exp, 3)
+                else:
+                    simulation_quality = 0.0
                 
-                expectation, _ = evolution_exact.compute_expectation_exact(
-                        init_state,
-                        observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
-                        1.0            # time
-                        )
-                
-                #if verbose:
                 print("")
-                print("*** Testing new version of exact code:")
-                print(f"... exact computation time (2) = {round((time.time() - ts), 3)} sec")
-                print(f"    Correct expectation (2) = {expectation}")
-                print("")
-                
-                # DEVNOTE: we cannot use the result of the new method yet.
-                ## correct_exp = expectation
-
-                    
-        
-                ############ report results 
-                    
-                simulation_quality = round(total_energy / correct_exp, 3)
-                
-                #print("************")
-                print("")
-                print(f"    Expectation: {round(correct_exp, 4)}")
+                print(f"    Exact expectation value, computed classically: {round(correct_exp, 4)}")
+                print(f"    Estimated expectation value, from quantum algorithm: {round(total_energy, 4)}")
                 if verbose: print(f"    Term Contributions: {term_contributions}")
-                print(f"    Total Energy: {round(total_energy, 4)}")
                 
                 #print("") 
                 print(f"    ==> Simulation Quality: {simulation_quality}")
                 
                 print("")
- 
+           
                 
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
