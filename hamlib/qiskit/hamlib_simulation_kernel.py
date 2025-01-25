@@ -339,8 +339,163 @@ def convert_to_sparse_pauli_op(pauli_terms):
     
 #####################################################################################
 # KERNEL FUNCTIONS
+ 
+################ Create Trotterized Circuit with Initial State   
+   
+def create_circuit_from_op(
+    num_qubits: int = 0,
+    ham_op: Union[
+        List[Tuple[str, complex]],
+        List[Tuple[Dict[int, str], complex]],
+        SparsePauliOp
+    ] = None, 
+    time: float = 1,
+    num_trotter_steps: int = 5,
+    method: int = 1,
+    use_inverse_flag: bool = False,
+    init_state: str = None,
+    append_measurements: bool = True
+):
+    """
+    Create a quantum circuit based on the given Hamiltonian data.
 
-def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
+    Steps:
+        1. Extract Hamiltonian data from an HDF5 file.
+        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
+        3. Build a quantum circuit with an initial state and an evolution gate based on the Hamiltonian.
+        4. Measure all qubits and print the circuit details.
+
+    Returns:
+        tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
+    """
+    global QCI_, INV_
+    
+    # convert from any form to SparsePauliOp
+    ham_op = ensure_sparse_pauli_op(ham_op, num_qubits)
+
+    # Build the evolution gate
+    # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
+    evo_label = "e^-iHt"
+    time_step = time/num_trotter_steps if num_trotter_steps > 0 else 0.0
+    evo = PauliEvolutionGate(ham_op, time=time_step, label=evo_label)
+
+    # Plug it into a circuit
+    circuit = QuantumCircuit(ham_op.num_qubits)
+    
+    # first create and append the initial_state
+    # init_state = "checkerboard"
+    i_state = initial_state(num_qubits, init_state)
+    circuit.append(i_state, range(ham_op.num_qubits))
+    circuit.barrier()
+    
+    if num_qubits <= 6:
+        QCI_ = i_state
+    
+    # Append K trotter steps
+    circuit = append_trotter_steps(num_trotter_steps,
+            evo if not use_inverse_flag else evo.inverse(),
+            ham_op,
+            circuit)
+
+    # Append K Trotter steps of inverse, if method 3
+    inv = None
+    bitstring = None
+
+    # append simple inverse Trotter steps if method 3
+    if method == 3:  
+        inv = evo.inverse()
+        inv.name = "e^iHt"
+        circuit = append_trotter_steps(num_trotter_steps, inv, ham_op, circuit)
+        if num_qubits <= 6:
+            INV_ = inv
+        
+    # if requested, add measurement gates    
+    if append_measurements:
+        circuit.measure_all()
+
+    return circuit, bitstring, evo if not use_inverse_flag else evo.inverse()
+
+
+################ Create Trotterized Circuit with Initial State
+#               (Mirrored using pyGSTi methodology)
+
+def create_circuit_from_op_pygsti(
+    num_qubits: int = 0,
+    ham_op: Union[
+        List[Tuple[str, complex]],
+        List[Tuple[Dict[int, str], complex]],
+        SparsePauliOp
+    ] = None, 
+    time: float = 1,
+    num_trotter_steps: int = 5,
+    method: int = 1,
+    use_inverse_flag: bool = False,
+    init_state: str = None,
+    random_pauli_flag: bool = False,
+    random_init_flag: bool = False,
+    append_measurements: bool = True
+):
+    """
+    Create a quantum circuit from the given Hamiltonian data.
+    This version creates a special mirrored circuit using functions from pyGSTi library.
+
+    Steps:
+        1. Extract Hamiltonian data from an HDF5 file.
+        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
+        3. Build a quantum circuit with an initial state and an evolution gate based on the Hamiltonian.
+        4. Measure all qubits and print the circuit details.
+
+    Returns:
+        tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
+    """
+    # do this here, so import not required by default
+    from pygsti_mirror import convert_to_mirror_circuit
+       
+    global QCI_, INV_
+    
+    # convert from any form to SparsePauliOp
+    ham_op = ensure_sparse_pauli_op(ham_op, num_qubits)
+
+    # Build the evolution gate
+    # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
+    evo_label = "e^-iHt"
+    time_step = time/num_trotter_steps if num_trotter_steps > 0 else 0.0
+    evo = PauliEvolutionGate(ham_op, time=time_step, label=evo_label)
+
+    # Create a circuit, but with no initial state
+    circuit_without_initial_state = QuantumCircuit(ham_op.num_qubits)
+    
+    # Append K trotter steps           
+    circuit_without_initial_state = append_trotter_steps(num_trotter_steps,
+            evo if not use_inverse_flag else evo.inverse(),
+            ham_op,
+            circuit_without_initial_state)
+
+    # Append K Trotter steps of inverse, if method 3
+    bitstring = None
+    
+    # if random init flag state is set, then discard the inital state input and use a completely (harr) random one
+    if random_init_flag:
+        circuit, bitstring = convert_to_mirror_circuit(
+                circuit_without_initial_state,
+                random_pauli = True,
+                init_state = None)
+    else: 
+        i_state = initial_state(num_qubits, init_state)
+        circuit, bitstring = convert_to_mirror_circuit(
+                circuit_without_initial_state,
+                random_pauli = True,
+                init_state = i_state
+                )
+        if num_qubits <= 6:
+            QCI_ = i_state
+        
+    return circuit, bitstring, evo if not use_inverse_flag else evo.inverse()
+
+
+################ Append Trotter steps   
+ 
+def append_trotter_steps(num_trotter_steps, evo, operator, circuit):
     """
     Appends Trotter steps to a quantum circuit based on the given evolution operator.
 
@@ -363,111 +518,6 @@ def create_trotter_steps(num_trotter_steps, evo, operator, circuit):
         circuit.append(evo, range(operator.num_qubits))
     circuit.barrier()
     return circuit
-    
-    
-def create_circuit_from_op(
-    num_qubits: int = 0,
-    ham_op: Union[
-        List[Tuple[str, complex]],
-        List[Tuple[Dict[int, str], complex]],
-        SparsePauliOp
-    ] = None, 
-    time: float = 1,
-    num_trotter_steps: int = 5,
-    method: int = 1,
-    use_inverse_flag: bool = False,
-    init_state: str = None,
-    random_pauli_flag: bool = False,
-    random_init_flag: bool = False,
-    append_measurements: bool = True
-):
-    """
-    Create a quantum circuit based on the Hamiltonian data from an HDF5 file.
-
-    Steps:
-        1. Extract Hamiltonian data from an HDF5 file.
-        2. Process the data to obtain a SparsePauliOp and determine the number of qubits.
-        3. Build a quantum circuit with an initial state and an evolution gate based on the Hamiltonian.
-        4. Measure all qubits and print the circuit details.
-
-    Returns:
-        tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
-    """
-    global QCI_, INV_
-
-    if ham_op is None or num_qubits == 0:
-        # print(f"Dataset not available for num_qubits = {num_qubits}.")
-        return None, None, None
-    
-    # print("Number of qubits:", num_qubits)
-    if verbose:
-        print(f"... Evolution operator = {ham_op}")
-    
-    # convert from any form to SparsePauliOp
-    ham_op = ensure_sparse_pauli_op(ham_op, num_qubits)
-
-    # Build the evolution gate
-    # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
-    evo_label = "e^-iHt"
-    time_step = time/num_trotter_steps if num_trotter_steps > 0 else 0.0
-    evo = PauliEvolutionGate(ham_op, time=time_step, label=evo_label)
-
-    # Plug it into a circuit
-    circuit = QuantumCircuit(ham_op.num_qubits)
-    circuit_without_initial_state = QuantumCircuit(ham_op.num_qubits)
-    
-    # first create and append the initial_state
-    # init_state = "checkerboard"
-    i_state = initial_state(num_qubits, init_state)
-    circuit.append(i_state, range(ham_op.num_qubits))
-    circuit.barrier()
-    
-    if num_qubits <= 6:
-        QCI_ = i_state
-    
-    # Append K trotter steps
-    circuit = create_trotter_steps(num_trotter_steps,
-            evo if not use_inverse_flag else evo.inverse(),
-            ham_op,
-            circuit)
-            
-    circuit_without_initial_state = create_trotter_steps(num_trotter_steps,
-            evo if not use_inverse_flag else evo.inverse(),
-            ham_op,
-            circuit_without_initial_state)
-
-    # Append K Trotter steps of inverse, if method 3
-    inv = None
-    bitstring = None
-
-    if method == 3: 
-
-        # if not adding random Paulis, just create simple inverse Trotter steps
-        if not random_pauli_flag:
-            inv = evo.inverse()
-            inv.name = "e^iHt"
-            circuit = create_trotter_steps(num_trotter_steps, inv, ham_op, circuit)
-            if num_qubits <= 6:
-                INV_ = inv
- 
-        # if adding Paulis, do that here, with code from pyGSTi
-        else:
-            from pygsti_mirror import convert_to_mirror_circuit
-           
-            # if random init flag state is set, then discard the inital state input and use a completely (harr) random one
-            if random_init_flag:
-                circuit, bitstring = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli = True, init_state=None)
-            else: 
-                init_state = initial_state(num_qubits, init_state)
-                circuit, bitstring = convert_to_mirror_circuit(circuit_without_initial_state, random_pauli = True, init_state=init_state)
-
-    # convert_to_mirror_circuit adds its own measurement gates    
-    if not (random_pauli_flag and method == 3):
-        if append_measurements:
-            circuit.measure_all()
-
-    return circuit, bitstring, evo if not use_inverse_flag else evo.inverse()
-
 
 ############### Initial Circuit Definition
 
@@ -499,7 +549,10 @@ def initial_state(n_spins: int, init_state: str = "checker") -> QuantumCircuit:
             qc.cx(k-1, k)
 
     return qc
-
+    
+######################################################################
+# EXTERNAL API FUNCTIONS
+   
 ############### Hamiltonian Circuit Definition
 
 def HamiltonianSimulation(
@@ -531,27 +584,56 @@ def HamiltonianSimulation(
     Returns:
         QuantumCircuit: The constructed Qiskit circuit.
     """
+    
+    if num_qubits <= 0:
+        return None, None
+        
     circuit_id = f"{K}-{t}"
 
-    # Allocate qubits
+    # Allocate qubits in a QuantumCircuit
     qr = QuantumRegister(num_qubits)
     cr = ClassicalRegister(num_qubits)
     qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{circuit_id}")
     
-    # create the quantum circuit for this Hamiltonian, along with the correct pauli bstring,
-    # the operator and trotter evolution circuit
-    qc, bitstring, evo = create_circuit_from_op(
-        num_qubits=num_qubits,
-        ham_op=ham_op,
-        time=t,
-        method=method,
-        use_inverse_flag=use_inverse_flag,
-        init_state=init_state,
-        num_trotter_steps=K,
-        random_pauli_flag=random_pauli_flag,
-        random_init_flag=random_init_flag,
-        append_measurements=append_measurements
-        )
+    # if no Hamiltonian given, just return initial state is specified
+    if ham_op is None:
+    
+        # DEVNOTE: this is not creating the proper circuit name
+        if init_state is not None:
+            qc = initial_state(num_qubits, init_state)
+            
+        return qc, None
+    
+    # print("Number of qubits:", num_qubits)
+    if verbose:
+        print(f"... HamiltonianSimulation(), with evolution operator = {ham_op}")
+        
+    # create a Trotterized quantum circuit for this Hamiltonian, with various options
+    if not random_pauli_flag:
+        qc, bitstring, evo = create_circuit_from_op(
+            num_qubits=num_qubits,
+            ham_op=ham_op,
+            method=method,
+            init_state=init_state,
+            time=t,
+            num_trotter_steps=K,
+            append_measurements=append_measurements,
+            use_inverse_flag=use_inverse_flag
+            )
+    # to generate circuits with random paulis, use the pygsti version
+    else:
+        qc, bitstring, evo = create_circuit_from_op_pygsti(
+            num_qubits=num_qubits,
+            ham_op=ham_op,
+            method=method,
+            init_state=init_state,
+            time=t,
+            num_trotter_steps=K,
+            append_measurements=append_measurements,
+            use_inverse_flag=use_inverse_flag,
+            random_pauli_flag=random_pauli_flag,
+            random_init_flag=random_init_flag
+            )
 
     # Save smaller circuit example for display
     global QC_, HAM_, EVO_, INV_
