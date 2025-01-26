@@ -323,7 +323,7 @@ try:
     from qiskit.quantum_info import Statevector
 
 except Exception as ex:
-    print("WARNING: Qiskit-dependent compute observable value functions are not available")
+    print("WARNING: Qiskit-dependent exact evolution functions are not available")
     
 # The functions below are not currently used in the benchmarks.
 # However, we retain them here for reference and possible future use.

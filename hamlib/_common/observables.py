@@ -12,8 +12,6 @@ import sys
 import time
 from typing import Union, List, Tuple, Dict
 
-from qiskit.quantum_info import SparsePauliOp
-
 sys.path[1:1] = ["..//qiskit"]
 import hamlib_simulation_kernel as kernel
 
@@ -24,36 +22,6 @@ verbose_time = False
 
 noise_model = None
 
-# ===========================================
-# CONVERT TO SPARSE PAULI OP
-
-# This is only needed for the high-level estimate_expectation_value, which will be moved out soon.
-
-def convert_to_sparse_pauli_op(pauli_terms):
-    """
-    Convert an array of (coefficient, pauli string) tuples into a SparsePauliOp.
-    
-    Args:
-    pauli_terms (list): List of tuples, each containing (coeff, pauli)
-    
-    Returns:
-    SparsePauliOp: Qiskit SparsePauliOp representation of the Hamiltonian
-    """
-         
-    if (pauli_terms is None):
-        return None
-    
-    coeffs = []
-    paulis = []
-
-    for coeff, pauli_string in pauli_terms:
-        coeffs.append(coeff)
-        paulis.append(pauli_string)
-                
-    #print(paulis)
-    #print(coeffs)
-    
-    return SparsePauliOp(paulis, coeffs)
     
 # ===========================================
 # SWAP COEFF and PAULI STRING IN PAULI_LIST
@@ -551,7 +519,23 @@ def estimate_expectation_value(backend, qc, pauli_terms, use_commuting_groups=Tr
      
     return total_energy, term_contributions
 
- 
+
+##########################################################
+##########################################################
+# API-DEPENDENT FUNCTIONS
+
+try:
+    from qiskit import QuantumCircuit 
+    from qiskit.quantum_info import SparsePauliOp
+    from qiskit_aer import Aer
+    from qiskit.primitives import Estimator
+
+except Exception as ex:
+    print("WARNING: Qiskit-dependent compute observable value functions are not available")
+
+# ===========================================
+# QISKIT ESTIMATOR FUNCTIONS
+
 def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
     """
     Estimates the expectation value of a quantum circuit and Hamiltonian using the `Estimator` class.
@@ -569,6 +553,7 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
         - Converts `H_terms` to a `SparsePauliOp` using `convert_to_sparse_pauli_op`.
         - Uses the `Estimator` class for efficient, non-shot-based computation.
     """
+    
     # Convert Hamiltonian terms to SparsePauliOp
     H_op = convert_to_sparse_pauli_op(H_terms)
 
@@ -584,26 +569,52 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
 
     return measured_energy
 
+# ===========================================
+# CONVERT TO SPARSE PAULI OP
 
-  
+# This is only needed for the high-level estimate_expectation_value, which will be moved out soon.
+
+def convert_to_sparse_pauli_op(pauli_terms):
+    """
+    Convert an array of (coefficient, pauli string) tuples into a SparsePauliOp.
+    
+    Args:
+    pauli_terms (list): List of tuples, each containing (coeff, pauli)
+    
+    Returns:
+    SparsePauliOp: Qiskit SparsePauliOp representation of the Hamiltonian
+    """
+    
+    from qiskit.quantum_info import SparsePauliOp
+    
+    if (pauli_terms is None):
+        return None
+    
+    coeffs = []
+    paulis = []
+
+    for coeff, pauli_string in pauli_terms:
+        coeffs.append(coeff)
+        paulis.append(pauli_string)
+                
+    #print(paulis)
+    #print(coeffs)
+    
+    return SparsePauliOp(paulis, coeffs)
+    
 # ===========================================
 # EXECUTION FUNCTIONS
-
-from qiskit import QuantumCircuit
-from qiskit_aer import Aer
-from qiskit.primitives import Estimator
-import numpy as np
-
-# Initialize the backend and the simulator
-backend = Aer.get_backend('qasm_simulator')
-#backend = Aer.get_backend('statevector_simulator')
-noise_model = None
 
 # Here we define a function to perform the execution and return an array of measurements.
 # DEVNOTE: params argument not currently used, as the circuit is created with values defined; we don't use Parameter yet
 
 # Execute a quantum circuit with the specified parameters on the given backend system
 def execute_circuit(qc, backend, num_shots, params):
+
+    # Initialize the backend and the simulator
+    backend = Aer.get_backend('qasm_simulator')
+    #backend = Aer.get_backend('statevector_simulator')
+    noise_model = None
      
     # Execute the quantum circuit to obtain the probability distribution associated with the current parameters
     result = backend.run(qc, shots=num_shots, noise_model=noise_model).result()
@@ -620,6 +631,11 @@ def execute_circuit(qc, backend, num_shots, params):
 
 # Execute a list of quantum circuits with the specified parameters on the given backend system
 def execute_circuits(circuits, backend, num_shots: int, params=None):
+
+    # Initialize the backend and the simulator
+    backend = Aer.get_backend('qasm_simulator')
+    #backend = Aer.get_backend('statevector_simulator')
+    noise_model = None
 
     results = backend.run(circuits, shots=num_shots).result()
     

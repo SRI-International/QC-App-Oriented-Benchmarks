@@ -21,8 +21,6 @@ from typing import Dict, Optional   # for backwards compat <= py 3.10
 
 sys.path[1:1] = ["_common"]
 
-from hamiltonian_simulation_exact import HamiltonianSimulationExact, HamiltonianSimulation_Noiseless
-
 import evolution_exact
 
 ############### Configure API
@@ -61,12 +59,16 @@ def qedc_benchmarks_init(api: str = "qiskit"):
     
     import hamlib_simulation_kernel as hamlib_simulation_kernel
     globals()["hamlib_simulation_kernel"] = hamlib_simulation_kernel
-    
+
     # there must be a better way to do this
-    from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw, initial_state
+    from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw
     globals()["HamiltonianSimulation"] = HamiltonianSimulation
     globals()["kernel_draw"] = kernel_draw
-    globals()["initial_state"] = initial_state
+    
+    # this is only needed while testing the old exact evolution functions; remove soon (250125)
+    if api == 'qiskit':
+        from hamlib_simulation_kernel import initial_state
+        globals()["initial_state"] = initial_state
     
     return HamiltonianSimulation, kernel_draw
     
@@ -139,7 +141,8 @@ def analyze_and_print_result(
             method: int,
             random_pauli_flag: bool,
             do_sqrt_fidelity: bool,
-            init_state: str) -> tuple:
+            init_state: str
+        ) -> tuple:
     """
     Analyze and print the measured results. Compute the quality of the result based on operator expectation for each state.
 
@@ -155,6 +158,7 @@ def analyze_and_print_result(
     Returns:
         tuple: Counts and fidelity.
     """
+    
     counts = result.get_counts(qc)
 
     if verbose:
@@ -166,6 +170,9 @@ def analyze_and_print_result(
     
     # for method 1, compute expected dist using ideal quantum simulation of the circuit provided
     if method == 1:
+    
+        from hamiltonian_simulation_exact import HamiltonianSimulation_Noiseless
+        
         if verbose:
             print(f"... begin noiseless simulation for expected distribution for id={type} ...")
             
@@ -402,6 +409,12 @@ def run(min_qubits: int = 2,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
     
+    # For CUDA-Q, cannot yet use method 1 as it uses Aer for simulation
+    # use method 2 instead
+    if api == "cudaq" and method == 1:
+        print(f"WARNING: method 1 not supported for {api} API, use method 2 instead")
+        method = 2
+        
     # DEVNOTE: this is necessary, since we get the Hamiltonian pauli terms when circuit execution is launched.
     # need to wait until it completes since we need to have access to those terms.  They are currently global.
     # Need to fix this
@@ -458,8 +471,10 @@ def run(min_qubits: int = 2,
                 use_inverse_flag = use_inverse_flag,
                 random_pauli_flag = random_pauli_flag, 
                 random_init_flag = random_init_flag)
-               
-            bitstring_dict[qc.name] = bitstring
+            
+            # this only works for qiskit circuits
+            if "name" in qc:
+                bitstring_dict[qc.name] = bitstring
             
             if not do_observables:
             
