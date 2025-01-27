@@ -238,12 +238,12 @@ def convert_to_spin_op (num_qubits: int,
     """
     coefficients = extractCoefficients(spin_op)
     words = extractWords(spin_op)
+    
     print(coefficients)
     print(words)
     """
    
     return spin_op
-    #return hamiltonian
 
     
 #####################################################           
@@ -331,32 +331,51 @@ def pe_kernel (num_qubits: int, theta: float):
 ############### Hamiltonian Simulation Kernel Definition
 
 @cudaq.kernel
-def trotter_step_2(state: cudaq.State,
+def trotter_step_2(qubits: cudaq.qview,
                 dt: float, 
                 coefficients: List[complex],
                 words: List[cudaq.pauli_word]
              ) -> None:
              
     """Perform single Trotter step"""
-    qubits = cudaq.qvector(state)
-    n_spins = len(qubits)
+    #qubits = cudaq.qvector(state)
+    #n_spins = len(qubits)
    
     for i in range(len(coefficients)):
         exp_pauli(coefficients[i].real * dt, qubits, words[i])
 
 
 @cudaq.kernel           
-def hamsim_kernel (num_qubits: int, init_phases: List[float], K: int = 5, t: float = 1.0):
+def hamsim_kernel(
+        num_qubits: int,
+        init_phases: List[float],
+        K: int = 5,
+        t: float = 1.0,
+        coefficients: List[complex] = None,
+        words: List[cudaq.pauli_word] = None
+    ):
 
     # Parameters
     n_spins = num_qubits  # Number of spins in the chain
     
+    # create the qubit vector
     qubits = cudaq.qvector(num_qubits)
     
+    # add on the initial state
     append_initial_state(qubits, n_spins, init_phases)
     
-    # Apply measurement gates to just the `qubits`
-    # (excludes the auxillary qubit).
+    # determin delta for one trotter step
+    dt = t / K
+    
+    # instantiate K Trotter steps
+    """
+    trotter_step_2(qubits,
+            dt, 
+            coefficients,
+            words
+        )        
+    """
+    # Apply measurement gates to the `qubits`
     mz(qubits)
  
  
@@ -374,34 +393,42 @@ def barrier(qubits: cudaq.qview, num_qubits: int):
 ############### Hamiltonian Circuit Definition
 
 def HamiltonianSimulation(
-        num_qubits: int = 0,
-        ham_op: Union[
-            List[Tuple[str, complex]],
-            List[Tuple[Dict[int, str], complex]]
-        ] = None,
-        K: int = 5, t: float = 1.0,
-        init_state = None,
-        method: int = 1,
-        use_inverse_flag: bool = False,
-        random_pauli_flag = False,
-        random_init_flag = False,
-        append_measurements = True,
-    ) -> Tuple:
+            num_qubits: int = 0,
+            ham_op: Union[
+                List[Tuple[str, complex]],
+                List[Tuple[Dict[int, str], complex]]
+            ] = None,
+            K: int = 5, t: float = 1.0,
+            init_state = None,
+            method: int = 1,
+            use_inverse_flag: bool = False,
+            random_pauli_flag = False,
+            random_init_flag = False,
+            append_measurements = True,
+        ) -> Tuple:
     
-
     spin_op = convert_to_spin_op(num_qubits, ham_op)
     print(f"... spin_op = {spin_op}")
+    
+    # Extract coefficients and words
+    coefficients = extractCoefficients(spin_op)
+    words = extractWords(spin_op)
+    
+    print(coefficients)
+    print(words)
         
     bitset = init_state_to_ivec(num_qubits, init_state)
     bitsetf = [float(v) for v in bitset]
     print(f"... init_state_to_ivec, bitsetf = {bitsetf}")
     
     #qc = [pe_kernel, [num_qubits, t]]
-    qc = [hamsim_kernel, [num_qubits, bitsetf, K, t]]
+    qc = [hamsim_kernel, [num_qubits, bitsetf, K, t, coefficients, words]]
     
     global QC_
     if num_qubits <= 6:
         QC_ = qc
+        
+    kernel_draw()
 
     return qc, None
 
