@@ -491,34 +491,43 @@ def run(min_qubits: int = 2,
 
                 # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
                 ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
+                
             else:
-        
-                # Flag to control optimize by use of commuting groups
-                use_commuting_groups = True
 
-                # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
-                pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
-                        num_qubits, sparse_pauli_terms, use_commuting_groups)
+                if api == None or api == 'qiskit':
+                    # Flag to control optimize by use of commuting groups
+                    use_commuting_groups = True
 
-                # generate an array of circuits, one for each pauli_string in list
-                circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
+                    # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
+                    pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                            num_qubits, sparse_pauli_terms, use_commuting_groups)
+
+                    # generate an array of circuits, one for each pauli_string in list
+                    circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
+                    
+                    if verbose:                 
+                        for circuit, group in list(zip(circuits, pauli_term_groups)):
+                            print(group)
+                            #print(circuit)
+                      
+                    # Initialize simulator backend
+                    from qiskit_aer import Aer
+                    backend = Aer.get_backend('qasm_simulator')
+                   
+                    # Execute all of the circuits to obtain array of result objects
+                    results = backend.run(circuits, num_shots=num_shots).result()
+                    
+                    # Compute the total energy for the Hamiltonian
+                    total_energy, term_contributions = observables.calculate_expectation_from_measurements(
+                                                                num_qubits, results, pauli_term_groups)
+                    total_energy = np.real(total_energy)
                 
-                if verbose:                 
-                    for circuit, group in list(zip(circuits, pauli_term_groups)):
-                        print(group)
-                        #print(circuit)
-                  
-                # Initialize simulator backend
-                from qiskit_aer import Aer
-                backend = Aer.get_backend('qasm_simulator')
-               
-                # Execute all of the circuits to obtain array of result objects
-                results = backend.run(circuits, num_shots=num_shots).result()
+                # special case for CUDA Q Observables (restructure later 250126)
+                elif api == "cudaq":
                 
-                # Compute the total energy for the Hamiltonian
-                total_energy, term_contributions = observables.calculate_expectation_from_measurements(
-                                                            num_qubits, results, pauli_term_groups)
-                total_energy = np.real(total_energy)
+                    total_energy = hamlib_simulation_kernel.get_expectation(
+                            qc, num_qubits, sparse_pauli_terms)
+                    
                 
                 print(f"... total execution time = {round(time.time()-ts, 3)}")
                 
@@ -579,7 +588,8 @@ def run(min_qubits: int = 2,
            
                 
         # Wait for some active circuits to complete; report metrics when groups complete
-        ex.throttle_execution(metrics.finalize_group)
+        if api != "cudaq" or do_observables == False:
+            ex.throttle_execution(metrics.finalize_group)
     
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)

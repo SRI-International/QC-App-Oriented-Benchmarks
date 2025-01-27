@@ -13,6 +13,10 @@ from cudaq import spin
 QC_ = None
 Uf_ = None
 
+
+######################################################################
+# CUDAQ KERNEL FUNCTIONS
+
 ############### State Initialization
 
 # Prepare the initial quantum state of the system. 
@@ -37,26 +41,85 @@ def append_initial_state(qubits: cudaq.qview, n_spins: int, init_phases: List[fl
     for index, phase in enumerate(init_phases):
         if phase > 0.0:
             x(qubits[num_qubits - index - 1])
-            
-    
-############### Extract Coefficients and Pauli Words
+                        
 
-"""
-Extract the coefficients and Pauli words from the provided Hamiltonian for use in the Trotter step.
-"""
-def extractCoefficients(hamiltonian: cudaq.SpinOperator) -> List[complex]:
-    result = []
-    hamiltonian.for_each_term(lambda term: result.append(term.get_coefficient()))
-    return result
+############### Hamiltonian Simulation Kernel Definition
 
-def extractWords(hamiltonian: cudaq.SpinOperator) -> List[str]:
-    result = []
-    hamiltonian.for_each_term(lambda term: result.append(term.to_string(False)))
-    return result
+@cudaq.kernel           
+def hamsim_kernel(
+        num_qubits: int,
+        init_phases: List[float],
+        K: int = 5,
+        t: float = 1.0,
+        coefficients: List[complex] = None,
+        words: List[cudaq.pauli_word] = None,
+        append_measurements: bool = True
+    ):
     
+    # create the qubit vector
+    qubits = cudaq.qvector(num_qubits)
+    
+    # add on the initial state
+    append_initial_state(qubits, num_qubits, init_phases)
+    
+    # determin delta for one trotter step
+    dt = t / K
+    
+    # Apply K Trotter steps
+    for _ in range(K): 
+        append_trotter_step(qubits, dt, coefficients, words)
+
+@cudaq.kernel           
+def hamsim_kernel_measured(
+        num_qubits: int,
+        init_phases: List[float],
+        K: int = 5,
+        t: float = 1.0,
+        coefficients: List[complex] = None,
+        words: List[cudaq.pauli_word] = None,
+        append_measurements: bool = True
+    ):
+    
+    # create the qubit vector
+    qubits = cudaq.qvector(num_qubits)
+    
+    # add on the initial state
+    append_initial_state(qubits, num_qubits, init_phases)
+    
+    # determin delta for one trotter step
+    dt = t / K
+    
+    # Apply K Trotter steps
+    for _ in range(K): 
+        append_trotter_step(qubits, dt, coefficients, words)
  
-#####################################################           
+    # Apply measurement gates to the `qubits`
+    if append_measurements == True:
+        mz(qubits)
+        
+# Append a trotter step defined by the time step dt and hamiltonian terms
+@cudaq.kernel
+def append_trotter_step(
+            qubits: cudaq.qview,
+            dt: float, 
+            coefficients: List[complex],
+            words: List[cudaq.pauli_word]
+        ) -> None:
+   
+    for i in range(len(coefficients)):
+        exp_pauli(coefficients[i].real * dt, qubits, words[i])   # this crashes jupyter kernel
  
+#DEVNOTE: use this as a barrier when drawing circuit; comment out otherwise
+@cudaq.kernel
+def barrier(qubits: cudaq.qview, num_qubits: int):
+	for i in range(num_qubits / 2):
+		swap(qubits[i*2], qubits[i*2 + 1])
+		swap(qubits[i*2], qubits[i*2 + 1])
+  
+  
+######################################################################
+# CUDAQ HELPER FUNCTIONS
+
 ############### Convert Hamiltonian to Spin Operator
            
 def convert_to_spin_op (num_qubits: int,
@@ -93,66 +156,26 @@ def convert_to_spin_op (num_qubits: int,
  
    
     return spin_op
- 
-#####################################################           
 
-############### Hamiltonian Simulation Kernel Definition
+############### Extract Coefficients and Pauli Words
 
-@cudaq.kernel           
-def hamsim_kernel(
-        num_qubits: int,
-        init_phases: List[float],
-        K: int = 5,
-        t: float = 1.0,
-        coefficients: List[complex] = None,
-        words: List[cudaq.pauli_word] = None
-        #flat_indices: List[int] = None,
-        #flat_codes: List[int] = None,
-        #term_offsets: List[int] = None
-    ):
+"""
+Extract the coefficients and Pauli words from the provided Hamiltonian for use in the Trotter step.
+"""
+def extractCoefficients(hamiltonian: cudaq.SpinOperator) -> List[complex]:
+    result = []
+    hamiltonian.for_each_term(lambda term: result.append(term.get_coefficient()))
+    return result
 
-    # Parameters
-    n_spins = num_qubits  # Number of spins in the chain
-    
-    # create the qubit vector
-    qubits = cudaq.qvector(num_qubits)
-    
-    # add on the initial state
-    append_initial_state(qubits, n_spins, init_phases)
-    
-    # determin delta for one trotter step
-    dt = t / K
-    
-    # Apply K Trotter steps
-    for _ in range(K): 
-        append_trotter_step(qubits, dt, coefficients, words)
-        
-    # Apply measurement gates to the `qubits`
-    mz(qubits)
-
-# Append a trotter step defined by the time step dt and hamiltonian terms
-@cudaq.kernel
-def append_trotter_step(
-            qubits: cudaq.qview,
-            dt: float, 
-            coefficients: List[complex],
-            words: List[cudaq.pauli_word]
-        ) -> None:
-   
-    for i in range(len(coefficients)):
-        exp_pauli(coefficients[i].real * dt, qubits, words[i])   # this crashes jupyter kernel
- 
-#DEVNOTE: use this as a barrier when drawing circuit; comment out otherwise
-@cudaq.kernel
-def barrier(qubits: cudaq.qview, num_qubits: int):
-	for i in range(num_qubits / 2):
-		swap(qubits[i*2], qubits[i*2 + 1])
-		swap(qubits[i*2], qubits[i*2 + 1])
+def extractWords(hamiltonian: cudaq.SpinOperator) -> List[str]:
+    result = []
+    hamiltonian.for_each_term(lambda term: result.append(term.to_string(False)))
+    return result
   
   
 ######################################################################
 # EXTERNAL API FUNCTIONS
-   
+    
 ############### Hamiltonian Circuit Definition
 
 def HamiltonianSimulation(
@@ -167,28 +190,32 @@ def HamiltonianSimulation(
             use_inverse_flag: bool = False,
             random_pauli_flag = False,
             random_init_flag = False,
-            append_measurements = True,
+            append_measurements: bool = False,
         ) -> Tuple:
     
+    # convert the Hamiltonian to cudaq format
     spin_op = convert_to_spin_op(num_qubits, ham_op)
     #print(f"... spin_op = {spin_op}")
     
-    # Extract coefficients and words
+    # Extract coefficients and words from the spin operator (for kernel)
     coefficients = extractCoefficients(spin_op)
-    words = extractWords(spin_op)
-    
+    words = extractWords(spin_op)   
     #print(coefficients)
     #print(words)
     
-    
+    # convert the initial state from string form to vector of floats
     bitset = init_state_to_ivec(num_qubits, init_state)
     bitsetf = [float(v) for v in bitset]
-    print(f"... init_state_to_ivec, bitsetf = {bitsetf}")
-    
-    #qc = [pe_kernel, [num_qubits, t]]
-    qc = [hamsim_kernel, [num_qubits, bitsetf, K, t,
-            #coefficients, flat_indices, flat_codes, term_offsets]]
-            coefficients, words]]
+    #print(f"... init_state_to_ivec, bitsetf = {bitsetf}")
+     
+    # Return a kernel with our without measurement gates
+    # CUDAQ ISSUE: the mz() operation cannot be controlled by a flag
+    if append_measurements:
+        qc = [hamsim_kernel_measured, [num_qubits, bitsetf, K, t,
+                coefficients, words, append_measurements]]
+    else:
+        qc = [hamsim_kernel, [num_qubits, bitsetf, K, t,
+                coefficients, words, append_measurements]]
             
     global QC_
     if num_qubits <= 6:
@@ -222,7 +249,7 @@ def init_state_to_ivec(n_spins: int, init_state: str):
             #qc.x([k]) 
             bitset[k] = 1
             
-    print(f"... init_state_to_ivec, bitset = {bitset}")
+    #print(f"... init_state_to_ivec, bitset = {bitset}")
     
     return bitset
   
@@ -246,7 +273,29 @@ def str_to_ivec(input_size: int, s_int: int):
     
     return bitset
     
-############### BV Circuit Drawer
+
+############### Hamiltonian Expectation Functions
+
+def get_expectation(
+        qc: List = None, 
+        num_qubits: int = 0,
+        ham_op: Union[
+                List[Tuple[str, complex]],
+                List[Tuple[Dict[int, str], complex]]
+            ] = None
+        ):
+
+    #print(f"... cudaq_kernel.get_expectation()")
+
+    spin_op = convert_to_spin_op(num_qubits, ham_op)
+    #print(f"... spin_op = {spin_op}")
+    
+    result = cudaq.observe(qc[0], spin_op, *qc[1])       
+
+    return result.expectation()
+    
+    
+############### HamLib Circuit Drawer
 
 # Draw the circuits of this benchmark program
 def kernel_draw(hamiltonian: str = "hamlib", method: int = 1):
@@ -255,6 +304,7 @@ def kernel_draw(hamiltonian: str = "hamlib", method: int = 1):
         try:
             #when using exp_pauli, this is crashing with seg violation
             #print(cudaq.draw(QC_[0], *QC_[1]))
+            print(f"WARNING: cudaq cannot draw kernels with Trotter steps")
             pass
         except:
             print(f"ERROR attemtping to draw the kernel")
