@@ -397,7 +397,21 @@ def parse_hamiltonian_to_sparse_pauli_terms(data):
     if isinstance(data, bytes):
         data = data.decode()
     
+    # this regex approach did not find terms without () around the coeffs
+    # replace with simpler parsing approach below
     terms = re.findall(r'\(([^)]+)\)\s*\[(.*?)\]', data)
+    
+    line_data = data.split("\n")
+    #print(f"    ... normalized, decoded, Hamiltonian data = ")
+    
+    # simpler parsing approach
+    terms2 = []
+    for line in line_data:
+        parts = line.rstrip(" +").split(' ', 1)
+        terms2.append((parts[0].strip("()"), parts[1].strip("[]")))
+    
+    # these terms should be correct and include all terms in the dataset
+    terms = terms2
     
     parsed_pauli_list = []
 
