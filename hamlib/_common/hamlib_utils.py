@@ -89,7 +89,11 @@ def load_hamlib_file(filename: str):
     except Exception:
         extracted_path = None
         print(f"ERROR: can not download the requested HamLib file from: {fullname}")
-        return
+        
+        # attempt to use cached data already downloaded
+        print(f"       using cached data if possible")
+        extracted_path = "downloaded_hamlib_files"
+        #return
         
     # Assuming the HDF5 file is located directly inside the extracted folder
     hdf5_file_path = os.path.join(extracted_path, os.path.basename(pathname)) + ".hdf5"
