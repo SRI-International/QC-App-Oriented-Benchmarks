@@ -75,8 +75,9 @@ def generate_initial_state(state_str):
     return tensor_product(*state)
     
 # Ensure that the initial state is a valid state vector (array)
-def ensure_valid_state(initial_state, num_qubits = None): 
-
+def ensure_valid_state(initial_state, num_qubits = None, reverse = False): 
+    # "reverse" only applies to the checkerboard"
+    
     # if initial_state is None or "", generate |00> state
     if initial_state is None or (isinstance(initial_state, str) and initial_state == ""):
         initial_state = np.zeros((2**num_qubits), dtype=complex)
@@ -87,8 +88,11 @@ def ensure_valid_state(initial_state, num_qubits = None):
         if initial_state == "checkerboard" or initial_state == "neele":
             initial_state = ""
             for k in range(0, num_qubits):
-                initial_state += "0" if k % 2 == 1 else "1"
-                        
+                if not reverse:
+                    initial_state += "0" if k % 2 == 1 else "1"
+                else:
+                    initial_state += "1" if k % 2 == 1 else "0"
+                    
         initial_state = generate_initial_state(initial_state)
          
         # Convert to dense for general use; DEVNOTE: could use sparse state later
@@ -178,6 +182,10 @@ def build_sparse_hamiltonian(num_qubits, pauli_terms):
 """
 Compute theoretical energies from Hamiltonian and initial state.
 This version is returning an array of classically computed exact energies, one for each step of evolution over time.
+
+NOTE: there is some issue with the bit order.  The checkerboard init_state needs to be reversed.
+250125: this needs to be invistigated.  The older scipy_spo version works the other way.
+We need to also check on the |00> and other string states to see if they should be reversed also.
 """
    
 def compute_expectations_exact(initial_state, pauli_terms, time, step_size):
@@ -212,7 +220,7 @@ def compute_expectations_exact(initial_state, pauli_terms, time, step_size):
         print(f"... matrix creation time = {matrix_time} sec")
     
     # ensure initial_state is a normalized complex vector
-    initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
+    initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits, reverse=True)
 
     initial_time = round(timefuns.time()-ts, 3)
     if verbose:
@@ -281,7 +289,7 @@ def compute_expectation_exact(initial_state, pauli_terms, time):
         print(f"... matrix creation time = {matrix_time} sec")
     
     # ensure initial_state is a normalized complex vector
-    initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits)
+    initial_state = ensure_valid_state(initial_state, num_qubits=num_qubits, reverse=True)
 
     initial_time = round(timefuns.time()-ts, 3)
     if verbose:
@@ -567,13 +575,15 @@ def compute_expectation_exact_spo_scipy(initial_state, qc_initial, num_qubits, H
         #initial_state = np.array(initial_state, dtype=complex)
         #initial_state /= np.linalg.norm(initial_state)
 
-        #print(f"... initial state = {initial_state}")
+        #print(f"... initial state (spo)= {initial_state}")
         
         qc_initial = QuantumCircuit(num_qubits)
         
         # Initialize the circuit with the given state vector
         qc_initial.initialize(initial_state, qc_initial.qubits)
-        
+    
+    #print(f"... initial state (spo)= {initial_state}")
+    
     # Evolve the state using SciPyRealEvolver
     time_problem = TimeEvolutionProblem(H, time, initial_state=qc_initial)
     evolved_state = SciPyRealEvolver(num_timesteps=1).evolve(time_problem).evolved_state      

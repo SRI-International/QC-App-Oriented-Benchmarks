@@ -139,6 +139,7 @@ def analyze_and_print_result(
             num_shots: int,
             hamiltonian: str,
             method: int,
+            t: float,
             random_pauli_flag: bool,
             do_sqrt_fidelity: bool,
             init_state: str
@@ -201,7 +202,7 @@ def analyze_and_print_result(
                 qc_initial,
                 num_qubits,
                 hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                1.0        # time (hardocded to match default benchmark)
+                t        # time (hardocded to match default benchmark)
                 )
         """
         ################ Test of the newer evolution_exact code:
@@ -209,7 +210,7 @@ def analyze_and_print_result(
         correct_exp, correct_dist = evolution_exact.compute_expectation_exact(
                 init_state,
                 observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
-                1.0        # time (hardocded to match default benchmark)
+                t        # time
                 )
         
         # report details if verbose mode
@@ -400,7 +401,15 @@ def run(min_qubits: int = 2,
     def execution_handler(qc, result, num_qubits, type, num_shots):
         # Determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, hamiltonian, method, random_pauli_flag, do_sqrt_fidelity, init_state)
+        counts, expectation_a = analyze_and_print_result(
+                    qc, result, num_qubits, type, num_shots,
+                    hamiltonian,
+                    method,
+                    t,
+                    random_pauli_flag,
+                    do_sqrt_fidelity,
+                    init_state
+                )
         metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
 
     # Initialize execution module using the execution result handler above and specified backend_id
