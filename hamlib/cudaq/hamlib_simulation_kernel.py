@@ -24,7 +24,21 @@ def get_initial_state(n_spins: int) -> None:
     for i in range(0, n_spins, 2):
         x(qubits[i])
         
- 
+@cudaq.kernel
+def append_initial_state(qubits: cudaq.qview, n_spins: int, init_phases: List[float]) -> None:
+    """Create initial state |1010...>"""
+    #qubits = cudaq.qvector(n_spins)
+    #for i in range(0, n_spins, 2):
+        #x(qubits[i])
+    
+    num_qubits = n_spins
+    
+    # Rotate each qubit into its initial state, 0 or 1
+    for index, phase in enumerate(init_phases):
+        if phase > 0.0:
+            x(qubits[num_qubits - index - 1])
+            
+        
 ############### Hamiltonian Trotterization
 
 """
@@ -231,33 +245,7 @@ def convert_to_spin_op (num_qubits: int,
     return spin_op
     #return hamiltonian
 
-############### Hamiltonian Simulation Kernel Definition
- 
-@cudaq.kernel           
-def trotter_step (
-
-@cudaq.kernel
-def trotter_step_2(state: cudaq.State,
-                dt: float, 
-                coefficients: List[complex],
-                words: List[cudaq.pauli_word]
-             ) -> None:
-             
-    """Perform single Trotter step"""
-    qubits = cudaq.qvector(state)
-    n_spins = len(qubits)
-   
-    for i in range(len(coefficients)):
-        exp_pauli(coefficients[i].real * dt, qubits, words[i])
-
-
-@cudaq.kernel           
-def hamsim_kernel (num_qubits: int, K: int = 5, t: float = 1.0):
-
-    # Parameters
-    n_spins = num_qubits  # Number of spins in the chain
     
- 
 #####################################################           
  
 ############### Phase Esimation Circuit Definition
@@ -338,8 +326,48 @@ def pe_kernel (num_qubits: int, theta: float):
     # Apply measurement gates to just the `qubits`
     # (excludes the auxillary qubit).
     mz(counting_qubits)
+
+
+############### Hamiltonian Simulation Kernel Definition
+
+@cudaq.kernel
+def trotter_step_2(state: cudaq.State,
+                dt: float, 
+                coefficients: List[complex],
+                words: List[cudaq.pauli_word]
+             ) -> None:
+             
+    """Perform single Trotter step"""
+    qubits = cudaq.qvector(state)
+    n_spins = len(qubits)
+   
+    for i in range(len(coefficients)):
+        exp_pauli(coefficients[i].real * dt, qubits, words[i])
+
+
+@cudaq.kernel           
+def hamsim_kernel (num_qubits: int, init_phases: List[float], K: int = 5, t: float = 1.0):
+
+    # Parameters
+    n_spins = num_qubits  # Number of spins in the chain
+    
+    qubits = cudaq.qvector(num_qubits)
+    
+    append_initial_state(qubits, n_spins, init_phases)
+    
+    # Apply measurement gates to just the `qubits`
+    # (excludes the auxillary qubit).
+    mz(qubits)
  
  
+#DEVNOTE: use this as a barrier when drawing circuit; comment out otherwise
+@cudaq.kernel
+def barrier(qubits: cudaq.qview, num_qubits: int):
+	for i in range(num_qubits / 2):
+		swap(qubits[i*2], qubits[i*2 + 1])
+		swap(qubits[i*2], qubits[i*2 + 1])
+  
+  
 ######################################################################
 # EXTERNAL API FUNCTIONS
    
@@ -364,17 +392,68 @@ def HamiltonianSimulation(
     spin_op = convert_to_spin_op(num_qubits, ham_op)
     print(f"... spin_op = {spin_op}")
         
-    theta = 1.0
+    bitset = init_state_to_ivec(num_qubits, init_state)
+    bitsetf = [float(v) for v in bitset]
+    print(f"... init_state_to_ivec, bitsetf = {bitsetf}")
     
-    qc = [pe_kernel, [num_qubits, theta]]
+    #qc = [pe_kernel, [num_qubits, t]]
+    qc = [hamsim_kernel, [num_qubits, bitsetf, K, t]]
     
     global QC_
     if num_qubits <= 6:
         QC_ = qc
 
     return qc, None
-    
 
+############## Convert Input string to an integer vector
+
+def init_state_to_ivec(n_spins: int, init_state: str):
+    """
+    Initialize the quantum state.
+    
+    Args:
+        n_spins (int): Number of spins (qubits).
+        init_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
+
+    Returns:
+        int []: The initialized integer array.
+    """
+    
+    init_state = init_state.strip().lower()
+    
+    # create an array to hold one integer per bit
+    bitset = [0] * n_spins
+    
+    if init_state == "checkerboard" or init_state == "neele":
+        # Checkerboard state, or "Neele" state
+        for k in range(0, n_spins, 2):
+            #qc.x([k]) 
+            bitset[k] = 1
+            
+    print(f"... init_state_to_ivec, bitset = {bitset}")
+    
+    return bitset
+  
+# Routine to convert the secret integer into an array of integers, each representing one bit
+# DEVNOTE: do we need to convert to string, or can we just keep shifting?
+def str_to_ivec(input_size: int, s_int: int):
+
+    # convert the secret integer into a string so we can scan the characters
+    s = ('{0:0' + str(input_size) + 'b}').format(s_int)
+    
+    # create an array to hold one integer per bit
+    bitset = []
+    
+    # assign bits in reverse order of characters in string
+    for i in range(input_size):
+
+        if s[input_size - 1 - i] == '1':
+            bitset.append(1)
+        else:
+            bitset.append(0)
+    
+    return bitset
+    
 ############### BV Circuit Drawer
 
 # Draw the circuits of this benchmark program
