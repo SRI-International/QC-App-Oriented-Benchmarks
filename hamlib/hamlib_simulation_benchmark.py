@@ -668,7 +668,7 @@ def do_run(args):
         #theta=args.theta,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
-        #api=args.api
+        api=args.api
         )
 
 import cProfile
