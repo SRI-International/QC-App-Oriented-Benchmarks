@@ -24,11 +24,11 @@ import sys
 # This module does not currently use the metrics stored in top-level benchmark metrics.
 # Instead we collect metrics locally for now and concentrate here on plotting.
 
-#sys.path[1:1] = [ "_common", "_common/qiskit", "hydrogen-lattice/_common" ]
-#sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
+sys.path[1:1] = [ "_common" ]
+sys.path[1:1] = [ "../_common" ]
 
 # import the metrics module
-#import metrics as metrics
+import metrics as metrics
 
 # h_lattice_metrics = metrics.circuit_metrics_detail
 
@@ -320,8 +320,7 @@ def plot_expectation_metrics(suptitle="",
             groups=None,
             expectation_values_exact=None,
             expectation_values_computed=None,
-            
-            
+                      
             backend_id=None,
             options=None,
             suffix=None):
@@ -395,7 +394,7 @@ def plot_expectation_metrics(suptitle="",
     ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
     
     # Plot the data
-    ax1.plot(x_data, y_data1, label='Exact1', marker='o')
+    ax1.plot(x_data, y_data1, label='Exact', marker='o')
     ax1.plot(x_data, y_data2, label='Computed', marker='s')
 
     # Add labels and legend
@@ -494,11 +493,16 @@ def plot_expectation_metrics(suptitle="",
     fig1.tight_layout(pad=padding, h_pad=2.0, w_pad=3.0)
                 
     # save the plot image
-    """
+    
+    save_plot_images = True
+    suffix = ""
+    
     if save_plot_images:
-        metrics.save_plot_image(plt, os.path.join("Hydrogen-Lattice-(2)" +
-                                            "-" + suffix),
-                                           backend_id)
-    """
+
+        suffix=("-" + suffix) if suffix else ""                                 
+        metrics.save_plot_image(plt,
+                os.path.join(f"HamLib-Simulation-{options['ham']}" + suffix),
+                backend_id)
+                                            
     # show the plot(s)
     plt.show(block=True)
