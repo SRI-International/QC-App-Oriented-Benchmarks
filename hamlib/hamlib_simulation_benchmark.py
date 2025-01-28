@@ -22,6 +22,7 @@ from typing import Dict, Optional   # for backwards compat <= py 3.10
 sys.path[1:1] = ["_common"]
 
 import evolution_exact
+import metric_plots
 
 ############### Configure API
 #
@@ -310,6 +311,7 @@ def run(min_qubits: int = 2,
         do_sqrt_fidelity: bool = False,
         init_state: str = None,
         K: int = None, t: float = None,
+        plot_results=True,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None):
@@ -346,6 +348,8 @@ def run(min_qubits: int = 2,
         K (int): Number of Trotter steps for the simulation. 
                  This is a crucial parameter for the precision of the Trotterized simulation.
         t (float): Total simulation time. This parameter is used to determine the evolution time for the Hamiltonian.
+        plot_results : bool, optional
+            Plot results only if True. The default is True.
         backend_id (str): Backend identifier for execution on a quantum processor.
         provider_backend: Provider backend instance for advanced execution settings.
         hub (str): IBM Quantum hub identifier. Default is "ibm-q".
@@ -438,6 +442,11 @@ def run(min_qubits: int = 2,
         print(f"       Terminating this benchmark.")
         return
     
+    # temporary metrics storage for observables, until we get the code to use metrics module
+    groups = []
+    expectation_values_exact = []
+    expectation_values_computed = []
+    
     for num_qubits in valid_qubits:
         global sparse_pauli_terms
     
@@ -457,6 +466,8 @@ def run(min_qubits: int = 2,
             print(f"... hamiltonian_params = \n{hamiltonian_params}")
             print(f"... sparse_pauli_terms = {sparse_pauli_terms}")
 
+        groups.append(num_qubits)
+        
         #######################################################################
 
         # in the case of random paulis, method = 3: loop over multiple random pauli circuits
@@ -575,7 +586,10 @@ def run(min_qubits: int = 2,
                     simulation_quality = round(total_energy / correct_exp, 3)
                 else:
                     simulation_quality = 0.0
-                
+                       
+                expectation_values_exact.append(round(correct_exp, 4))
+                expectation_values_computed.append(round(total_energy, 4))
+    
                 print("")
                 print(f"    Exact expectation value, computed classically: {round(correct_exp, 4)}")
                 print(f"    Estimated expectation value, from quantum algorithm: {round(total_energy, 4)}")
@@ -601,8 +615,34 @@ def run(min_qubits: int = 2,
        
     # Plot metrics for all circuit sizes
     base_ham_name = os.path.basename(hamiltonian)
-    options = {"ham": base_ham_name, "method":method, "shots": num_shots, "reps": max_circuits}   
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
+    options = {"ham": base_ham_name, "method":method, "shots": num_shots, "reps": max_circuits}  
+
+    if not plot_results:
+        return
+        
+    if not do_observables:
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
+    
+    if do_observables:
+        #plot_results_from_data(**dict_of_inputs)
+        
+        suptitle = f"Benchmark Results - {benchmark_name} ({method}) - {api if api else 'Qiskit'}"
+
+        # plot all line metrics, including solution quality and accuracy ratio
+        # vs iteration count and cumulative execution time
+        metric_plots.plot_expectation_metrics(
+            suptitle,
+            #line_x_metrics=line_x_metrics,
+            #line_y_metrics=line_y_metrics,
+            #plot_layout_style=plot_layout_style,
+            
+            groups=groups,
+            expectation_values_exact=expectation_values_exact,
+            expectation_values_computed=expectation_values_computed,
+                
+            backend_id=backend_id,
+            options=options,
+        )
 
 
 #######################
@@ -634,7 +674,8 @@ def get_args():
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="Gen random paulis")
     parser.add_argument("--random_init_flag", "-rani", action="store_true", help="Gen random initialization")
     parser.add_argument("--init_state", "-init", default=None, help="initial state", type=str)  
-    parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")    
+    parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")  
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     return parser.parse_args()
     
 def parse_name_value_pairs(input_string: str) -> Dict[str, str]:
@@ -676,6 +717,7 @@ def do_run(args):
         K = args.num_steps,
         t = args.time,
         #theta=args.theta,
+        plot_results=not args.noplot,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
         api=args.api
