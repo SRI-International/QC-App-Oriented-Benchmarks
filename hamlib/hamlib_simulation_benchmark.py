@@ -446,6 +446,8 @@ def run(min_qubits: int = 2,
     groups = []
     expectation_values_exact = []
     expectation_values_computed = []
+    expectation_times_exact = []
+    expectation_times_computed = []
     
     for num_qubits in valid_qubits:
         global sparse_pauli_terms
@@ -540,54 +542,67 @@ def run(min_qubits: int = 2,
                             qc, num_qubits, sparse_pauli_terms)
                     
                 
-                print(f"... total execution time = {round(time.time()-ts, 3)}")
+                computed_time = round((time.time() - ts), 3)
+                expectation_times_computed.append(computed_time)
+                
+                print(f"... total execution time = {computed_time}")
                 
                 ############ compute exact expectation
                 
-                if verbose:
-                    print(f"... begin exact computation for id={type} ...")
+                if num_qubits < 17:
                 
-                ts = time.time()
-                
-                """ no longer used ...                
-                ################ Using the previous evolution_exact code:
-                # the plan is to remove this code and use the new once it is validated.
-                
-                # 250125 (TL): confirmed this old code is giving erroneous values for BH and H2
-                     
-                # create quantum circuit with initial state
-                qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
-                
-                # apply the Hamiltonian operator to initial state to get expectation/distribution
-                correct_exp, _ = evolution_exact.compute_expectation_exact_spo_scipy(
-                        init_state, 
-                        qc_initial,
-                        num_qubits,
-                        hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                        t        # time
-                        )
-                correct_exp = np.real(correct_exp)
-                """
-                
-                ################ Using newer evolution_exact code:
-                
-                correct_exp, _ = evolution_exact.compute_expectation_exact(
-                        init_state,
-                        observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
-                        t        # time
-                        )
+                    if verbose:
+                        print(f"... begin exact computation for id={type} ...")
+                    
+                    ts = time.time()
+                    
+                    """ no longer used ...                
+                    ################ Using the previous evolution_exact code:
+                    # the plan is to remove this code and use the new once it is validated.
+                    
+                    # 250125 (TL): confirmed this old code is giving erroneous values for BH and H2
+                         
+                    # create quantum circuit with initial state
+                    qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
+                    
+                    # apply the Hamiltonian operator to initial state to get expectation/distribution
+                    correct_exp, _ = evolution_exact.compute_expectation_exact_spo_scipy(
+                            init_state, 
+                            qc_initial,
+                            num_qubits,
+                            hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
+                            t        # time
+                            )
+                    correct_exp = np.real(correct_exp)
+                    """
+                    
+                    ################ Using newer evolution_exact code:
+                    
+                    correct_exp, _ = evolution_exact.compute_expectation_exact(
+                            init_state,
+                            observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
+                            t        # time
+                            )
+                            
+                    exact_time = round((time.time() - ts), 3)
+                    expectation_times_exact.append(exact_time)
+                    
+                else:
+                    exact_time = None
                 
                 ############ report results 
                 
                 #if verbose:
-                print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
+                print(f"... exact computation time = {exact_time} sec")
                  
                 if correct_exp != 0.0:  
                     simulation_quality = round(total_energy / correct_exp, 3)
                 else:
                     simulation_quality = 0.0
-                       
-                expectation_values_exact.append(round(correct_exp, 4))
+                
+                if exact_time is not None:
+                    expectation_values_exact.append(round(correct_exp, 4))
+                    
                 expectation_values_computed.append(round(total_energy, 4))
     
                 print("")
@@ -630,7 +645,7 @@ def run(min_qubits: int = 2,
 
         # plot all line metrics, including solution quality and accuracy ratio
         # vs iteration count and cumulative execution time
-        metric_plots.plot_expectation_metrics(
+        metric_plots.plot_expectation_value_metrics(
             suptitle,
             #line_x_metrics=line_x_metrics,
             #line_y_metrics=line_y_metrics,
@@ -639,6 +654,22 @@ def run(min_qubits: int = 2,
             groups=groups,
             expectation_values_exact=expectation_values_exact,
             expectation_values_computed=expectation_values_computed,
+                
+            backend_id=backend_id,
+            options=options,
+        )
+        
+        # plot all line metrics, including solution quality and accuracy ratio
+        # vs iteration count and cumulative execution time
+        metric_plots.plot_expectation_time_metrics(
+            suptitle,
+            #line_x_metrics=line_x_metrics,
+            #line_y_metrics=line_y_metrics,
+            #plot_layout_style=plot_layout_style,
+            
+            groups=groups,
+            expectation_times_exact=expectation_times_exact,
+            expectation_times_computed=expectation_times_computed,
                 
             backend_id=backend_id,
             options=options,
