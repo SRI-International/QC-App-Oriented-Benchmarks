@@ -541,6 +541,7 @@ def run(min_qubits: int = 2,
                     total_energy = hamlib_simulation_kernel.get_expectation(
                             qc, num_qubits, sparse_pauli_terms)
                     
+                expectation_values_computed.append(round(total_energy, 4))
                 
                 computed_time = round((time.time() - ts), 3)
                 expectation_times_computed.append(computed_time)
@@ -584,29 +585,27 @@ def run(min_qubits: int = 2,
                             t        # time
                             )
                             
+                    expectation_values_exact.append(round(correct_exp, 4))
+                            
                     exact_time = round((time.time() - ts), 3)
                     expectation_times_exact.append(exact_time)
+                    
+                    #if verbose:
+                    print(f"... exact computation time = {exact_time} sec")
                     
                 else:
                     exact_time = None
                 
                 ############ report results 
                 
-                #if verbose:
-                print(f"... exact computation time = {exact_time} sec")
-                 
                 if correct_exp != 0.0:  
                     simulation_quality = round(total_energy / correct_exp, 3)
                 else:
                     simulation_quality = 0.0
-                
-                if exact_time is not None:
-                    expectation_values_exact.append(round(correct_exp, 4))
-                    
-                expectation_values_computed.append(round(total_energy, 4))
     
                 print("")
-                print(f"    Exact expectation value, computed classically: {round(correct_exp, 4)}")
+                if exact_time is not None:
+                    print(f"    Exact expectation value, computed classically: {round(correct_exp, 4)}")
                 print(f"    Estimated expectation value, from quantum algorithm: {round(total_energy, 4)}")
                 if verbose: print(f"    Term Contributions: {term_contributions}")
                 

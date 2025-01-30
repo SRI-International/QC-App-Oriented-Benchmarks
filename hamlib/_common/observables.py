@@ -327,15 +327,19 @@ def calculate_expectation_from_measurements(num_qubits, results, pauli_term_grou
             - total_energy (float): The computed total energy of the Hamiltonian.
             - term_contributions (dict): A dictionary with individual Pauli terms as keys
               and their respective contributions to the total energy as values.
-    """
+    """    
     total_exp = 0
     term_contributions = {}
+    
+    debug = False
    
     # Loop over each group and its corresponding measurement results
     if len(pauli_term_groups) > 1:
         for group, result in zip(pauli_term_groups, results.get_counts()):
             counts = result
 
+            if debug: print(counts)
+            
             # Process each Pauli term in the current group
             for term, coeff in group:
                 exp_val = get_expectation_term(term, counts)
@@ -343,22 +347,30 @@ def calculate_expectation_from_measurements(num_qubits, results, pauli_term_grou
                 
                 # save the contribution from each term
                 term_contributions[term] = exp_val
-                    
+                
+                if debug:
+                    print(f"... {(term, coeff)} ==> {exp_val} : {coeff * exp_val} += {total_exp}")
+                
     # results object has different structure when only one circuit, process specially here
     else:
         counts = results.get_counts()
         group = pauli_term_groups[0]
 
+        if debug: print(counts)
+        
         # Process each Pauli term in the current group
         for term, coeff in group:
             exp_val = get_expectation_term(term, counts)
             total_exp += coeff * exp_val
             
-            # if dict provided, save the contribution from each term
+            # save the contribution from each term
             term_contributions[term] = exp_val
+            
+            if debug:
+                print(f"... {(term, coeff)} ==> {exp_val} : {coeff * exp_val} += {total_exp}")
 
     return total_exp, term_contributions
-    
+   
 def calculate_expectation_from_contributions(term_contributions: dict, pauli_terms: list):
     """
     Computes the total expectation value from precomputed term contributions.
@@ -396,8 +408,98 @@ def calculate_expectation_from_contributions(term_contributions: dict, pauli_ter
 # EXPECTATION VALUE SUPPORT FUNCTIONS
  
 # This function may also be used from custom expectation functions that use diagonalization, etc.
- 
+
+# This function appears to give the correct answer, matching Estimator, when groups are not used.
+# The group implementation is still in development. (250129)
+
 def get_expectation_term(term, counts):
+    """
+    Computes the expectation value of a measurement outcome with respect to a single Pauli operator.
+
+    Args:
+        term (str): A Pauli string (e.g., 'XXI', 'ZZI', 'III'), where each character
+                    corresponds to the Pauli operator ('X', 'Y', 'Z', or 'I') 
+                    acting on a specific qubit.
+        counts (dict): Measurement results as keys (bitstrings) and their counts as values.
+
+    Returns:
+        float: The expectation value of the measurement results with respect to the specified Pauli term.
+    """
+    exp_val = 0
+    total_counts = sum(counts.values())  # Total number of shots
+    num_qubits = len(term)  # Number of qubits
+
+    for bitstring, count in counts.items():
+        parity = 1.0  # Initialize parity
+
+        for qubit_index, pauli in enumerate(term):
+            if pauli == 'I':  # Skip identity operators
+                continue
+
+            # Use correct bit index (Qiskit is little-endian, so no need to reverse indexing)
+            bit_value = int(bitstring[qubit_index])
+
+            # Convert bit value to eigenvalue:
+            # |0⟩ (bit 0) corresponds to eigenvalue +1
+            # |1⟩ (bit 1) corresponds to eigenvalue -1
+            eigenvalue = 1 if bit_value == 0 else -1
+
+            parity *= eigenvalue  # Compute parity
+
+        exp_val += parity * count  # Weighted sum of parities
+
+    return exp_val / total_counts  # Normalize by total shots
+
+# This was a modified version that was an attempt to address thebad data issue
+# but it did not provide the correct answer
+
+def get_expectation_term1(term, counts):
+    """
+    Computes the expectation value of a measurement outcome with respect to a single Pauli operator.
+
+    Args:
+        term (str): A string representing a Pauli operator (e.g., 'XXI', 'ZZI', 'III').
+        counts (dict): Measurement results as keys (bitstrings) and their counts as values.
+
+    Returns:
+        float: The expectation value of the measurement results with respect to the specified Pauli term.
+    """
+    exp_val = 0
+    total_counts = sum(counts.values())  # Total number of shots
+    num_qubits = len(term)  # Number of qubits
+
+    for bitstring, count in counts.items():
+        parity = 1.0  # Initialize parity
+
+        for qubit_index, pauli in enumerate(term):
+            if pauli == 'I':  # Skip identity operators
+                continue
+
+            # Map qubit index to bitstring index (little-endian order)
+            bit_index = num_qubits - 1 - qubit_index
+            bit_value = int(bitstring[bit_index])
+
+            # Convert bit value to eigenvalue considering basis rotations
+            if pauli == 'X':
+                eigenvalue = 1 - 2 * bit_value  # +1 for |0>, -1 for |1>
+            elif pauli == 'Y':
+                eigenvalue = 1 - 2 * bit_value  # Same mapping, since measurement basis was rotated
+            elif pauli == 'Z':
+                eigenvalue = 1 - 2 * bit_value  # Z-basis does not change
+            else:
+                raise ValueError(f"Unexpected Pauli term: {pauli}")
+
+            parity *= eigenvalue  # Compute parity
+
+        exp_val += parity * count  # Weight parity by count
+
+    return exp_val / total_counts  # Normalize by total shots
+
+# This is the previous version that was giving a result that did not match Estimator
+# Commented out code below was an attempt to use the Qiskit sampled_expectation_value,
+# but that gives errors too.
+
+def get_expectation_term0(term, counts):
     """
     Computes the expectation value of a measurement outcome with respect to a single Pauli operator.
 
@@ -414,7 +516,10 @@ def get_expectation_term(term, counts):
     exp_val = 0
     total_counts = sum(counts.values())  # Total number of measurement shots
     num_qubits = len(term)  # Total number of qubits in the system
+    
+    print(f"... counts = {counts}")
 
+    
     # Loop over all measurement results
     for bitstring, count in counts.items():
         parity = 1.0  # Initialize parity for the current bitstring
@@ -433,9 +538,51 @@ def get_expectation_term(term, counts):
             parity *= eigenvalue  # Update parity based on the eigenvalue
 
         exp_val += parity * count  # Weighted sum of parities based on counts
-
+    """    
+        
+    from qiskit.result import sampled_expectation_value
+    
+    coeff = 1.0
+    
+    op = SparsePauliOp.from_list([(term, coeff)])
+    op2 = convert_sparse_pauli_op_to_z_basis(op)
+    print(f"  {op}")
+    
+    exp_val = sampled_expectation_value(counts, op2) / coeff
+    print(f"  op2.exp = {exp_val}")
+    """
+    
     # Normalize by the total number of measurement shots
     return exp_val / total_counts
+
+def convert_to_z_basis(pauli_string):
+    """
+    Convert a Pauli string (e.g., 'YIZY') into its equivalent Z-basis form (e.g., 'ZIZZ'),
+    assuming proper basis rotations have been applied before measurement.
+    """
+    return "".join("Z" if p in "XY" else p for p in pauli_string)
+
+def convert_sparse_pauli_op_to_z_basis(sparse_op):
+    """
+    Convert all terms in a SparsePauliOp to their equivalent Z-basis form
+    by replacing 'X' and 'Y' with 'Z'.
+
+    Args:
+        sparse_op (SparsePauliOp): The original SparsePauliOp object.
+
+    Returns:
+        SparsePauliOp: A new SparsePauliOp with terms converted to the Z-basis.
+    """
+    # Extract Pauli strings and coefficients
+    pauli_strings = sparse_op.paulis.to_labels()
+    coefficients = sparse_op.coeffs
+
+    # Convert each Pauli term to Z-basis
+    converted_terms = [pauli.replace("X", "Z").replace("Y", "Z") for pauli in pauli_strings]
+
+    # Create a new SparsePauliOp with the converted terms
+    return SparsePauliOp(converted_terms, coefficients)
+
 
     
 ####################################################################################
