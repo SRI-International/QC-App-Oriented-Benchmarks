@@ -297,14 +297,16 @@ def append_hamiltonian_term_to_circuit(qc, params, pauli):
     Returns:
         None
     """
+    num_qubits = qc.num_qubits
     is_diag = True  # Tracks if the term is diagonal (currently unused)
     for i, p in enumerate(pauli):
+        ii = num_qubits - i -1
         if p == "X":
             is_diag = False
-            qc.h(i)
+            qc.h(ii)
         elif p == "Y":
-            qc.sdg(i)
-            qc.h(i)
+            qc.sdg(ii)
+            qc.h(ii)
             is_diag = False
 
 # ===========================================

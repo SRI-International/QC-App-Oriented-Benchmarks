@@ -305,6 +305,7 @@ def run(min_qubits: int = 2,
         hamiltonian_params: dict = None,
         method: int = 1,
         do_observables = False,
+        group_method = None,
         random_pauli_flag: bool = False, 
         random_init_flag: bool = False, 
         use_inverse_flag: bool = False,
@@ -345,6 +346,12 @@ def run(min_qubits: int = 2,
         do_sqrt_fidelity (bool): If True, computes the square root of the fidelity for measurement results.
         init_state (str): Specifies the initial state for the quantum circuit. 
                           If None, a default state is used.
+        do_observables (bool): compute observable value from the Hamiltonian                
+        group_method (str): Method for generating commuting groups for observable computation. 
+                      Options include:
+                      - None: no commuting groups used
+                      - "simple": simple qubit-wise commuting groups
+                      - "N": where N is the "k" in k-communiting groups               
         K (int): Number of Trotter steps for the simulation. 
                  This is a crucial parameter for the precision of the Trotterized simulation.
         t (float): Total simulation time. This parameter is used to determine the evolution time for the Hamiltonian.
@@ -380,7 +387,8 @@ def run(min_qubits: int = 2,
     hamiltonian_name = hamiltonian
     
     if verbose:
-        print(f"... hamiltonian and params = {hamiltonian_name}, {hamiltonian_params}")
+        print(f"... hamiltonian and params = {hamiltonian_name}, {hamiltonian_params}")    
+        print(f"... group_method = {group_method}")
     
     # load the HamLib file for the given hamiltonian name
     hamlib_utils.load_hamlib_file(filename=hamiltonian_name)
@@ -508,13 +516,28 @@ def run(min_qubits: int = 2,
             else:
 
                 if api == None or api == 'qiskit':
-                    # Flag to control optimize by use of commuting groups
-                    use_commuting_groups = True
-
-                    # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
-                    pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
-                            num_qubits, sparse_pauli_terms, use_commuting_groups)
-
+                    
+                    # arrange Hamiltonian terms into groups as specified
+                    if group_method == None or group_method == 'simple':
+                    
+                        # Flag to control optimize by use of commuting groups
+                        use_commuting_groups = False
+                        if group_method == 'simple':
+                            use_commuting_groups = True
+                           
+                        #print(f"... ucg = {use_commuting_groups}")
+                        
+                        # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
+                        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                                num_qubits, sparse_pauli_terms, use_commuting_groups)
+                                
+                        #print(pauli_term_groups)
+                                
+                    # arrange terms using k-commuting groups
+                    else:
+                        print("WARNING: k-commuting group methods are not yet implemented.")
+                        return
+                        
                     # generate an array of circuits, one for each pauli_string in list
                     circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
                     
@@ -689,23 +712,24 @@ def get_args():
     parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
     parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
-    parser.add_argument("--max_circuits", "-c", default=1, help="Maximum circuit repetitions", type=int)     
-    parser.add_argument("--hamiltonian", "-ham", default="TFIM", help="Name of Hamiltonian", type=str)
-    parser.add_argument("--do_observables", "-obs", action="store_true", help="Compute observable values")
-    parser.add_argument("--parameters", "-params", default=None, help="Hamiltonian parameters, e.g 'enc:bk,h:2'")  
+    parser.add_argument("--max_circuits", "-c", default=1, help="Maximum circuit repetitions", type=int) 
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-    parser.add_argument("--data_suffix", "-suffix", default=None, help="Data File Suffix", type=str)
-    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--hamiltonian", "-ham", default="TFIM", help="Name of Hamiltonian", type=str)
+    parser.add_argument("--parameters", "-params", default=None, help="Hamiltonian parameters, e.g 'enc:bk,h:2'")
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
+    parser.add_argument("--do_observables", "-obs", action="store_true", help="Compute observable values")
+    parser.add_argument("--group_method", "-gm", default=None, help="Method for creating commuting groups, e.g. 'simple','1','2', 'N'")   
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--use_inverse_flag", "-inverse", action="store_true", help="Use inverse evolution")
     parser.add_argument("--do_sqrt_fidelity", "-sqrt", action="store_true", help="Return square root of fidelities")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="Gen random paulis")
     parser.add_argument("--random_init_flag", "-rani", action="store_true", help="Gen random initialization")
     parser.add_argument("--init_state", "-init", default=None, help="initial state", type=str)  
-    parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")  
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--data_suffix", "-suffix", default=None, help="Suffix appended to data file name", type=str)
+    parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile") 
     return parser.parse_args()
     
 def parse_name_value_pairs(input_string: str) -> Dict[str, str]:
@@ -735,10 +759,11 @@ def do_run(args):
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots=args.num_shots,
+        method=args.method,
         hamiltonian=args.hamiltonian,
         hamiltonian_params=hamiltonian_params,
         do_observables=args.do_observables,
-        method=args.method,
+        group_method=args.group_method,
         random_pauli_flag=args.random_pauli_flag,
         random_init_flag=args.random_init_flag,
         use_inverse_flag=args.use_inverse_flag,
