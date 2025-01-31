@@ -541,12 +541,19 @@ def initial_state(n_spins: int, init_state: str = "checker") -> QuantumCircuit:
         qc.name = "Neele"
         for k in range(0, n_spins, 2):
             qc.x([k])
+            
     elif init_state.strip().lower() == "ghz":
         # GHZ state: 1/sqrt(2) (|00...> + |11...>)
         qc.name = "GHZ"
         qc.h(0)
         for k in range(1, n_spins):
             qc.cx(k-1, k)
+            
+    elif set(init_state).issubset({'0', '1'}):
+        qc.name = "b" + init_state
+        for k in range(0, n_spins):
+            if init_state[k] == '1':
+                qc.x([n_spins - k - 1])
 
     return qc
     
