@@ -515,6 +515,9 @@ def run(min_qubits: int = 2,
                 
             else:
 
+                # use this to track how many circuits will be executed
+                num_circuits_to_execute = 0
+                
                 if api == None or api == 'qiskit':
                     
                     # arrange Hamiltonian terms into groups as specified
@@ -530,6 +533,8 @@ def run(min_qubits: int = 2,
                         # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
                         pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
                                 num_qubits, sparse_pauli_terms, use_commuting_groups)
+                                
+                        num_circuits_to_execute = len(pauli_term_groups)
                                 
                         #print(pauli_term_groups)
                                 
@@ -557,6 +562,9 @@ def run(min_qubits: int = 2,
                     total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                                 num_qubits, results, pauli_term_groups)
                     total_energy = np.real(total_energy)
+                    
+                    if num_circuits_to_execute > 0:
+                        print(f"... number of circuits executed = {num_circuits_to_execute}")
                 
                 # special case for CUDA Q Observables (restructure later 250126)
                 elif api == "cudaq":

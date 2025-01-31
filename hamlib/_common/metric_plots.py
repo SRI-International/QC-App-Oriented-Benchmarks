@@ -372,11 +372,11 @@ def plot_expectation_value_metrics(suptitle="",
     
     if not groups:
         return
-    
+    """
     print(groups)    
     print(expectation_values_exact)
     print(expectation_values_computed)
-    
+    """
     x_data = groups
     y_data1 = expectation_values_exact
     y_data2 = expectation_values_computed
@@ -572,11 +572,11 @@ def plot_expectation_time_metrics(suptitle="",
     
     if not groups:
         return
-    
+    """
     print(groups)    
     print(expectation_times_exact)
     print(expectation_times_computed)
-    
+    """
     x_data = groups
     y_data1 = expectation_times_exact
     y_data2 = expectation_times_computed
