@@ -358,8 +358,6 @@ def plot_expectation_value_metrics(suptitle="",
     # create common title (with hardcoded list of options, for now)
     suptitle = toptitle + f"\nham={options['ham']}, shots={options['shots']}, reps={options['reps']}"
     
-    print(f"... suptitle = {suptitle}")
-    
     print("----- Expectation Value Plot -----")
 
     # create a figure for the plot
@@ -557,8 +555,6 @@ def plot_expectation_time_metrics(suptitle="",
     
     # create common title (with hardcoded list of options, for now)
     suptitle = toptitle + f"\nham={options['ham']}, shots={options['shots']}, reps={options['reps']}"
-    
-    print(f"... suptitle = {suptitle}")
     
     print("----- Expectation Time Plot -----")
 

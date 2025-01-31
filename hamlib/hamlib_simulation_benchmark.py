@@ -456,6 +456,8 @@ def run(min_qubits: int = 2,
     expectation_values_computed = []
     expectation_times_exact = []
     expectation_times_computed = []
+    term_counts = []
+    circuit_counts = []
     
     for num_qubits in valid_qubits:
         global sparse_pauli_terms
@@ -478,6 +480,10 @@ def run(min_qubits: int = 2,
 
         groups.append(num_qubits)
         
+        num_hamiltonian_terms = len(sparse_pauli_terms)
+        term_counts.append(num_hamiltonian_terms)
+        print(f"... number of terms in Hamiltonian = {num_hamiltonian_terms}")
+              
         #######################################################################
 
         # in the case of random paulis, method = 3: loop over multiple random pauli circuits
@@ -533,8 +539,9 @@ def run(min_qubits: int = 2,
                         # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
                         pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
                                 num_qubits, sparse_pauli_terms, use_commuting_groups)
-                                
+                                                  
                         num_circuits_to_execute = len(pauli_term_groups)
+                        circuit_counts.append(num_circuits_to_execute)
                                 
                         #print(pauli_term_groups)
                                 
