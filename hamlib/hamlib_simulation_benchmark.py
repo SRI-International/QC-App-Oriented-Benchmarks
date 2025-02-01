@@ -313,9 +313,12 @@ def run(min_qubits: int = 2,
         init_state: str = None,
         K: int = None, t: float = None,
         plot_results=True,
-        backend_id: str = None, provider_backend = None,
-        hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
-        context = None, api = None):
+        backend_id: str = None,
+        provider_backend = None,
+        hub: str = "", group: str = "", project: str = "",
+        exec_options = None,
+        context = None,
+        api = None):
     """
     Execute program with default parameters.
 
@@ -557,14 +560,20 @@ def run(min_qubits: int = 2,
                         for circuit, group in list(zip(circuits, pauli_term_groups)):
                             print(group)
                             #print(circuit)
-                      
+                    """ 
                     # Initialize simulator backend
                     from qiskit_aer import Aer
                     backend = Aer.get_backend('qasm_simulator')
                    
                     # Execute all of the circuits to obtain array of result objects
                     results = backend.run(circuits, num_shots=num_shots).result()
-                    
+                    """
+                    # call api-specific function to execute circuits
+                    results = execute_circuits(
+                            backend_id = backend_id,
+                            circuits = circuits,
+                            num_shots = num_shots)
+                            
                     # Compute the total energy for the Hamiltonian
                     total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                                 num_qubits, results, pauli_term_groups)
@@ -712,6 +721,37 @@ def run(min_qubits: int = 2,
             options=options,
         )
 
+
+########################################
+# CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
+
+# This code is provided here to augment the default API/execute functions,
+# specifically to enable execution of an array of circuits for observable calculations.
+# This code will be moved up into the _common/API/execute methods later (210131).
+
+def execute_circuits(
+        backend_id: str = None,
+        circuits: list = None,
+        num_shots: int = 100
+    ) -> list:
+
+    if verbose:
+        print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
+    
+    if backend_id == None:
+        backend_id == "qasm_simulator"
+    
+    if backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
+    
+        # Initialize simulator backend
+        from qiskit_aer import Aer
+        backend = Aer.get_backend('qasm_simulator')
+   
+        # Execute all of the circuits to obtain array of result objects
+        results = backend.run(circuits, num_shots=num_shots).result()
+     
+    return results
+        
 
 #######################
 # MAIN
