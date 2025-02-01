@@ -560,14 +560,7 @@ def run(min_qubits: int = 2,
                         for circuit, group in list(zip(circuits, pauli_term_groups)):
                             print(group)
                             #print(circuit)
-                    """ 
-                    # Initialize simulator backend
-                    from qiskit_aer import Aer
-                    backend = Aer.get_backend('qasm_simulator')
-                   
-                    # Execute all of the circuits to obtain array of result objects
-                    results = backend.run(circuits, num_shots=num_shots).result()
-                    """
+
                     # call api-specific function to execute circuits
                     results = execute_circuits(
                             backend_id = backend_id,
@@ -749,9 +742,47 @@ def execute_circuits(
    
         # Execute all of the circuits to obtain array of result objects
         results = backend.run(circuits, num_shots=num_shots).result()
-     
+    
+    # handle special case using IBM Runtime Sampler Primitive
+    elif ex.sampler is not None:
+        print("... using Qiskit Runtime Sampler")
+        
+        from qiskit import transpile
+
+        # circuits need to be transpiled first, post Qiskit 1.0
+        trans_qcs = transpile(circuits, ex.backend)
+        
+        # execute the circuits using the Sampler Primitive (required for IBM Runtime Qiskit 1.3
+        job = ex.sampler.run(trans_qcs, shots=num_shots)
+        
+        # wrap the Sampler result object's data in a compatible Result object 
+        sampler_result = job.result()
+        results = BenchmarkResult(sampler_result)
+               
     return results
         
+
+# class BenchmarkResult is made for Sampler runs. This is because
+# qiskit primitive job result instances don't have a get_counts method 
+# like backend results do. As such, a get counts method is calculated
+# from the quasi distributions and shots taken.
+class BenchmarkResult:
+
+    def __init__(self, qiskit_result):
+        super().__init__()
+        self.qiskit_result = qiskit_result
+        self.metadata = qiskit_result.metadata
+
+    def get_counts(self):
+        count_array = []
+        for result in self.qiskit_result:    
+            # convert the quasi distribution bit values to shots distribution
+            bitvals = next(iter(result.data.values()))
+            counts = bitvals.get_counts()
+            count_array.append(counts)
+            
+        return count_array
+
 
 #######################
 # MAIN
