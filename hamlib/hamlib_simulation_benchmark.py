@@ -572,10 +572,10 @@ def run(min_qubits: int = 2,
                 
                 # record relevant performance metrics
                 computed_time = round((time.time() - ts), 3)
-                metrics_object["expectation_time_computed"] = computed_time
+                metrics_object["exp_time_computed"] = computed_time
                 
                 total_energy = round(total_energy, 4)  
-                metrics_object["expectation_value_computed"] = total_energy
+                metrics_object["exp_value_computed"] = total_energy
                 
                 metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
                               
@@ -622,10 +622,10 @@ def run(min_qubits: int = 2,
                             )
                             
                     correct_exp = round(correct_exp, 4)                    
-                    metrics_object["expectation_value_exact"] = correct_exp
+                    metrics_object["exp_value_exact"] = correct_exp
                             
                     exact_time = round((time.time() - ts), 3)
-                    metrics_object["expectation_time_exact"] = exact_time
+                    metrics_object["exp_time_exact"] = exact_time
                     
                     #if verbose:
                     print(f"... exact computation time = {exact_time} sec")
@@ -655,6 +655,9 @@ def run(min_qubits: int = 2,
                 
                 metrics_array.append(metrics_object)
                 
+                benchmark_name2 = f"HamLib-obs-{hamiltonian_name}"
+                store_app_metrics(benchmark_name2, backend_id, metrics_array)
+                
         # Wait for some active circuits to complete; report metrics when groups complete
         if api != "cudaq" or do_observables == False:
             ex.throttle_execution(metrics.finalize_group)
@@ -682,10 +685,10 @@ def run(min_qubits: int = 2,
 
         # extract data arrays metrics_array for plotting 
         groups = [m["group"] for m in metrics_array]
-        expectation_values_computed = [m["expectation_value_computed"] for m in metrics_array]
-        expectation_values_exact = [m["expectation_value_exact"] for m in metrics_array]
-        expectation_times_computed = [m["expectation_time_computed"] for m in metrics_array]
-        expectation_times_exact = [m["expectation_time_exact"] for m in metrics_array]
+        exp_values_computed = [m["exp_value_computed"] for m in metrics_array]
+        exp_values_exact = [m["exp_value_exact"] for m in metrics_array]
+        exp_times_computed = [m["exp_time_computed"] for m in metrics_array]
+        exp_times_exact = [m["exp_time_exact"] for m in metrics_array]
        
         ############## expectation value plot
         suptitle = f"Benchmark Results - {benchmark_name} ({method}) - {api if api else 'Qiskit'}"
@@ -698,8 +701,8 @@ def run(min_qubits: int = 2,
             options=options,
             
             groups=groups,
-            expectation_values_exact=expectation_values_exact,
-            expectation_values_computed=expectation_values_computed,   
+            expectation_values_exact=exp_values_exact,
+            expectation_values_computed=exp_values_computed,   
         )
         
         # expectation time plot
@@ -711,8 +714,8 @@ def run(min_qubits: int = 2,
             options=options,
             
             groups=groups,
-            expectation_times_exact=expectation_times_exact,
-            expectation_times_computed=expectation_times_computed,
+            expectation_times_exact=exp_times_exact,
+            expectation_times_computed=exp_times_computed,
         )
 
 
@@ -785,6 +788,35 @@ class BenchmarkResult:
         return count_array
 
 
+#######################
+# DATA FILE FUNCTIONS  
+  
+# This code needs to be moved or merged with code in _common/metrics.py (250202)
+  
+# Save the application metrics data to a shared file for the current device
+def store_app_metrics (app_name, backend_id, metrics_array):
+    # print(f"... storing metrics for {app_name} executed on {backend_id}")
+    
+    # don't leave slashes in the filename
+    backend_id = backend_id.replace("/", "_")
+    app_name = app_name.replace("/", "_")
+    
+    # load the current data file of all apps; DEVNOTE: might add this later
+    # shared_data = load_app_metrics(backend_id)
+    
+    # be sure we have a __data directory and backend_id directory under it
+    if not os.path.exists("__data"): os.makedirs("__data")
+    if not os.path.exists(f"__data/{backend_id}"): os.makedirs(f"__data/{backend_id}")
+    
+    # create filename based on the backend_id and optional data_suffix
+    filename = f"__data/{backend_id}/{app_name}.json"
+    print(filename)
+    # overwrite the existing file with the merged data
+    with open(filename, "w+") as f:
+        json.dump(metrics_array, f, indent=2, sort_keys=True)
+        f.close()
+ 
+ 
 #######################
 # MAIN
 
