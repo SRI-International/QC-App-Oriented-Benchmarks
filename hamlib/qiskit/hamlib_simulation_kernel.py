@@ -16,6 +16,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
 from qiskit.quantum_info import SparsePauliOp, Pauli
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.synthesis import LieTrotter
 
 verbose = False
 
@@ -356,7 +357,8 @@ def create_circuit_from_op(
     method: int = 1,
     use_inverse_flag: bool = False,
     init_state: str = None,
-    append_measurements: bool = True
+    append_measurements: bool = True,
+    optimize: bool = False
 ):
     """
     Create a quantum circuit based on the given Hamiltonian data.
@@ -370,24 +372,36 @@ def create_circuit_from_op(
     Returns:
         tuple: A tuple containing the constructed QuantumCircuit and the Hamiltonian as a SparsePauliOp.
     """
-    global QCI_, INV_
-    
-    # convert from any form to SparsePauliOp
-    ham_op = ensure_sparse_pauli_op(ham_op, num_qubits)
+    global QCI_, INV_  
 
     # Build the evolution gate
     # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
     evo_label = "e^-iHt"
     time_step = time/num_trotter_steps if num_trotter_steps > 0 else 0.0
-    evo = PauliEvolutionGate(ham_op, time=time_step, label=evo_label)
+    if optimize:
+        synthesis = LieTrotter(preserve_order=False)           
+    else:
+        synthesis = None
+
+    #Check if ham_op is a list of lists
+    if isinstance(ham_op, list) and isinstance(ham_op[0], list):
+        evo = []
+        for ham_op_group in ham_op:
+            # convert from any form to SparsePauliOp
+            ham_op_group = ensure_sparse_pauli_op(ham_op_group, num_qubits)
+            evo += [PauliEvolutionGate(ham_op_group, time=time_step, label=evo_label, synthesis=synthesis)]    
+    else:
+        # convert from any form to SparsePauliOp
+        ham_op = ensure_sparse_pauli_op(ham_op, num_qubits)
+        evo = [PauliEvolutionGate(ham_op, time=time_step, label=evo_label, synthesis=synthesis)]
 
     # Plug it into a circuit
-    circuit = QuantumCircuit(ham_op.num_qubits)
+    circuit = QuantumCircuit(num_qubits)
     
     # first create and append the initial_state
     # init_state = "checkerboard"
     i_state = initial_state(num_qubits, init_state)
-    circuit.append(i_state, range(ham_op.num_qubits))
+    circuit.append(i_state, range(num_qubits))
     circuit.barrier()
     
     if num_qubits <= 6:
@@ -396,7 +410,7 @@ def create_circuit_from_op(
     # Append K trotter steps
     circuit = append_trotter_steps(num_trotter_steps,
             evo if not use_inverse_flag else evo.inverse(),
-            ham_op,
+            num_qubits,
             circuit)
 
     # Append K Trotter steps of inverse, if method 3
@@ -497,7 +511,7 @@ def create_circuit_from_op_pygsti(
 
 ################ Append Trotter steps   
  
-def append_trotter_steps(num_trotter_steps, evo, operator, circuit):
+def append_trotter_steps(num_trotter_steps, evo, num_qubits, circuit):
     """
     Appends Trotter steps to a quantum circuit based on the given evolution operator.
 
@@ -517,7 +531,8 @@ def append_trotter_steps(num_trotter_steps, evo, operator, circuit):
         QuantumCircuit: The quantum circuit with the added Trotter steps and a barrier.
     """
     for _ in range (num_trotter_steps):
-        circuit.append(evo, range(operator.num_qubits))
+        for evo_group in evo:
+            circuit.append(evo_group, range(num_qubits))
     circuit.barrier()
     return circuit
 
@@ -578,6 +593,7 @@ def HamiltonianSimulation(
         random_pauli_flag = False,
         random_init_flag = False,
         append_measurements = True,
+        optimize = False
     ) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
@@ -627,7 +643,8 @@ def HamiltonianSimulation(
             time=t,
             num_trotter_steps=K,
             append_measurements=append_measurements,
-            use_inverse_flag=use_inverse_flag
+            use_inverse_flag=use_inverse_flag,
+            optimize=optimize
             )
     # to generate circuits with random paulis, use the pygsti version
     else:
