@@ -453,14 +453,8 @@ def run(min_qubits: int = 2,
         print(f"       Terminating this benchmark.")
         return
     
-    # temporary metrics storage for observables, until we get the code to use metrics module
-    groups = []
-    expectation_values_exact = []
-    expectation_values_computed = []
-    expectation_times_exact = []
-    expectation_times_computed = []
-    term_counts = []
-    circuit_counts = []
+    # metrics storage for observables, until we update the metrics module for use here
+    metrics_array = []
     
     for num_qubits in valid_qubits:
         global sparse_pauli_terms
@@ -480,15 +474,16 @@ def run(min_qubits: int = 2,
         if verbose:
             print(f"... hamiltonian_params = \n{hamiltonian_params}")
             print(f"... sparse_pauli_terms = {sparse_pauli_terms}")
-
-        groups.append(num_qubits)
-        
+      
         num_hamiltonian_terms = len(sparse_pauli_terms)
-        term_counts.append(num_hamiltonian_terms)
         print(f"... number of terms in Hamiltonian = {num_hamiltonian_terms}")
-              
+         
+        metrics_object = {}
+        metrics_object["group"] = num_qubits
+        metrics_object["term_count"] = num_hamiltonian_terms
+        
         #######################################################################
-
+     
         # in the case of random paulis, method = 3: loop over multiple random pauli circuits
         # otherwise, loop over the same circuit, executing it num_circuits times 
         for circuit_id in range(num_circuits):
@@ -515,13 +510,15 @@ def run(min_qubits: int = 2,
             if "name" in qc:
                 bitstring_dict[qc.name] = bitstring
             
+            # execute for fidelity benchmarks
             if not do_observables:
             
                 metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
                 # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
                 ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
-                
+            
+            # execute differently for observable benchmarks
             else:
 
                 # use this to track how many circuits will be executed
@@ -536,17 +533,12 @@ def run(min_qubits: int = 2,
                         use_commuting_groups = False
                         if group_method == 'simple':
                             use_commuting_groups = True
-                           
-                        #print(f"... ucg = {use_commuting_groups}")
                         
                         # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
                         pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
                                 num_qubits, sparse_pauli_terms, use_commuting_groups)
                                                   
                         num_circuits_to_execute = len(pauli_term_groups)
-                        circuit_counts.append(num_circuits_to_execute)
-                                
-                        #print(pauli_term_groups)
                                 
                     # arrange terms using k-commuting groups
                     else:
@@ -569,24 +561,28 @@ def run(min_qubits: int = 2,
                             
                     # Compute the total energy for the Hamiltonian
                     total_energy, term_contributions = observables.calculate_expectation_from_measurements(
-                                                                num_qubits, results, pauli_term_groups)
+                                                            num_qubits, results, pauli_term_groups)
                     total_energy = np.real(total_energy)
-                    
-                    if num_circuits_to_execute > 0:
-                        print(f"... number of circuits executed = {num_circuits_to_execute}")
                 
                 # special case for CUDA Q Observables (restructure later 250126)
                 elif api == "cudaq":
                 
                     total_energy = hamlib_simulation_kernel.get_expectation(
                             qc, num_qubits, sparse_pauli_terms)
-                    
-                expectation_values_computed.append(round(total_energy, 4))
                 
+                # record relevant performance metrics
                 computed_time = round((time.time() - ts), 3)
-                expectation_times_computed.append(computed_time)
+                metrics_object["expectation_time_computed"] = computed_time
                 
-                print(f"... total execution time = {computed_time}")
+                total_energy = round(total_energy, 4)  
+                metrics_object["expectation_value_computed"] = total_energy
+                
+                metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
+                              
+                if num_circuits_to_execute > 0:
+                        print(f"... number of circuits executed = {num_circuits_to_execute}")
+                
+                print(f"... quantum execution time = {computed_time}")
                 
                 ############ compute exact expectation
                 
@@ -625,10 +621,11 @@ def run(min_qubits: int = 2,
                             t        # time
                             )
                             
-                    expectation_values_exact.append(round(correct_exp, 4))
+                    correct_exp = round(correct_exp, 4)                    
+                    metrics_object["expectation_value_exact"] = correct_exp
                             
                     exact_time = round((time.time() - ts), 3)
-                    expectation_times_exact.append(exact_time)
+                    metrics_object["expectation_time_exact"] = exact_time
                     
                     #if verbose:
                     print(f"... exact computation time = {exact_time} sec")
@@ -642,6 +639,8 @@ def run(min_qubits: int = 2,
                     simulation_quality = round(total_energy / correct_exp, 3)
                 else:
                     simulation_quality = 0.0
+                    
+                metrics_object["simulation_quality"] = simulation_quality
     
                 print("")
                 if exact_time is not None:
@@ -653,7 +652,8 @@ def run(min_qubits: int = 2,
                 print(f"    ==> Simulation Quality: {simulation_quality}")
                 
                 print("")
-           
+                
+                metrics_array.append(metrics_object)
                 
         # Wait for some active circuits to complete; report metrics when groups complete
         if api != "cudaq" or do_observables == False:
@@ -679,39 +679,40 @@ def run(min_qubits: int = 2,
     
     if do_observables:
         #plot_results_from_data(**dict_of_inputs)
-        
+
+        # extract data arrays metrics_array for plotting 
+        groups = [m["group"] for m in metrics_array]
+        expectation_values_computed = [m["expectation_value_computed"] for m in metrics_array]
+        expectation_values_exact = [m["expectation_value_exact"] for m in metrics_array]
+        expectation_times_computed = [m["expectation_time_computed"] for m in metrics_array]
+        expectation_times_exact = [m["expectation_time_exact"] for m in metrics_array]
+       
+        ############## expectation value plot
         suptitle = f"Benchmark Results - {benchmark_name} ({method}) - {api if api else 'Qiskit'}"
 
         # plot all line metrics, including solution quality and accuracy ratio
         # vs iteration count and cumulative execution time
         metric_plots.plot_expectation_value_metrics(
             suptitle,
-            #line_x_metrics=line_x_metrics,
-            #line_y_metrics=line_y_metrics,
-            #plot_layout_style=plot_layout_style,
+            backend_id=backend_id,
+            options=options,
             
             groups=groups,
             expectation_values_exact=expectation_values_exact,
-            expectation_values_computed=expectation_values_computed,
-                
-            backend_id=backend_id,
-            options=options,
+            expectation_values_computed=expectation_values_computed,   
         )
         
+        # expectation time plot
         # plot all line metrics, including solution quality and accuracy ratio
         # vs iteration count and cumulative execution time
         metric_plots.plot_expectation_time_metrics(
             suptitle,
-            #line_x_metrics=line_x_metrics,
-            #line_y_metrics=line_y_metrics,
-            #plot_layout_style=plot_layout_style,
+            backend_id=backend_id,
+            options=options,
             
             groups=groups,
             expectation_times_exact=expectation_times_exact,
             expectation_times_computed=expectation_times_computed,
-                
-            backend_id=backend_id,
-            options=options,
         )
 
 
