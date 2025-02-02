@@ -1,16 +1,12 @@
-import os
 import math
 import numpy as np
 # Configure module paths
 import sys
 sys.path.insert(1, "_common")
 sys.path.insert(1, "qiskit")
-
 from hamlib_utils import load_hamlib_file, get_hamlib_sparsepaulilist
-from hamlib_simulation_kernel import ensure_sparse_pauli_op
 
 
-# 'H2': '/ham_BK-4'
 X = np.array([[0, 1], [1, 0]])
 Y = np.array([[0, -1j], [1j, 0]])
 Z = np.array([[1, 0], [0, -1]])
@@ -60,10 +56,11 @@ def get_terms_ordered_by_abscoeff(sparse_pauli_list:list, num_qubits: int) -> li
     Args:
         ham: A PauliSum.
     Returns:
-        a list of PauliStrings sorted by the absolute value of their coefficient.
+        a list of tuples including a PauliString and its coefficient sorted by the
+        absolute value of their coefficient.
     """
     sorted_data = sorted(sparse_pauli_list, key=lambda x: abs(x[1]), reverse=True)
-    sorted_pauli_terms = [dict_to_string(x[0], num_qubits) for x in sorted_data]
+    sorted_pauli_terms = [(dict_to_string(x[0], num_qubits), x[1]) for x in sorted_data]
     return sorted_pauli_terms
 
 def restrict_to(
@@ -123,7 +120,7 @@ def commutes(pauli1: str, pauli2: str, blocks) -> bool:
             return False
     return True
 
-def get_si_sets(num_qubits:int, sparse_pauli_list, k: int = 1) -> list[list[str]]:
+def get_si_sets(num_qubits:int, sparse_pauli_list, k: int = 1) -> tuple[list[list[tuple]], list[list]]:
     """Returns grouping from the sorted insertion algorithm [https://quantum-journal.org/papers/q-2021-01-20-385/].
 
     Args:
@@ -134,38 +131,38 @@ def get_si_sets(num_qubits:int, sparse_pauli_list, k: int = 1) -> list[list[str]
     blocks = compute_blocks(list(range(num_qubits)), k)
 
     commuting_sets = []
-    for pstring in get_terms_ordered_by_abscoeff(sparse_pauli_list, num_qubits):
+    for (pstring, coeff) in get_terms_ordered_by_abscoeff(sparse_pauli_list, num_qubits):
         found_commuting_set = False
 
         for commset in commuting_sets:
             cant_add = False
 
             for pauli in commset:
-                if not commutes(pstring, pauli, blocks):
+                if not commutes(pstring, pauli[0], blocks):
                     cant_add = True
                     break
 
             if not cant_add:
-                commset.append(pstring)
+                commset.append((pstring, coeff))
                 found_commuting_set = True
                 break
 
         if not found_commuting_set:
-            commuting_sets.append([pstring])
+            commuting_sets.append([(pstring, coeff)])
 
-    return commuting_sets
+    return commuting_sets, blocks
 
 # hamiltonian_name = 'chemistry/electronic/standard/H2'
 # hamiltonian_params = { "ham_BK": '' }
 # num_qubits = 4
-
+#
 # # load the HamLib file for the given hamiltonian name
 # load_hamlib_file(filename=hamiltonian_name)
-
+#
 # # return a sparse Pauli list of terms queried from the open HamLib file
 # sparse_pauli_terms, dataset_name = get_hamlib_sparsepaulilist(num_qubits=num_qubits, params=hamiltonian_params)
 # print(f"... sparse_pauli_terms = \n{sparse_pauli_terms}")
-
-
-# k = num_qubits
+#
+#
+# k = 3
 # print(compute_groups(num_qubits, sparse_pauli_terms, k))
