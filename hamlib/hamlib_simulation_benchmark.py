@@ -481,6 +481,7 @@ def run(min_qubits: int = 2,
         metrics_object = {}
         metrics_object["group"] = num_qubits
         metrics_object["term_count"] = num_hamiltonian_terms
+        metrics_object["group_method"] = group_method
         
         #######################################################################
      
@@ -540,9 +541,22 @@ def run(min_qubits: int = 2,
              
                     # arrange terms using k-commuting groups
                     else:
+                        # treat "N" specially, converting to num_qubits
+                        if group_method == "N":
+                            this_group_method = num_qubits
+                        else:
+                            this_group_method = int(group_method)
+
                         from generate_pauli_groups import compute_groups
                         pauli_term_groups, qubit_list = compute_groups(
-                                        num_qubits, sparse_pauli_terms, 1)
+                                        this_group_method, sparse_pauli_terms, 1)
+                                        
+                        # for each group, create a merged pauli string from all the terms in the group
+                        # DEVNOTE: move these 4 lines to a function in observables
+                        pauli_str_list = []
+                        for group in pauli_term_groups:
+                            merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
+                            pauli_str_list.append(merged_pauli_str)
     
                     num_circuits_to_execute = len(pauli_term_groups)
                         
