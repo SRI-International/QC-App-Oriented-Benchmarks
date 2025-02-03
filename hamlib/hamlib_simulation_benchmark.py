@@ -659,9 +659,7 @@ def run(min_qubits: int = 2,
                 
                 app_name = f"HamLib-obs-{hamiltonian_name}"
                 store_app_metrics(app_name, backend_id, metrics_array)
-                
-                new_metrics = load_app_metrics(app_name, backend_id)
-                
+                                
         # Wait for some active circuits to complete; report metrics when groups complete
         if api != "cudaq" or do_observables == False:
             ex.throttle_execution(metrics.finalize_group)
@@ -686,42 +684,12 @@ def run(min_qubits: int = 2,
     
     if do_observables:
         #plot_results_from_data(**dict_of_inputs)
-
-        # extract data arrays metrics_array for plotting 
-        groups = [m["group"] for m in metrics_array]
-        exp_values_computed = [m["exp_value_computed"] for m in metrics_array]
-        exp_values_exact = [m["exp_value_exact"] for m in metrics_array]
-        exp_times_computed = [m["exp_time_computed"] for m in metrics_array]
-        exp_times_exact = [m["exp_time_exact"] for m in metrics_array]
-       
+        
         ############## expectation value plot
         suptitle = f"Benchmark Results - {benchmark_name} ({method}) - {api if api else 'Qiskit'}"
-
-        # plot all line metrics, including solution quality and accuracy ratio
-        # vs iteration count and cumulative execution time
-        metric_plots.plot_expectation_value_metrics(
-            suptitle,
-            backend_id=backend_id,
-            options=options,
-            
-            groups=groups,
-            expectation_values_exact=exp_values_exact,
-            expectation_values_computed=exp_values_computed,   
-        )
         
-        # expectation time plot
-        # plot all line metrics, including solution quality and accuracy ratio
-        # vs iteration count and cumulative execution time
-        metric_plots.plot_expectation_time_metrics(
-            suptitle,
-            backend_id=backend_id,
-            options=options,
-            
-            groups=groups,
-            expectation_times_exact=exp_times_exact,
-            expectation_times_computed=exp_times_computed,
-        )
-        
+        plot_from_data(suptitle, metrics_array, backend_id, options)
+       
 
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
@@ -823,7 +791,7 @@ def store_app_metrics (app_name, backend_id, metrics_array):
 # Load the application metrics from the given data file
 # Returns a dict containing the metrics
 def load_app_metrics (app_name, backend_id):
-    print(f"... load metrics for {app_name} on {backend_id}")
+    #print(f"... load metrics for {app_name} on {backend_id}")
 
     # don't leave slashes in the filename
     backend_id = backend_id.replace("/", "_")
@@ -876,6 +844,44 @@ def plot_results_from_data(
     ):
     
     pass
+    
+    
+def plot_from_data(suptitle: str, metrics_array: list, backend_id: str, options):
+
+    # extract data arrays metrics_array for plotting 
+    groups = [m["group"] for m in metrics_array]
+    exp_values_computed = [m["exp_value_computed"] for m in metrics_array]
+    exp_values_exact = [m["exp_value_exact"] for m in metrics_array]
+    exp_times_computed = [m["exp_time_computed"] for m in metrics_array]
+    exp_times_exact = [m["exp_time_exact"] for m in metrics_array]
+   
+
+    # plot all line metrics, including solution quality and accuracy ratio
+    # vs iteration count and cumulative execution time
+    metric_plots.plot_expectation_value_metrics(
+        suptitle,
+        backend_id=backend_id,
+        options=options,
+        
+        groups=groups,
+        expectation_values_exact=exp_values_exact,
+        expectation_values_computed=exp_values_computed,   
+    )
+    
+    # expectation time plot
+    # plot all line metrics, including solution quality and accuracy ratio
+    # vs iteration count and cumulative execution time
+    metric_plots.plot_expectation_time_metrics(
+        suptitle,
+        backend_id=backend_id,
+        options=options,
+        
+        groups=groups,
+        expectation_times_exact=exp_times_exact,
+        expectation_times_computed=exp_times_computed,
+    )
+ 
+
  
 #######################
 # MAIN
