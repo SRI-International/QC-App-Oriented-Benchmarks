@@ -537,13 +537,14 @@ def run(min_qubits: int = 2,
                         # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
                         pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
                                 num_qubits, sparse_pauli_terms, use_commuting_groups)
-                                                  
-                        num_circuits_to_execute = len(pauli_term_groups)
-                                
+             
                     # arrange terms using k-commuting groups
                     else:
-                        print("WARNING: k-commuting group methods are not yet implemented.")
-                        return
+                        from generate_pauli_groups import compute_groups
+                        pauli_term_groups, qubit_list = compute_groups(
+                                        num_qubits, sparse_pauli_terms, 1)
+    
+                    num_circuits_to_execute = len(pauli_term_groups)
                         
                     # generate an array of circuits, one for each pauli_string in list
                     circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
@@ -677,7 +678,11 @@ def run(min_qubits: int = 2,
        
     # Plot metrics for all circuit sizes
     base_ham_name = os.path.basename(hamiltonian)
-    options = {"ham": base_ham_name, "method":method, "shots": num_shots, "reps": max_circuits}  
+    options = {"ham": base_ham_name,
+                "method": method,
+                "gm": group_method,
+                "shots": num_shots,
+                "reps": max_circuits}  
 
     if not plot_results:
         return
@@ -787,7 +792,7 @@ def store_app_metrics (app_name, backend_id, metrics_array):
     filename = f"__data/{backend_id}/{app_name}.json"
 
     # overwrite the existing file with the merged data
-    with open(filename, "w+") as f:
+    with open(filename, "w") as f:
         json.dump(metrics_array, f, indent=2, sort_keys=True)
         f.close()
 
