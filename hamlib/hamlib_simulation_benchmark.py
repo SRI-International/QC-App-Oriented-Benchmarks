@@ -569,6 +569,8 @@ def run(min_qubits: int = 2,
                 
                     total_energy = hamlib_simulation_kernel.get_expectation(
                             qc, num_qubits, sparse_pauli_terms)
+                            
+                    term_contributions = None
                 
                 # record relevant performance metrics
                 computed_time = round((time.time() - ts), 3)
@@ -631,13 +633,14 @@ def run(min_qubits: int = 2,
                     print(f"... exact computation time = {exact_time} sec")
                     
                 else:
+                    correct_exp = None
                     exact_time = None
-                    metrics_object["exp_value_exact"] = None
-                    metrics_object["exp_time_exact"] = None
+                    metrics_object["exp_value_exact"] = correct_exp
+                    metrics_object["exp_time_exact"] = exact_time
                 
                 ############ report results 
                 
-                if correct_exp != 0.0:  
+                if correct_exp is not None and correct_exp != 0.0:  
                     simulation_quality = round(total_energy / correct_exp, 3)
                 else:
                     simulation_quality = 0.0
@@ -770,7 +773,7 @@ def store_app_metrics (app_name, backend_id, metrics_array):
     # print(f"... storing metrics for {app_name} executed on {backend_id}")
     
     # don't leave slashes in the filename
-    backend_id = backend_id.replace("/", "_")
+    if backend_id is not None: backend_id = backend_id.replace("/", "_")
     app_name = app_name.replace("/", "_")
     
     # load the current data file of all apps; DEVNOTE: might add this later
@@ -787,14 +790,14 @@ def store_app_metrics (app_name, backend_id, metrics_array):
     with open(filename, "w+") as f:
         json.dump(metrics_array, f, indent=2, sort_keys=True)
         f.close()
- 
+
 # Load the application metrics from the given data file
 # Returns a dict containing the metrics
 def load_app_metrics (app_name, backend_id):
-    #print(f"... load metrics for {app_name} on {backend_id}")
+    # print(f"... load metrics for {app_name} on {backend_id}")
 
     # don't leave slashes in the filename
-    backend_id = backend_id.replace("/", "_")
+    if backend_id is not None: backend_id = backend_id.replace("/", "_")
     app_name = app_name.replace("/", "_")
     
     # create filename based on the backend_id and optional data_suffix
@@ -854,6 +857,10 @@ def plot_from_data(suptitle: str, metrics_array: list, backend_id: str, options)
     exp_values_exact = [m["exp_value_exact"] for m in metrics_array]
     exp_times_computed = [m["exp_time_computed"] for m in metrics_array]
     exp_times_exact = [m["exp_time_exact"] for m in metrics_array]
+    
+    # remove None values from some arrays
+    exp_times_computed = [x for x in exp_times_computed if x is not None]
+    exp_times_exact = [x for x in exp_times_exact if x is not None]
    
 
     # plot all line metrics, including solution quality and accuracy ratio
