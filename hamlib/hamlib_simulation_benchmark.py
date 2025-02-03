@@ -632,6 +632,8 @@ def run(min_qubits: int = 2,
                     
                 else:
                     exact_time = None
+                    metrics_object["exp_value_exact"] = None
+                    metrics_object["exp_time_exact"] = None
                 
                 ############ report results 
                 
@@ -655,8 +657,10 @@ def run(min_qubits: int = 2,
                 
                 metrics_array.append(metrics_object)
                 
-                benchmark_name2 = f"HamLib-obs-{hamiltonian_name}"
-                store_app_metrics(benchmark_name2, backend_id, metrics_array)
+                app_name = f"HamLib-obs-{hamiltonian_name}"
+                store_app_metrics(app_name, backend_id, metrics_array)
+                
+                new_metrics = load_app_metrics(app_name, backend_id)
                 
         # Wait for some active circuits to complete; report metrics when groups complete
         if api != "cudaq" or do_observables == False:
@@ -717,7 +721,7 @@ def run(min_qubits: int = 2,
             expectation_times_exact=exp_times_exact,
             expectation_times_computed=exp_times_computed,
         )
-
+        
 
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
@@ -802,7 +806,7 @@ def store_app_metrics (app_name, backend_id, metrics_array):
     app_name = app_name.replace("/", "_")
     
     # load the current data file of all apps; DEVNOTE: might add this later
-    # shared_data = load_app_metrics(backend_id)
+    # shared_data = load_app_metrics(app_name, backend_id)
     
     # be sure we have a __data directory and backend_id directory under it
     if not os.path.exists("__data"): os.makedirs("__data")
@@ -810,12 +814,68 @@ def store_app_metrics (app_name, backend_id, metrics_array):
     
     # create filename based on the backend_id and optional data_suffix
     filename = f"__data/{backend_id}/{app_name}.json"
-    print(filename)
+
     # overwrite the existing file with the merged data
     with open(filename, "w+") as f:
         json.dump(metrics_array, f, indent=2, sort_keys=True)
         f.close()
  
+# Load the application metrics from the given data file
+# Returns a dict containing the metrics
+def load_app_metrics (app_name, backend_id):
+    print(f"... load metrics for {app_name} on {backend_id}")
+
+    # don't leave slashes in the filename
+    backend_id = backend_id.replace("/", "_")
+    app_name = app_name.replace("/", "_")
+    
+    # create filename based on the backend_id and optional data_suffix
+    #ilename = f"__data/DATA-{backend_id}{data_suffix}.json"
+    filename = f"__data/{backend_id}/{app_name}.json"
+  
+    metrics_array = None
+    
+    # attempt to load metrics data from file
+    if os.path.exists(filename) and os.path.isfile(filename):
+        with open(filename, 'r') as f:
+            
+            # attempt to load shared_data dict as json
+            try:
+                metrics_array = json.load(f)
+                
+            except:
+                pass
+            
+    # create empty shared_data dict if not read from file
+    if metrics_array == None:
+        metrics_array = []
+        
+    return metrics_array
+
+################################################
+# PLOT METHODS
+
+# %% Loading saved data (from json files)
+
+def load_data_and_plot(folder=None, backend_id=None, **kwargs):
+    """
+    The highest level function for loading stored data from a previous run
+    and plotting optgaps and area metrics
+
+    Parameters
+    ----------
+    folder : string
+        Directory where json files are saved.
+    """
+    _gen_prop = load_all_metrics(folder, backend_id=backend_id)
+    if _gen_prop is not None:
+        gen_prop = {**_gen_prop, **kwargs}
+        plot_results_from_data(**gen_prop)
+        
+def plot_results_from_data(
+    ):
+    
+    pass
  
 #######################
 # MAIN
