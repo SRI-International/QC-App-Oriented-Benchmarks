@@ -675,8 +675,10 @@ def run(min_qubits: int = 2,
                 
                 metrics_array.append(metrics_object)
                 
-                app_name = f"HamLib-obs-{hamiltonian_name}"
-                store_app_metrics(app_name, backend_id, metrics_array)
+                # we want to write file every time we have new data.
+                # but if file is busy, we get error, do it at end for now
+                ###app_name = f"HamLib-obs-{hamiltonian_name}"
+                ###store_app_metrics(app_name, backend_id, metrics_array)
                                 
         # Wait for some active circuits to complete; report metrics when groups complete
         if api != "cudaq" or do_observables == False:
@@ -684,6 +686,11 @@ def run(min_qubits: int = 2,
     
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
+    
+    # we want to write file every time we have new data.
+    # but if file is busy, we get error, do it at end for now
+    app_name = f"HamLib-obs-{hamiltonian_name}"
+    store_app_metrics(app_name, backend_id, metrics_array)
 
     ##########
     
@@ -786,6 +793,10 @@ class BenchmarkResult:
 # DATA FILE FUNCTIONS  
   
 # This code needs to be moved or merged with code in _common/metrics.py (250202)
+
+# It is also inefficient in that it is loading the existing metrics from file every time
+# We should load only at start of the benchmark run
+# To avoid this, for now we are writing the data only at the end of the whole benchmark 
   
 # Save the application metrics data to a shared file for the current device
 def store_app_metrics (app_name, backend_id, metrics_array):
@@ -795,9 +806,22 @@ def store_app_metrics (app_name, backend_id, metrics_array):
     if backend_id is not None: backend_id = backend_id.replace("/", "_")
     app_name = app_name.replace("/", "_")
     
-    # load the current data file of all apps; DEVNOTE: might add this later
-    # shared_data = load_app_metrics(app_name, backend_id)
+    ##### load content of exising data file and merge new metrics_array into it
     
+    # load the current data file for this app
+    current_metrics_array = load_app_metrics(app_name, backend_id)
+    
+    # Convert list to a dictionary using multiple keys
+    merged_dict = {get_key(d): d for d in current_metrics_array}
+
+    # Update existing records or add new ones
+    merged_dict.update({get_key(d): d for d in metrics_array})
+
+    # Convert back to a list
+    metrics_array = list(merged_dict.values())
+
+    ##### Write out the merged metrics_array to the data file
+
     # be sure we have a __data directory and backend_id directory under it
     if not os.path.exists("__data"): os.makedirs("__data")
     if not os.path.exists(f"__data/{backend_id}"): os.makedirs(f"__data/{backend_id}")
@@ -842,6 +866,11 @@ def load_app_metrics (app_name, backend_id):
         
     return metrics_array
 
+# Define a function to create a unique key using multiple keys
+def get_key(d):
+    return (d["group"], d["group_method"])  # Unique key based on id and type
+    
+    
 ################################################
 # PLOT METHODS
 
