@@ -502,6 +502,122 @@ def plot_expectation_value_metrics(suptitle="",
     # show the plot(s)
     plt.show(block=True)
 
+#####################################
+
+# method to plot cumulative exec and execution time vs. number of qubits
+def plot_expectation_value_metrics_2(suptitle="",
+            x_data:list=None, x_label:str="",
+            y_data:list=None, y_err:list=None,
+            y_data_2:list=None, y_err_2:list=None,
+            y_label:str="", y_lim_min=None,
+            show_elapsed_times=True,
+            use_logscale_for_times=False,
+            plot_layout_style='grid', 
+            
+            groups=None,
+            expectation_values=None,
+                      
+            backend_id=None,
+            options=None,
+            suffix=None):
+    '''
+    Function to plot execution time metrics (elapsed/execution time per iteration) over different number of qubits
+
+    parameters:
+    ----------
+    x_data: list
+        list of x data for plot
+    x_label: str
+        label for x axis
+    y_data: list
+        list of y data for plot
+    y_err: list
+        list of y error data for plot
+    y_data: list
+        list of y data for plot 2
+    y_err: list
+        list of y error data for plot 2
+    y_label: str
+        label for y axis
+    y_lim_min: float    
+        minimum value to autoscale y axis 
+    '''
+
+    # get subtitle from metrics
+    #m_subtitle = metrics.circuit_metrics['subtitle']
+       
+    # Create standard title for all plots
+    #toptitle = suptitle + metrics.get_backend_title()
+    toptitle = suptitle + f"\nDevice={backend_id}"
+    subtitle = ""
+    
+    # create common title (with hardcoded list of options, for now)
+    suptitle = toptitle + f"\nham={options['ham']}, gm={options['gm']}, shots={options['shots']}, reps={options['reps']}"
+    
+    print("----- Expectation Value Plot -----")
+
+    # create a figure for the plot
+    fig1, ax1 = plt.subplots(1, 1, figsize=(6, 4.2))
+    
+    # and add the title (shifted to the right a bit if single column plot)
+    fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
+    
+    ###### Plot the metrics
+    
+    if not groups:
+        return
+    """
+    print(groups)    
+    print(expectation_values_exact)
+    print(expectation_values_computed)
+    """
+    x_data = groups
+    y_data1 = expectation_values[0]
+    y_data2 = expectation_values[1]
+    
+    #############
+    
+    # set the axis labels
+    ax1.set_xlabel("Number of Qubits")
+    ax1.set_ylabel("Expectation Value")
+    
+    # add the background grid
+    ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
+    
+    # Plot the data
+    ax1.plot(x_data[:len(y_data1)], y_data1, label='Exact Value', marker='.', color='coral', linestyle='dotted')
+    ax1.plot(x_data, y_data2, label='Quantum Value', marker='s', color='C0')
+    ax1.plot(x_data, expectation_values[2], label='#3', marker='s', color='C2')
+    ax1.plot(x_data, expectation_values[3], label='#3', marker='s', color='C4')
+
+    # Add labels and legend
+    #ax1.set_title('Plot of Two Data Sets')
+    ax1.legend()
+
+    # Autoscale the y-axis
+    ax1.autoscale(axis='y')
+
+    ##############
+    
+    # add padding below suptitle, and between plots, due to multi-line titles
+    padding=0.8
+    fig1.tight_layout(pad=padding, h_pad=2.0, w_pad=3.0)
+                
+    # save the plot image
+    
+    save_plot_images = True
+    suffix = ""
+    
+    if save_plot_images:
+
+        suffix=("-" + suffix) if suffix else ""                                 
+        metrics.save_plot_image(plt,
+                os.path.join(f"HamLib-Simulation-{options['ham']}-exp-values" + suffix),
+                backend_id)
+                                            
+    # show the plot(s)
+    plt.show(block=True)
+
 
 #####################################
 
@@ -618,3 +734,118 @@ def plot_expectation_time_metrics(suptitle="",
     # show the plot(s)
     plt.show(block=True)
 
+#####################################
+
+# method to plot cumulative exec and execution time vs. number of qubits
+def plot_expectation_time_metrics_2(suptitle="",
+            x_data:list=None, x_label:str="",
+            y_data:list=None, y_err:list=None,
+            y_data_2:list=None, y_err_2:list=None,
+            y_label:str="", y_lim_min=None,
+            show_elapsed_times=True,
+            use_logscale_for_times=False,
+            plot_layout_style='grid', 
+            
+            groups=None,
+            expectation_times=None,
+                      
+            backend_id=None,
+            options=None,
+            suffix=None):
+    '''
+    Function to plot execution time metrics (elapsed/execution time per iteration) over different number of qubits
+
+    parameters:
+    ----------
+    x_data: list
+        list of x data for plot
+    x_label: str
+        label for x axis
+    y_data: list
+        list of y data for plot
+    y_err: list
+        list of y error data for plot
+    y_data: list
+        list of y data for plot 2
+    y_err: list
+        list of y error data for plot 2
+    y_label: str
+        label for y axis
+    y_lim_min: float    
+        minimum value to autoscale y axis 
+    '''
+
+    # get subtitle from metrics
+    #m_subtitle = metrics.circuit_metrics['subtitle']
+       
+    # Create standard title for all plots
+    #toptitle = suptitle + metrics.get_backend_title()
+    toptitle = suptitle + f"\nDevice={backend_id}"
+    subtitle = ""
+    
+    # create common title (with hardcoded list of options, for now)
+    suptitle = toptitle + f"\nham={options['ham']}, gm={options['gm']}, shots={options['shots']}, reps={options['reps']}"
+    
+    print("----- Expectation Time Plot -----")
+
+    # create a figure for the plot
+    fig1, ax1 = plt.subplots(1, 1, figsize=(6, 4.2))
+    
+    # and add the title (shifted to the right a bit if single column plot)
+    fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
+    
+    ###### Plot the metrics
+    
+    if not groups:
+        return
+    """
+    print(groups)    
+    print(expectation_times_exact)
+    print(expectation_times_computed)
+    """
+    x_data = groups
+    y_data1 = expectation_times[0]
+    y_data2 = expectation_times[1]
+    
+    #############
+    
+    # set the axis labels
+    ax1.set_xlabel("Number of Qubits")
+    ax1.set_ylabel("Expectation Compute Time (sec)")
+    
+    # add the background grid
+    ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
+    
+    # Plot the data
+    ax1.plot(x_data[:len(y_data1)], y_data1, label='Exact Time', marker='.', color='coral', linestyle='dotted')
+    ax1.plot(x_data, y_data2, label='Quantum Time', marker='X', color='C0')
+    ax1.plot(x_data, expectation_times[2], label='#3', marker='X', color='C2')
+    ax1.plot(x_data, expectation_times[3], label='#4', marker='X', color='C4')
+    
+    # Add labels and legend
+    #ax1.set_title('Plot of Two Data Sets')
+    ax1.legend()
+
+    # Autoscale the y-axis
+    ax1.autoscale(axis='y')
+    
+    ##############
+    
+    # add padding below suptitle, and between plots, due to multi-line titles
+    padding=0.8
+    fig1.tight_layout(pad=padding, h_pad=2.0, w_pad=3.0)
+                
+    # save the plot image
+    
+    save_plot_images = True
+    suffix = ""
+    
+    if save_plot_images:
+
+        suffix=("-" + suffix) if suffix else ""                                 
+        metrics.save_plot_image(plt,
+                os.path.join(f"HamLib-Simulation-{options['ham']}-exp-times" + suffix),
+                backend_id)
+                                            
+    # show the plot(s)
+    plt.show(block=True)

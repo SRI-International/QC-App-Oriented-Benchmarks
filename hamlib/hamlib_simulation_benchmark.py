@@ -869,6 +869,19 @@ def load_app_metrics (app_name, backend_id):
 # Define a function to create a unique key using multiple keys
 def get_key(d):
     return (d["group"], d["group_method"])  # Unique key based on id and type
+
+def query_dict_array(data, query):
+    """
+    Filters an array of dictionaries based on a given query dictionary.
+
+    Args:
+        data (list of dict): The dataset to search.
+        query (dict): A dictionary of key-value pairs to match.
+
+    Returns:
+        list: A list of dictionaries that match all query criteria.
+    """
+    return [row for row in data if all(row.get(k) == v for k, v in query.items())]   
     
     
 ################################################
