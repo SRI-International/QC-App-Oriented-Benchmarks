@@ -30,7 +30,7 @@ The `qiskit` package allows quantum circuits to be executed on real quantum hard
 
 To use a hardware backend from a computer system provider other than IBM, you will need to install the "Qiskit Provider" module that is specific to that manufacturer. Please see the documentation provided by that provider.
 
-To execute the benchmarks on IBM systems, go your account page (
+To execute the benchmarks on IBM systems, go your account page, 
 [create an account](https://quantum-computing.ibm.com/docs/manage/account/) in IBM Quantum and save the account token in your local machine using instructions [here](https://quantum-computing.ibm.com/docs/manage/account/ibmq).
 
 ## Run the benchmark programs in a Jupyter Notebook
