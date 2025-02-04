@@ -33,6 +33,25 @@ To use a hardware backend from a computer system provider other than IBM, you wi
 To execute the benchmarks on IBM systems, go your account page, 
 [create an account](https://quantum-computing.ibm.com/docs/manage/account/) in IBM Quantum and save the account token in your local machine using instructions [here](https://quantum-computing.ibm.com/docs/manage/account/ibmq).
 
+## Configuraing IBM Runtime primitives
+
+The `qiskit-ibm-runtime` package offers the Sampler primitive and the Estimator primitive to execute quantum circuits. The Sampler primitive performs tasks of drawing samples from the output state of the quantum circuits in the computation basis, and the Estimator primitive performs tasks of estimating expectation values of observables with respect to the output state of the quantum circuits. 
+
+To configure the options for the Sampler and the Estimator, simply specify with keyword arguments in `exec_options` in `benchmarks-qiskit.ipynb`. Below is an example of configuring the Sampler options:
+```
+    exec_options = {
+        "use_ibm_quantum_platform": False,
+        "use_sessions": True,
+        "sampler_options": {
+            "dynamical_decoupling": {
+                "enable": True,
+            }
+        }
+    }
+```
+
+For more options to run the Sampler and the Estimator primitives, please go to related pages on the [IBM Quantum Documentation](https://docs.quantum.ibm.com/guides/runtime-options-overview).
+
 ## Run the benchmark programs in a Jupyter Notebook
 
 Many Python users prefer to execute these benchmark programs in a Jupyter notebook.
