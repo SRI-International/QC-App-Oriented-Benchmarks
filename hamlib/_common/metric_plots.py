@@ -351,9 +351,6 @@ def plot_expectation_value_metrics(suptitle="",
     y_lim_min: float    
         minimum value to autoscale y axis 
     '''
-
-    # get subtitle from metrics
-    #m_subtitle = metrics.circuit_metrics['subtitle']
        
     # Create standard title for all plots
     #toptitle = suptitle + metrics.get_backend_title()
@@ -370,6 +367,8 @@ def plot_expectation_value_metrics(suptitle="",
     
     # and add the title (shifted to the right a bit if single column plot)
     fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
+    
+    #ax1.set_title('Plot of Two Data Sets')
     
     ###### Plot the metrics
     
@@ -393,8 +392,7 @@ def plot_expectation_value_metrics(suptitle="",
     ax1.plot(x_data[:len(y_data1)], y_data1, label='Exact Value', marker='.', color='coral', linestyle='dotted')
     ax1.plot(x_data[:len(y_data2)], y_data2, label='Quantum Value', marker='s', color='C0')
 
-    # Add labels and legend
-    #ax1.set_title('Plot of Two Data Sets')
+    # Add legend
     ax1.legend()
 
     # Autoscale the y-axis
@@ -544,10 +542,8 @@ def plot_expectation_value_metrics_2(suptitle="",
     y_lim_min: float    
         minimum value to autoscale y axis 
     '''
-
-    # get subtitle from metrics
-    #m_subtitle = metrics.circuit_metrics['subtitle']
-       
+    
+    """ 
     # Create standard title for all plots
     #toptitle = suptitle + metrics.get_backend_title()
     toptitle = suptitle + f"\nDevice={backend_id}"
@@ -555,7 +551,7 @@ def plot_expectation_value_metrics_2(suptitle="",
     
     # create common title (with hardcoded list of options, for now)
     suptitle = toptitle + f"\nham={options['ham']}, gm={options['gm']}, shots={options['shots']}, reps={options['reps']}"
-    
+    """
     print("----- Expectation Value Plot -----")
 
     # create a figure for the plot
@@ -563,6 +559,8 @@ def plot_expectation_value_metrics_2(suptitle="",
     
     # and add the title (shifted to the right a bit if single column plot)
     fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
+    
+    #ax1.set_title('Plot of Two Data Sets')
     
     ###### Plot the metrics
     
@@ -589,8 +587,7 @@ def plot_expectation_value_metrics_2(suptitle="",
         
         ax1.plot(x_data[:len(values[i])], values[i], label=labels[i], marker=marker, color=color)
 
-    # Add labels and legend
-    #ax1.set_title('Plot of Two Data Sets')
+    # Add legend
     ax1.legend()
 
     # Autoscale the y-axis
@@ -659,9 +656,6 @@ def plot_expectation_time_metrics(suptitle="",
     y_lim_min: float    
         minimum value to autoscale y axis 
     '''
-
-    # get subtitle from metrics
-    #m_subtitle = metrics.circuit_metrics['subtitle']
        
     # Create standard title for all plots
     #toptitle = suptitle + metrics.get_backend_title()
@@ -678,6 +672,8 @@ def plot_expectation_time_metrics(suptitle="",
     
     # and add the title (shifted to the right a bit if single column plot)
     fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
+    
+    #ax1.set_title('Plot of Two Data Sets')
     
     ###### Plot the metrics
     
@@ -701,8 +697,7 @@ def plot_expectation_time_metrics(suptitle="",
     ax1.plot(x_data[:len(y_data1)], y_data1, label='Exact Time', marker='.', color='coral', linestyle='dotted')
     ax1.plot(x_data[:len(y_data2)], y_data2, label='Quantum Time', marker='X', color='C0')
 
-    # Add labels and legend
-    #ax1.set_title('Plot of Two Data Sets')
+    # Add legend
     ax1.legend()
 
     # Autoscale the y-axis
@@ -771,9 +766,7 @@ def plot_expectation_time_metrics_2(suptitle="",
         minimum value to autoscale y axis 
     '''
 
-    # get subtitle from metrics
-    #m_subtitle = metrics.circuit_metrics['subtitle']
-       
+    """
     # Create standard title for all plots
     #toptitle = suptitle + metrics.get_backend_title()
     toptitle = suptitle + f"\nDevice={backend_id}"
@@ -781,7 +774,7 @@ def plot_expectation_time_metrics_2(suptitle="",
     
     # create common title (with hardcoded list of options, for now)
     suptitle = toptitle + f"\nham={options['ham']}, gm={options['gm']}, shots={options['shots']}, reps={options['reps']}"
-    
+    """
     print("----- Expectation Time Plot -----")
 
     # create a figure for the plot
@@ -789,6 +782,8 @@ def plot_expectation_time_metrics_2(suptitle="",
     
     # and add the title (shifted to the right a bit if single column plot)
     fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
+    
+    #ax1.set_title('Plot of Two Data Sets')
     
     ###### Plot the metrics
     
@@ -815,8 +810,7 @@ def plot_expectation_time_metrics_2(suptitle="",
         
         ax1.plot(x_data[:len(times[i])], times[i], label=labels[i], marker=marker, color=color)
     
-    # Add labels and legend
-    #ax1.set_title('Plot of Two Data Sets')
+    # Add legend
     ax1.legend()
 
     # Autoscale the y-axis
