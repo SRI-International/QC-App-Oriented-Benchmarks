@@ -391,7 +391,7 @@ def plot_expectation_value_metrics(suptitle="",
     
     # Plot the data
     ax1.plot(x_data[:len(y_data1)], y_data1, label='Exact Value', marker='.', color='coral', linestyle='dotted')
-    ax1.plot(x_data, y_data2, label='Quantum Value', marker='s', color='C0')
+    ax1.plot(x_data[:len(y_data2)], y_data2, label='Quantum Value', marker='s', color='C0')
 
     # Add labels and legend
     #ax1.set_title('Plot of Two Data Sets')
@@ -587,7 +587,7 @@ def plot_expectation_value_metrics_2(suptitle="",
         color = _colors[i] if i < len(_colors) else _colors[-1]
         marker = _markers[i] if i < len(_markers) else _markers[-1]
         
-        ax1.plot(x_data, values[i], label=labels[i], marker=marker, color=color)
+        ax1.plot(x_data[:len(values[i])], values[i], label=labels[i], marker=marker, color=color)
 
     # Add labels and legend
     #ax1.set_title('Plot of Two Data Sets')
@@ -699,7 +699,7 @@ def plot_expectation_time_metrics(suptitle="",
     
     # Plot the data
     ax1.plot(x_data[:len(y_data1)], y_data1, label='Exact Time', marker='.', color='coral', linestyle='dotted')
-    ax1.plot(x_data, y_data2, label='Quantum Time', marker='X', color='C0')
+    ax1.plot(x_data[:len(y_data2)], y_data2, label='Quantum Time', marker='X', color='C0')
 
     # Add labels and legend
     #ax1.set_title('Plot of Two Data Sets')
@@ -813,7 +813,7 @@ def plot_expectation_time_metrics_2(suptitle="",
         color = _colors[i] if i < len(_colors) else _colors[-1]
         marker = _markers[i] if i < len(_markers) else _markers[-1]
         
-        ax1.plot(x_data, times[i], label=labels[i], marker=marker, color=color)
+        ax1.plot(x_data[:len(times[i])], times[i], label=labels[i], marker=marker, color=color)
     
     # Add labels and legend
     #ax1.set_title('Plot of Two Data Sets')
