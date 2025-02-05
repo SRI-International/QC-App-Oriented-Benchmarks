@@ -46,7 +46,7 @@ omit_initial_elapsed_time_factor = 10
 
 
 _markers = [ ".", "s", "*", "h", "P", "X", "d" ]
-_colors = [ "coral", "C0", "C2", "C4" ]
+_colors = [ "coral", "C0", "C2", "C4", "C5", "C6" ]
 _styles = [ "dotted" ]
 
     
