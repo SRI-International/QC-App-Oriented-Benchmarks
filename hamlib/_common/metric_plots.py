@@ -327,7 +327,7 @@ def plot_expectation_value_metrics(suptitle="",
             expectation_values_computed=None,
                       
             backend_id=None,
-            options=None,
+            options={},
             suffix=None):
     '''
     Function to plot execution time metrics (elapsed/execution time per iteration) over different number of qubits
@@ -351,14 +351,20 @@ def plot_expectation_value_metrics(suptitle="",
     y_lim_min: float    
         minimum value to autoscale y axis 
     '''
-       
-    # Create standard title for all plots
-    #toptitle = suptitle + metrics.get_backend_title()
-    toptitle = suptitle + f"\nDevice={backend_id}"
-    subtitle = ""
     
-    # create common title (with hardcoded list of options, for now)
-    suptitle = toptitle + f"\nham={options['ham']}, gm={options['gm']}, shots={options['shots']}, reps={options['reps']}"
+    # these options are required
+    hamiltonian_name = options['ham']
+    num_shots = options['shots']
+    reps = options['reps']
+    
+    # Create standard title for all plots
+    suptitle += f"\nHamiltonian={hamiltonian_name}"
+    #suptitle += f"\n{hamiltonian_params}"
+
+    suptitle = suptitle + f"\nDevice={backend_id}"
+    suptitle += f", shots={num_shots}, reps={reps}"
+    
+    subtitle = ""
     
     print("----- Expectation Value Plot -----")
 
@@ -656,14 +662,28 @@ def plot_expectation_time_metrics(suptitle="",
     y_lim_min: float    
         minimum value to autoscale y axis 
     '''
-       
+    
+    # these options are required
+    hamiltonian_name = options['ham']
+    num_shots = options['shots']
+    reps = options['reps']
+    
+    # Create standard title for all plots
+    suptitle += f"\nHamiltonian={hamiltonian_name}"
+    #suptitle += f"\n{hamiltonian_params}"
+
+    suptitle = suptitle + f"\nDevice={backend_id}"
+    suptitle += f", shots={num_shots}, reps={reps}"
+    """
     # Create standard title for all plots
     #toptitle = suptitle + metrics.get_backend_title()
     toptitle = suptitle + f"\nDevice={backend_id}"
-    subtitle = ""
     
     # create common title (with hardcoded list of options, for now)
     suptitle = toptitle + f"\nham={options['ham']}, gm={options['gm']}, shots={options['shots']}, reps={options['reps']}"
+    """
+    
+    subtitle = ""
     
     print("----- Expectation Time Plot -----")
 
