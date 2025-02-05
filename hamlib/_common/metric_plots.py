@@ -44,7 +44,12 @@ testing_error_bars = False
 # Toss out elapsed times for any run if the initial value is this factor of the second value 
 omit_initial_elapsed_time_factor = 10
 
-  
+
+_markers = [ ".", "s", "*", "h", "P", "X", "d" ]
+_colors = [ "coral", "C0", "C2", "C4" ]
+_styles = [ "dotted" ]
+
+    
 #################################################
 # PLOT EXPECTATION METRICS
 
@@ -370,11 +375,7 @@ def plot_expectation_value_metrics(suptitle="",
     
     if not groups:
         return
-    """
-    print(groups)    
-    print(expectation_values_exact)
-    print(expectation_values_computed)
-    """
+
     x_data = groups
     y_data1 = expectation_values_exact
     y_data2 = expectation_values_computed
@@ -514,8 +515,9 @@ def plot_expectation_value_metrics_2(suptitle="",
             use_logscale_for_times=False,
             plot_layout_style='grid', 
             
-            groups=None,
-            expectation_values=None,
+            groups: list = None,
+            labels: list = None,
+            values: list = None,
                       
             backend_id=None,
             options=None,
@@ -566,14 +568,8 @@ def plot_expectation_value_metrics_2(suptitle="",
     
     if not groups:
         return
-    """
-    print(groups)    
-    print(expectation_values_exact)
-    print(expectation_values_computed)
-    """
-    x_data = groups
-    y_data1 = expectation_values[0]
-    y_data2 = expectation_values[1]
+
+    x_data = groups  
     
     #############
     
@@ -585,10 +581,13 @@ def plot_expectation_value_metrics_2(suptitle="",
     ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
     
     # Plot the data
-    ax1.plot(x_data[:len(y_data1)], y_data1, label='Exact Value', marker='.', color='coral', linestyle='dotted')
-    ax1.plot(x_data, y_data2, label='Quantum Value', marker='s', color='C0')
-    ax1.plot(x_data, expectation_values[2], label='#3', marker='s', color='C2')
-    ax1.plot(x_data, expectation_values[3], label='#3', marker='s', color='C4')
+    ax1.plot(x_data[:len(values[0])], values[0], label=labels[0], marker='.', color='coral', linestyle='dotted')
+    
+    for i in range(1, len(values)):
+        color = _colors[i] if i < len(_colors) else _colors[-1]
+        marker = _markers[i] if i < len(_markers) else _markers[-1]
+        
+        ax1.plot(x_data, values[i], label=labels[i], marker=marker, color=color)
 
     # Add labels and legend
     #ax1.set_title('Plot of Two Data Sets')
@@ -684,11 +683,7 @@ def plot_expectation_time_metrics(suptitle="",
     
     if not groups:
         return
-    """
-    print(groups)    
-    print(expectation_times_exact)
-    print(expectation_times_computed)
-    """
+
     x_data = groups
     y_data1 = expectation_times_exact
     y_data2 = expectation_times_computed
@@ -746,8 +741,9 @@ def plot_expectation_time_metrics_2(suptitle="",
             use_logscale_for_times=False,
             plot_layout_style='grid', 
             
-            groups=None,
-            expectation_times=None,
+            groups: list = None,
+            labels: list = None,
+            times: list = None,
                       
             backend_id=None,
             options=None,
@@ -798,14 +794,8 @@ def plot_expectation_time_metrics_2(suptitle="",
     
     if not groups:
         return
-    """
-    print(groups)    
-    print(expectation_times_exact)
-    print(expectation_times_computed)
-    """
+
     x_data = groups
-    y_data1 = expectation_times[0]
-    y_data2 = expectation_times[1]
     
     #############
     
@@ -816,11 +806,14 @@ def plot_expectation_time_metrics_2(suptitle="",
     # add the background grid
     ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
     
-    # Plot the data
-    ax1.plot(x_data[:len(y_data1)], y_data1, label='Exact Time', marker='.', color='coral', linestyle='dotted')
-    ax1.plot(x_data, y_data2, label='Quantum Time', marker='X', color='C0')
-    ax1.plot(x_data, expectation_times[2], label='#3', marker='X', color='C2')
-    ax1.plot(x_data, expectation_times[3], label='#4', marker='X', color='C4')
+    # Plot the data 
+    ax1.plot(x_data[:len(times[0])], times[0], label=labels[0], marker='.', color='coral', linestyle='dotted')
+
+    for i in range(1, len(times)):
+        color = _colors[i] if i < len(_colors) else _colors[-1]
+        marker = _markers[i] if i < len(_markers) else _markers[-1]
+        
+        ax1.plot(x_data, times[i], label=labels[i], marker=marker, color=color)
     
     # Add labels and legend
     #ax1.set_title('Plot of Two Data Sets')
