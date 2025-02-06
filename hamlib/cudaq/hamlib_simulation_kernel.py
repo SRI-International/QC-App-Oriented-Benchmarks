@@ -134,26 +134,42 @@ def convert_to_spin_op (num_qubits: int,
     
     spin_op = cudaq.SpinOperator(num_qubits=n_spins)
     
+    # print(f"... init spin op: {spin_op}")
+    
     for term in ham_op:
         #print(f"... term = {term}")
         qops = term[0]
         coeff = term[1]
         
-        spins = -coeff
-        for qidx, pauli in qops.items():
-            #print(f"        {qidx} : {pauli}")
-            if pauli == 'Z':
-                spins *= spin.z(qidx)
-            elif pauli == 'Y':
-                spins *= spin.y(qidx)
-            elif pauli == 'X':
-                spins *= spin.x(qidx)
-            elif pauli == '':
+        # handle the coefficient at the end, and don't make it negative
+        #spins = -coeff
+        #spins = coeff
+        spins = 1.0
+        
+        # if the pauli string is empty but provided, add term with coefficient
+        if len(qops) < 1:
+            for qidx in range(num_qubits):
                 spins *= spin.i(qidx)
-                
-        if len(qops) > 0:       
-            spin_op += spins
- 
+                #print(f"  ... i() on {qidx}")
+        else:
+            for qidx, pauli in qops.items():
+                #print(f"        {qidx} : {pauli}")
+                if pauli == 'Z':
+                    spins *= spin.z(qidx)
+                elif pauli == 'Y':
+                    spins *= spin.y(qidx)
+                elif pauli == 'X':
+                    spins *= spin.x(qidx)
+                elif pauli == '':
+                    spins *= spin.i(qidx)
+                elif pauli == 'I':
+                    spins *= spin.i(qidx)
+        
+        # we do not do this check any more, since we are creating a term for empty paulis
+        #if len(qops) > 0:       
+            #spin_op += (spins * coeff)
+
+        spin_op += (spins * coeff)
    
     return spin_op
 
@@ -206,9 +222,9 @@ def HamiltonianSimulation(
     # convert the initial state from string form to vector of floats
     bitset = init_state_to_ivec(num_qubits, init_state)
     bitsetf = [float(v) for v in bitset]
-    #print(f"... init_state_to_ivec, bitsetf = {bitsetf}")
+    print(f"... init_state_to_ivec, bitsetf = {bitsetf}")
      
-    # Return a kernel with our without measurement gates
+    # Return a kernel with or without measurement gates
     # CUDAQ ISSUE: the mz() operation cannot be controlled by a flag
     if append_measurements:
         qc = [hamsim_kernel_measured, [num_qubits, bitsetf, K, t,
@@ -249,7 +265,11 @@ def init_state_to_ivec(n_spins: int, init_state: str):
             #qc.x([k]) 
             bitset[k] = 1
             
-    #print(f"... init_state_to_ivec, bitset = {bitset}")
+    elif set(init_state).issubset({'0', '1'}):
+        for k in range(0, n_spins):
+            if init_state[k] == '1':
+                #qc.x([n_spins - k - 1])
+                bitset[n_spins - k - 1] = 1
     
     return bitset
   
@@ -286,13 +306,21 @@ def get_expectation(
         ):
 
     #print(f"... cudaq_kernel.get_expectation()")
+    #print(ham_op)
 
     spin_op = convert_to_spin_op(num_qubits, ham_op)
     #print(f"... spin_op = {spin_op}")
     
     result = cudaq.observe(qc[0], spin_op, *qc[1])       
 
-    return result.expectation()
+    exp = result.expectation()
+    
+    # DEVNOTE: This code is here to compensate for an oddity of cudaq   
+    # TL - the code to create the spin_operator always adds one term with a coefficient of 1.0
+    # which we are subtracting out here; needs some investigation)
+    exp = exp - 1.0
+    
+    return exp
     
     
 ############### HamLib Circuit Drawer

@@ -303,6 +303,7 @@ def run(min_qubits: int = 2,
         num_shots: int = 100,
         hamiltonian: str = "TFIM", 
         hamiltonian_params: dict = None,
+        pauli_terms: list = None,
         method: int = 1,
         do_observables = False,
         group_method = None,
@@ -394,6 +395,7 @@ def run(min_qubits: int = 2,
         print(f"... group_method = {group_method}")
     
     # load the HamLib file for the given hamiltonian name
+    #if pauli_terms is not None:
     hamlib_utils.load_hamlib_file(filename=hamiltonian_name)
 
     # assume default init_state if not given
@@ -467,8 +469,14 @@ def run(min_qubits: int = 2,
         
         print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
         
-        # return a sparse Pauli list of terms queried from the open HamLib file
-        sparse_pauli_terms, dataset_name = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
+        # use the given Hamiltonian, if provided
+        if pauli_terms is not None:
+            sparse_pauli_terms = pauli_terms
+            dataset_name = "<None>"
+            
+        # use a sparse Pauli list of terms queried from the open HamLib file
+        else:    
+            sparse_pauli_terms, dataset_name = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
                                                                 params=hamiltonian_params)
         print(f"... dataset_name = {dataset_name}")
         if verbose:
