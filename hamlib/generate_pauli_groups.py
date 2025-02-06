@@ -120,7 +120,7 @@ def commutes(pauli1: str, pauli2: str, blocks) -> bool:
             return False
     return True
 
-def get_si_sets(num_qubits:int, sparse_pauli_list, k: int = 1) -> tuple[list[list[tuple]], list[list]]:
+def get_si_sets(num_qubits:int, sparse_pauli_list, k: int = 1) -> list[list[tuple]]:
     """Returns grouping from the sorted insertion algorithm [https://quantum-journal.org/papers/q-2021-01-20-385/].
 
     Args:
@@ -150,7 +150,7 @@ def get_si_sets(num_qubits:int, sparse_pauli_list, k: int = 1) -> tuple[list[lis
         if not found_commuting_set:
             commuting_sets.append([(pstring, coeff)])
 
-    return commuting_sets, blocks
+    return commuting_sets
 
 # hamiltonian_name = 'chemistry/electronic/standard/H2'
 # hamiltonian_params = { "ham_BK": '' }
