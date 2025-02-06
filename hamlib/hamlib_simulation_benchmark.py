@@ -535,57 +535,84 @@ def run(min_qubits: int = 2,
                 
                 if api == None or api == 'qiskit':
                     
-                    # arrange Hamiltonian terms into groups as specified
-                    if group_method == None or group_method == 'simple':
+                    # if NOT using Estimator
+                    if group_method != "estimator":
                     
-                        # Flag to control optimize by use of commuting groups
-                        use_commuting_groups = False
-                        if group_method == 'simple':
-                            use_commuting_groups = True
+                        # arrange Hamiltonian terms into groups as specified
+                        if group_method == None or group_method == 'simple':
                         
-                        # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
-                        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
-                                num_qubits, sparse_pauli_terms, use_commuting_groups)
-             
-                    # arrange terms using k-commuting groups
-                    else:
-                        # treat "N" specially, converting to num_qubits
-                        if group_method == "N":
-                            this_group_method = num_qubits
-                        else:
-                            this_group_method = int(group_method)
-
-                        from generate_pauli_groups import compute_groups
-                        pauli_term_groups, qubit_list = compute_groups(
-                                        this_group_method, sparse_pauli_terms, 1)
-                                        
-                        # for each group, create a merged pauli string from all the terms in the group
-                        # DEVNOTE: move these 4 lines to a function in observables
-                        pauli_str_list = []
-                        for group in pauli_term_groups:
-                            merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
-                            pauli_str_list.append(merged_pauli_str)
-    
-                    num_circuits_to_execute = len(pauli_term_groups)
-                        
-                    # generate an array of circuits, one for each pauli_string in list
-                    circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
-                    
-                    if verbose:                 
-                        for circuit, group in list(zip(circuits, pauli_term_groups)):
-                            print(group)
-                            #print(circuit)
-
-                    # call api-specific function to execute circuits
-                    results = execute_circuits(
-                            backend_id = backend_id,
-                            circuits = circuits,
-                            num_shots = num_shots)
+                            # Flag to control optimize by use of commuting groups
+                            use_commuting_groups = False
+                            if group_method == 'simple':
+                                use_commuting_groups = True
                             
-                    # Compute the total energy for the Hamiltonian
-                    total_energy, term_contributions = observables.calculate_expectation_from_measurements(
-                                                            num_qubits, results, pauli_term_groups)
-                    total_energy = np.real(total_energy)
+                            # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
+                            pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                                    num_qubits, sparse_pauli_terms, use_commuting_groups)
+                 
+                        # arrange terms using k-commuting groups
+                        elif group_method != "estimator":
+                            # treat "N" specially, converting to num_qubits
+                            if group_method == "N":
+                                this_group_method = num_qubits
+                            else:
+                                this_group_method = int(group_method)
+
+                            from generate_pauli_groups import compute_groups
+                            pauli_term_groups, qubit_list = compute_groups(
+                                            this_group_method, sparse_pauli_terms, 1)
+                                            
+                            # for each group, create a merged pauli string from all the terms in the group
+                            # DEVNOTE: move these 4 lines to a function in observables
+                            pauli_str_list = []
+                            for group in pauli_term_groups:
+                                merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
+                                pauli_str_list.append(merged_pauli_str)
+        
+                        num_circuits_to_execute = len(pauli_term_groups)
+                            
+                        # generate an array of circuits, one for each pauli_string in list
+                        circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
+                        
+                        if verbose:                 
+                            for circuit, group in list(zip(circuits, pauli_term_groups)):
+                                print(group)
+                                #print(circuit)
+
+                        # call api-specific function to execute circuits
+                        results = execute_circuits(
+                                backend_id = backend_id,
+                                circuits = circuits,
+                                num_shots = num_shots)
+                                
+                        # Compute the total energy for the Hamiltonian
+                        total_energy, term_contributions = observables.calculate_expectation_from_measurements(
+                                                                num_qubits, results, pauli_term_groups)
+                        total_energy = np.real(total_energy)
+                        
+                    # if using Qiskit Estimator
+                    else:
+                        print("... using Qiskit Estimator primitive.")
+                        
+                        # DEVNOTE: We may want to surface the actual Estimator call instead. 
+
+                        # Ensure that the pauli_terms are in 'full' format, not 'sparse' - convert if necessary
+                        est_pauli_terms = observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits=num_qubits)
+                        est_pauli_terms = observables.swap_pauli_list(est_pauli_terms)
+
+                        #ts = time.time()
+
+                        # DEVNOTE: backend_id not actually used yet
+                        estimator_energy = observables.estimate_expectation_with_estimator(
+                                backend_id, qc, est_pauli_terms, num_shots=num_shots)
+
+                        estimator_time = round(time.time()-ts, 3)
+                        print(f"... Estimator computation time = {estimator_time} sec")
+
+                        print(f"Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
+                         
+                        total_energy = estimator_energy
+                        term_contributions = None
                 
                 # special case for CUDA Q Observables (restructure later 250126)
                 elif api == "cudaq":
