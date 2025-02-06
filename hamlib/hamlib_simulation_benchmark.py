@@ -559,7 +559,7 @@ def run(min_qubits: int = 2,
                                 this_group_method = int(group_method)
 
                             from generate_pauli_groups import compute_groups
-                            pauli_term_groups, qubit_list = compute_groups(
+                            pauli_term_groups = compute_groups(
                                             this_group_method, sparse_pauli_terms, 1)
                                             
                             # for each group, create a merged pauli string from all the terms in the group
