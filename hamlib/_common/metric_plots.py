@@ -46,7 +46,7 @@ omit_initial_elapsed_time_factor = 10
 
 
 _markers = [ ".", "s", "*", "h", "P", "X", "d" ]
-_colors = [ "coral", "C0", "C2", "C4", "C5", "C6" ]
+_colors = [ "coral", "C0", "C2", "C4", "C5", "C6", "C7", "C8" ]
 _styles = [ "dotted", "solid" ]
 
     
@@ -595,7 +595,8 @@ def plot_expectation_value_metrics_2(suptitle="",
         marker = _markers[i] if i < len(_markers) else _markers[-1]
         style = _styles[i] if i < len(_styles) else _styles[-1]
         
-        ax1.plot(x_data[:len(values[i])], values[i], label=labels[i], marker=marker, color=color)
+        ax1.plot(x_data[:len(values[i])], values[i], label=labels[i],
+                linestyle=style, marker=marker, color=color)
 
     # Add legend
     ax1.legend()
