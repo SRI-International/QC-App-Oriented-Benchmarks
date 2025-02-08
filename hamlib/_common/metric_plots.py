@@ -572,10 +572,6 @@ def plot_expectation_value_metrics_2(suptitle="",
     
     if not groups:
         return
-
-    x_data = groups  
-    
-    #############
     
     # set the axis labels
     ax1.set_xlabel("Number of Qubits")
@@ -584,18 +580,15 @@ def plot_expectation_value_metrics_2(suptitle="",
     # add the background grid
     ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
     
-    # Plot the data
-    #ax1.plot(x_data[:len(values[0])], values[0], label=labels[0], marker='.', color='coral', linestyle='dotted')
-    
     for i in range(0, len(values)):       
         if len(values[i]) < 1:
             continue
-        
+
         color = _colors[i] if i < len(_colors) else _colors[-1]
         marker = _markers[i] if i < len(_markers) else _markers[-1]
         style = _styles[i] if i < len(_styles) else _styles[-1]
         
-        ax1.plot(x_data[:len(values[i])], values[i], label=labels[i],
+        ax1.plot(groups[i][:len(values[i])], values[i], label=labels[i],
                 linestyle=style, marker=marker, color=color)
 
     # Add legend
@@ -814,10 +807,6 @@ def plot_expectation_time_metrics_2(suptitle="",
     
     if not groups:
         return
-
-    x_data = groups
-    
-    #############
     
     # set the axis labels
     ax1.set_xlabel("Number of Qubits")
@@ -834,7 +823,7 @@ def plot_expectation_time_metrics_2(suptitle="",
         marker = _markers[i] if i < len(_markers) else _markers[-1]
         style = _styles[i] if i < len(_styles) else _styles[-1]
         
-        ax1.plot(x_data[:len(times[i])], times[i], label=labels[i],
+        ax1.plot(groups[i][:len(times[i])], times[i], label=labels[i],
                     linestyle=style, marker=marker, color=color)
     
     # Add legend
