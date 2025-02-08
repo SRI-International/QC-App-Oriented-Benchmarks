@@ -676,6 +676,7 @@ try:
     from qiskit.quantum_info import SparsePauliOp
     from qiskit_aer import Aer
     from qiskit.primitives import Estimator
+    from qiskit.primitives import BackendEstimator
 
 except Exception as ex:
     print("WARNING: Qiskit-dependent compute observable value functions are not available")
@@ -703,9 +704,12 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
     
     # Convert Hamiltonian terms to SparsePauliOp
     H_op = convert_to_sparse_pauli_op(H_terms)
+    
+    # Choose an actual quantum backend (Aer simulator with shot-based execution)
+    backend = Aer.get_backend("qasm_simulator") 
 
-    # Create an Estimator instance
-    estimator = Estimator()
+    # Create an Estimator bound to the backend
+    estimator = BackendEstimator(backend=backend)
 
     # Use the estimator to compute the expectation value
     job = estimator.run(qc, H_op)
