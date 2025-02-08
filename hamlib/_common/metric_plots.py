@@ -561,7 +561,7 @@ def plot_expectation_value_metrics_2(suptitle="",
     print("----- Expectation Value Plot -----")
 
     # create a figure for the plot
-    fig1, ax1 = plt.subplots(1, 1, figsize=(6, 4.2))
+    fig1, ax1 = plt.subplots(1, 1, figsize=(7.2, 5.0))
     
     # and add the title (shifted to the right a bit if single column plot)
     fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
@@ -796,7 +796,7 @@ def plot_expectation_time_metrics_2(suptitle="",
     print("----- Expectation Time Plot -----")
 
     # create a figure for the plot
-    fig1, ax1 = plt.subplots(1, 1, figsize=(6, 4.2))
+    fig1, ax1 = plt.subplots(1, 1, figsize=(7.2, 5.0))
     
     # and add the title (shifted to the right a bit if single column plot)
     fig1.suptitle(suptitle, fontsize=13, x=(0.5 if plot_layout_style=='grid' else 0.54))
