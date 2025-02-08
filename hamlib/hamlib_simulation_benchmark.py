@@ -897,6 +897,7 @@ def load_app_metrics (app_name, backend_id):
             
     # create empty shared_data dict if not read from file
     if metrics_array == None:
+        print(f"WARNING: cannot load metrics file: {filename}")
         metrics_array = []
         
     return metrics_array

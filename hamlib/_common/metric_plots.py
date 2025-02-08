@@ -47,7 +47,7 @@ omit_initial_elapsed_time_factor = 10
 
 _markers = [ ".", "s", "*", "h", "P", "X", "d" ]
 _colors = [ "coral", "C0", "C2", "C4", "C5", "C6" ]
-_styles = [ "dotted" ]
+_styles = [ "dotted", "solid" ]
 
     
 #################################################
@@ -585,11 +585,15 @@ def plot_expectation_value_metrics_2(suptitle="",
     ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
     
     # Plot the data
-    ax1.plot(x_data[:len(values[0])], values[0], label=labels[0], marker='.', color='coral', linestyle='dotted')
+    #ax1.plot(x_data[:len(values[0])], values[0], label=labels[0], marker='.', color='coral', linestyle='dotted')
     
-    for i in range(1, len(values)):
+    for i in range(0, len(values)):       
+        if len(values[i]) < 1:
+            continue
+        
         color = _colors[i] if i < len(_colors) else _colors[-1]
         marker = _markers[i] if i < len(_markers) else _markers[-1]
+        style = _styles[i] if i < len(_styles) else _styles[-1]
         
         ax1.plot(x_data[:len(values[i])], values[i], label=labels[i], marker=marker, color=color)
 
@@ -821,14 +825,16 @@ def plot_expectation_time_metrics_2(suptitle="",
     # add the background grid
     ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
     
-    # Plot the data 
-    ax1.plot(x_data[:len(times[0])], times[0], label=labels[0], marker='.', color='coral', linestyle='dotted')
-
-    for i in range(1, len(times)):
+    for i in range(0, len(times)):
+        if len(times[i]) < 1:
+            continue
+        
         color = _colors[i] if i < len(_colors) else _colors[-1]
         marker = _markers[i] if i < len(_markers) else _markers[-1]
+        style = _styles[i] if i < len(_styles) else _styles[-1]
         
-        ax1.plot(x_data[:len(times[i])], times[i], label=labels[i], marker=marker, color=color)
+        ax1.plot(x_data[:len(times[i])], times[i], label=labels[i],
+                    linestyle=style, marker=marker, color=color)
     
     # Add legend
     ax1.legend()
