@@ -80,6 +80,9 @@ benchmark_name = "Hamiltonian Simulation"
 # Maximum # of qubits for which to perform classical exact computation
 max_qubits_exact = 16
 
+# Data suffix appended to backend_id when saving data files
+data_suffix = ""
+
 np.random.seed(0)
 
 verbose = False
@@ -777,14 +780,22 @@ def execute_circuits(
     if backend_id == None:
         backend_id == "qasm_simulator"
     
+    # Set up the backend for execution
     if backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
     
         # Initialize simulator backend
         from qiskit_aer import Aer
-        backend = Aer.get_backend('qasm_simulator')
+        if backend_id == "statevector_simulator":
+            backend = Aer.get_backend('statevector_simulator')
+        else:
+            backend = Aer.get_backend('qasm_simulator')
    
         # Execute all of the circuits to obtain array of result objects
-        results = backend.run(circuits, num_shots=num_shots).result()
+        if ex.noise is not None:
+            #print("**************** executing with noise")
+            results = backend.run(circuits, num_shots=num_shots, noise_model=ex.noise).result()
+        else:
+            results = backend.run(circuits, num_shots=num_shots).result()
     
     # handle special case using IBM Runtime Sampler Primitive
     elif ex.sampler is not None:
@@ -862,10 +873,11 @@ def store_app_metrics (app_name, backend_id, metrics_array):
 
     # be sure we have a __data directory and backend_id directory under it
     if not os.path.exists("__data"): os.makedirs("__data")
-    if not os.path.exists(f"__data/{backend_id}"): os.makedirs(f"__data/{backend_id}")
+    if not os.path.exists(f"__data/{backend_id}{data_suffix}"):
+        os.makedirs(f"__data/{backend_id}{data_suffix}")
     
     # create filename based on the backend_id and optional data_suffix
-    filename = f"__data/{backend_id}/{app_name}.json"
+    filename = f"__data/{backend_id}{data_suffix}/{app_name}.json"
 
     # overwrite the existing file with the merged data
     with open(filename, "w") as f:
@@ -883,7 +895,7 @@ def load_app_metrics (app_name, backend_id):
     
     # create filename based on the backend_id and optional data_suffix
     #ilename = f"__data/DATA-{backend_id}{data_suffix}.json"
-    filename = f"__data/{backend_id}/{app_name}.json"
+    filename = f"__data/{backend_id}{data_suffix}/{app_name}.json"
   
     metrics_array = None
     
