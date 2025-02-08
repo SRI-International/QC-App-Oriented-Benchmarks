@@ -77,6 +77,9 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
 
+# Maximum # of qubits for which to perform classical exact computation
+max_qubits_exact = 16
+
 np.random.seed(0)
 
 verbose = False
@@ -638,7 +641,7 @@ def run(min_qubits: int = 2,
                 
                 ############ compute exact expectation
                 
-                if num_qubits < 17:
+                if num_qubits <= max_qubits_exact:
                 
                     if verbose:
                         print(f"... begin exact computation for id={type} ...")
