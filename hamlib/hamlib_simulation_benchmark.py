@@ -776,7 +776,7 @@ def execute_circuits(
 
     if verbose:
         print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
-    
+    print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
     if backend_id == None:
         backend_id == "qasm_simulator"
     
@@ -786,12 +786,13 @@ def execute_circuits(
         # Initialize simulator backend
         from qiskit_aer import Aer
         if backend_id == "statevector_simulator":
-            backend = Aer.get_backend('statevector_simulator')
+            #backend = Aer.get_backend('statevector_simulator')
+            backend = Aer.get_backend('qasm_simulator')
         else:
             backend = Aer.get_backend('qasm_simulator')
    
         # Execute all of the circuits to obtain array of result objects
-        if ex.noise is not None:
+        if backend_id != "statevector_simulator" and ex.noise is not None:
             #print("**************** executing with noise")
             results = backend.run(circuits, num_shots=num_shots, noise_model=ex.noise).result()
         else:
@@ -812,7 +813,24 @@ def execute_circuits(
         # wrap the Sampler result object's data in a compatible Result object 
         sampler_result = job.result()
         results = BenchmarkResult(sampler_result)
-               
+     
+    # handle all other backends here
+    else:
+        print(f"... using Qiskit run() with {backend_id}")
+        
+        from qiskit import transpile
+        
+        # DEVNOTE: This line is specific to IonQ Aria-1 simulation; comment out
+        # ex.backend.set_options(noise_model="aria-1")
+        
+        # circuits need to be transpiled first, post Qiskit 1.0
+        trans_qcs = transpile(circuits, ex.backend)
+        
+        # execute the circuits using backend.run()
+        job = ex.backend.run(trans_qcs, shots=num_shots)
+        
+        results = job.result()
+          
     return results
         
 
