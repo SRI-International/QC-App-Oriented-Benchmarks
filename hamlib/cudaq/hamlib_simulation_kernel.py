@@ -53,7 +53,7 @@ def hamsim_kernel(
         t: float = 1.0,
         coefficients: List[complex] = None,
         words: List[cudaq.pauli_word] = None,
-        append_measurements: bool = True
+        append_measurements: bool = False
     ):
     
     # create the qubit vector
@@ -107,7 +107,7 @@ def append_trotter_step(
         ) -> None:
    
     for i in range(len(coefficients)):
-        exp_pauli(coefficients[i].real * dt, qubits, words[i])   # this crashes jupyter kernel
+        exp_pauli(coefficients[i].real * dt, qubits, words[i])   # this crashes jupyter kernel on draw
  
 #DEVNOTE: use this as a barrier when drawing circuit; comment out otherwise
 @cudaq.kernel
