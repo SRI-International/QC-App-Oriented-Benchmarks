@@ -91,7 +91,16 @@ def pauli_string_to_matrix(pauli_str: str) -> np.array:
         result = np.kron(result, pauli_map[p])
     return result
 
-def if_commute(pauli1: str, pauli2: str, atol=1e-8) -> bool:
+def if_commute(pauli1: str, pauli2: str) -> bool:
+    assert len(pauli1) == len(pauli2)
+    commute = True
+    for p1, p2 in zip(pauli1, pauli2):
+        if p1 != 'I' and p2 != 'I':
+            if p1 != p2:
+                commute = not commute
+    return commute
+
+def _if_commute(pauli1: str, pauli2: str, atol=1e-8) -> bool:
     """
     Checks if the pauli1(A) and pauli2(B) commutes.
     if AB-BA < atol, they commute.
