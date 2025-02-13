@@ -41,7 +41,6 @@ def append_initial_state(qubits: cudaq.qview, n_spins: int, init_phases: List[fl
     for index, phase in enumerate(init_phases):
         if phase > 0.0:
             x(qubits[num_qubits - index - 1])
-                        
 
 ############### Hamiltonian Simulation Kernel Definition
 
@@ -133,10 +132,8 @@ def convert_to_spin_op (num_qubits: int,
     n_spins = num_qubits  # Number of spins in the chain
     
     spin_op = cudaq.SpinOperator(num_qubits=n_spins)
-    
-    # print(f"... init spin op: {spin_op}")
-    
-    for term in ham_op:
+        
+    for term in (ham_op):
         #print(f"... term = {term}")
         qops = term[0]
         coeff = term[1]
@@ -172,6 +169,7 @@ def convert_to_spin_op (num_qubits: int,
         spin_op += (spins * coeff)
    
     return spin_op
+    
 
 ############### Extract Coefficients and Pauli Words
 
@@ -187,58 +185,36 @@ def extractWords(hamiltonian: cudaq.SpinOperator) -> List[str]:
     result = []
     hamiltonian.for_each_term(lambda term: result.append(term.to_string(False)))
     return result
-  
-  
-######################################################################
-# EXTERNAL API FUNCTIONS
-    
-############### Hamiltonian Circuit Definition
+ 
+ 
+def convert_sparse_to_dense(sparse_pauli_terms, num_qubits):
+    """
+    Convert sparse Pauli terms into full-length Pauli strings and coefficient arrays.
 
-def HamiltonianSimulation(
-            num_qubits: int = 0,
-            ham_op: Union[
-                List[Tuple[str, complex]],
-                List[Tuple[Dict[int, str], complex]]
-            ] = None,
-            K: int = 5, t: float = 1.0,
-            init_state = None,
-            method: int = 1,
-            use_inverse_flag: bool = False,
-            random_pauli_flag = False,
-            random_init_flag = False,
-            append_measurements: bool = False,
-        ) -> Tuple:
-    
-    # convert the Hamiltonian to cudaq format
-    spin_op = convert_to_spin_op(num_qubits, ham_op)
-    #print(f"... spin_op = {spin_op}")
-    
-    # Extract coefficients and words from the spin operator (for kernel)
-    coefficients = extractCoefficients(spin_op)
-    words = extractWords(spin_op)   
-    #print(coefficients)
-    #print(words)
-    
-    # convert the initial state from string form to vector of floats
-    bitset = init_state_to_ivec(num_qubits, init_state)
-    bitsetf = [float(v) for v in bitset]
-    print(f"... init_state_to_ivec, bitsetf = {bitsetf}")
-     
-    # Return a kernel with or without measurement gates
-    # CUDAQ ISSUE: the mz() operation cannot be controlled by a flag
-    if append_measurements:
-        qc = [hamsim_kernel_measured, [num_qubits, bitsetf, K, t,
-                coefficients, words, append_measurements]]
-    else:
-        qc = [hamsim_kernel, [num_qubits, bitsetf, K, t,
-                coefficients, words, append_measurements]]
-            
-    global QC_
-    if num_qubits <= 6:
-        QC_ = qc
+    Parameters:
+        sparse_pauli_terms (list of tuples): List of (dict, coefficient) pairs
+        num_qubits (int): Total number of qubits
 
-    return qc, None
-    
+    Returns:
+        tuple: (list of full Pauli strings, list of coefficients)
+    """
+    full_pauli_strings = []
+    coefficients = []
+
+    for pauli_dict, coefficient in sparse_pauli_terms:
+        # Initialize a full identity string
+        full_term = ['I'] * num_qubits
+
+        # Insert Pauli operators at the correct qubit positions
+        for qubit, pauli in pauli_dict.items():
+            full_term[qubit] = pauli  # Replace identity with the correct Pauli
+
+        # Convert list to string and append to results
+        full_pauli_strings.append("".join(full_term))
+        coefficients.append(coefficient)
+
+    return full_pauli_strings, coefficients
+
 
 ############## Convert Input string to an integer vector
 
@@ -292,10 +268,73 @@ def str_to_ivec(input_size: int, s_int: int):
             bitset.append(0)
     
     return bitset
+ 
+
+###################################################################### 
+######################################################################
+# EXTERNAL API FUNCTIONS
+    
+############### Hamiltonian Circuit Definition
+
+use_commuting_terms = True
+
+def HamiltonianSimulation(
+            num_qubits: int = 0,
+            ham_op: Union[
+                List[Tuple[str, complex]],
+                List[Tuple[Dict[int, str], complex]]
+            ] = None,
+            K: int = 5, t: float = 1.0,
+            init_state = None,
+            method: int = 1,
+            use_inverse_flag: bool = False,
+            random_pauli_flag = False,
+            random_init_flag = False,
+            append_measurements: bool = False,
+        ) -> Tuple:
+    
+    # convert the Hamiltonian to cudaq SpinOperator format
+    spin_op = convert_to_spin_op(num_qubits, ham_op)
+    #print(f"... spin_op = {spin_op}")
+
+    # Extract coefficients and words from the spin operator (for kernel)
+    # Note that the lists returned are re-ordered for optimal Trotterization
+    # we use this technique by default, but can disable it for testing
+    if use_commuting_terms:
+        coefficients = extractCoefficients(spin_op)
+        words = extractWords(spin_op)
+        
+    # Optionally, convert to full Pauli strings and coefficients in original order       
+    else:
+        words, coefficients = convert_sparse_to_dense(ham_op, num_qubits)
+    
+    #print(words)
+    #print(coefficients)   
+    
+    # convert the initial state from string form to vector of floats
+    bitset = init_state_to_ivec(num_qubits, init_state)
+    bitsetf = [float(v) for v in bitset]
+    #print(f"... init_state_to_ivec, bitsetf = {bitsetf}")
+     
+    # Return a kernel with or without measurement gates
+    # CUDAQ ISSUE: the mz() operation cannot be controlled by a flag
+    if append_measurements:
+        qc = [hamsim_kernel_measured, [num_qubits, bitsetf, K, t,
+                coefficients, words, append_measurements]]
+    else:
+        qc = [hamsim_kernel, [num_qubits, bitsetf, K, t,
+                coefficients, words, append_measurements]]
+            
+    global QC_
+    if num_qubits <= 6:
+        QC_ = qc
+
+    return qc, None
     
 
 ############### Hamiltonian Expectation Functions
 
+# Call this to obtain the expectation value for the given Hamiltonian after executing kernel qc
 def get_expectation(
         qc: List = None, 
         num_qubits: int = 0,
@@ -317,7 +356,7 @@ def get_expectation(
     
     # DEVNOTE: This code is here to compensate for an oddity of cudaq   
     # TL - the code to create the spin_operator always adds one term with a coefficient of 1.0
-    # which we are subtracting out here; needs some investigation)
+    # (which we are subtracting out here; needs some investigation)
     exp = exp - 1.0
     
     return exp
