@@ -319,7 +319,8 @@ def run(min_qubits: int = 2,
         do_sqrt_fidelity: bool = False,
         init_state: str = None,
         K: int = None, t: float = None,
-        plot_results=True,
+        draw_circuits: bool = True,
+        plot_results: bool = True,
         backend_id: str = None,
         provider_backend = None,
         hub: str = "", group: str = "", project: str = "",
@@ -736,7 +737,8 @@ def run(min_qubits: int = 2,
     ##########
     
     # draw a sample circuit
-    kernel_draw(hamiltonian, method)
+    if draw_circuits:
+        kernel_draw(hamiltonian, method)
        
     # Plot metrics for all circuit sizes
     base_ham_name = os.path.basename(hamiltonian)
@@ -1050,6 +1052,7 @@ def get_args():
     parser.add_argument("--random_init_flag", "-rani", action="store_true", help="Gen random initialization")
     parser.add_argument("--init_state", "-init", default=None, help="initial state", type=str)  
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Suffix appended to data file name", type=str)
     parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile") 
     return parser.parse_args()
@@ -1095,6 +1098,7 @@ def do_run(args):
         t = args.time,
         #theta=args.theta,
         plot_results=not args.noplot,
+        draw_circuits=not args.nodraw,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
         api=args.api
