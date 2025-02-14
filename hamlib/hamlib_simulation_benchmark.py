@@ -778,7 +778,7 @@ def execute_circuits(
 
     if verbose:
         print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
-    print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
+
     if backend_id == None:
         backend_id == "qasm_simulator"
     
@@ -793,7 +793,7 @@ def execute_circuits(
         else:
             backend = Aer.get_backend('qasm_simulator')
             
-        print(f"... backend_id = {backend_id}")
+        #print(f"... backend_id = {backend_id}")
    
         # Execute all of the circuits to obtain array of result objects
         if backend_id != "statevector_simulator" and ex.noise is not None:
@@ -802,8 +802,8 @@ def execute_circuits(
         else:
             results = backend.run(circuits, shots=num_shots).result()
             
-        for counts in results.get_counts():
-            print(counts)
+        #for counts in results.get_counts():
+        #    print(counts)
     
     # handle special case using IBM Runtime Sampler Primitive
     elif ex.sampler is not None:
