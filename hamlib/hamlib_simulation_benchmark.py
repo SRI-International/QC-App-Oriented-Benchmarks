@@ -317,6 +317,7 @@ def run(min_qubits: int = 2,
         random_init_flag: bool = False, 
         use_inverse_flag: bool = False,
         do_sqrt_fidelity: bool = False,
+        distribute_shots: bool = False,
         init_state: str = None,
         K: int = None, t: float = None,
         draw_circuits: bool = True,
@@ -357,15 +358,18 @@ def run(min_qubits: int = 2,
         do_sqrt_fidelity (bool): If True, computes the square root of the fidelity for measurement results.
         init_state (str): Specifies the initial state for the quantum circuit. 
                           If None, a default state is used.
-        do_observables (bool): compute observable value from the Hamiltonian                
+        do_observables (bool): compute observable value from the Hamiltonian  
         group_method (str): Method for generating commuting groups for observable computation. 
                       Options include:
                       - None: no commuting groups used
                       - "simple": simple qubit-wise commuting groups
-                      - "N": where N is the "k" in k-communiting groups               
+                      - "N": where N is the "k" in k-communiting groups  
+        distribute_shots (bool): with "N" group method, distribute shots weighted by group coefficients                      
         K (int): Number of Trotter steps for the simulation. 
                  This is a crucial parameter for the precision of the Trotterized simulation.
         t (float): Total simulation time. This parameter is used to determine the evolution time for the Hamiltonian.
+        draw_circuits : bool, optional
+            Draw circuit diagrams only if True. The default is True.
         plot_results : bool, optional
             Plot results only if True. The default is True.
         backend_id (str): Backend identifier for execution on a quantum processor.
@@ -590,7 +594,8 @@ def run(min_qubits: int = 2,
                         results = execute_circuits(
                                 backend_id = backend_id,
                                 circuits = circuits,
-                                num_shots = num_shots)
+                                num_shots = num_shots,
+                                distribute_shots = distribute_shots)
                                 
                         # Compute the total energy for the Hamiltonian
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
@@ -773,7 +778,8 @@ def run(min_qubits: int = 2,
 def execute_circuits(
         backend_id: str = None,
         circuits: list = None,
-        num_shots: int = 100
+        num_shots: int = 100,
+        distribute_shots: bool = False,
     ) -> list:
 
     if verbose:
@@ -798,12 +804,32 @@ def execute_circuits(
         # Execute all of the circuits to obtain array of result objects
         if backend_id != "statevector_simulator" and ex.noise is not None:
             #print("**************** executing with noise")
-            results = backend.run(circuits, shots=num_shots, noise_model=ex.noise).result()
-        else:
-            results = backend.run(circuits, shots=num_shots).result()
+            noise_model = ex.noise
             
-        #for counts in results.get_counts():
-        #    print(counts)
+        else:
+            noise_model = None
+            #results = backend.run(circuits, shots=num_shots).result()
+        
+        # not distributing shots, all circuits get the same number of shots as given (default)
+        if not distribute_shots or len(circuits) < 2:
+            #print(f"... NOT distributing shots, each circuit = {num_shots} shots")
+            results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
+            
+        # distribute shots; obtain total and distribute according to weights
+        # (weighting not implemented yet)
+        else:
+            circuit_count = len(circuits)
+            total_shots = circuit_count * num_shots
+            print(f"... distributing shots, total shots = {total_shots} shots")
+            
+            #results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
+            counts_array = []
+            for circuit in circuits:
+                results = backend.run(circuit, shots=num_shots, noise_model=noise_model).result()
+                counts = results.get_counts()
+                counts_array.append(counts)
+                
+            results = ExecResult(counts_array)
     
     # handle special case using IBM Runtime Sampler Primitive
     elif ex.sampler is not None:
@@ -862,6 +888,24 @@ class BenchmarkResult:
             
         return count_array
 
+# class ExecResult is made for multi-circuit runs. 
+class ExecResult(object):
+
+    def __init__(self, counts_array):
+        super().__init__()
+        #self.qiskit_result = qiskit_result
+        #self.metadata = qiskit_result.metadata
+        self.counts = counts_array
+
+    def get_counts(self, qc=0):
+        # counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
+        # for key in counts.keys():
+        #     counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])
+        #qc_index = 0 # this should point to the index of the circuit in a pub
+        #bitvals = next(iter(self.qiskit_result[qc_index].data.values()))
+        #counts = bitvals.get_counts()
+        return self.counts
+        
 
 #######################
 # DATA FILE FUNCTIONS  
