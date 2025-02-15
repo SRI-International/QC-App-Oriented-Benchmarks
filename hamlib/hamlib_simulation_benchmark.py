@@ -669,26 +669,6 @@ def run(min_qubits: int = 2,
                     
                     ts = time.time()
                     
-                    """ no longer used ...                
-                    ################ Using the previous evolution_exact code:
-                    # the plan is to remove this code and use the new once it is validated.
-                    
-                    # 250125 (TL): confirmed this old code is giving erroneous values for BH and H2
-                         
-                    # create quantum circuit with initial state
-                    qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
-                    
-                    # apply the Hamiltonian operator to initial state to get expectation/distribution
-                    correct_exp, _ = evolution_exact.compute_expectation_exact_spo_scipy(
-                            init_state, 
-                            qc_initial,
-                            num_qubits,
-                            hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                            t        # time
-                            )
-                    correct_exp = np.real(correct_exp)
-                    """
-                    
                     ################ Using newer evolution_exact code:
                     
                     correct_exp, _ = evolution_exact.compute_expectation_exact(
@@ -780,79 +760,7 @@ def run(min_qubits: int = 2,
         plot_from_data(suptitle, metrics_array, backend_id, options)
 
 
-#########################################
-# EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
-
-def execute_circuits_distribute_shots(
-        backend_id: str = None,
-        circuits: list = None,
-        num_shots: int = 100,
-        groups: list = None
-    ) -> list:
-
-    if verbose:
-        print(f"... execute_circuits_distribute_shots({backend_id}, {len(circuits)}, {num_shots}, {groups})")
-                  
-    # distribute shots; obtain total and distribute according to weights
-    # (weighting not implemented yet)
-    circuit_count = len(circuits)
-    total_shots = circuit_count * num_shots         # to match current behavior
-    print(f"... distributing shots, total shots = {total_shots} shots")
-    
-    # determine the number of shots to execute for each circuit, weighted by largest coefficient
-    num_shots_list = get_distributed_shot_counts(total_shots, groups)
-    print(f"  ... num_shots_list = {num_shots_list}")
-            
-    counts_array = []
-    for circuit in circuits:
-        
-        # execute this list of circuits, same shots each
-        results = execute_circuits(
-                backend_id = backend_id,
-                circuits = [circuit],
-                num_shots = num_shots
-                )
-                                       
-        counts = results.get_counts()
-        counts_array.append(counts)
-    
-    if len(circuits) < 2:
-        results = ExecResult(counts)
-    else:
-        results = ExecResult(counts_array)
    
-    return results
-    
-# From the given list of term groups, distribute the total shot count, returning num_shots by group
-def get_distributed_shot_counts(
-        num_shots: int = 100,
-        groups: list = None
-    ) -> List:
-    
-    # loop over all groups, to find the largest coefficient in each group
-    max_weights = []
-    for group in groups:
-        #print(group)
-        max_weight = 0
-        for pauli, coeff in group:
-            #print(f"  ... coeff = {coeff}")
-            max_weight = max(max_weight, np.real(coeff))
-            
-        max_weights.append(max_weight)
-
-    # compute a normalized distribution over all groups
-    total_weights = sum(max_weights)
-    max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
-    
-    # compute shots counts based on these weights
-    num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
-    
-    # add shots to first group until the total is same as the given total shot count
-    while sum(num_shots_list) < num_shots:
-        num_shots_list[0] += 1
-       
-    return num_shots_list
-    
     
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
@@ -971,8 +879,82 @@ class ExecResult(object):
         #bitvals = next(iter(self.qiskit_result[qc_index].data.values()))
         #counts = bitvals.get_counts()
         return self.counts
-        
+ 
+ 
+#########################################
+# EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
 
+def execute_circuits_distribute_shots(
+        backend_id: str = None,
+        circuits: list = None,
+        num_shots: int = 100,
+        groups: list = None
+    ) -> list:
+
+    if verbose:
+        print(f"... execute_circuits_distribute_shots({backend_id}, {len(circuits)}, {num_shots}, {groups})")
+                  
+    # distribute shots; obtain total and distribute according to weights
+    # (weighting not implemented yet)
+    circuit_count = len(circuits)
+    total_shots = circuit_count * num_shots         # to match current behavior
+    print(f"... distributing shots, total shots = {total_shots} shots")
+    
+    # determine the number of shots to execute for each circuit, weighted by largest coefficient
+    num_shots_list = get_distributed_shot_counts(total_shots, groups)
+    print(f"  ... num_shots_list = {num_shots_list}")
+            
+    counts_array = []
+    for circuit in circuits:
+        
+        # execute this list of circuits, same shots each
+        results = execute_circuits(
+                backend_id = backend_id,
+                circuits = [circuit],
+                num_shots = num_shots
+                )
+                                       
+        counts = results.get_counts()
+        counts_array.append(counts)
+    
+    if len(circuits) < 2:
+        results = ExecResult(counts)
+    else:
+        results = ExecResult(counts_array)
+   
+    return results
+    
+# From the given list of term groups, distribute the total shot count, returning num_shots by group
+def get_distributed_shot_counts(
+        num_shots: int = 100,
+        groups: list = None
+    ) -> List:
+    
+    # loop over all groups, to find the largest coefficient in each group
+    max_weights = []
+    for group in groups:
+        #print(group)
+        max_weight = 0
+        for pauli, coeff in group:
+            #print(f"  ... coeff = {coeff}")
+            max_weight = max(max_weight, np.real(coeff))
+            
+        max_weights.append(max_weight)
+
+    # compute a normalized distribution over all groups
+    total_weights = sum(max_weights)
+    max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
+    
+    # compute shots counts based on these weights
+    num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
+    
+    # add shots to first group until the total is same as the given total shot count
+    while sum(num_shots_list) < num_shots:
+        num_shots_list[0] += 1
+       
+    return num_shots_list
+ 
+ 
 #######################
 # DATA FILE FUNCTIONS  
   
