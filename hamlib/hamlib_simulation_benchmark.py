@@ -511,40 +511,17 @@ def run(min_qubits: int = 2,
 
             ts = time.time()
             
-            #used to store random pauli correct bitstrings
-            global bitstring_dict
+            ##############################
+            # Observables Grouping Options
             
-            # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
-            qc, bitstring = HamiltonianSimulation(
-                num_qubits = num_qubits,
-                ham_op = sparse_pauli_terms,               
-                K = K,
-                t = t,         
-                init_state = init_state,
-                append_measurements = False if do_observables else True,
-                method = method, 
-                use_inverse_flag = use_inverse_flag,
-                random_pauli_flag = random_pauli_flag, 
-                random_init_flag = random_init_flag)
-            
-            # this only works for qiskit circuits
-            if "name" in qc:
-                bitstring_dict[qc.name] = bitstring
-            
-            # execute for fidelity benchmarks
-            if not do_observables:
-            
-                metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
-
-                # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
-            
-            # execute differently for observable benchmarks
-            else:
+            # NOTE: the label "group" is used here to mean "commuting groups" 
+       
+            if do_observables:
 
                 # use this to track how many circuits will be executed
                 num_circuits_to_execute = 0
                 
+                # group options only used in Qiskit version, for now
                 if api == None or api == 'qiskit':
                     
                     # if NOT using Estimator
@@ -582,7 +559,54 @@ def run(min_qubits: int = 2,
                                 pauli_str_list.append(merged_pauli_str)
         
                         num_circuits_to_execute = len(pauli_term_groups)
-                            
+                        
+            #######################
+            # Base Circuit Creation            
+            
+            #used to store random pauli correct bitstrings
+            global bitstring_dict
+            
+            # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
+            qc, bitstring = HamiltonianSimulation(
+                num_qubits = num_qubits,
+                ham_op = sparse_pauli_terms,               
+                K = K,
+                t = t,         
+                init_state = init_state,
+                append_measurements = False if do_observables else True,
+                method = method, 
+                use_inverse_flag = use_inverse_flag,
+                random_pauli_flag = random_pauli_flag, 
+                random_init_flag = random_init_flag)
+                
+            # this only works for qiskit circuits
+            if "name" in qc:
+                bitstring_dict[qc.name] = bitstring
+            
+            
+            ####################################
+            # Execution for Fidelity Computation  
+            
+            # NOTE: the label "group" here mean the "number of qubits" as an index into stored metrics
+            
+            # execute for fidelity benchmarks
+            if not do_observables:
+            
+                metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+
+                # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
+                ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
+            
+            
+            ######################################
+            # Execution for Observable Computation 
+            
+            else:               
+                if api == None or api == 'qiskit':
+                    
+                    # if NOT using Estimator
+                    if group_method != "estimator":
+   
                         # generate an array of circuits, one for each pauli_string in list
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                                 qc, num_qubits, pauli_str_list)
@@ -633,12 +657,12 @@ def run(min_qubits: int = 2,
                         estimator_time = round(time.time()-ts, 3)
                         print(f"... Estimator computation time = {estimator_time} sec")
 
-                        print(f"Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
+                        print(f"... Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
                          
                         total_energy = estimator_energy
                         term_contributions = None
                 
-                # special case for CUDA Q Observables (restructure later 250126)
+                # special case for CUDA Q Observables
                 elif api == "cudaq":
                 
                     total_energy = hamlib_simulation_kernel.get_expectation(
@@ -660,7 +684,8 @@ def run(min_qubits: int = 2,
                 
                 print(f"... quantum execution time = {computed_time}")
                 
-                ############ compute exact expectation
+                ##############################################
+                # Compute exact expectation value classically
                 
                 if num_qubits <= max_qubits_exact:
                 
@@ -692,7 +717,9 @@ def run(min_qubits: int = 2,
                     metrics_object["exp_value_exact"] = correct_exp
                     metrics_object["exp_time_exact"] = exact_time
                 
-                ############ report results 
+                
+                ################
+                # Report results 
                 
                 if correct_exp is not None and correct_exp != 0.0:  
                     simulation_quality = round(total_energy / correct_exp, 3)
@@ -718,7 +745,11 @@ def run(min_qubits: int = 2,
                 # but if file is busy, we get error, do it at end for now
                 ###app_name = f"HamLib-obs-{hamiltonian_name}"
                 ###store_app_metrics(app_name, backend_id, metrics_array)
-                                
+ 
+ 
+        ##############################
+        # Finalize current Qubit Wdith
+                
         # Wait for some active circuits to complete; report metrics when groups complete
         if api != "cudaq" or do_observables == False:
             ex.throttle_execution(metrics.finalize_group)
@@ -731,12 +762,15 @@ def run(min_qubits: int = 2,
     app_name = f"HamLib-obs-{hamiltonian_name}"
     store_app_metrics(app_name, backend_id, metrics_array)
 
-    ##########
+    ########################
+    # Display Sample Circuit
     
-    # draw a sample circuit
     if draw_circuits:
         kernel_draw(hamiltonian, method)
-       
+ 
+    ##########################
+    # Display Plots of Results
+    
     # Plot metrics for all circuit sizes
     base_ham_name = os.path.basename(hamiltonian)
     options = {"ham": base_ham_name,
@@ -759,8 +793,7 @@ def run(min_qubits: int = 2,
         
         plot_from_data(suptitle, metrics_array, backend_id, options)
 
-
-   
+  
     
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
