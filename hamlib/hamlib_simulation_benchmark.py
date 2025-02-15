@@ -583,7 +583,8 @@ def run(min_qubits: int = 2,
                         num_circuits_to_execute = len(pauli_term_groups)
                             
                         # generate an array of circuits, one for each pauli_string in list
-                        circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
+                        circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
+                                qc, num_qubits, pauli_str_list)
                         
                         if verbose:                 
                             for circuit, group in list(zip(circuits, pauli_term_groups)):
@@ -591,11 +592,21 @@ def run(min_qubits: int = 2,
                                 #print(circuit)
 
                         # call api-specific function to execute circuits
-                        results = execute_circuits(
-                                backend_id = backend_id,
-                                circuits = circuits,
-                                num_shots = num_shots,
-                                distribute_shots = distribute_shots)
+                        if not distribute_shots:
+                            # execute the entire list of circuits, same shots each
+                            results = execute_circuits(
+                                    backend_id = backend_id,
+                                    circuits = circuits,
+                                    num_shots = num_shots
+                                    )
+                        else:
+                            # execute with shots distributed by weight of coefficients
+                            results = execute_circuits_distribute_shots(
+                                    backend_id = backend_id,
+                                    circuits = circuits,
+                                    num_shots = num_shots,
+                                    groups = pauli_term_groups
+                                    )
                                 
                         # Compute the total energy for the Hamiltonian
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
@@ -766,7 +777,45 @@ def run(min_qubits: int = 2,
         suptitle = f"Benchmark Results - {benchmark_name} ({method}) - {api if api else 'Qiskit'}"
         
         plot_from_data(suptitle, metrics_array, backend_id, options)
-       
+
+#########################################
+# EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
+
+def execute_circuits_distribute_shots(
+        backend_id: str = None,
+        circuits: list = None,
+        num_shots: int = 100,
+        groups: list = None
+    ) -> list:
+
+    if verbose:
+        print(f"... execute_circuits_distribute_shots({backend_id}, {len(circuits)}, {num_shots}, {groups})")
+                  
+    # distribute shots; obtain total and distribute according to weights
+    # (weighting not implemented yet)
+    circuit_count = len(circuits)
+    total_shots = circuit_count * num_shots         # to match current behavior
+    print(f"... distributing shots, total shots = {total_shots} shots")
+            
+    counts_array = []
+    for circuit in circuits:
+    
+        #results = backend.run(circuit, shots=num_shots, noise_model=noise_model).result()
+        
+        # execute this list of circuits, same shots each
+        results = execute_circuits(
+                backend_id = backend_id,
+                circuits = [circuit],
+                num_shots = num_shots
+                )
+                                       
+        counts = results.get_counts()
+        counts_array.append(counts)
+                
+    results = ExecResult(counts_array)
+   
+    return results
+    
 
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
@@ -775,11 +824,12 @@ def run(min_qubits: int = 2,
 # specifically to enable execution of an array of circuits for observable calculations.
 # This code will be moved up into the _common/API/execute methods later (210131).
 
+from typing import Union, List, Tuple, Dict
+
 def execute_circuits(
         backend_id: str = None,
         circuits: list = None,
-        num_shots: int = 100,
-        distribute_shots: bool = False,
+        num_shots: int = 100
     ) -> list:
 
     if verbose:
@@ -808,28 +858,9 @@ def execute_circuits(
             
         else:
             noise_model = None
-            #results = backend.run(circuits, shots=num_shots).result()
         
-        # not distributing shots, all circuits get the same number of shots as given (default)
-        if not distribute_shots or len(circuits) < 2:
-            #print(f"... NOT distributing shots, each circuit = {num_shots} shots")
-            results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
-            
-        # distribute shots; obtain total and distribute according to weights
-        # (weighting not implemented yet)
-        else:
-            circuit_count = len(circuits)
-            total_shots = circuit_count * num_shots
-            print(f"... distributing shots, total shots = {total_shots} shots")
-            
-            #results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
-            counts_array = []
-            for circuit in circuits:
-                results = backend.run(circuit, shots=num_shots, noise_model=noise_model).result()
-                counts = results.get_counts()
-                counts_array.append(counts)
-                
-            results = ExecResult(counts_array)
+        # all circuits get the same number of shots as given 
+        results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
     
     # handle special case using IBM Runtime Sampler Primitive
     elif ex.sampler is not None:
