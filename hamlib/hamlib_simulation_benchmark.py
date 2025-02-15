@@ -18,6 +18,7 @@ import time
 import math
 import numpy as np
 from typing import Dict, Optional   # for backwards compat <= py 3.10
+from typing import Union, List, Tuple
 
 sys.path[1:1] = ["_common"]
 
@@ -778,6 +779,7 @@ def run(min_qubits: int = 2,
         
         plot_from_data(suptitle, metrics_array, backend_id, options)
 
+
 #########################################
 # EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
 
@@ -796,11 +798,13 @@ def execute_circuits_distribute_shots(
     circuit_count = len(circuits)
     total_shots = circuit_count * num_shots         # to match current behavior
     print(f"... distributing shots, total shots = {total_shots} shots")
+    
+    # determine the number of shots to execute for each circuit, weighted by largest coefficient
+    num_shots_list = get_distributed_shot_counts(total_shots, groups)
+    print(f"  ... num_shots_list = {num_shots_list}")
             
     counts_array = []
     for circuit in circuits:
-    
-        #results = backend.run(circuit, shots=num_shots, noise_model=noise_model).result()
         
         # execute this list of circuits, same shots each
         results = execute_circuits(
@@ -811,20 +815,51 @@ def execute_circuits_distribute_shots(
                                        
         counts = results.get_counts()
         counts_array.append(counts)
-                
-    results = ExecResult(counts_array)
+    
+    if len(circuits) < 2:
+        results = ExecResult(counts)
+    else:
+        results = ExecResult(counts_array)
    
     return results
     
+# From the given list of term groups, distribute the total shot count, returning num_shots by group
+def get_distributed_shot_counts(
+        num_shots: int = 100,
+        groups: list = None
+    ) -> List:
+    
+    # loop over all groups, to find the largest coefficient in each group
+    max_weights = []
+    for group in groups:
+        #print(group)
+        max_weight = 0
+        for pauli, coeff in group:
+            #print(f"  ... coeff = {coeff}")
+            max_weight = max(max_weight, np.real(coeff))
+            
+        max_weights.append(max_weight)
 
+    # compute a normalized distribution over all groups
+    total_weights = sum(max_weights)
+    max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
+    
+    # compute shots counts based on these weights
+    num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
+    
+    # add shots to first group until the total is same as the given total shot count
+    while sum(num_shots_list) < num_shots:
+        num_shots_list[0] += 1
+       
+    return num_shots_list
+    
+    
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
 
 # This code is provided here to augment the default API/execute functions,
 # specifically to enable execution of an array of circuits for observable calculations.
 # This code will be moved up into the _common/API/execute methods later (210131).
-
-from typing import Union, List, Tuple, Dict
 
 def execute_circuits(
         backend_id: str = None,
