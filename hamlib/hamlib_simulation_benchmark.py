@@ -791,6 +791,11 @@ def run(min_qubits: int = 2,
         ############## expectation value plot
         suptitle = f"Benchmark Results - {benchmark_name} ({method}) - {api if api else 'Qiskit'}"
         
+        # should not be needed; needs investigation, saving image fails if command line invocation
+        # and non-observable case works fine.
+        if backend_id is None:
+            backend_id = "qasm_simulator"
+        
         plot_from_data(suptitle, metrics_array, backend_id, options)
 
   
