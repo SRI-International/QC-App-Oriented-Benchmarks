@@ -22,14 +22,14 @@ Uf_ = None
 # Prepare the initial quantum state of the system. 
 
 @cudaq.kernel
-def get_initial_state(n_spins: int) -> None:
+def get_initial_state(n_spins: int):
     """Create initial state |1010...>"""
     qubits = cudaq.qvector(n_spins)
     for i in range(0, n_spins, 2):
         x(qubits[i])
         
 @cudaq.kernel
-def append_initial_state(qubits: cudaq.qview, n_spins: int, init_phases: List[float]) -> None:
+def append_initial_state(qubits: cudaq.qview, n_spins: int, init_phases: List[float]):
     """Create initial state |1010...>"""
     #qubits = cudaq.qvector(n_spins)
     #for i in range(0, n_spins, 2):
@@ -103,7 +103,7 @@ def append_trotter_step(
             dt: float, 
             coefficients: List[complex],
             words: List[cudaq.pauli_word]
-        ) -> None:
+        ):
    
     for i in range(len(coefficients)):
         exp_pauli(coefficients[i].real * dt, qubits, words[i])   # this crashes jupyter kernel on draw
