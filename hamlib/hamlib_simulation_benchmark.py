@@ -993,6 +993,63 @@ def get_distributed_shot_counts(
     return num_shots_list
  
  
+########################################
+# UTILITY FUNCTIONS (TEMPORARY)
+
+# The functions included in this section will be moved/merged with other lower-level functions.
+# These have been developed iteratively up in the example notebooks and the code is being incrementally 
+# moved down to lower modules.  For now, these functions are shared by several of the demo notebooks
+# as they are being developed.
+
+def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method):
+    """
+    Group the Pauli terms accourding to the given group method: "None", "simple", "N"
+    """
+    # have to do this here, due to logic of the "api" code; improve these imports later 
+    import observables
+    
+    ### print(f"... using group method: {group_method}")
+
+    ts = time.time()
+    
+    # use no grouping or the most basic method "simple"
+    if group_method == None or group_method == "simple":
+    
+        # Flag to control optimize by use of commuting groups
+        use_commuting_groups = False
+        if group_method == "simple":
+            use_commuting_groups = True
+    
+        # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
+        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                num_qubits, sparse_pauli_terms, use_commuting_groups)
+    
+    # use k-commuting algorithm
+    else:
+        from generate_pauli_groups import compute_groups
+        pauli_term_groups = compute_groups(num_qubits, sparse_pauli_terms, 1)
+    
+    #print(f"\n... Number of groups created: {len(pauli_term_groups)}")
+    #print(f"... Pauli Term Groups:")
+    #for group in pauli_term_groups:
+        #print(group)
+    
+    group_time = round(time.time()-ts, 3)
+    print(f"\n... finished grouping terms, total grouping time = {group_time} sec.\n")
+    
+    # for each group, create a merged pauli string from all the terms in the group
+    # DEVNOTE: move these 4 lines to a function in observables
+    pauli_str_list = []
+    for group in pauli_term_groups:
+        merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
+        pauli_str_list.append(merged_pauli_str)
+    
+    #print(f"\n... Merged Pauli strings, one per group:\n  {pauli_str_list}\n")
+
+    return pauli_term_groups, pauli_str_list
+
+
+
 #######################
 # DATA FILE FUNCTIONS  
   
