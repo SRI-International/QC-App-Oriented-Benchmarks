@@ -285,11 +285,11 @@ def HamiltonianSimulation(
                 List[Tuple[Dict[int, str], complex]]
             ] = None,
             K: int = 5, t: float = 1.0,
-            init_state = None,
+            init_state: str = None,
             method: int = 1,
             use_inverse_flag: bool = False,
-            random_pauli_flag = False,
-            random_init_flag = False,
+            random_pauli_flag: bool = False,
+            random_init_flag: bool = False,
             append_measurements: bool = False,
         ) -> Tuple:
     
