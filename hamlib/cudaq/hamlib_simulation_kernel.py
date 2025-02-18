@@ -315,6 +315,9 @@ def HamiltonianSimulation(
     bitset = init_state_to_ivec(num_qubits, init_state)
     bitsetf = [float(v) for v in bitset]
     #print(f"... init_state_to_ivec, bitsetf = {bitsetf}")
+    
+    # ensure time is float, as cudaq rejects integer here
+    t = float(t)
      
     # Return a kernel with or without measurement gates
     # CUDAQ ISSUE: the mz() operation cannot be controlled by a flag
