@@ -351,18 +351,8 @@ def plot_expectation_value_metrics(suptitle="",
     y_lim_min: float    
         minimum value to autoscale y axis 
     '''
-    
-    # these options are required
-    hamiltonian_name = options['ham']
-    num_shots = options['shots']
-    reps = options['reps']
-    
-    # Create standard title for all plots
-    suptitle += f"\nHamiltonian={hamiltonian_name}"
-    #suptitle += f"\n{hamiltonian_params}"
-
-    suptitle = suptitle + f"\nDevice={backend_id}"
-    suptitle += f", shots={num_shots}, reps={reps}"
+        
+    suptitle = append_options_to_title(suptitle, options, backend_id)
     
     subtitle = ""
     
@@ -404,88 +394,6 @@ def plot_expectation_value_metrics(suptitle="",
     # Autoscale the y-axis
     ax1.autoscale(axis='y')
     
-    """
-    # sort the arrays, in case they come out of order
-    x_data = [float(x) for x in x_data]
-    y_data = [float(y) for y in y_data]
-    y_data_2 = [float(y) for y in y_data_2]
-    z = sorted(zip(x_data, y_data, y_data_2))
-    x_data = [x for x, y, y2 in z]
-    y_data = [y for x, y, y2 in z]
-    y_data_2 = [y2 for x, y, y2 in z]
-    
-    #############
-    
-    # check if we have sparse or non-linear axis data and linearize if so
-    # (convert irregular x-axis data to linear if any non-linear gaps in the data)
-    if metrics.needs_linearize(x_data, gap=2):
-        x_data, x_labels = metrics.linearize_axis(x_data, gap=1, outer=0, fill=False) 
-        ax1.set_xticks(x_data)
-        if x_labels != None:
-            plt.xticks(x_data, x_labels)
-
-    # for testing of error bars
-    if testing_error_bars:
-        y_err = [y * 0.15 for y in y_data]
-        y_err_2 = [y * 0.15 for y in y_data_2]
-        
-    #############
-    
-    # set the axis labels
-    ax1.set_xlabel(x_label)
-    ax1.set_ylabel(y_label)
-    
-    # add the background grid
-    ax1.grid(True, axis = 'y', which='major', color='silver', zorder = 0)
-  
-    # determine max of both data sets, with a lower limit of 0.1
-    # DEVNOTE: we are suppressing range of the first plot if show_elapsed times is False, backwards?
-    y_max_0 = 0.1
-    y_max_0 = max(y_max_0, max(y_data_2))
-    if show_elapsed_times:
-        y_max_0 = max(y_max_0, max(y_data))
-        
-    if y_max_0 > 0.1:
-            y_max_0 *= 1.2
-     
-    # set up log scale if specified
-    y_min_0 = 0.0
-    if use_logscale_for_times:
-        ax1.set_yscale('log') 
-        y_min_0 = min(0.01, min(y_data_2) / 2.0)    # include smallest data value
-        
-        if y_max_0 > 0.1:
-            y_max_0 *= 2.0 
-   
-    ax1.set_ylim([y_min_0, y_max_0])
-    
-    # elapsed time bar plot
-    if show_elapsed_times:
-        ax1.bar(x_data, y_data, 0.75, color='skyblue', zorder = 3)
-        
-        ax1.plot(x_data, y_data, color='darkblue',
-            linestyle='dotted', linewidth=1, markersize=6, zorder = 3)
-            
-        ax1.errorbar(x_data, y_data, yerr=y_err, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='', marker = "D", markersize = 5, mfc = 'c', mec = 'k', mew = 0.5, label = 'Error', alpha = 0.75, zorder = 5)
-    
-    # execution time bar plot
-    ax1.bar(x_data, y_data_2, zorder = 3)
-    
-    ax1.plot(x_data, y_data_2, color='darkblue',
-            linestyle='dotted', linewidth=1, markersize=6, zorder = 3)
-            
-    ax1.errorbar(x_data, y_data_2, yerr=y_err_2, ecolor = 'k', elinewidth = 1, barsabove = False, capsize=5, ls='', marker = "D", markersize = 5, mfc = 'c', mec = 'k', mew = 0.5, label = 'Error', alpha = 0.75, zorder = 5)
-    
-    # legend
-    if show_elapsed_times:
-        elapsed_patch = Patch(color='skyblue', label='Elapsed')
-        exec_patch = Patch(color='#1f77b4', label='Quantum')
-        #ax1.legend(handles=[elapsed_patch, exec_patch], loc='upper left')
-        ax1.legend(handles=[elapsed_patch, exec_patch])
-        #ax1.legend(['Elapsed', 'Quantum'], loc='upper left')
-    #else:
-        #ax1.legend(['Quantum'], loc='upper left')
-    """
     ##############
     
     # add padding below suptitle, and between plots, due to multi-line titles
@@ -660,26 +568,7 @@ def plot_expectation_time_metrics(suptitle="",
     y_lim_min: float    
         minimum value to autoscale y axis 
     '''
-    
-    # these options are required
-    hamiltonian_name = options['ham']
-    num_shots = options['shots']
-    reps = options['reps']
-    
-    # Create standard title for all plots
-    suptitle += f"\nHamiltonian={hamiltonian_name}"
-    #suptitle += f"\n{hamiltonian_params}"
-
-    suptitle = suptitle + f"\nDevice={backend_id}"
-    suptitle += f", shots={num_shots}, reps={reps}"
-    """
-    # Create standard title for all plots
-    #toptitle = suptitle + metrics.get_backend_title()
-    toptitle = suptitle + f"\nDevice={backend_id}"
-    
-    # create common title (with hardcoded list of options, for now)
-    suptitle = toptitle + f"\nham={options['ham']}, gm={options['gm']}, shots={options['shots']}, reps={options['reps']}"
-    """
+    suptitle = append_options_to_title(suptitle, options, backend_id)
     
     subtitle = ""
     
@@ -852,3 +741,31 @@ def plot_expectation_time_metrics_2(suptitle="",
                                             
     # show the plot(s)
     plt.show(block=True)
+
+##########################################################
+# SUPPORT FUNCTIONS
+
+def append_options_to_title(suptitle: str, options:list, backend_id:str):
+
+    # these options are required
+    hamiltonian_name = options['ham']
+    hamiltonian_params = options['params'] if 'params' in options else None
+    ham_params = ",".join([f"{k}:{v}" for k, v in hamiltonian_params.items()])
+    
+    num_shots = options['shots']
+    reps = options['reps']
+    K = options['K'] if 'K' in options else '?'
+    t = options['t'] if 't' in options else '?'
+    gm = options['gm'] if 'gm' in options else '?'
+    
+    # Create standard title for all plots
+    suptitle += f"\nHam={hamiltonian_name}"
+    suptitle += f" {ham_params}"
+    suptitle += f" K={K}, t={t}, gm={gm}"
+
+    suptitle = suptitle + f"\nDevice={backend_id}"
+    suptitle += f", shots={num_shots}, reps={reps}"
+    
+    return suptitle
+        
+        
