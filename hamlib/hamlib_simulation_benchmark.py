@@ -78,6 +78,9 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
 
+# If set, write each dataset to a json file
+save_dataset_file = False
+
 # Maximum # of qubits for which to perform classical exact computation
 max_qubits_exact = 16
 
@@ -497,6 +500,9 @@ def run(min_qubits: int = 2,
       
         num_hamiltonian_terms = len(sparse_pauli_terms)
         print(f"... number of terms in Hamiltonian = {num_hamiltonian_terms}")
+        
+        if save_dataset_file:
+            save_one_hamlib_dataset(dataset = sparse_pauli_terms, dataset_name = dataset_name)
          
         metrics_object = {}
         metrics_object["group"] = num_qubits
@@ -1145,8 +1151,33 @@ def query_dict_array(data, query):
         list: A list of dictionaries that match all query criteria.
     """
     return [row for row in data if all(row.get(k) == v for k, v in query.items())]   
+
+def save_one_hamlib_dataset(dataset: list, dataset_name: str):
     
+    # create filename based on the dataset_name
+    filename = f"{dataset_name}.json"
     
+    dataset = convert_coefficients_to_real(dataset)
+    
+    # overwrite the existing file with the merged data
+    with open(filename, "w") as f:
+        json.dump(dataset, f, indent=2)
+        f.close()
+
+def convert_coefficients_to_real(pauli_terms):
+    """
+    Convert complex coefficients to their real parts in a list of Pauli terms.
+    
+    Parameters:
+        pauli_terms (list of tuples): [(pauli_dict, complex_coefficient), ...]
+    
+    Returns:
+        list of tuples: [(pauli_dict, real_coefficient), ...]
+    """
+    return [(pauli_dict, coeff.real) for pauli_dict, coeff in pauli_terms]
+
+
+       
 ################################################
 # PLOT METHODS
 
