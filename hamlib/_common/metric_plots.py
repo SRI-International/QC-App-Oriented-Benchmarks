@@ -749,7 +749,7 @@ def append_options_to_title(suptitle: str, options:list, backend_id:str):
 
     # these options are required
     hamiltonian_name = options['ham']
-    hamiltonian_params = options['params'] if 'params' in options else None
+    hamiltonian_params = options['params'] if 'params' in options else {}
     ham_params = ",".join([f"{k}:{v}" for k, v in hamiltonian_params.items()])
     
     num_shots = options['shots']
