@@ -628,7 +628,7 @@ def run(min_qubits: int = 2,
                             results = execute_circuits(
                                     backend_id = backend_id,
                                     circuits = circuits,
-                                    num_shots = num_shots
+                                    num_shots = int(num_shots / len(circuits))
                                     )
                         else:
                             # execute with shots distributed by weight of coefficients
@@ -944,7 +944,7 @@ def execute_circuits_distribute_shots(
     # distribute shots; obtain total and distribute according to weights
     # (weighting not implemented yet)
     circuit_count = len(circuits)
-    total_shots = circuit_count * num_shots         # to match current behavior
+    total_shots = num_shots         # to match current behavior
     print(f"... distributing shots, total shots = {total_shots} shots")
     
     # determine the number of shots to execute for each circuit, weighted by largest coefficient
