@@ -624,6 +624,7 @@ def run(min_qubits: int = 2,
 
                         # call api-specific function to execute circuits
                         if not distribute_shots:
+                            print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
                             # execute the entire list of circuits, same shots each
                             results = execute_circuits(
                                     backend_id = backend_id,
