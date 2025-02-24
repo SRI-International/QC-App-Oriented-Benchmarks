@@ -756,6 +756,7 @@ def append_options_to_title(suptitle: str, options:list, backend_id:str):
     reps = options['reps']
     K = options['K'] if 'K' in options else '?'
     t = options['t'] if 't' in options else '?'
+    t = round(t, 3)
     gm = options['gm'] if 'gm' in options else '?'
     
     # Create standard title for all plots
