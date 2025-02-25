@@ -135,7 +135,6 @@ def sort_pstrings(pstrings):
 def get_right_most(pstrings, current_qubit):
     # print('get_right_most\t', current_qubit)
     vals = -np.ones(len(pstrings), dtype=int)
-
     for ip, p in enumerate(pstrings):
         for j in range(current_qubit, -1, -1):
             if p[j] != '-':
@@ -160,60 +159,34 @@ def simultaneously_diagonalize(old_pstringlist, barrier=False):
 
         index, current_qubit = get_right_most(pstringlist, current_qubit)
         new_ops = local_diagonalize(pstringlist[index], current_qubit + 1)
+#         print('new ops in sim:', new_ops)
         current_qubit += -1
 
         if barrier:
             ops = ops + new_ops + [['Barr']]
         else:
             ops = ops + new_ops
-
-        for j in range(len(pstringlist)):
-            pstringlist[j], change = apply_ops(new_ops, pstringlist[j])
 
     return ops
 
 
-def simultaneously_diagonalize_circuit(old_pstringlist, barrier=False):
-    # assume that the list is somehow sorted
-    ops = []
+def diagonalized_pauli_strings(pauli_string_terms, k, n):
+    pauli_string_list = transfer_ops(pauli_string_terms)
+    pauli_diag_string_terms = []
+    ops = kcommutative_diagonalize(pauli_string_list, k, n)
+    for term, coeff in zip(pauli_string_list, pauli_string_terms):
+#         term_list = list(term)
+#         print('old term:', term_list)
+        new_op, change = apply_ops(ops, term)
+        new_op = [pauli if pauli != '-' else 'I' for pauli in new_op]
+#         print('new term:', new_op)
+        pauli_diag_string_terms.append((''.join(term), ''.join(new_op), coeff[1], change))
 
-    n = len(old_pstringlist[0])
-
-    qc = QuantumCircuit(n)
-    current_qubit = n - 1
-
-    pstringlist = old_pstringlist.copy()
-
-    for i in range(len(pstringlist)):
-        index, current_qubit = get_right_most(pstringlist, current_qubit)
-        new_ops = local_diagonalize(pstringlist[index], current_qubit + 1)
-        current_qubit += -1
-
-        if barrier:
-            ops = ops + new_ops + [['Barr']]
-        else:
-            ops = ops + new_ops
-
-        for j in range(len(pstringlist)):
-            pstringlist[j], change = apply_ops(new_ops, pstringlist[j])
-
-    for i in range(len(ops) - 1, -1, -1):
-        o = ops[i]
-        if o[0] == 'H':
-            qc.h(o[1])
-        elif o[0] == 'S':
-            qc.sdg(o[1])
-        elif o[0] == 'Sdag':
-            qc.s(o[1])
-        elif o[0] == 'CX':
-            qc.cx(o[1], o[2])
-        elif o[0] == 'Barr':
-            qc.barrier()
-    return qc
-
+    return pauli_diag_string_terms
+              
 
 def apply_ops(ops, pstring):
-    signchange = False
+    signchange = 1
     result = pstring.copy()
 
     for o in ops:
@@ -229,26 +202,22 @@ def apply_ops(ops, pstring):
             result, change = cx(result, o[1], o[2])
 
         if change:
-            signchange = not signchange
-
+            signchange = -1
     return result, signchange
 
 
 def kcommutative_diagonalize(pstrings, k, n):
     #assuming that the pstrings k-commute with each other!! It might not work otherwise.
-
     operation_list = []
     
     for i in range(n//k):
         newlist = []
         for p in pstrings:
             newlist.append(p[i*k:(i+1)*k])
-        
         newops = simultaneously_diagonalize(newlist)
         for o in newops:
             for j in range(1, len(o)):
                 o[j] = o[j] + i*k
-        
         operation_list += newops
         
     if n%k > 0:
@@ -276,23 +245,25 @@ def transfer_ops(ops):
     return new_ops
 
 
-def create_circuits_for_pauli_terms(qc, grouping_paulis, k, barrier=False):
+def create_circuits_for_pauli_terms_k_commute(qc, grouping_paulis, k, barrier=False):
     qc_complete = qc.copy()
     pauli_string_list = transfer_ops(grouping_paulis)
+#     print(pauli_string_list)
     n = qc_complete.num_qubits
-    ops = kcommutative_diagonalize(pauli_string_list, k, n)
+    ops = kcommutative_diagonalize(pauli_string_list, k, n)[::-1]
     measurement_qc = QuantumCircuit(n)
     for i in range(len(ops) - 1, -1, -1):
         o = ops[i]
         if o[0] == 'H':
-            measurement_qc.h(o[1])
+            measurement_qc.h(n - 1 - o[1])
         elif o[0] == 'S':
-            measurement_qc.sdg(o[1])
+            measurement_qc.sdg(n - 1 - o[1])
         elif o[0] == 'Sdag':
-            measurement_qc.s(o[1])
+            measurement_qc.s(n - 1 - o[1])
         elif o[0] == 'CX':
-            measurement_qc.cx(o[1], o[2])
+            measurement_qc.cx(n - 1 -o[1], n - 1 -o[2])
         elif o[0] == 'Barr' and barrier:
             measurement_qc.barrier()
     qc_complete.compose(measurement_qc, qubits=list(range(qc_complete.num_qubits)), inplace=True)
+    qc_complete.measure_all()
     return qc_complete
