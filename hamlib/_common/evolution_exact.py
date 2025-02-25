@@ -84,7 +84,7 @@ def ensure_valid_state(initial_state, num_qubits = None, reverse = False):
         initial_state[0] = 1  # Set the amplitude for |00> state
     
     # if initial_state is a string turn it into a vector
-    if isinstance(initial_state, str):
+    elif isinstance(initial_state, str):
         if initial_state == "checkerboard" or initial_state == "neele":
             initial_state = ""
             for k in range(0, num_qubits):
@@ -93,11 +93,23 @@ def ensure_valid_state(initial_state, num_qubits = None, reverse = False):
                 else:
                     initial_state += "1" if k % 2 == 1 else "0"
                     
-        initial_state = generate_initial_state(initial_state)
+            initial_state = generate_initial_state(initial_state)
          
-        # Convert to dense for general use; DEVNOTE: could use sparse state later
-        dense_state = initial_state.toarray()
-        initial_state = dense_state
+            # Convert to dense 1D array for general use; DEVNOTE: could use sparse state later
+            initial_state = initial_state.toarray().flatten()
+            # dense_state = initial_state.toarray()
+            # initial_state = dense_state
+    
+        elif initial_state == "ghz":
+            initial_state = np.zeros((2**num_qubits), dtype=complex)
+            initial_state[0] = 1/np.sqrt(2)
+            initial_state[-1] = 1/np.sqrt(2)
+
+        else:
+            raise ValueError(f"Invalid initial state: {initial_state}")
+        
+    else:
+        raise ValueError(f"Invalid initial state: {initial_state}")
     
     # ensure initial_state is a normalized complex vector
     initial_state = np.array(initial_state, dtype=complex)
@@ -316,7 +328,7 @@ def compute_expectation_exact(initial_state, pauli_terms, time):
     
     # values in distribution items are arrays of len 1; collapse to single values
     for bitstring, count in probability_distribution.items():
-        probability_distribution[bitstring] = count[0]
+        probability_distribution[bitstring] = count
         
     return exact_expectation, probability_distribution
 
