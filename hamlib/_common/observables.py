@@ -370,6 +370,83 @@ def calculate_expectation_from_measurements(num_qubits, results, pauli_term_grou
                 print(f"... {(term, coeff)} ==> {exp_val} : {coeff * exp_val} += {total_exp}")
 
     return total_exp, term_contributions
+
+
+def calculate_expectation_from_measurements_k_commute(num_qubits, results, pauli_term_groups):
+    """
+    Calculates the total expectation value (energy) from measurement results and provided pauli_term_groups.
+
+    This function processes measurement results for a set of quantum circuits, each corresponding to
+    a group of Pauli terms, to compute the expectation value of a Hamiltonian. Optionally, it can store
+    the contribution of each term in a dictionary.
+
+    Args:
+        num_qubits (int): Number of qubits in the circuit.
+        results (Result): Results object containing measurement counts from circuit execution.
+        pauli_term_groups (list): Groups of diagonalized Pauli terms as tuples of (pauli, coeff).
+
+    Returns:
+        tuple: A tuple containing:
+            - total_energy (float): The computed total energy of the Hamiltonian.
+            - term_contributions (dict): A dictionary with individual Pauli terms as keys
+              and their respective contributions to the total energy as values.
+    """    
+    total_exp = 0
+    term_contributions = {}
+    total_exp_z = 0
+    total_exp_x = 0
+    
+    debug = False
+   
+    # Loop over each group and its corresponding measurement results
+    if len(pauli_term_groups) > 1:
+        num_group = 0
+        for group, result in zip(pauli_term_groups, results.get_counts()):
+            
+            counts = result
+            if debug: print(counts)
+            
+            # Process each Pauli term in the current group
+            for old_term, new_term, coeff, sign in group:
+#                 new_term = new_term[::-1]
+                exp_val = get_expectation_term(new_term, counts)
+
+                total_exp += coeff * exp_val * sign
+                if num_group == 1:
+                    total_exp_z += coeff * exp_val * sign
+                else:
+                    total_exp_x += coeff * exp_val * sign
+                
+                # save the contribution from each term
+                term_contributions[old_term] = exp_val
+                
+                if debug:
+                    print(f"... {(old_term, coeff)} ==> {exp_val} : {coeff * exp_val * sign} += {total_exp}")
+            num_group += 1
+                   
+                
+    # results object has different structure when only one circuit, process specially here
+    else:
+        counts = results.get_counts()
+        group = pauli_term_groups[0]
+
+        if debug: print(counts)
+        
+        # Process each Pauli term in the current group
+        for old_term, new_term, coeff in group:
+            exp_val = get_expectation_term(new_term, counts)
+            total_exp += coeff * exp_val * sign
+            
+            # save the contribution from each term
+            term_contributions[old_term] = exp_val
+            
+            if debug:
+                print(f"... {(old_term, coeff)} ==> {exp_val} : {coeff * exp_val * sign} += {total_exp}")
+    print('z expectation:', total_exp_z)
+    print('x expectation:', total_exp_x)
+
+    return total_exp, term_contributions
+
    
 def calculate_expectation_from_contributions(term_contributions: dict, pauli_terms: list):
     """
