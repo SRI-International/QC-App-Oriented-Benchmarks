@@ -372,22 +372,32 @@ def create_circuit_from_op(
     """
     global QCI_, INV_
     
-    # convert from any form to SparsePauliOp
-    ham_op = ensure_sparse_pauli_op(ham_op, num_qubits)
+    time_step = time/num_trotter_steps if num_trotter_steps > 0 else 0.0
 
     # Build the evolution gate
     # label = "e\u2071\u1D34\u1D57"    # superscripted, but doesn't look good
     evo_label = "e^-iHt"
-    time_step = time/num_trotter_steps if num_trotter_steps > 0 else 0.0
-    evo = PauliEvolutionGate(ham_op, time=time_step, label=evo_label)
-
+    
+    #Check if ham_op is a list of lists
+    if isinstance(ham_op, list) and isinstance(ham_op[0], list):
+        # construct the evo circuit from the groups
+        evo = []
+        for ham_op_group in ham_op:
+            # convert from any form to SparsePauliOp
+            ham_op_group = ensure_sparse_pauli_op(ham_op_group, num_qubits)
+            evo += [PauliEvolutionGate(ham_op_group, time=time_step, label=evo_label)]    
+    else:
+        # convert from any form to SparsePauliOp
+        ham_op = ensure_sparse_pauli_op(ham_op, num_qubits)
+        evo = [PauliEvolutionGate(ham_op, time=time_step, label=evo_label)]
+        
     # Plug it into a circuit
-    circuit = QuantumCircuit(ham_op.num_qubits)
+    circuit = QuantumCircuit(num_qubits)
     
     # first create and append the initial_state
     # init_state = "checkerboard"
     i_state = initial_state(num_qubits, init_state)
-    circuit.append(i_state, range(ham_op.num_qubits))
+    circuit.append(i_state, range(num_qubits))
     circuit.barrier()
     
     if num_qubits <= 6:
@@ -396,7 +406,7 @@ def create_circuit_from_op(
     # Append K trotter steps
     circuit = append_trotter_steps(num_trotter_steps,
             evo if not use_inverse_flag else evo.inverse(),
-            ham_op,
+            num_qubits,
             circuit)
 
     # Append K Trotter steps of inverse, if method 3
@@ -497,7 +507,7 @@ def create_circuit_from_op_pygsti(
 
 ################ Append Trotter steps   
  
-def append_trotter_steps(num_trotter_steps, evo, operator, circuit):
+def append_trotter_steps(num_trotter_steps, evo, num_qubits, circuit):
     """
     Appends Trotter steps to a quantum circuit based on the given evolution operator.
 
@@ -517,7 +527,8 @@ def append_trotter_steps(num_trotter_steps, evo, operator, circuit):
         QuantumCircuit: The quantum circuit with the added Trotter steps and a barrier.
     """
     for _ in range (num_trotter_steps):
-        circuit.append(evo, range(operator.num_qubits))
+        for evo_group in evo:
+            circuit.append(evo_group, range(num_qubits))
     circuit.barrier()
     return circuit
 
@@ -678,8 +689,10 @@ def kernel_draw(hamiltonian: str = "hamlib", method: int = 1):
         # create a small circuit, just to display this evolution subciruit structure
         print("  Evolution Operator (e^-iHt) =")
         qctt = QuantumCircuit(QC_.num_qubits)
-        qctt.append(EVO_, range(QC_.num_qubits))
-        print(transpile(qctt, optimization_level=3))
+        print(EVO_)
+        for evo in EVO_:
+            qctt.append(evo, range(QC_.num_qubits))
+            print(transpile(qctt, optimization_level=3))
         
         # create a small circuit, just to display this inverse evolution subcircuit structure        
         if INV_ is not None:                       
