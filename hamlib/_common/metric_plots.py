@@ -389,12 +389,70 @@ def plot_expectation_value_metrics(suptitle="",
     ax1.plot(x_data[:len(y_data2)], y_data2, label='Quantum Value', marker='s', color='C0')
 
     # Add legend
-    ax1.legend()
+    #ax1.legend()
 
     # Autoscale the y-axis
     ax1.autoscale(axis='y')
     
+    ###############
+    
+    # Create secondary y-axis
+    ax2 = ax1.twinx()
+
+    # Set its own y-label
+    ax2.set_ylabel("Difference from Exact Value", color="black")
+
+    # data for second axis is difference between the first two traces
+    second_data = []  
+    for i in range(len(y_data1)):
+        delta = y_data2[i] - y_data1[i]
+        second_data.append(delta)
+    
+    # auto-center and shrink the range of second axis' data
+    ymin = min(second_data)
+    ymax = max(second_data)
+    ydelta = ymax - ymin
+    #print(f"min = {ymin}, {ymax}, {ydelta}")
+    
+    if ymin >= 0 and ymax > 0:
+        ymin = 0.0 
+        ymax = ymax * 2.0
+    elif ymin < 0 and ymax <= 0:        
+        ymin = ymin * 2.0 + (ydelta / 2)
+        ymax = 0.0 + (ydelta / 2)
+    else:
+        ymid = (ymin + ymax) / 2.0
+        ymin = ymid - ydelta
+        ymax = ymid + ydelta 
+        
+        # move the second plot down by 5 %
+        ymin += 0.1 * ydelta
+        ymax += 0.1 * ydelta
+    
+    # plot the data for second axis (difference)
+    """
+    color = _alt_colors[j] if j < len(_alt_colors) else _alt_colors[-1]
+    marker = _alt_markers[j] if j < len(_alt_markers) else _alt_markers[-1]
+    style = _alt_styles[j] if j < len(_alt_styles) else _alt_styles[-1]
+    """
+    color = "blueviolet"
+    style = "dashed"
+    marker = "."
+    
+    #ax2.plot(groups[j][:len(second_data[j])], second_data[j], label="Difference", #label=second_labels[j],
+    #         linestyle=style, marker=marker, color=color)
+             
+    ax2.plot(x_data[:len(y_data1)], second_data, label="Difference", #label=second_labels[j],
+             linestyle=style, marker=marker, color=color, linewidth=0.5)
+    
+    ax2.set_ylim(ymin, ymax)
+    
     ##############
+    
+    # Manually merge legends from both axes
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc="upper left")  # Combine and display
     
     # add padding below suptitle, and between plots, due to multi-line titles
     padding=0.8
@@ -720,7 +778,7 @@ def plot_expectation_time_metrics_2(suptitle="",
 
     # Autoscale the y-axis
     ax1.autoscale(axis='y')
-    
+            
     ##############
     
     # add padding below suptitle, and between plots, due to multi-line titles
