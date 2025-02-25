@@ -780,14 +780,25 @@ def run(min_qubits: int = 2,
     
     # Plot metrics for all circuit sizes
     base_ham_name = os.path.basename(hamiltonian)
-    options = {"ham": base_ham_name,
+    if do_observables:
+        options = {"ham": base_ham_name,
                 "params": hamiltonian_params,
                 "method": method,
                 "gm": group_method,
                 "K": K,
                 "t": t,
                 "shots": num_shots,
-                "reps": max_circuits}  
+                "reps": max_circuits} 
+    else:
+        options = {"ham": base_ham_name,
+                #"params": hamiltonian_params,
+                "method": method,
+                #"gm": group_method,
+                "K": K,
+                "t": t,
+                "shots": num_shots,
+                "reps": max_circuits} 
+    
 
     if not plot_results:
         return
