@@ -689,7 +689,7 @@ def kernel_draw(hamiltonian: str = "hamlib", method: int = 1):
         # create a small circuit, just to display this evolution subciruit structure
         print("  Evolution Operator (e^-iHt) =")
         qctt = QuantumCircuit(QC_.num_qubits)
-        print(EVO_)
+        #print(EVO_)
         for evo in EVO_:
             qctt.append(evo, range(QC_.num_qubits))
             print(transpile(qctt, optimization_level=3))
