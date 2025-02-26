@@ -401,16 +401,19 @@ def plot_expectation_value_metrics(suptitle="",
 
     # Set its own y-label
     ax2.set_ylabel("Difference from Exact Value", color="black")
-
+     
     # data for second axis is difference between the first two traces
     second_data = []  
     for i in range(len(y_data1)):
-        delta = y_data2[i] - y_data1[i]
+        if y_data1[i] == None or y_data2[i] == None:
+            delta = None
+        else:
+            delta = y_data2[i] - y_data1[i]
         second_data.append(delta)
     
     # auto-center and shrink the range of second axis' data
-    ymin = min(second_data)
-    ymax = max(second_data)
+    ymin = min([x for x in second_data if x is not None])
+    ymax = max([x for x in second_data if x is not None])
     ydelta = ymax - ymin
     #print(f"min = {ymin}, {ymax}, {ydelta}")
     
@@ -439,10 +442,7 @@ def plot_expectation_value_metrics(suptitle="",
     style = "dashed"
     marker = "."
     
-    #ax2.plot(groups[j][:len(second_data[j])], second_data[j], label="Difference", #label=second_labels[j],
-    #         linestyle=style, marker=marker, color=color)
-             
-    ax2.plot(x_data[:len(y_data1)], second_data, label="Difference", #label=second_labels[j],
+    ax2.plot(x_data[:len(y_data1)], second_data[:len(y_data1)], label="Difference", #label=second_labels[j],
              linestyle=style, marker=marker, color=color, linewidth=0.5)
     
     ax2.set_ylim(ymin, ymax)
@@ -452,7 +452,7 @@ def plot_expectation_value_metrics(suptitle="",
     # Manually merge legends from both axes
     lines, labels = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines + lines2, labels + labels2, loc="upper left")  # Combine and display
+    ax1.legend(lines + lines2, labels + labels2)  # Combine and display
     
     # add padding below suptitle, and between plots, due to multi-line titles
     padding=0.8
