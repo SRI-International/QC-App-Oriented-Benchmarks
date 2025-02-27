@@ -456,6 +456,11 @@ def run(min_qubits: int = 2,
         print(f"WARNING: method 1 not supported for {api} API, use method 2 instead")
         method = 2
         
+    # Force the name "nvidia" if cudaq used but no backend_id provided:
+    # shouldn't have to do this, but needed so we don't get a _data folder called None
+    if api == "cudaq" and backend_id == None:
+        backend_id = "nvidia"
+        
     # DEVNOTE: this is necessary, since we get the Hamiltonian pauli terms when circuit execution is launched.
     # need to wait until it completes since we need to have access to those terms.  They are currently global.
     # Need to fix this
@@ -774,7 +779,7 @@ def run(min_qubits: int = 2,
     
     if draw_circuits:
         kernel_draw(hamiltonian, method)
- 
+    
     ##########################
     # Display Plots of Results
     
