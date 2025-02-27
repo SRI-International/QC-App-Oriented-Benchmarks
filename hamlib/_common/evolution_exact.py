@@ -99,6 +99,10 @@ def ensure_valid_state(initial_state, num_qubits = None, reverse = False):
             initial_state = initial_state.toarray().flatten()
             # dense_state = initial_state.toarray()
             # initial_state = dense_state
+            
+        elif set(initial_state).issubset({'0', '1'}):
+            initial_state = generate_initial_state(initial_state)
+            initial_state = initial_state.toarray().flatten()
     
         elif initial_state == "ghz":
             initial_state = np.zeros((2**num_qubits), dtype=complex)
