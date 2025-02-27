@@ -431,6 +431,9 @@ def plot_expectation_value_metrics(suptitle="",
         # move the second plot down by 5 %
         ymin += 0.1 * ydelta
         ymax += 0.1 * ydelta
+        
+    if ymin == ymax:
+        ymax += 0.001
     
     # plot the data for second axis (difference)
     """
@@ -807,7 +810,10 @@ def append_options_to_title(suptitle: str, options:list, backend_id:str):
 
     # these options are required
     hamiltonian_name = options['ham']
+    if not hamiltonian_name: hamiltonian_name = "?"
+    
     hamiltonian_params = options['params'] if 'params' in options else {}
+    if not hamiltonian_params: hamiltonian_params = {}
     ham_params = ",".join([f"{k}:{v}" for k, v in hamiltonian_params.items()])
     
     num_shots = options['shots']
