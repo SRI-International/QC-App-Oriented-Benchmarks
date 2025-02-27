@@ -411,29 +411,34 @@ def plot_expectation_value_metrics(suptitle="",
             delta = y_data2[i] - y_data1[i]
         second_data.append(delta)
     
-    # auto-center and shrink the range of second axis' data
-    ymin = min([x for x in second_data if x is not None])
-    ymax = max([x for x in second_data if x is not None])
-    ydelta = ymax - ymin
-    #print(f"min = {ymin}, {ymax}, {ydelta}")
+    if second_data and len(second_data) > 0 and second_data[0] is not None:
     
-    if ymin >= 0 and ymax > 0:
-        ymin = 0.0 
-        ymax = ymax * 2.0
-    elif ymin < 0 and ymax <= 0:        
-        ymin = ymin * 2.0 + (ydelta / 2)
-        ymax = 0.0 + (ydelta / 2)
-    else:
-        ymid = (ymin + ymax) / 2.0
-        ymin = ymid - ydelta
-        ymax = ymid + ydelta 
+        # auto-center and shrink the range of second axis' data
+        ymin = min([x for x in second_data if x is not None])
+        ymax = max([x for x in second_data if x is not None])
+        ydelta = ymax - ymin
+        #print(f"min = {ymin}, {ymax}, {ydelta}")
         
-        # move the second plot down by 5 %
-        ymin += 0.1 * ydelta
-        ymax += 0.1 * ydelta
+        if ymin >= 0 and ymax > 0:
+            ymin = 0.0 
+            ymax = ymax * 2.0
+        elif ymin < 0 and ymax <= 0:        
+            ymin = ymin * 2.0 + (ydelta / 2)
+            ymax = 0.0 + (ydelta / 2)
+        else:
+            ymid = (ymin + ymax) / 2.0
+            ymin = ymid - ydelta
+            ymax = ymid + ydelta 
+            
+            # move the second plot down by 5 %
+            ymin += 0.1 * ydelta
+            ymax += 0.1 * ydelta
+            
+    else:
+        ymin = ymax = 0.0
         
     if ymin == ymax:
-        ymax += 0.001
+        ymax += 0.01
     
     # plot the data for second axis (difference)
     """
