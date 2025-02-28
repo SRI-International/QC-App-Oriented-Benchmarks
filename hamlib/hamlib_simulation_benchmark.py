@@ -1061,7 +1061,7 @@ def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method):
         #print(group)
     
     group_time = round(time.time()-ts, 3)
-    print(f"\n... finished grouping terms, total grouping time = {group_time} sec.\n")
+    #print(f"\n... finished grouping terms, total grouping time = {group_time} sec.\n")
     
     # for each group, create a merged pauli string from all the terms in the group
     # DEVNOTE: move these 4 lines to a function in observables
