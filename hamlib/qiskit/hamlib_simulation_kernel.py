@@ -83,7 +83,7 @@ def convert_sparse_pauli_terms_to_sparse_pauliop(sparse_pauli_terms, num_qubits)
         label = ''.join(label)
         pauli_list.append((label, coefficient))
     
-    hamiltonian = SparsePauliOp.from_list(pauli_list, num_qubits=num_qubits)
+    hamiltonian = SparsePauliOp.from_list(pauli_list)
     return hamiltonian
     
 def ensure_sparse_pauli_op(

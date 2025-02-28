@@ -638,7 +638,7 @@ def run(min_qubits: int = 2,
                                     )
                         else:
                             # execute with shots distributed by weight of coefficients
-                            results = execute_circuits_distribute_shots(
+                            results, pauli_term_groups = execute_circuits_distribute_shots(
                                     backend_id = backend_id,
                                     circuits = circuits,
                                     num_shots = num_shots,
@@ -966,27 +966,32 @@ def execute_circuits_distribute_shots(
     
     # determine the number of shots to execute for each circuit, weighted by largest coefficient
     num_shots_list = get_distributed_shot_counts(total_shots, groups)
+    print('num shot list:', num_shots_list)
+    from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
+    buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=3)
+    print('bucket kmeans:', buckets_kmeans)
+    bucket_avg_shots = compute_bucket_averages(buckets_kmeans)
+    circuit_list = [[circuits[idx] for idx in indices] for indices in indices_kmeans]
+    group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
     print(f"  ... num_shots_list = {num_shots_list}")
             
-    counts_array = []
-    for circuit in circuits:
-        
-        # execute this list of circuits, same shots each
+    results_array = []
+    for circuits, num_shots in zip(circuit_list, bucket_avg_shots):
         results = execute_circuits(
                 backend_id = backend_id,
-                circuits = [circuit],
+                circuits = circuits,
                 num_shots = num_shots
                 )
-                                       
+                     
         counts = results.get_counts()
-        counts_array.append(counts)
+        if len(circuits) < 2:
+            results_array.append(ExecResult(counts))
+        else:
+            for count in counts:
+                results_array.append(ExecResult(count))
+    group_list = [item for sublist in group_list for item in sublist]
+    return results_array, group_list
     
-    if len(circuits) < 2:
-        results = ExecResult(counts)
-    else:
-        results = ExecResult(counts_array)
-   
-    return results
     
 # From the given list of term groups, distribute the total shot count, returning num_shots by group
 def get_distributed_shot_counts(

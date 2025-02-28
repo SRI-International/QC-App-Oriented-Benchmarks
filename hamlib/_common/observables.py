@@ -335,11 +335,9 @@ def calculate_expectation_from_measurements(num_qubits, results, pauli_term_grou
    
     # Loop over each group and its corresponding measurement results
     if len(pauli_term_groups) > 1:
-        for group, result in zip(pauli_term_groups, results.get_counts()):
-            counts = result
-
+        for group, result in zip(pauli_term_groups, results):
+            counts = result.get_counts()
             if debug: print(counts)
-            
             # Process each Pauli term in the current group
             for term, coeff in group:
                 exp_val = get_expectation_term(term, counts)
@@ -401,9 +399,9 @@ def calculate_expectation_from_measurements_k_commute(num_qubits, results, pauli
     # Loop over each group and its corresponding measurement results
     if len(pauli_term_groups) > 1:
         num_group = 0
-        for group, result in zip(pauli_term_groups, results.get_counts()):
+        for group, result in zip(pauli_term_groups, results):
             
-            counts = result
+            counts = result.get_counts()
             if debug: print(counts)
             
             # Process each Pauli term in the current group

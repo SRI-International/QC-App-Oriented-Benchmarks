@@ -159,7 +159,7 @@ def bucket_numbers_kmeans(num_list, max_buckets):
     indexed_nums = [(idx, num) for idx, num in enumerate(num_list)]
     
     # Extract only the values for clustering
-    num_values = [num for _, num in indexed_nums]
+    num_values = [num for _, num in indexed_nums if num != 0]
 
     # Run K-Means Clustering
     clustered_values = kmeans_clustering(num_values, max_buckets)
@@ -180,9 +180,9 @@ def bucket_numbers_kmeans(num_list, max_buckets):
                     indices.append(idx)
                     indexed_nums.remove((idx, value))  # Avoid duplicate matching
                     break
-
-        buckets.append(bucket)
-        bucket_indices.append(indices)
+        if bucket:
+            buckets.append(bucket)
+            bucket_indices.append(indices)
 
     return buckets, bucket_indices
 
