@@ -934,7 +934,7 @@ def visualize_error_distribution(
     fwhm = 2.355 * std_dev  # Approximate FWHM if shape is roughly symmetric
 
     # Create histogram without assuming normality
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(8, 5))
     plt.hist(errors, bins=40, color='blue', alpha=0.6, edgecolor='black')
 
     plt.title(title)
@@ -1036,6 +1036,7 @@ def plot_timing_analysis_bar_chart(
         num_shots: int,
         datasets: list, 
         dataset_labels: list, 
+        categories: list,
         x_label = "Datasets", 
         error_bar_position = "middle"
         ):
@@ -1058,7 +1059,9 @@ def plot_timing_analysis_bar_chart(
     title += f"\nHam={base_ham_name}, qubits={num_qubits}, gm={group_method}, shots={num_shots}" 
 
     # Define categories (excluding stddev fields)
-    categories = [key for key in datasets[0] if not key.endswith("_stddev") and key != "exact_time" and key != 'execute_circuits_time' and key != 'total_time'  ]
+    #categories = [key for key in datasets[0] if not key.endswith("_stddev") and key != "exact_time" and key != 'execute_circuits_time' and key != 'total_time'  ]
+    if not categories:
+        categories = [key for key in datasets[0] if not key.endswith("_stddev")]
 
     # Scale bar width dynamically
     num_datasets = len(datasets)
@@ -1088,14 +1091,16 @@ def plot_timing_analysis_bar_chart(
         "append_measurements_time": "#5FA8D3",  # Muted Sky Blue
         "execute_circuits_time": "#9FC6E7",  # Soft Light Blue
         "observable_compute_time": "#5F7367",  # Subtle Green-Gray
-        "total_time": "#2E5E4E"  # Deep Forest Green
+        "total_time": "#2E5E4E",  # Deep Forest Green
+        "more_1": "#1B4965",  # Deep Steel Blue
+        "more_2": "#1B4965",  # Deep Steel Blue
     }
 
     #print(colors)
     color_list = list(colors.values())  # Convert dictionary values to a list    
 
     # Create figure
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(8, 5))
 
     # Initialize bottoms for stacking
     bottoms = np.zeros(num_datasets)
