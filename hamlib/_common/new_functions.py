@@ -13,6 +13,8 @@ import hamlib_simulation_benchmark
 import evolution_exact
 import observables
 
+import hamlib_simulation_kernel
+
 
 metrics_object = {}
 
