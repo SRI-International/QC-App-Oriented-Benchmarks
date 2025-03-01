@@ -1,3 +1,8 @@
+'''
+Hamiltonian Simulation Benchmark Program - Qiskit
+(C) Quantum Economic Development Consortium (QED-C) 2025.
+'''
+
 import numpy as np
 from qiskit import QuantumCircuit
 
