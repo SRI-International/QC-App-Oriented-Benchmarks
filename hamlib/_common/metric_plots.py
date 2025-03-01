@@ -838,4 +838,331 @@ def append_options_to_title(suptitle: str, options:list, backend_id:str):
     
     return suptitle
         
+
+##########################################################
+# VALUE ANALYSIS FUNCTIONS
+
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import Counter
+
+def plot_value_error(
+        hamiltonian_name: str,
+        backend_id: str,
+        num_qubits: int,
+        group_method: str,
+        num_shots: int,
+        exact_energies,
+        computed_energies
+    ):
+    """
+    Plots the difference (computed - exact) against exact_energies.
+
+    Args:
+        exact_energies (list or array): Exact energy values (x-axis).
+        computed_energies (list or array): Computed energy values.
+
+    """
+    if len(exact_energies) != len(computed_energies):
+        raise ValueError("Arrays must have the same length.")
+
+    base_ham_name = os.path.basename(hamiltonian_name)
+    
+    # Compute the difference (error)
+    errors = [computed - exact for computed, exact in zip(computed_energies, exact_energies)]
+
+    # Create scatter plot
+    plt.figure(figsize=(8, 5))
+    plt.scatter(exact_energies, errors, color='red', alpha=0.7, edgecolors='black', label='Computed - Exact')
+
+    # Labels and title
+    title = "Error in Computed Energy vs Exact Energy"
+    title += f"\nHam={base_ham_name}, qubits={num_qubits}, gm={group_method}, shots={num_shots}" 
+    plt.title(title)
+    
+    plt.xlabel("Exact Energy")
+    plt.ylabel("Computed - Exact Energy (Error)")
+    plt.axhline(0, color='gray', linestyle='--')  # Add horizontal line at 0 for reference
+    plt.grid(True)
+
+    ymin = min(errors)
+    ymax = max(errors)
+    ydelta = ymax - ymin
+    ymin -= 0.10 * ydelta
+    ymax += 0.10 * ydelta
+    
+    #plt.xlim(xmin, xmax)
+    plt.ylim(ymin, ymax)  
+
+    plt.legend()
+
+    imagename = f"{base_ham_name}-{num_qubits}-{group_method}-value-error"
+    metrics.save_plot_image(plt, imagename, backend_id)
+
+    plt.show()
+
+
+def visualize_error_distribution(
+        hamiltonian_name: str,
+        backend_id: str,
+        num_qubits: int,
+        group_method: str,
+        num_shots: int,
+        errors
+    ):
+    """
+    Plots the histogram of the error distribution and overlays key statistical metrics.
+    Works for any distribution (not just Gaussian).
+
+    Args:
+        errors (list or array): List of error values.
+    """
+    base_ham_name = os.path.basename(hamiltonian_name)
+    
+    title = "Error Distribution with Key Metrics"
+    title += f"\nHam={base_ham_name}, qubits={num_qubits}, gm={group_method}, shots={num_shots}" 
+    
+    errors = np.array(errors)
+
+    # Compute key error metrics
+    std_dev = np.std(errors)  # Standard deviation (σ)
+    mean_error = np.mean(errors)  # Mean error (detects bias)
+    mae = np.mean(np.abs(errors))  # Mean Absolute Error (MAE)
+    rmse = np.sqrt(np.mean(errors**2))  # Root Mean Square Error (RMSE)
+
+    # Compute Full Width at Half Maximum (FWHM) estimate
+    fwhm = 2.355 * std_dev  # Approximate FWHM if shape is roughly symmetric
+
+    # Create histogram without assuming normality
+    plt.figure(figsize=(10, 6))
+    plt.hist(errors, bins=40, color='blue', alpha=0.6, edgecolor='black')
+
+    plt.title(title)
+    
+    # Plot key statistics
+    plt.axvline(mean_error, color='red', linestyle="--", label=f"Mean (Bias) = {mean_error:.4f}")
+    plt.axvline(mean_error + std_dev, color='orange', linestyle="--", label=f"σ = {std_dev:.4f}")
+    plt.axvline(mean_error - std_dev, color='orange', linestyle="--")
+    plt.axvline(mean_error + fwhm/2, color='green', linestyle="--", label=f"FWHM/2 = {fwhm/2:.4f}")
+    plt.axvline(mean_error - fwhm/2, color='green', linestyle="--")
+
+    # Labels & legend
+    plt.xlabel("Error Value")
+    plt.ylabel("Frequency")
+    plt.legend()
+    plt.grid(True)
+
+    imagename = f"{base_ham_name}-{num_qubits}-{group_method}-value-error-distr"
+    metrics.save_plot_image(plt, imagename, backend_id)
+
+    plt.show()
+
+    # Print error bias analysis
+    bias_direction = "positive" if mean_error > 0 else "negative"
+    print("\n🔹 **Bias Detection**")
+    print(f"Mean Error (Bias) = {mean_error:.4f}")
+    
+    # More general bias detection without assuming Gaussian shape
+    if abs(mean_error) > 0.5 * (np.max(errors) - np.min(errors)) / 4:  # Using range-based threshold
+        print(f"⚠️ Warning: Significant {bias_direction} bias detected in the error distribution!")
+    else:
+        print("✅ No significant bias detected.")
+
+
+# DEVNOTE: These function need title and code to save to imagefile
+
+def plot_values_scatter(x_values, y_values, y_values_2):
+    """
+    Plots a scatter plot with x_values on the x-axis and y_values on the y-axis.
+
+    Args:
+        x_values (list or array): Values for the x-axis.
+        y_values (list or array): Values for the y-axis.
+    """
+    if len(x_values) != len(y_values):
+        raise ValueError("Both input arrays must have the same length.")
+
+    plt.figure(figsize=(8, 5))  # Set figure size
+    plt.scatter(x_values, y_values, color='coral', alpha=0.7, edgecolors='black', label='Exact')
+    plt.scatter(x_values, y_values_2, color='blue', alpha=0.7, edgecolors='black', label='Computed')
+
+    plt.xlabel("Initial State (int)")
+    plt.ylabel("Y Values")
+    plt.ylabel("Expectation Value")
+    plt.title("Expectation Value over Initial States")
+    plt.grid(True)
+
+    plt.legend()
+
+    plt.show()
+    
+def plot_value_counts(x_values):
+    """
+    Plots a scatter plot where the x-axis represents unique values from x_values,
+    and the y-axis represents their frequency (number of occurrences).
+
+    Args:
+        x_values (list or array): Values for the x-axis.
+    """
+    # Count occurrences of each unique value
+    value_counts = Counter(x_values)
+
+    # Extract unique values and their counts
+    unique_x = list(value_counts.keys())
+    counts = list(value_counts.values())
+
+    # Create scatter plot
+    plt.figure(figsize=(8, 5))
+    plt.scatter(unique_x, counts, color='blue', alpha=0.7, edgecolors='black')
+
+    # Labels and title
+    plt.xlabel("Unique Values")
+    plt.ylabel("Frequency")
+    plt.title("Scatter Plot of Value Counts")
+    plt.grid(True)
+
+    plt.show()
+
+
+
+##########################################################
+# TIMING ANALYSIS FUNCTIONS    
+
+def plot_timing_analysis_bar_chart(
+        hamiltonian_name: str,
+        backend_id: str,
+        num_qubits: int,
+        group_method: str,
+        num_shots: int,
+        datasets: list, 
+        dataset_labels: list, 
+        x_label = "Datasets", 
+        error_bar_position = "middle"
+        ):
+    """
+    Plots a stacked bar chart for multiple datasets with standard deviations.
+
+    Args:
+        datasets (list of dicts): List of dictionaries containing mean & stddev values for each dataset.
+        dataset_labels (list of dicts): List containing metadata (e.g., name, label) for each dataset.
+        x_label (str): Label for the x-axis.
+        error_bar_position (str): "middle" for stddev markers at the middle, "top" for error bars at the top.
+    """
+    if not datasets or len(datasets) != len(dataset_labels):
+        raise ValueError("Datasets and labels must have the same length.")
+
+    base_ham_name = os.path.basename(hamiltonian_name)
+    
+    #title = "Error Distribution with Key Metrics"
+    title = "Stacked Bar Chart of Timing Metrics"
+    title += f"\nHam={base_ham_name}, qubits={num_qubits}, gm={group_method}, shots={num_shots}" 
+
+    # Define categories (excluding stddev fields)
+    categories = [key for key in datasets[0] if not key.endswith("_stddev") and key != "exact_time" and key != 'execute_circuits_time' and key != 'total_time'  ]
+
+    # Scale bar width dynamically
+    num_datasets = len(datasets)
+    bar_width = max(0.2, 0.8 / num_datasets)  # Ensures bars are visible and not too thin
+    #bar_width = 0.2
+
+    x_positions = np.arange(num_datasets)  # X positions for each dataset
+
+    # x_positions = np.array([0]) if num_datasets == 1 else np.arange(num_datasets)  # Fix for single dataset
+    # bar_width = 0.5 if num_datasets > 1 else 0.3  # Adjust bar width for single dataset
+
+    # Define colors for different categories
+    colors = plt.cm.tab10(np.linspace(0, 1, len(categories)))
+
+    # we are currently only using the color by its index, not the key name
+    """
+    colors = {
+        "create_base_time": "#A7C7E7",  # Soft Sky Blue
+        "append_measurements_time": "#B5D6B2",  # Light Sage Green
+        "execute_circuits_time": "#809BCE",  # Muted Blue
+        "observable_compute_time": "#5D6D7E",  # Slate Gray
+        "total_time": "#5B84B1"  # Deep Cool Blue
+    }
+    """
+    colors = {
+        "create_base_time": "#1B4965",  # Deep Steel Blue
+        "append_measurements_time": "#5FA8D3",  # Muted Sky Blue
+        "execute_circuits_time": "#9FC6E7",  # Soft Light Blue
+        "observable_compute_time": "#5F7367",  # Subtle Green-Gray
+        "total_time": "#2E5E4E"  # Deep Forest Green
+    }
+
+    #print(colors)
+    color_list = list(colors.values())  # Convert dictionary values to a list    
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Initialize bottoms for stacking
+    bottoms = np.zeros(num_datasets)
+
+    ymax = 0.01
+    ymax_cat = 0.0
+    all_values = None
+    
+    for i, category in enumerate(categories):
+        values = np.array([dataset[category] for dataset in datasets])
+        stddevs = np.array([dataset.get(f"{category}_stddev", 0) for dataset in datasets])
+
+        # Plot stacked bars
+        ax.bar(x_positions, values, bar_width, label=category.replace("_", " ").title(), bottom=bottoms, color=color_list[i], align='center')
         
+        all_values = values if all_values is None else (all_values + values)
+        
+        #ymax = max(ymax, max(sum(values)))
+
+        # bar_width = min(0.8, 0.6 / num_datasets)  # Keeps bars visible but prevents full-width issue
+        # x_positions = np.linspace(-bar_width * (num_datasets - 1) / 2, bar_width * (num_datasets - 1) / 2, num_datasets)  # Evenly space bars
+        # ax.bar(x_positions + i, values, bar_width, label=category.replace("_", " ").title(), bottom=bottoms, color=color_list[i])
+
+        # Plot standard deviation
+        if error_bar_position == "middle":
+            # Place markers at the middle of each bar segment
+            ax.errorbar(x_positions, bottoms + values / 2, yerr=stddevs, fmt='o', color='black', capsize=4, alpha=0.6)
+        elif error_bar_position == "top":
+            # Place error bars at the top of each bar segment
+            ax.errorbar(x_positions, bottoms + values, yerr=stddevs, fmt='none', ecolor='black', capsize=5, alpha=0.8)
+
+        # Update stacking positions
+        bottoms += values
+   
+    ymax = max(ymax, max(all_values))
+        
+    # X-axis labels
+    dataset_labels_formatted = [d["label"] for d in dataset_labels]
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(dataset_labels_formatted)
+
+    # Labels and title
+    ax.set_xlabel(x_label)
+    ax.set_ylabel("Time (seconds)")
+    ax.set_title(title)
+    
+    ax.set_ylim(0.0, ymax * 1.4)
+
+    # Legend
+    #ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
+
+    # Add legend, but reverse its order to match the stacked bars
+    handles, labels = ax.get_legend_handles_labels()
+    #ax.legend(handles[::-1], labels[::-1], loc="upper left", bbox_to_anchor=(1, 1))
+    ax.legend(handles[::-1], labels[::-1])
+
+    # Grid for readability
+    ax.grid(axis="y", linestyle="--", alpha=0.5)
+
+    plt.tight_layout()
+
+    imagename = f"{base_ham_name}-{num_qubits}-{group_method}-timing-metrics"
+    metrics.save_plot_image(plt, imagename, backend_id)
+    
+    plt.show()
+
+
+##########################################################
+# OTHER ANALYSIS FUNCTIONS - NOT USED CURRENTLY
+
