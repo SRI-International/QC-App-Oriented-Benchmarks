@@ -985,7 +985,8 @@ def execute_circuits_distribute_shots(
         from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
         
         # get buckets of terms with similar shots counts, and index of original position
-        buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=4)
+        max_buckets = 3 if len(groups) < 50 else 4
+        buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=max_buckets)
                 
         # find the average number of shots required for each bucket
         # (sum of all shots for all circuits, nested, should be same as the incoming total)
@@ -1020,7 +1021,8 @@ def execute_circuits_distribute_shots(
                     circuits = circuits,
                     num_shots = num_shots
                     )
-                   
+            
+            # Qiskit returns and array if array executed, but single counts for one circuit
             if len(circuits) > 1:                           
                 counts = results.get_counts()
             else:
@@ -1028,9 +1030,10 @@ def execute_circuits_distribute_shots(
                 
             for counts2 in counts:
                 counts_array.append(counts2)
-        
+
+        # similarly, construct a Result object with counts structure to match circuits
         if len(counts_array) < 2:
-            results = ExecResult(counts)
+            results = ExecResult(counts_array[0])
         else:
             results = ExecResult(counts_array)
              

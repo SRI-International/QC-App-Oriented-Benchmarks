@@ -359,6 +359,7 @@ def calculate_expectation_from_measurements(num_qubits, results, pauli_term_grou
         group = pauli_term_groups[0]
 
         if debug:
+            print(f"  ... ONE term group")
             print(f"  ... group = {group}")
             print(f"  ... counts = {counts}")
         
@@ -406,9 +407,11 @@ def calculate_expectation_from_measurements_k_commute(num_qubits, results, pauli
     if len(pauli_term_groups) > 1:
         num_group = 0
         for group, result in zip(pauli_term_groups, results.get_counts()):
-            
             counts = result
-            if debug: print(counts)
+            
+            if debug:
+                print(f"  ... group = {group}")
+                print(f"  ... counts = {counts}")
             
             # Process each Pauli term in the current group
             for old_term, new_term, coeff, sign in group:
@@ -434,7 +437,10 @@ def calculate_expectation_from_measurements_k_commute(num_qubits, results, pauli
         counts = results.get_counts()
         group = pauli_term_groups[0]
 
-        if debug: print(counts)
+        if debug:
+            print(f"  ... ONE term group")
+            print(f"  ... group = {group}")
+            print(f"  ... counts = {counts}")
         
         # Process each Pauli term in the current group
         for old_term, new_term, coeff in group:
@@ -446,8 +452,9 @@ def calculate_expectation_from_measurements_k_commute(num_qubits, results, pauli
             
             if debug:
                 print(f"... {(old_term, coeff)} ==> {exp_val} : {coeff * exp_val * sign} += {total_exp}")
-    print('z expectation:', total_exp_z)
-    print('x expectation:', total_exp_x)
+                
+    #print('z expectation:', total_exp_z)
+    #print('x expectation:', total_exp_x)
 
     return total_exp, term_contributions
 
