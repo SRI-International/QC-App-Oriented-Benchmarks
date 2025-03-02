@@ -62,7 +62,8 @@ def create_measurement_circuts(qc, num_qubits, pauli_term_groups, pauli_str_list
 
 #################################################
 
-def do_execute(backend_id: str, circuits: list, num_shots: int):
+def do_execute(backend_id: str, circuits: list, num_shots: int,
+        pauli_term_groups: list, distribute_shots: bool = False):
     
     # Initialize simulator backend
     
@@ -81,6 +82,24 @@ def do_execute(backend_id: str, circuits: list, num_shots: int):
                                     circuits = circuits,
                                     num_shots = int(num_shots / len(circuits))
                                     )
+                                    
+    # call api-specific function to execute circuits
+    if not distribute_shots:
+        #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
+        # execute the entire list of circuits, same shots each
+        results = hamlib_simulation_benchmark.execute_circuits(
+                backend_id = backend_id,
+                circuits = circuits,
+                num_shots = int(num_shots / len(circuits))
+                )
+    else:
+        # execute with shots distributed by weight of coefficients
+        results, pauli_term_groups = hamlib_simulation_benchmark.execute_circuits_distribute_shots(
+                backend_id = backend_id,
+                circuits = circuits,
+                num_shots = num_shots,
+                groups = pauli_term_groups
+                )                                
 
     #for ca in results.get_counts():
     #    print(ca)
@@ -89,7 +108,7 @@ def do_execute(backend_id: str, circuits: list, num_shots: int):
     metrics_object["execute_circuits_time"] = exec_time
     ###print(f"... finished executing {len(circuits)} circuits, total execution time = {exec_time} sec.\n")
 
-    return results
+    return results, pauli_term_groups
 
 
 #################################################

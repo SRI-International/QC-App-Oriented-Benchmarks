@@ -948,6 +948,10 @@ class ExecResult(object):
 #########################################
 # EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
 
+# 250302 TL: Leaving these options in until we are sure all works well.
+new_way = True
+debug = False
+    
 def execute_circuits_distribute_shots(
         backend_id: str = None,
         circuits: list = None,
@@ -955,22 +959,20 @@ def execute_circuits_distribute_shots(
         groups: list = None
     ) -> list:
 
-    if verbose:
+    if verbose or debug:
         print(f"... execute_circuits_distribute_shots({backend_id}, {len(circuits)}, {num_shots}, {groups})")
                   
     # distribute shots; obtain total and distribute according to weights
     # (weighting not implemented yet)
     circuit_count = len(circuits)
     total_shots = num_shots         # to match current behavior
-    print(f"... distributing shots, total shots = {total_shots} shots")
+    if verbose or debug:
+        print(f"... distributing shots, total shots = {total_shots} shots")
     
     # determine the number of shots to execute for each circuit, weighted by largest coefficient
     num_shots_list = get_distributed_shot_counts(total_shots, groups)
-    print(f"  ... num_shots_list = {num_shots_list}")
-    
-    # 250302 TL: Leaving these options in until we are sure all works well.
-    new_way = True
-    debug = False
+    if verbose or debug:
+        print(f"  ... num_shots_list = {num_shots_list}")  
     
     # The "new" approach that uses bucketing, to reduce number of circuits to be executed
     if new_way:
@@ -1004,7 +1006,8 @@ def execute_circuits_distribute_shots(
             print(f"  circuit_list after bucketing = {circuit_list}")
             print(f"  ... group_list after bucketing = {group_list}") 
         
-        print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
+        if verbose or debug:
+            print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
                 
         counts_array = []
         #for circuit in circuits:
