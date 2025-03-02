@@ -638,7 +638,7 @@ def run(min_qubits: int = 2,
                                     )
                         else:
                             # execute with shots distributed by weight of coefficients
-                            results = execute_circuits_distribute_shots(
+                            results, pauli_term_groups = execute_circuits_distribute_shots(
                                     backend_id = backend_id,
                                     circuits = circuits,
                                     num_shots = num_shots,
@@ -967,26 +967,114 @@ def execute_circuits_distribute_shots(
     # determine the number of shots to execute for each circuit, weighted by largest coefficient
     num_shots_list = get_distributed_shot_counts(total_shots, groups)
     print(f"  ... num_shots_list = {num_shots_list}")
-            
-    counts_array = []
-    for circuit in circuits:
-        
-        # execute this list of circuits, same shots each
-        results = execute_circuits(
-                backend_id = backend_id,
-                circuits = [circuit],
-                num_shots = num_shots
-                )
-                                       
-        counts = results.get_counts()
-        counts_array.append(counts)
     
-    if len(circuits) < 2:
-        results = ExecResult(counts)
+    # 250302 TL: Leaving these options in until we are sure all works well.
+    new_way = True
+    debug = False
+    
+    # The "new" approach that uses bucketing, to reduce number of circuits to be executed
+    if new_way:
+        if debug:
+            print("************* NEW WAY")
+            for group in groups:
+                print(group)
+                   
+            print(f"  in circuits = {circuits}")
+        
+        # determine optimal bucketing for these circuits, based on distribution of shots needed
+        from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
+        
+        # get buckets of terms with similar shots counts, and index of original position
+        buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=4)
+                
+        # find the average number of shots required for each bucket
+        # (sum of all shots for all circuits, nested, should be same as the incoming total)
+        bucket_avg_shots = compute_bucket_averages(buckets_kmeans)
+        
+        if debug:
+            print('  ... bucket kmeans:', buckets_kmeans)
+            print('  ... indices_kmeans:', indices_kmeans)
+            print('  ... bucket_avg_shots:', bucket_avg_shots)
+        
+        circuit_list = [[circuits[idx] for idx in indices] for indices in indices_kmeans]   
+        group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
+        
+        if debug:
+            print(f"  circuit_list after bucketing = {circuit_list}")
+            print(f"  ... group_list after bucketing = {group_list}") 
+        
+        print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
+                
+        counts_array = []
+        #for circuit in circuits:
+        for circuits, num_shots in zip(circuit_list, bucket_avg_shots):
+        
+            if debug:
+                print(f"  ...    cccc = {circuits}")
+                print(f"... len circs = {len(circuits)}")
+            
+            # execute this list of circuits, same shots each
+            results = execute_circuits(
+                    backend_id = backend_id,
+                    #circuits = [circuit],
+                    circuits = circuits,
+                    num_shots = num_shots
+                    )
+                   
+            if len(circuits) > 1:                           
+                counts = results.get_counts()
+            else:
+                counts = [results.get_counts()]
+                
+            for counts2 in counts:
+                counts_array.append(counts2)
+        
+        if len(counts_array) < 2:
+            results = ExecResult(counts)
+        else:
+            results = ExecResult(counts_array)
+             
+        group_list = [item for sublist in group_list for item in sublist]
+        
+        if debug:
+            print(f"... results.get_counts() = {results.get_counts()}")
+            print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
+            print(f"... group_list len = {len(group_list)}")
+            print(f"  ... group_list after subgroups = ")
+            for group in group_list:
+                print(group)
+            
+        return results, group_list
+    
+    # The "old" approach that executes every circuit, but with weighted num shots
     else:
-        results = ExecResult(counts_array)
-   
-    return results
+        if debug:
+            print("************* OLD WAY")
+            
+        counts_array = []
+        for circuit, num_shots in zip(circuits, num_shots_list):
+            
+            # execute this list of circuits, same shots each
+            results = execute_circuits(
+                    backend_id = backend_id,
+                    circuits = [circuit],
+                    num_shots = num_shots
+                    )
+                                           
+            counts = results.get_counts()
+            counts_array.append(counts)
+        
+        if len(circuits) < 2:
+            results = ExecResult(counts)
+        else:
+            results = ExecResult(counts_array)
+        
+        if debug:        
+            print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
+            print(f"... groups len = {len(groups)}")
+            
+        return results, groups
+
     
 # From the given list of term groups, distribute the total shot count, returning num_shots by group
 def get_distributed_shot_counts(
@@ -1001,7 +1089,7 @@ def get_distributed_shot_counts(
         max_weight = 0
         for pauli, coeff in group:
             #print(f"  ... coeff = {coeff}")
-            max_weight = max(max_weight, np.real(coeff))
+            max_weight = max(max_weight, np.real(abs(coeff)))
             
         max_weights.append(max_weight)
 

@@ -332,13 +332,15 @@ def calculate_expectation_from_measurements(num_qubits, results, pauli_term_grou
     term_contributions = {}
     
     debug = False
-   
+    
     # Loop over each group and its corresponding measurement results
     if len(pauli_term_groups) > 1:
         for group, result in zip(pauli_term_groups, results.get_counts()):
             counts = result
 
-            if debug: print(counts)
+            if debug:
+                print(f"  ... group = {group}")
+                print(f"  ... counts = {counts}")
             
             # Process each Pauli term in the current group
             for term, coeff in group:
@@ -356,7 +358,9 @@ def calculate_expectation_from_measurements(num_qubits, results, pauli_term_grou
         counts = results.get_counts()
         group = pauli_term_groups[0]
 
-        if debug: print(counts)
+        if debug:
+            print(f"  ... group = {group}")
+            print(f"  ... counts = {counts}")
         
         # Process each Pauli term in the current group
         for term, coeff in group:
