@@ -840,7 +840,49 @@ def append_options_to_title(suptitle: str, options:list, backend_id:str):
         
 
 ##########################################################
-# VALUE ANALYSIS FUNCTIONS
+# VALUE ANALYSIS PLOT FUNCTIONS
+
+#from metric_plots import plot_values_scatter, plot_value_counts
+#from metric_plots import plot_value_error, visualize_error_distribution
+
+def plot_value_analysis_data(
+        hamiltonian_name: str,
+        backend_id: str,
+        num_qubits: int,
+        group_method: str,
+        num_shots: int,
+        init_values,
+        exact_energies,
+        computed_energies
+    ):
+
+    # Optionally plot raw observable values, both exact and computed, using a scatter plot
+    plot_values_scatter(init_values, exact_energies, computed_energies)
+
+    # Plot a spectrum of the observable values (this needs work yet)
+    # plot_value_counts(computed_energies)
+
+    # Plot the difference between computed and exact obverable values
+    plot_value_error(
+            hamiltonian_name,
+            backend_id,
+            num_qubits,
+            group_method,
+            num_shots,
+            exact_energies,
+            computed_energies
+        )
+
+    # Plot the distribution of errors and compute mean and sigma
+    visualize_error_distribution(
+            hamiltonian_name,
+            backend_id,
+            num_qubits,
+            group_method,
+            num_shots,
+            np.array(exact_energies) - np.array(computed_energies)
+        )
+    
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -1037,7 +1079,7 @@ def plot_timing_analysis_bar_chart(
         datasets: list, 
         dataset_labels: list, 
         categories: list,
-        x_label = "Datasets", 
+        x_label = "Observable Computation / Grouping Method", 
         error_bar_position = "middle"
         ):
     """
@@ -1065,8 +1107,11 @@ def plot_timing_analysis_bar_chart(
 
     # Scale bar width dynamically
     num_datasets = len(datasets)
-    bar_width = max(0.2, 0.8 / num_datasets)  # Ensures bars are visible and not too thin
-    #bar_width = 0.2
+    #bar_width = max(0.2, 0.8 / num_datasets)  # Ensures bars are visible and not too thin
+    bar_width = 0.6
+    
+    xmin = 0.0 - (1.0 - bar_width / 2.0)
+    xmax = len(datasets) - bar_width / 2.0
 
     x_positions = np.arange(num_datasets)  # X positions for each dataset
 
@@ -1147,6 +1192,7 @@ def plot_timing_analysis_bar_chart(
     ax.set_ylabel("Time (seconds)")
     ax.set_title(title)
     
+    ax.set_xlim(xmin, xmax)
     ax.set_ylim(0.0, ymax * 1.4)
 
     # Legend
