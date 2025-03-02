@@ -761,7 +761,7 @@ except Exception as ex:
 # ===========================================
 # QISKIT ESTIMATOR FUNCTIONS
 
-def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
+def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000, noise_model=None):
     """
     Estimates the expectation value of a quantum circuit and Hamiltonian using the `Estimator` class.
 
@@ -783,9 +783,11 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000):
     H_op = convert_to_sparse_pauli_op(H_terms)
     
     # Choose an actual quantum backend (Aer simulator with shot-based execution)
-    backend = Aer.get_backend("qasm_simulator") 
+    if backend is None:
+        backend = Aer.get_backend("qasm_simulator") 
 
     # Create an Estimator bound to the backend
+    #estimator = BackendEstimator(backend=backend, noise_model=noise_model)   # may be supported in v2
     estimator = BackendEstimator(backend=backend)
 
     # Use the estimator to compute the expectation value
