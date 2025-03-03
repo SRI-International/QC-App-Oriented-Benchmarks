@@ -938,6 +938,7 @@ def plot_value_error(
 
     plt.legend()
 
+    if group_method: group_method = group_method.replace(":", "-")
     imagename = f"{base_ham_name}-{num_qubits}-{group_method}-value-error"
     metrics.save_plot_image(plt, imagename, backend_id)
 
@@ -994,6 +995,7 @@ def visualize_error_distribution(
     plt.legend()
     plt.grid(True)
 
+    if group_method: group_method = group_method.replace(":", "-")
     imagename = f"{base_ham_name}-{num_qubits}-{group_method}-value-error-distr"
     metrics.save_plot_image(plt, imagename, backend_id)
 
@@ -1208,7 +1210,10 @@ def plot_timing_analysis_bar_chart(
 
     plt.tight_layout()
 
-    imagename = f"{base_ham_name}-{num_qubits}-{group_method}-timing-metrics"
+    if "execute_circuits_time" in categories:
+        imagename = f"{base_ham_name}-{num_qubits}-timing-x-metrics"
+    else:
+        imagename = f"{base_ham_name}-{num_qubits}-timing-metrics"
     metrics.save_plot_image(plt, imagename, backend_id)
     
     plt.show()

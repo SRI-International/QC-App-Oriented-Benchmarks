@@ -798,7 +798,7 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000, n
         backend = Aer.get_backend("qasm_simulator") 
 
     # Create an Estimator bound to the backend
-    #estimator = BackendEstimator(backend=backend, noise_model=noise_model)   # may be supported in v2
+    #estimator = BackendEstimator(backend=backend, noise_model=noise_model) # not sure this can be done v2
     estimator = BackendEstimator(backend=backend)
 
     # Use the estimator to compute the expectation value
