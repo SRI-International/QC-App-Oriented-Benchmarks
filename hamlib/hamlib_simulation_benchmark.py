@@ -1003,8 +1003,14 @@ def execute_circuits_distribute_shots(
         group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
         
         if debug:
-            print(f"  circuit_list after bucketing = {circuit_list}")
-            print(f"  ... group_list after bucketing = {group_list}") 
+#             print(f"  circuit_list after bucketing = {circuit_list}")
+#             print(f"  ... group_list after bucketing = {group_list}") 
+            print(f"  ... group_list after bucketing....") 
+            for group in group_list:
+                for g in group:
+                    print(g)
+                print('-----')
+
         
         if verbose or debug:
             print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
@@ -1049,7 +1055,7 @@ def execute_circuits_distribute_shots(
             print(f"  ... group_list after subgroups = ")
             for group in group_list:
                 print(group)
-            
+
         return results, group_list
     
     # The "old" approach that executes every circuit, but with weighted num shots
@@ -1088,29 +1094,58 @@ def get_distributed_shot_counts(
         groups: list = None
     ) -> List:
     
-    # loop over all groups, to find the largest coefficient in each group
-    max_weights = []
-    for group in groups:
-        #print(group)
-        max_weight = 0
-        for pauli, coeff in group:
-            #print(f"  ... coeff = {coeff}")
-            max_weight = max(max_weight, np.real(abs(coeff)))
+#     # loop over all groups, to find the largest coefficient in each group
+#     max_weights = []
+#     for group in groups:
+#         #print(group)
+#         max_weight = 0
+#         for pauli, coeff in group:
+#             #print(f"  ... coeff = {coeff}")
+#             max_weight = max(max_weight, np.real(abs(coeff)))
             
-        max_weights.append(max_weight)
+#         max_weights.append(max_weight)
 
-    # compute a normalized distribution over all groups
-    total_weights = sum(max_weights)
-    max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
+    # loop over all groups, to find the sum of coefficient in each group
+#     norm_weights = []
+#     for group in groups:
+#         #print(group)
+#         sum_weight = 0
+#         for pauli, coeff in group:
+#             #print(f"  ... coeff = {coeff}")
+#             sum_weight += np.real(abs(coeff))
+            
+#         norm_weights.append(sum_weight/len(group))
+
+        
+# #     # compute a normalized distribution over all groups
+# #     total_weights = sum(max_weights)
+# #     max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
     
-    # compute shots counts based on these weights
-    num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
+# #     # compute shots counts based on these weights
+# #     num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
+     
+#     # compute a normalized distribution over all groups
+#     total_weights = sum(norm_weights)
+#     norm_weights_normalized = [norm_weight / total_weights for norm_weight in norm_weights]
+    
+#     # compute shots counts based on these weights
+#     num_shots_list = [int(mwn * num_shots) for mwn in norm_weights_normalized]
+    
     
     # add shots to first group until the total is same as the given total shot count
-    while sum(num_shots_list) < num_shots:
-        num_shots_list[0] += 1
+    one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
+
+    # Step 2: Normalize weights to compute shot proportions
+    total_weight = sum(one_norm_weights)
+    shot_allocations = [int((w / total_weight) * num_shots) for w in one_norm_weights]
+
+    # Step 3: Adjust to ensure total shots match exactly
+    while sum(shot_allocations) < num_shots:
+        max_index = np.argmax(shot_allocations)
+        shot_allocations[max_index] += 1
+
        
-    return num_shots_list
+    return shot_allocations
  
  
 ########################################
@@ -1121,7 +1156,7 @@ def get_distributed_shot_counts(
 # moved down to lower modules.  For now, these functions are shared by several of the demo notebooks
 # as they are being developed.
 
-def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method):
+def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     """
     Group the Pauli terms accourding to the given group method: "None", "simple", "N"
     """
@@ -1147,7 +1182,7 @@ def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method):
     # use k-commuting algorithm
     else:
         from generate_pauli_groups import compute_groups
-        pauli_term_groups = compute_groups(num_qubits, sparse_pauli_terms, 1)
+        pauli_term_groups = compute_groups(num_qubits, sparse_pauli_terms, k)
     
     #print(f"\n... Number of groups created: {len(pauli_term_groups)}")
     #print(f"... Pauli Term Groups:")
