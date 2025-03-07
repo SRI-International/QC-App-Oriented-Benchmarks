@@ -111,6 +111,10 @@ def ensure_valid_state(initial_state, num_qubits = None, reverse = False):
 
         else:
             raise ValueError(f"Invalid initial state: {initial_state}")
+            
+    # if initial_state is a list, assume it is a state vector passed in, ready to use
+    elif isinstance(initial_state, np.ndarray) or isinstance(initial_state, list):
+        pass
         
     else:
         raise ValueError(f"Invalid initial state: {initial_state}")

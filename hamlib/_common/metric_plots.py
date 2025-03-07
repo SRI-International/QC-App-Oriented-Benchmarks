@@ -857,7 +857,8 @@ def plot_value_analysis_data(
     ):
 
     # Optionally plot raw observable values, both exact and computed, using a scatter plot
-    plot_values_scatter(init_values, exact_energies, computed_energies)
+    if len(init_values) == len(computed_energies):
+        plot_values_scatter(init_values, exact_energies, computed_energies)
 
     # Plot a spectrum of the observable values (this needs work yet)
     # plot_value_counts(computed_energies)

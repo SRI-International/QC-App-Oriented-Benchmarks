@@ -589,6 +589,7 @@ def HamiltonianSimulation(
         random_pauli_flag = False,
         random_init_flag = False,
         append_measurements = True,
+        initial_circuit = None,
     ) -> QuantumCircuit:
     """
     Construct a Qiskit circuit for Hamiltonian simulation.
@@ -604,7 +605,6 @@ def HamiltonianSimulation(
     Returns:
         QuantumCircuit: The constructed Qiskit circuit.
     """
-    
     if num_qubits <= 0:
         return None, None
         
@@ -616,11 +616,16 @@ def HamiltonianSimulation(
     qc = QuantumCircuit(qr, cr, name=f"hamsim-{num_qubits}-{circuit_id}")
     
     # if no Hamiltonian given, just return initial state is specified
+    # DEVNOTE: this is not assigning the proper useful circuit name
     if ham_op is None:
     
-        # DEVNOTE: this is not creating the proper circuit name
-        if init_state is not None:
+        # if a string is passed in, create initialized state from it
+        if init_state is not None and isinstance(init_state, str):
             qc = initial_state(num_qubits, init_state)
+            
+        # if initial circuit is passed in , then just use it
+        elif initial_circuit is not None:
+            qc = initial_circuit.copy()
             
         return qc, None
     
@@ -665,7 +670,12 @@ def HamiltonianSimulation(
             
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
     qc2 = qc.decompose().decompose()
-
+    
+    # an initial state passed in must be cloned before use, since it wasn't created here
+    if initial_circuit:
+        initial_circuit.compose(qc2, qubits=list(range(qc2.num_qubits)), inplace=True)
+        qc2 = initial_circuit.copy()
+        
     # return both the circuit created, the bitstring, and the Hamiltonian operator
     # if random_pauli_flag is false or method isn't 3, bitstring will be None
     return qc2, bitstring    
