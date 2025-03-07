@@ -11,7 +11,6 @@ Note that only the first of the compute functions is in use currently and is the
 It is also independent of any quantum programming API.
 The others are maintained here for reference and may be removed later.d 
 """
-
 import copy
 from math import sin, cos, pi
 import time as timefuns
@@ -111,6 +110,8 @@ def ensure_valid_state(initial_state, num_qubits = None, reverse = False):
 
         else:
             raise ValueError(f"Invalid initial state: {initial_state}")
+    elif isinstance(initial_state, np.ndarray) or isinstance(initial_state, list):
+        pass
         
     else:
         raise ValueError(f"Invalid initial state: {initial_state}")

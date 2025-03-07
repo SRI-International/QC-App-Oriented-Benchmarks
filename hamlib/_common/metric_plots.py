@@ -857,7 +857,7 @@ def plot_value_analysis_data(
     ):
 
     # Optionally plot raw observable values, both exact and computed, using a scatter plot
-    plot_values_scatter(init_values, exact_energies, computed_energies)
+#     plot_values_scatter(init_values, exact_energies, computed_energies)
 
     # Plot a spectrum of the observable values (this needs work yet)
     # plot_value_counts(computed_energies)
@@ -1023,6 +1023,10 @@ def plot_values_scatter(x_values, y_values, y_values_2):
         x_values (list or array): Values for the x-axis.
         y_values (list or array): Values for the y-axis.
     """
+    print(x_values)
+    print(y_values)
+    print('len x values:', len(x_values))
+    print('len y values:', len(y_values))
     if len(x_values) != len(y_values):
         raise ValueError("Both input arrays must have the same length.")
 

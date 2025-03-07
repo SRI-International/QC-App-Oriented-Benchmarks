@@ -956,7 +956,8 @@ def execute_circuits_distribute_shots(
         backend_id: str = None,
         circuits: list = None,
         num_shots: int = 100,
-        groups: list = None
+        groups: list = None,
+        ds_method: str = 'max_sq',
     ) -> list:
 
     if verbose or debug:
@@ -970,7 +971,7 @@ def execute_circuits_distribute_shots(
         print(f"... distributing shots, total shots = {total_shots} shots")
     
     # determine the number of shots to execute for each circuit, weighted by largest coefficient
-    num_shots_list = get_distributed_shot_counts(total_shots, groups)
+    num_shots_list = get_distributed_shot_counts(total_shots, groups, ds_method)
     if verbose or debug:
         print(f"  ... num_shots_list = {num_shots_list}")  
     
@@ -1091,7 +1092,8 @@ def execute_circuits_distribute_shots(
 # From the given list of term groups, distribute the total shot count, returning num_shots by group
 def get_distributed_shot_counts(
         num_shots: int = 100,
-        groups: list = None
+        groups: list = None,
+        method: str = 'max_sq',
     ) -> List:
     
 #     # loop over all groups, to find the largest coefficient in each group
@@ -1133,17 +1135,30 @@ def get_distributed_shot_counts(
     
     
     # add shots to first group until the total is same as the given total shot count
-    one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
-
+#     one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
+    weights = []
+    for group in groups:
+        w_sqs =  [abs(coeff)**2 for pauli, coeff in group] 
+        ws = [abs(coeff) for pauli, coeff in group]
+    
+        if method == 'max_sq':
+            weights.append(max(w_sqs))
+        elif method == 'mean_sq':
+            weights.append(sum(w_sqs)/len(w_sqs))
+        elif method == 'max':
+            weights.append(max(ws))
+        else:
+            weights.append(sum(ws)/len(ws))
+        
     # Step 2: Normalize weights to compute shot proportions
-    total_weight = sum(one_norm_weights)
-    shot_allocations = [int((w / total_weight) * num_shots) for w in one_norm_weights]
+    total_weight = sum(weights)
+    shot_allocations = [int((w / total_weight) * num_shots) for w in weights]
 
     # Step 3: Adjust to ensure total shots match exactly
     while sum(shot_allocations) < num_shots:
         max_index = np.argmax(shot_allocations)
         shot_allocations[max_index] += 1
-
+    print('shot allocation:', shot_allocations)
        
     return shot_allocations
  

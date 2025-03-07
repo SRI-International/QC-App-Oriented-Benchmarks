@@ -63,7 +63,7 @@ def create_measurement_circuts(qc, num_qubits, pauli_term_groups, pauli_str_list
 #################################################
 
 def do_execute(backend_id: str, circuits: list, num_shots: int,
-        pauli_term_groups: list, distribute_shots: bool = False):
+        pauli_term_groups: list, distribute_shots: bool = False, ds_method: str = 'max_sq'):
     
     # Initialize simulator backend
     
@@ -98,7 +98,8 @@ def do_execute(backend_id: str, circuits: list, num_shots: int,
                 backend_id = backend_id,
                 circuits = circuits,
                 num_shots = num_shots,
-                groups = pauli_term_groups
+                groups = pauli_term_groups,
+                ds_method = ds_method,
                 )     
 
     #for ca in results.get_counts():
