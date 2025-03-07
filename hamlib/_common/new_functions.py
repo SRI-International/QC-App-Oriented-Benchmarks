@@ -99,7 +99,7 @@ def do_execute(backend_id: str, circuits: list, num_shots: int,
                 circuits = circuits,
                 num_shots = num_shots,
                 groups = pauli_term_groups
-                )                                
+                )     
 
     #for ca in results.get_counts():
     #    print(ca)
@@ -107,20 +107,24 @@ def do_execute(backend_id: str, circuits: list, num_shots: int,
     exec_time = round(time.time()-ts, 3)
     metrics_object["execute_circuits_time"] = exec_time
     ###print(f"... finished executing {len(circuits)} circuits, total execution time = {exec_time} sec.\n")
-
     return results, pauli_term_groups
 
 
 #################################################
 
 # Compute the total energy for the Hamiltonian
-def compute_energy(num_qubits, results, pauli_term_groups):
+def compute_energy(num_qubits, results, pauli_term_groups, group_method, num_k=None):
 
     ###print(f"... begin computing observable value ...")
     ts = time.time()
-    
-    total_energy, term_contributions = observables.calculate_expectation_from_measurements(
+    if group_method != 'N':
+         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                 num_qubits, results, pauli_term_groups)
+    else:
+        from generate_measurement_circuits import diagonalized_pauli_strings
+        diag_pauli_term_groups = [diagonalized_pauli_strings(pauli_term_group, num_k, num_qubits) for pauli_term_group in pauli_term_groups]
+        total_energy, term_contributions = observables.calculate_expectation_from_measurements_k_commute(
+                                            num_qubits, results, diag_pauli_term_groups)
     obs_time = round(time.time()-ts, 3)
     metrics_object["observable_compute_time"] = obs_time
     #print(f"... finished computing observable value, computation time = {obs_time} sec.\n")
