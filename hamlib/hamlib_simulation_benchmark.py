@@ -18,6 +18,7 @@ import time
 import math
 import numpy as np
 from typing import Dict, Optional   # for backwards compat <= py 3.10
+from typing import Union, List, Tuple
 
 sys.path[1:1] = ["_common"]
 
@@ -76,6 +77,9 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
+
+# If set, write each dataset to a json file
+save_dataset_file = False
 
 # Maximum # of qubits for which to perform classical exact computation
 max_qubits_exact = 16
@@ -317,9 +321,11 @@ def run(min_qubits: int = 2,
         random_init_flag: bool = False, 
         use_inverse_flag: bool = False,
         do_sqrt_fidelity: bool = False,
+        distribute_shots: bool = False,
         init_state: str = None,
         K: int = None, t: float = None,
-        plot_results=True,
+        draw_circuits: bool = True,
+        plot_results: bool = True,
         backend_id: str = None,
         provider_backend = None,
         hub: str = "", group: str = "", project: str = "",
@@ -356,15 +362,18 @@ def run(min_qubits: int = 2,
         do_sqrt_fidelity (bool): If True, computes the square root of the fidelity for measurement results.
         init_state (str): Specifies the initial state for the quantum circuit. 
                           If None, a default state is used.
-        do_observables (bool): compute observable value from the Hamiltonian                
+        do_observables (bool): compute observable value from the Hamiltonian  
         group_method (str): Method for generating commuting groups for observable computation. 
                       Options include:
                       - None: no commuting groups used
                       - "simple": simple qubit-wise commuting groups
-                      - "N": where N is the "k" in k-communiting groups               
+                      - "N": where N is the "k" in k-communiting groups  
+        distribute_shots (bool): with "N" group method, distribute shots weighted by group coefficients                      
         K (int): Number of Trotter steps for the simulation. 
                  This is a crucial parameter for the precision of the Trotterized simulation.
         t (float): Total simulation time. This parameter is used to determine the evolution time for the Hamiltonian.
+        draw_circuits : bool, optional
+            Draw circuit diagrams only if True. The default is True.
         plot_results : bool, optional
             Plot results only if True. The default is True.
         backend_id (str): Backend identifier for execution on a quantum processor.
@@ -447,6 +456,11 @@ def run(min_qubits: int = 2,
         print(f"WARNING: method 1 not supported for {api} API, use method 2 instead")
         method = 2
         
+    # Force the name "nvidia" if cudaq used but no backend_id provided:
+    # shouldn't have to do this, but needed so we don't get a _data folder called None
+    if api == "cudaq" and backend_id == None:
+        backend_id = "nvidia"
+        
     # DEVNOTE: this is necessary, since we get the Hamiltonian pauli terms when circuit execution is launched.
     # need to wait until it completes since we need to have access to those terms.  They are currently global.
     # Need to fix this
@@ -491,6 +505,9 @@ def run(min_qubits: int = 2,
       
         num_hamiltonian_terms = len(sparse_pauli_terms)
         print(f"... number of terms in Hamiltonian = {num_hamiltonian_terms}")
+        
+        if save_dataset_file:
+            save_one_hamlib_dataset(dataset = sparse_pauli_terms, dataset_name = dataset_name)
          
         metrics_object = {}
         metrics_object["group"] = num_qubits
@@ -505,40 +522,17 @@ def run(min_qubits: int = 2,
 
             ts = time.time()
             
-            #used to store random pauli correct bitstrings
-            global bitstring_dict
+            ##############################
+            # Observables Grouping Options
             
-            # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
-            qc, bitstring = HamiltonianSimulation(
-                num_qubits = num_qubits,
-                ham_op = sparse_pauli_terms,               
-                K = K,
-                t = t,         
-                init_state = init_state,
-                append_measurements = False if do_observables else True,
-                method = method, 
-                use_inverse_flag = use_inverse_flag,
-                random_pauli_flag = random_pauli_flag, 
-                random_init_flag = random_init_flag)
-            
-            # this only works for qiskit circuits
-            if "name" in qc:
-                bitstring_dict[qc.name] = bitstring
-            
-            # execute for fidelity benchmarks
-            if not do_observables:
-            
-                metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
-
-                # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
-            
-            # execute differently for observable benchmarks
-            else:
+            # NOTE: the label "group" is used here to mean "commuting groups" 
+       
+            if do_observables:
 
                 # use this to track how many circuits will be executed
                 num_circuits_to_execute = 0
                 
+                # group options only used in Qiskit version, for now
                 if api == None or api == 'qiskit':
                     
                     # if NOT using Estimator
@@ -576,9 +570,57 @@ def run(min_qubits: int = 2,
                                 pauli_str_list.append(merged_pauli_str)
         
                         num_circuits_to_execute = len(pauli_term_groups)
-                            
+                        
+            #######################
+            # Base Circuit Creation            
+            
+            #used to store random pauli correct bitstrings
+            global bitstring_dict
+            
+            # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
+            qc, bitstring = HamiltonianSimulation(
+                num_qubits = num_qubits,
+                ham_op = sparse_pauli_terms,               
+                K = K,
+                t = t,         
+                init_state = init_state,
+                append_measurements = False if do_observables else True,
+                method = method, 
+                use_inverse_flag = use_inverse_flag,
+                random_pauli_flag = random_pauli_flag, 
+                random_init_flag = random_init_flag)
+                
+            # this only works for qiskit circuits
+            if "name" in qc:
+                bitstring_dict[qc.name] = bitstring
+            
+            
+            ####################################
+            # Execution for Fidelity Computation  
+            
+            # NOTE: the label "group" here mean the "number of qubits" as an index into stored metrics
+            
+            # execute for fidelity benchmarks
+            if not do_observables:
+            
+                metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+
+                # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
+                ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
+            
+            
+            ######################################
+            # Execution for Observable Computation 
+            
+            else:               
+                if api == None or api == 'qiskit':
+                    
+                    # if NOT using Estimator
+                    if group_method != "estimator":
+   
                         # generate an array of circuits, one for each pauli_string in list
-                        circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(qc, num_qubits, pauli_str_list)
+                        circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
+                                qc, num_qubits, pauli_str_list)
                         
                         if verbose:                 
                             for circuit, group in list(zip(circuits, pauli_term_groups)):
@@ -586,10 +628,22 @@ def run(min_qubits: int = 2,
                                 #print(circuit)
 
                         # call api-specific function to execute circuits
-                        results = execute_circuits(
-                                backend_id = backend_id,
-                                circuits = circuits,
-                                num_shots = num_shots)
+                        if not distribute_shots:
+                            print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
+                            # execute the entire list of circuits, same shots each
+                            results = execute_circuits(
+                                    backend_id = backend_id,
+                                    circuits = circuits,
+                                    num_shots = int(num_shots / len(circuits))
+                                    )
+                        else:
+                            # execute with shots distributed by weight of coefficients
+                            results, pauli_term_groups = execute_circuits_distribute_shots(
+                                    backend_id = backend_id,
+                                    circuits = circuits,
+                                    num_shots = num_shots,
+                                    groups = pauli_term_groups
+                                    )
                                 
                         # Compute the total energy for the Hamiltonian
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
@@ -615,12 +669,12 @@ def run(min_qubits: int = 2,
                         estimator_time = round(time.time()-ts, 3)
                         print(f"... Estimator computation time = {estimator_time} sec")
 
-                        print(f"Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
+                        print(f"... Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
                          
                         total_energy = estimator_energy
                         term_contributions = None
                 
-                # special case for CUDA Q Observables (restructure later 250126)
+                # special case for CUDA Q Observables
                 elif api == "cudaq":
                 
                     total_energy = hamlib_simulation_kernel.get_expectation(
@@ -642,7 +696,8 @@ def run(min_qubits: int = 2,
                 
                 print(f"... quantum execution time = {computed_time}")
                 
-                ############ compute exact expectation
+                ##############################################
+                # Compute exact expectation value classically
                 
                 if num_qubits <= max_qubits_exact:
                 
@@ -650,26 +705,6 @@ def run(min_qubits: int = 2,
                         print(f"... begin exact computation for id={type} ...")
                     
                     ts = time.time()
-                    
-                    """ no longer used ...                
-                    ################ Using the previous evolution_exact code:
-                    # the plan is to remove this code and use the new once it is validated.
-                    
-                    # 250125 (TL): confirmed this old code is giving erroneous values for BH and H2
-                         
-                    # create quantum circuit with initial state
-                    qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
-                    
-                    # apply the Hamiltonian operator to initial state to get expectation/distribution
-                    correct_exp, _ = evolution_exact.compute_expectation_exact_spo_scipy(
-                            init_state, 
-                            qc_initial,
-                            num_qubits,
-                            hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                            t        # time
-                            )
-                    correct_exp = np.real(correct_exp)
-                    """
                     
                     ################ Using newer evolution_exact code:
                     
@@ -694,7 +729,9 @@ def run(min_qubits: int = 2,
                     metrics_object["exp_value_exact"] = correct_exp
                     metrics_object["exp_time_exact"] = exact_time
                 
-                ############ report results 
+                
+                ################
+                # Report results 
                 
                 if correct_exp is not None and correct_exp != 0.0:  
                     simulation_quality = round(total_energy / correct_exp, 3)
@@ -720,7 +757,11 @@ def run(min_qubits: int = 2,
                 # but if file is busy, we get error, do it at end for now
                 ###app_name = f"HamLib-obs-{hamiltonian_name}"
                 ###store_app_metrics(app_name, backend_id, metrics_array)
-                                
+ 
+ 
+        ##############################
+        # Finalize current Qubit Wdith
+                
         # Wait for some active circuits to complete; report metrics when groups complete
         if api != "cudaq" or do_observables == False:
             ex.throttle_execution(metrics.finalize_group)
@@ -733,18 +774,36 @@ def run(min_qubits: int = 2,
     app_name = f"HamLib-obs-{hamiltonian_name}"
     store_app_metrics(app_name, backend_id, metrics_array)
 
-    ##########
+    ########################
+    # Display Sample Circuit
     
-    # draw a sample circuit
-    kernel_draw(hamiltonian, method)
-       
+    if draw_circuits:
+        kernel_draw(hamiltonian, method)
+    
+    ##########################
+    # Display Plots of Results
+    
     # Plot metrics for all circuit sizes
     base_ham_name = os.path.basename(hamiltonian)
-    options = {"ham": base_ham_name,
+    if do_observables:
+        options = {"ham": base_ham_name,
+                "params": hamiltonian_params,
                 "method": method,
                 "gm": group_method,
+                "K": K,
+                "t": t,
                 "shots": num_shots,
-                "reps": max_circuits}  
+                "reps": max_circuits} 
+    else:
+        options = {"ham": base_ham_name,
+                #"params": hamiltonian_params,
+                "method": method,
+                #"gm": group_method,
+                "K": K,
+                "t": t,
+                "shots": num_shots,
+                "reps": max_circuits} 
+    
 
     if not plot_results:
         return
@@ -758,9 +817,15 @@ def run(min_qubits: int = 2,
         ############## expectation value plot
         suptitle = f"Benchmark Results - {benchmark_name} ({method}) - {api if api else 'Qiskit'}"
         
+        # should not be needed; needs investigation, saving image fails if command line invocation
+        # and non-observable case works fine.
+        if backend_id is None:
+            backend_id = "qasm_simulator"
+        
         plot_from_data(suptitle, metrics_array, backend_id, options)
-       
 
+  
+    
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
 
@@ -776,7 +841,7 @@ def execute_circuits(
 
     if verbose:
         print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
-    print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
+
     if backend_id == None:
         backend_id == "qasm_simulator"
     
@@ -790,13 +855,19 @@ def execute_circuits(
             backend = Aer.get_backend('qasm_simulator')
         else:
             backend = Aer.get_backend('qasm_simulator')
+            
+        #print(f"... backend_id = {backend_id}")
    
         # Execute all of the circuits to obtain array of result objects
         if backend_id != "statevector_simulator" and ex.noise is not None:
             #print("**************** executing with noise")
-            results = backend.run(circuits, num_shots=num_shots, noise_model=ex.noise).result()
+            noise_model = ex.noise
+            
         else:
-            results = backend.run(circuits, num_shots=num_shots).result()
+            noise_model = None
+        
+        # all circuits get the same number of shots as given 
+        results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
     
     # handle special case using IBM Runtime Sampler Primitive
     elif ex.sampler is not None:
@@ -854,6 +925,299 @@ class BenchmarkResult:
             count_array.append(counts)
             
         return count_array
+
+# class ExecResult is made for multi-circuit runs. 
+class ExecResult(object):
+
+    def __init__(self, counts_array):
+        super().__init__()
+        #self.qiskit_result = qiskit_result
+        #self.metadata = qiskit_result.metadata
+        self.counts = counts_array
+
+    def get_counts(self, qc=0):
+        # counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
+        # for key in counts.keys():
+        #     counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])
+        #qc_index = 0 # this should point to the index of the circuit in a pub
+        #bitvals = next(iter(self.qiskit_result[qc_index].data.values()))
+        #counts = bitvals.get_counts()
+        return self.counts
+ 
+ 
+#########################################
+# EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
+
+# 250302 TL: Leaving these options in until we are sure all works well.
+new_way = True
+debug = False
+    
+def execute_circuits_distribute_shots(
+        backend_id: str = None,
+        circuits: list = None,
+        num_shots: int = 100,
+        groups: list = None,
+        ds_method: str = 'max_sq',
+    ) -> list:
+
+    if verbose or debug:
+        print(f"... execute_circuits_distribute_shots({backend_id}, {len(circuits)}, {num_shots}, {groups})")
+                  
+    # distribute shots; obtain total and distribute according to weights
+    # (weighting not implemented yet)
+    circuit_count = len(circuits)
+    total_shots = num_shots         # to match current behavior
+    if verbose or debug:
+        print(f"... distributing shots, total shots = {total_shots} shots")
+    
+    # determine the number of shots to execute for each circuit, weighted by largest coefficient
+    num_shots_list = get_distributed_shot_counts(total_shots, groups, ds_method)
+    if verbose or debug:
+        print(f"  ... num_shots_list = {num_shots_list}")  
+    
+    # The "new" approach that uses bucketing, to reduce number of circuits to be executed
+    if new_way:
+        if debug:
+            print("************* NEW WAY")
+            for group in groups:
+                print(group)
+                   
+            print(f"  in circuits = {circuits}")
+        
+        # determine optimal bucketing for these circuits, based on distribution of shots needed
+        from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
+        
+        # get buckets of terms with similar shots counts, and index of original position
+        max_buckets = 3 if len(groups) < 50 else 4
+        buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=max_buckets)
+                
+        # find the average number of shots required for each bucket
+        # (sum of all shots for all circuits, nested, should be same as the incoming total)
+        bucket_avg_shots = compute_bucket_averages(buckets_kmeans)
+        
+        if debug:
+            print('  ... bucket kmeans:', buckets_kmeans)
+            print('  ... indices_kmeans:', indices_kmeans)
+            print('  ... bucket_avg_shots:', bucket_avg_shots)
+        
+        circuit_list = [[circuits[idx] for idx in indices] for indices in indices_kmeans]   
+        group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
+        
+        if debug:
+#             print(f"  circuit_list after bucketing = {circuit_list}")
+#             print(f"  ... group_list after bucketing = {group_list}") 
+            print(f"  ... group_list after bucketing....") 
+            for group in group_list:
+                for g in group:
+                    print(g)
+                print('-----')
+
+        
+        if verbose or debug:
+            print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
+                
+        counts_array = []
+        #for circuit in circuits:
+        for circuits, num_shots in zip(circuit_list, bucket_avg_shots):
+        
+            if debug:
+                print(f"  ...    cccc = {circuits}")
+                print(f"... len circs = {len(circuits)}")
+            
+            # execute this list of circuits, same shots each
+            results = execute_circuits(
+                    backend_id = backend_id,
+                    #circuits = [circuit],
+                    circuits = circuits,
+                    num_shots = num_shots
+                    )
+            
+            # Qiskit returns and array if array executed, but single counts for one circuit
+            if len(circuits) > 1:                           
+                counts = results.get_counts()
+            else:
+                counts = [results.get_counts()]
+                
+            for counts2 in counts:
+                counts_array.append(counts2)
+
+        # similarly, construct a Result object with counts structure to match circuits
+        if len(counts_array) < 2:
+            results = ExecResult(counts_array[0])
+        else:
+            results = ExecResult(counts_array)
+             
+        group_list = [item for sublist in group_list for item in sublist]
+        
+        if debug:
+            print(f"... results.get_counts() = {results.get_counts()}")
+            print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
+            print(f"... group_list len = {len(group_list)}")
+            print(f"  ... group_list after subgroups = ")
+            for group in group_list:
+                print(group)
+
+        return results, group_list
+    
+    # The "old" approach that executes every circuit, but with weighted num shots
+    else:
+        if debug:
+            print("************* OLD WAY")
+            
+        counts_array = []
+        for circuit, num_shots in zip(circuits, num_shots_list):
+            
+            # execute this list of circuits, same shots each
+            results = execute_circuits(
+                    backend_id = backend_id,
+                    circuits = [circuit],
+                    num_shots = num_shots
+                    )
+                                           
+            counts = results.get_counts()
+            counts_array.append(counts)
+        
+        if len(circuits) < 2:
+            results = ExecResult(counts)
+        else:
+            results = ExecResult(counts_array)
+        
+        if debug:        
+            print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
+            print(f"... groups len = {len(groups)}")
+            
+        return results, groups
+
+    
+# From the given list of term groups, distribute the total shot count, returning num_shots by group
+def get_distributed_shot_counts(
+        num_shots: int = 100,
+        groups: list = None,
+        ds_method: str = 'max_sq',
+    ) -> List:
+    
+#     # loop over all groups, to find the largest coefficient in each group
+#     max_weights = []
+#     for group in groups:
+#         #print(group)
+#         max_weight = 0
+#         for pauli, coeff in group:
+#             #print(f"  ... coeff = {coeff}")
+#             max_weight = max(max_weight, np.real(abs(coeff)))
+            
+#         max_weights.append(max_weight)
+
+    # loop over all groups, to find the sum of coefficient in each group
+#     norm_weights = []
+#     for group in groups:
+#         #print(group)
+#         sum_weight = 0
+#         for pauli, coeff in group:
+#             #print(f"  ... coeff = {coeff}")
+#             sum_weight += np.real(abs(coeff))
+            
+#         norm_weights.append(sum_weight/len(group))
+
+        
+# #     # compute a normalized distribution over all groups
+# #     total_weights = sum(max_weights)
+# #     max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
+    
+# #     # compute shots counts based on these weights
+# #     num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
+     
+#     # compute a normalized distribution over all groups
+#     total_weights = sum(norm_weights)
+#     norm_weights_normalized = [norm_weight / total_weights for norm_weight in norm_weights]
+    
+#     # compute shots counts based on these weights
+#     num_shots_list = [int(mwn * num_shots) for mwn in norm_weights_normalized]
+    
+    
+    # add shots to first group until the total is same as the given total shot count
+#     one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
+    weights = []
+    for group in groups:
+        w_sqs =  [abs(coeff)**2 for pauli, coeff in group] 
+        ws = [abs(coeff) for pauli, coeff in group]
+    
+        if ds_method == 'max_sq':
+            weights.append(max(w_sqs))
+        elif ds_method == 'mean_sq':
+            weights.append(sum(w_sqs)/len(w_sqs))
+        elif ds_method == 'max':
+            weights.append(max(ws))
+        else:
+            weights.append(sum(ws)/len(ws))
+        
+    # Step 2: Normalize weights to compute shot proportions
+    total_weight = sum(weights)
+    shot_allocations = [int((w / total_weight) * num_shots) for w in weights]
+
+    # Step 3: Adjust to ensure total shots match exactly
+    while sum(shot_allocations) < num_shots:
+        max_index = np.argmax(shot_allocations)
+        shot_allocations[max_index] += 1
+    print('shot allocation:', shot_allocations)
+       
+    return shot_allocations
+ 
+ 
+########################################
+# UTILITY FUNCTIONS (TEMPORARY)
+
+# The functions included in this section will be moved/merged with other lower-level functions.
+# These have been developed iteratively up in the example notebooks and the code is being incrementally 
+# moved down to lower modules.  For now, these functions are shared by several of the demo notebooks
+# as they are being developed.
+
+def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
+    """
+    Group the Pauli terms accourding to the given group method: "None", "simple", "N"
+    """
+    # have to do this here, due to logic of the "api" code; improve these imports later 
+    import observables
+    
+    ### print(f"... using group method: {group_method}")
+
+    ts = time.time()
+    
+    # use no grouping or the most basic method "simple"
+    if group_method == None or group_method == "simple":
+    
+        # Flag to control optimize by use of commuting groups
+        use_commuting_groups = False
+        if group_method == "simple":
+            use_commuting_groups = True
+    
+        # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
+        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                num_qubits, sparse_pauli_terms, use_commuting_groups)
+    
+    # use k-commuting algorithm
+    else:
+        from generate_pauli_groups import compute_groups
+        pauli_term_groups = compute_groups(num_qubits, sparse_pauli_terms, k)
+    
+    #print(f"\n... Number of groups created: {len(pauli_term_groups)}")
+    #print(f"... Pauli Term Groups:")
+    #for group in pauli_term_groups:
+        #print(group)
+    
+    group_time = round(time.time()-ts, 3)
+    #print(f"\n... finished grouping terms, total grouping time = {group_time} sec.\n")
+    
+    # for each group, create a merged pauli string from all the terms in the group
+    # DEVNOTE: move these 4 lines to a function in observables
+    pauli_str_list = []
+    for group in pauli_term_groups:
+        merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
+        pauli_str_list.append(merged_pauli_str)
+    
+    #print(f"\n... Merged Pauli strings, one per group:\n  {pauli_str_list}\n")
+
+    return pauli_term_groups, pauli_str_list
+
 
 
 #######################
@@ -951,8 +1315,33 @@ def query_dict_array(data, query):
         list: A list of dictionaries that match all query criteria.
     """
     return [row for row in data if all(row.get(k) == v for k, v in query.items())]   
+
+def save_one_hamlib_dataset(dataset: list, dataset_name: str):
     
+    # create filename based on the dataset_name
+    filename = f"{dataset_name}.json"
     
+    dataset = convert_coefficients_to_real(dataset)
+    
+    # overwrite the existing file with the merged data
+    with open(filename, "w") as f:
+        json.dump(dataset, f, indent=2)
+        f.close()
+
+def convert_coefficients_to_real(pauli_terms):
+    """
+    Convert complex coefficients to their real parts in a list of Pauli terms.
+    
+    Parameters:
+        pauli_terms (list of tuples): [(pauli_dict, complex_coefficient), ...]
+    
+    Returns:
+        list of tuples: [(pauli_dict, real_coefficient), ...]
+    """
+    return [(pauli_dict, coeff.real) for pauli_dict, coeff in pauli_terms]
+
+
+       
 ################################################
 # PLOT METHODS
 
@@ -1050,6 +1439,7 @@ def get_args():
     parser.add_argument("--random_init_flag", "-rani", action="store_true", help="Gen random initialization")
     parser.add_argument("--init_state", "-init", default=None, help="initial state", type=str)  
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Suffix appended to data file name", type=str)
     parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile") 
     return parser.parse_args()
@@ -1095,6 +1485,7 @@ def do_run(args):
         t = args.time,
         #theta=args.theta,
         plot_results=not args.noplot,
+        draw_circuits=not args.nodraw,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
         api=args.api

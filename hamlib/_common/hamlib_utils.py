@@ -79,26 +79,41 @@ def load_hamlib_file(filename: str):
     fullname = f"{_base_url}{pathname}.zip"
     if verbose:
         print(f"  ... fullname = {fullname}")
-        
-    # Download the HamLib zip file and extract the hdf5 file from wihin
-    try:
-        extracted_path = download_and_extract(filename, fullname)
+                       
+    # Assume the HDF5 file is located directly inside local download folder
+    download_dir = "downloaded_hamlib_files"
+    hdf5_file_path = os.path.join(download_dir, os.path.basename(pathname)) + ".hdf5"
+    
+    # if HamLib hdf5 is already downloaded, just use this cached version
+    if os.path.exists(hdf5_file_path):
         if verbose:
-            print(f"  ... extracted_path = {extracted_path}")
+            print(f"... loading cached HamLib file: {hdf5_file_path}")
+    
+    # if file is not downloaded already, download the zip and extract hdf5
+    else:
+        if verbose:
+            print(f"... download HamLib zip file and extract hdf5 file: {filename}")
+        
+        # Download the HamLib zip file and extract the hdf5 file from wihin
+        try:
             
-    except Exception:
-        extracted_path = None
-        print(f"ERROR: can not download the requested HamLib file from: {fullname}")
-        
-        # attempt to use cached data already downloaded
-        print(f"       using cached data if possible")
-        extracted_path = "downloaded_hamlib_files"
-        #return
-        
-    # Assuming the HDF5 file is located directly inside the extracted folder
-    hdf5_file_path = os.path.join(extracted_path, os.path.basename(pathname)) + ".hdf5"
-    if verbose:
-        print(f"  ... hdf5_file_path = {hdf5_file_path}")
+            extracted_path = download_and_extract(filename, fullname)
+            if verbose:
+                print(f"  ... extracted_path = {extracted_path}")
+      
+        except Exception:
+            extracted_path = None
+            print(f"ERROR: can not download the requested HamLib file from: {fullname}")
+            
+            # attempt to use cached data already downloaded
+            print(f"       using cached data if possible")
+            extracted_path = "downloaded_hamlib_files"
+            #return
+            
+        # Assuming the HDF5 file is located directly inside the extracted folder
+        hdf5_file_path = os.path.join(extracted_path, os.path.basename(pathname)) + ".hdf5"
+        if verbose:
+            print(f"  ... hdf5_file_path = {hdf5_file_path}")
 
     global active_hamiltonian_datasets
     active_hamiltonian_datasets = {}

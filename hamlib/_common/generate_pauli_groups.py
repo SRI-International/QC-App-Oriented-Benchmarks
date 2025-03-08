@@ -82,28 +82,14 @@ def restrict_to(
             new_pauli_strings += p
     return new_pauli_strings
 
-def pauli_string_to_matrix(pauli_str: str) -> np.array:
-    """
-    Converts a Pauli string (like 'XYZ') to the corresponding matrix.
-    """
-    result = pauli_map[pauli_str[0]]
-    for p in pauli_str[1:]:
-        result = np.kron(result, pauli_map[p])
-    return result
-
-def if_commute(pauli1: str, pauli2: str, atol=1e-8) -> bool:
-    """
-    Checks if the pauli1(A) and pauli2(B) commutes.
-    if AB-BA < atol, they commute.
-    """
-    mat1 = pauli_string_to_matrix(pauli1)
-    mat2 = pauli_string_to_matrix(pauli2)
-    # calculate the commutator
-    commutator = mat1 @ mat2 - mat2 @ mat1
-    if np.allclose(commutator, np.zeros_like(commutator), atol=atol):
-        return True # they commute
-    else:
-        return False # they don't commute
+def if_commute(pauli1: str, pauli2: str) -> bool:
+    assert len(pauli1) == len(pauli2)
+    commute = True
+    for p1, p2 in zip(pauli1, pauli2):
+        if p1 != 'I' and p2 != 'I':
+            if p1 != p2:
+                commute = not commute
+    return commute
 
 def commutes(pauli1: str, pauli2: str, blocks) -> bool:
     """Returns True if pauli1 k-commutes with pauli2, else False.
