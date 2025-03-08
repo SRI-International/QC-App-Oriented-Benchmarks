@@ -1396,6 +1396,9 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
     # indicate we are done collecting metrics (called once at end of app)
     if report_end:
         metrics.end_metrics()
+        
+        # also, close any open session to avoid runaway cost
+        close_session()
 
 
 def close_session():
