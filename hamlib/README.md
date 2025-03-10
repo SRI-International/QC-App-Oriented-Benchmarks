@@ -1,5 +1,13 @@
 # HamLib Simulation - Benchmark Program
 
+Important Note:  The README for this benchmark has not yet been updated to reflect the most recent work-in-progress regarding the computation of observable values.  The initial benchmark work was described in the our paper:
+
+    https://arxiv.org/abs/2409.06919  
+
+However, major enhancements are in process that provide a more complete benchmark that not only measures the fidelity of execution of a single Hamiltonian simulation circuit, but also computes observable values, such as energy, from the Hamiltonian.  The documentation will be updated soon.
+
+--- 
+
 Simulation of quantum systems is one of the most promising applications for quantum computers [[1]](#references). In the current version of this benchmark, we have three strategies for calculating the fidelity of a quantum Trotterization circuit. 
 
 In the first strategy, we compare the trotter circuit results on target hardware against a classical circuit simulation to report our fidelity. This works well for small circuit sizes but is not scalable past a certain number of qubits. 
