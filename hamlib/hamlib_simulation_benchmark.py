@@ -972,6 +972,7 @@ def execute_circuits_distribute_shots(
     
     # determine the number of shots to execute for each circuit, weighted by largest coefficient
     num_shots_list = get_distributed_shot_counts(total_shots, groups, ds_method)
+    print('shot list:', num_shots_list)
     if verbose or debug:
         print(f"  ... num_shots_list = {num_shots_list}")  
     
@@ -982,7 +983,7 @@ def execute_circuits_distribute_shots(
             for group in groups:
                 print(group)
                    
-            print(f"  in circuits = {circuits}")
+            # print(f"  in circuits = {circuits}")
         
         # determine optimal bucketing for these circuits, based on distribution of shots needed
         from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
@@ -990,7 +991,7 @@ def execute_circuits_distribute_shots(
         # get buckets of terms with similar shots counts, and index of original position
         max_buckets = 3 if len(groups) < 50 else 4
         buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=max_buckets)
-                
+        
         # find the average number of shots required for each bucket
         # (sum of all shots for all circuits, nested, should be same as the incoming total)
         bucket_avg_shots = compute_bucket_averages(buckets_kmeans)
@@ -1021,7 +1022,7 @@ def execute_circuits_distribute_shots(
         for circuits, num_shots in zip(circuit_list, bucket_avg_shots):
         
             if debug:
-                print(f"  ...    cccc = {circuits}")
+                # print(f"  ...    cccc = {circuits}")
                 print(f"... len circs = {len(circuits)}")
             
             # execute this list of circuits, same shots each
@@ -1158,7 +1159,7 @@ def get_distributed_shot_counts(
     while sum(shot_allocations) < num_shots:
         max_index = np.argmax(shot_allocations)
         shot_allocations[max_index] += 1
-    print('shot allocation:', shot_allocations)
+    # print('shot allocation:', shot_allocations)
        
     return shot_allocations
  
