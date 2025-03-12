@@ -395,10 +395,11 @@ def create_circuit_from_op(
     circuit = QuantumCircuit(num_qubits)
     
     # first create and append the initial_state
-    # init_state = "checkerboard"
-    i_state = initial_state(num_qubits, init_state)
-    circuit.append(i_state, range(num_qubits))
-    circuit.barrier()
+    i_state = None
+    if init_state is not None:
+        i_state = initial_state(num_qubits, init_state)
+        circuit.append(i_state, range(num_qubits))
+        circuit.barrier()
     
     if num_qubits <= 6:
         QCI_ = i_state
@@ -639,7 +640,7 @@ def HamiltonianSimulation(
             num_qubits=num_qubits,
             ham_op=ham_op,
             method=method,
-            init_state=init_state,
+            init_state=init_state if initial_circuit is None else None,
             time=t,
             num_trotter_steps=K,
             append_measurements=append_measurements,
@@ -651,7 +652,7 @@ def HamiltonianSimulation(
             num_qubits=num_qubits,
             ham_op=ham_op,
             method=method,
-            init_state=init_state,
+            init_state=init_state if initial_circuit is None else None,
             time=t,
             num_trotter_steps=K,
             append_measurements=append_measurements,
@@ -671,10 +672,11 @@ def HamiltonianSimulation(
     # Collapse the sub-circuits used in this benchmark (for Qiskit)
     qc2 = qc.decompose().decompose()
     
-    # an initial state passed in must be cloned before use, since it wasn't created here
+    # an initial circuit passed in must be cloned before use, since it wasn't created here
     if initial_circuit:
         initial_circuit.compose(qc2, qubits=list(range(qc2.num_qubits)), inplace=True)
         qc2 = initial_circuit.copy()
+        QCI_ = qc2
         
     # return both the circuit created, the bitstring, and the Hamiltonian operator
     # if random_pauli_flag is false or method isn't 3, bitstring will be None
