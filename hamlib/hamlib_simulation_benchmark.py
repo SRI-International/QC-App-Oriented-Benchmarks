@@ -32,9 +32,14 @@ import metric_plots
 ## based on the "api" on which the benchmark executes.
 
 # Configure the QED-C Benchmark package for use with the given API
+
+api_ = "qiskit" 
+
 def qedc_benchmarks_init(api: str = "qiskit"):
 
+    global api_
     if api == None: api = "qiskit"
+    api_ = api
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
     down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
@@ -525,8 +530,7 @@ def run(min_qubits: int = 2,
             ##############################
             # Observables Grouping Options
             
-            # NOTE: the label "group" is used here to mean "commuting groups" 
-       
+            # NOTE: the label "group" is used here to mean "commuting groups"        
             if do_observables:
 
                 # use this to track how many circuits will be executed
@@ -609,23 +613,23 @@ def run(min_qubits: int = 2,
                 ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
             
             
+            # ######################################
+            # # Execution for Observable Computation 
             ######################################
-            # Execution for Observable Computation 
-            
+
             else:               
                 if api == None or api == 'qiskit':
-                    
+
                     # if NOT using Estimator
                     if group_method != "estimator":
-   
+
                         # generate an array of circuits, one for each pauli_string in list
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                                 qc, num_qubits, pauli_str_list)
-                        
+
                         if verbose:                 
                             for circuit, group in list(zip(circuits, pauli_term_groups)):
                                 print(group)
-                                #print(circuit)
 
                         # call api-specific function to execute circuits
                         if not distribute_shots:
@@ -644,25 +648,20 @@ def run(min_qubits: int = 2,
                                     num_shots = num_shots,
                                     groups = pauli_term_groups
                                     )
-                                
+
                         # Compute the total energy for the Hamiltonian
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                                 num_qubits, results, pauli_term_groups)
                         total_energy = np.real(total_energy)
-                        
+
                     # if using Qiskit Estimator
                     else:
                         print("... using Qiskit Estimator primitive.")
-                        
-                        # DEVNOTE: We may want to surface the actual Estimator call instead. 
 
                         # Ensure that the pauli_terms are in 'full' format, not 'sparse' - convert if necessary
                         est_pauli_terms = observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits=num_qubits)
                         est_pauli_terms = observables.swap_pauli_list(est_pauli_terms)
 
-                        #ts = time.time()
-
-                        # DEVNOTE: backend_id not actually used yet
                         estimator_energy = observables.estimate_expectation_with_estimator(
                                 backend_id, qc, est_pauli_terms, num_shots=num_shots)
 
@@ -670,31 +669,155 @@ def run(min_qubits: int = 2,
                         print(f"... Estimator computation time = {estimator_time} sec")
 
                         print(f"... Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
-                         
+
                         total_energy = estimator_energy
                         term_contributions = None
-                
-                # special case for CUDA Q Observables
+
+                # For CUDA-Q Observables
                 elif api == "cudaq":
-                
-                    total_energy = hamlib_simulation_kernel.get_expectation(
-                            qc, num_qubits, sparse_pauli_terms)
-                            
-                    term_contributions = None
-                
-                # record relevant performance metrics
-                computed_time = round((time.time() - ts), 3)
-                metrics_object["exp_time_computed"] = computed_time
-                
-                total_energy = round(total_energy, 4)  
-                metrics_object["exp_value_computed"] = total_energy
-                
-                metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
-                              
-                if num_circuits_to_execute > 0:
+                    if group_method != "SpinOperator":
+                                print("... executing circuits manually without using CUDA-Q Observe.")
+                                # Generate circuits for each Pauli term
+                                pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                                    num_qubits, sparse_pauli_terms, False
+                                )
+                                
+                                circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
+                                    qc, num_qubits, pauli_str_list
+                                ) # qc is an array with the kernel and dependent parameters
+
+                                if verbose:
+                                    for circuit, group in zip(circuits, pauli_term_groups):
+                                        print(group)
+
+                                # Execute circuits
+                                if not distribute_shots:
+                                    print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
+                                    results = execute_circuits(
+                                        backend_id=backend_id,
+                                        circuits=circuits,
+                                        num_shots=int(num_shots / len(circuits)),
+                                    )
+                                else:
+                                    results, pauli_term_groups = execute_circuits_distribute_shots(
+                                        backend_id=backend_id,
+                                        circuits=circuits,
+                                        num_shots=num_shots,
+                                        groups=pauli_term_groups,
+                                    )
+
+                                # Compute total energy from measurements
+                                total_energy, term_contributions = observables.calculate_expectation_from_measurements(
+                                    num_qubits, results, pauli_term_groups
+                                )
+                                total_energy = np.real(total_energy)
+
+                    else:
+                        print("... using CUDA Q Observe.")
+                        total_energy = hamlib_simulation_kernel.get_expectation(
+                                qc, num_qubits, sparse_pauli_terms)
+                                
+                        term_contributions = None
+                        
+                    # Record relevant performance metrics
+                    computed_time = round((time.time() - ts), 3)
+                    metrics_object["exp_time_computed"] = computed_time
+
+                    total_energy = round(total_energy, 4)  
+                    metrics_object["exp_value_computed"] = total_energy
+
+                    metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
+
+                    if num_circuits_to_execute > 0:
                         print(f"... number of circuits executed = {num_circuits_to_execute}")
+
+                    print(f"... quantum execution time = {computed_time}")
+
+                        
+            # else:               
+            #     if api == None or api == 'qiskit':
+                    
+            #         # if NOT using Estimator
+            #         if group_method != "estimator":
+   
+            #             # generate an array of circuits, one for each pauli_string in list
+            #             circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
+            #                     qc, num_qubits, pauli_str_list)
+                        
+            #             if verbose:                 
+            #                 for circuit, group in list(zip(circuits, pauli_term_groups)):
+            #                     print(group)
+            #                     #print(circuit)
+
+            #             # call api-specific function to execute circuits
+            #             if not distribute_shots:
+            #                 print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
+            #                 # execute the entire list of circuits, same shots each
+            #                 results = execute_circuits(
+            #                         backend_id = backend_id,
+            #                         circuits = circuits,
+            #                         num_shots = int(num_shots / len(circuits))
+            #                         )
+            #             else:
+            #                 # execute with shots distributed by weight of coefficients
+            #                 results, pauli_term_groups = execute_circuits_distribute_shots(
+            #                         backend_id = backend_id,
+            #                         circuits = circuits,
+            #                         num_shots = num_shots,
+            #                         groups = pauli_term_groups
+            #                         )
+                                
+            #             # Compute the total energy for the Hamiltonian
+            #             total_energy, term_contributions = observables.calculate_expectation_from_measurements(
+            #                                                     num_qubits, results, pauli_term_groups)
+            #             total_energy = np.real(total_energy)
+                        
+            #         # if using Qiskit Estimator
+            #         else:
+            #             print("... using Qiskit Estimator primitive.")
+                        
+            #             # DEVNOTE: We may want to surface the actual Estimator call instead. 
+
+            #             # Ensure that the pauli_terms are in 'full' format, not 'sparse' - convert if necessary
+            #             est_pauli_terms = observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits=num_qubits)
+            #             est_pauli_terms = observables.swap_pauli_list(est_pauli_terms)
+
+            #             #ts = time.time()
+
+            #             # DEVNOTE: backend_id not actually used yet
+            #             estimator_energy = observables.estimate_expectation_with_estimator(
+            #                     backend_id, qc, est_pauli_terms, num_shots=num_shots)
+
+            #             estimator_time = round(time.time()-ts, 3)
+            #             print(f"... Estimator computation time = {estimator_time} sec")
+
+            #             print(f"... Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
+                         
+            #             total_energy = estimator_energy
+            #             term_contributions = None
                 
-                print(f"... quantum execution time = {computed_time}")
+            #     # special case for CUDA Q Observables
+            #     elif api == "cudaq":
+            #             print("... using CUDA Q Observe.")
+            #             total_energy = hamlib_simulation_kernel.get_expectation(
+            #                     qc, num_qubits, sparse_pauli_terms)
+                                
+            #             term_contributions = None
+                
+            #     # record relevant performance metrics
+            #     computed_time = round((time.time() - ts), 3)
+            #     metrics_object["exp_time_computed"] = computed_time
+                
+            #     total_energy = round(total_energy, 4)  
+            #     metrics_object["exp_value_computed"] = total_energy
+                
+            #     metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
+                              
+            #     if num_circuits_to_execute > 0:
+            #             print(f"... number of circuits executed = {num_circuits_to_execute}")
+                
+            #     print(f"... quantum execution time = {computed_time}")
+                
                 
                 ##############################################
                 # Compute exact expectation value classically
@@ -840,13 +963,21 @@ def execute_circuits(
     ) -> list:
 
     if verbose:
-        print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
-
+        print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})") 
+ 
     if backend_id == None:
         backend_id == "qasm_simulator"
-    
+
+    # if backend_id == "nvidia":
+    if api_ == "cudaq":
+        results = []
+        for circuit in circuits:
+            result = ex.execute_circuit_immed(circuit, num_shots)
+            results.append(result.get_counts())
+        results = ExecResult(results)
+
     # Set up the backend for execution
-    if backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
+    elif backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
     
         # Initialize simulator backend
         from qiskit_aer import Aer
