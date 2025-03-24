@@ -75,7 +75,7 @@ def init_execution (handler):
     result_handler = handler
 
     # On initialize, always set trnaspilation for metrics and execute to True
-    set_tranpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
+    set_transpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
     
     # create an informative device name
     # this should be move to set_execution_target method later
@@ -322,7 +322,7 @@ def count_ops(circuit: cirq.Circuit) -> OrderedDict[str, int]:
     
 #####
 # Set the state of the transpilation flags
-def set_tranpilation_flags(do_transpile_metrics = True, do_transpile_for_execute = True):
+def set_transpilation_flags(do_transpile_metrics = True, do_transpile_for_execute = True):
     globals()['do_transpile_metrics'] = do_transpile_metrics
     globals()['do_transpile_for_execute'] = do_transpile_for_execute
 
