@@ -52,7 +52,9 @@ def hamsim_kernel(
         t: float = 1.0,
         coefficients: List[complex] = None,
         words: List[cudaq.pauli_word] = None,
-        append_measurements: bool = False
+        append_measurements: bool = False,
+        append_pauli_term: bool = False,
+        pauli_term : List[int] = None
     ):
     
     # create the qubit vector
@@ -76,7 +78,9 @@ def hamsim_kernel_measured(
         t: float = 1.0,
         coefficients: List[complex] = None,
         words: List[cudaq.pauli_word] = None,
-        append_measurements: bool = True
+        append_measurements: bool = True,
+        append_pauli_term: bool = False,
+        pauli_term : List[int] = None
     ):
     
     # create the qubit vector
@@ -91,9 +95,21 @@ def hamsim_kernel_measured(
     # Apply K Trotter steps
     for _ in range(K): 
         append_trotter_step(qubits, dt, coefficients, words)
- 
+               
+    # append gates for pauli_term if given
+    if append_pauli_term:
+        for i, pauli in enumerate(pauli_term):
+            if pauli == 1:
+                h(qubits[i])
+            elif pauli == 2:
+                rx(-1.5708, qubits[i])  # Rotate by -p/2 around X-axis
+            else:
+                pass 
+                
+        mz(qubits)  # Measure all qubits in the computational basis
+    
     # Apply measurement gates to the `qubits`
-    if append_measurements == True:
+    if append_measurements:
         mz(qubits)
         
 # Append a trotter step defined by the time step dt and hamiltonian terms
@@ -323,10 +339,10 @@ def HamiltonianSimulation(
     # CUDAQ ISSUE: the mz() operation cannot be controlled by a flag
     if append_measurements:
         qc = [hamsim_kernel_measured, [num_qubits, bitsetf, K, t,
-                coefficients, words, append_measurements]]
+                coefficients, words, append_measurements, False, []]]
     else:
         qc = [hamsim_kernel, [num_qubits, bitsetf, K, t,
-                coefficients, words, append_measurements]]
+                coefficients, words, append_measurements, False, []]]
             
     global QC_
     if num_qubits <= 6:
@@ -376,9 +392,112 @@ def kernel_draw(hamiltonian: str = "hamlib", method: int = 1):
             #print(cudaq.draw(QC_[0], *QC_[1]))
             print(f"WARNING: cudaq cannot draw kernels with Trotter steps")
             pass
-        except:
-            print(f"ERROR attemtping to draw the kernel")
+        except Exception as ex:
+            print(f"ERROR attempting to draw the kernel")
+            print(ex)
         
     else:
         print("  ... too large!")
+
+
+########################## CudaQ Kernels for pauli terms (Sampling solutions) #############################
+def create_circuits_for_pauli_terms(qc: list, num_qubits: int, pauli_str_list: list) -> list: # init_state: str
+    """
+    Creates quantum circuits for measuring terms in a raw Hamiltonian.
+    Each Pauli term is mapped to a separate circuit with appropriate rotations and measurements.
+
+    Args:
+        qc (cudaq.Kernel): The quantum circuit to be cloned.
+        num_qubits (int): The number of qubits in the circuit.
+        pauli_str_list (list of tuples): The Hamiltonian represented as a list of tuples,
+                                         where each tuple contains a Pauli string and a coefficient.
+    
+    Returns:
+        list: A list where each element is a tuple (cudaq.Kernel, [(term, coeff)]).
+    """
+    circuits = []
+
+    for pauli_term in pauli_str_list:
+            
+        params = []
+        for i in range(len(qc[1])):
+            params.append(qc[1][i])
+
+        pauli_ints = []
+        for pauli in pauli_term:
+            if pauli == "I":
+                p = 0
+            elif pauli == "X":
+                p = 1
+            elif pauli == "Y":
+                p = 2
+            else:
+                p = 3
+            pauli_ints.append(p)
+
+        # modify params to append the pauli_ints for this term
+        params[-2] = True
+        params[-1] = pauli_ints
+
+        qc_new = [hamsim_kernel_measured, params]
+
+        circuits.append(qc_new)        # build up the array of "pseudo-cloned" kernels with a pointer to orig params
+
+    return circuits
+
+@cudaq.kernel
+def kernel_with_subkernel(qc: cudaq.kernel, params: list, num_qubits: int) -> cudaq.kernel:
+    """
+    Creates a quantum circuit for a given Pauli term with necessary rotations and measurements.
+    
+    Args:
+        qc (cudaq.Kernel): The quantum circuit to be cloned.
+        params (list): The parameters of the original quantum kernel that is cloned.
+        num_qubits (int): Number of qubits in the circuit.
+    
+    Returns:
+        cudaq.Kernel: The generated quantum circuit.
+    """
+
+    qubits = cudaq.qvector(num_qubits)
+
+    qc(qubits, **params) 
+    
+    qc.mz(qubits)  # Measure all qubits in the computational basis
+
+@cudaq.kernel
+def append_measurement_circuit_for_term(qc: cudaq.qview, num_qubits: int, term: str) -> cudaq.kernel:
+    """
+    Creates a quantum circuit for a given Pauli term with necessary rotations and measurements.
+    
+    Args:
+        qc (cudaq.Kernel): The quantum circuit to be cloned.
+        num_qubits (int): Number of qubits in the circuit.
+        term (str): The Pauli term to measure (e.g., "XZI").
+    
+    Returns:
+        cudaq.Kernel: The generated quantum circuit.
+    """
+
+    qubits = cudaq.qvector(num_qubits)
+
+    append_hamiltonian_term_to_circuit(qc, qubits, term)
+    
+    qc.mz(qubits)  # Measure all qubits in the computational basis
+
+@cudaq.kernel
+def append_hamiltonian_term_to_circuit(qc: cudaq.qview, qubits, term):
+    """
+    Applies necessary rotations based on the given Pauli term.
+    
+    Args:
+        qc (cudaq.Kernel): The circuit to which operations will be applied.
+        qubits (list): List of allocated qubits.
+        term (str): The Pauli term to encode (e.g., "XZI").
+    """
+    for i, pauli in enumerate(term):
+        if pauli == 'X':
+            qc.h(qubits[i])
+        elif pauli == 'Y':
+            qc.rx(-1.5708, qubits[i])  # Rotate by -p/2 around X-axis
     
