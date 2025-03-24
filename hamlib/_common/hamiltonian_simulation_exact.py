@@ -25,7 +25,8 @@ def HamiltonianSimulationExact(qc_initial, n_spins: int, hamiltonian_op = None, 
     time_problem = TimeEvolutionProblem(hamiltonian_op, time, initial_state=qc_initial)
     result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
     
-    return result.evolved_state.probabilities_dict()
+    return result.evolved_state.probabilities_dict(), result.evolved_state.expectation_value(hamiltonian_op)
+
 
 def HamiltonianSimulation_Noiseless(qc, num_qubits, circuit_id: str="0", num_shots=100):
     """

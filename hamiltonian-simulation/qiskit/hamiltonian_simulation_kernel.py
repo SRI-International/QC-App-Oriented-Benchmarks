@@ -210,11 +210,7 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
                 for j in range(2):
                     for i in range(j % 2, self.n_spins - 1, 2):
                         qc.append(xx_gate(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
-                for j in range(2):
-                    for i in range(j % 2, self.n_spins - 1, 2):
                         qc.append(yy_gate(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
-                for j in range(2):
-                    for i in range(j % 2, self.n_spins - 1, 2):
                         qc.append(zz_gate(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
             else:
                 for j in range(2):
@@ -230,14 +226,10 @@ class HeisenbergHamiltonianKernel(HamiltonianKernel):
         qc = QuantumCircuit(qr, name="Heisenberg\u2020")
         for k in range(self.K): 
             if self.use_XX_YY_ZZ_gates:
-                for j in range(2):
-                    for i in range(j % 2, self.n_spins - 1, 2):
-                        qc.append(zz_gate_mirror(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
                 for j in reversed(range(2)):
                     for i in reversed(range(j % 2, self.n_spins - 1, 2)):
+                        qc.append(zz_gate_mirror(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
                         qc.append(yy_gate_mirror(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
-                for j in range(2):
-                    for i in range(j % 2, self.n_spins - 1, 2):
                         qc.append(xx_gate_mirror(self.tau).to_instruction(), [qr[i], qr[(i + 1) % self.n_spins]])
             else:
                 for j in reversed(range(2)):
@@ -521,9 +513,9 @@ def xxyyzz_opt_gate(tau: float) -> QuantumCircuit:
     qc.rz(pi / 2, qr[1])
     qc.cx(qr[1], qr[0])
     qc.rz(pi * gamma - pi / 2, qr[0])
-    qc.ry(pi / 2 - pi * alpha, qr[1])
+    qc.ry(-pi / 2 + pi * alpha, qr[1])
     qc.cx(qr[0], qr[1])
-    qc.ry(pi * beta - pi / 2, qr[1])
+    qc.ry(-pi * beta + pi / 2, qr[1])
     qc.cx(qr[1], qr[0])
     qc.rz(-pi / 2, qr[0])
 
@@ -626,9 +618,9 @@ def xxyyzz_opt_gate_mirror(tau: float) -> QuantumCircuit:
     qc = QuantumCircuit(qr, name="XXYYZZ\u2020")
     qc.rz(pi / 2, qr[0])
     qc.cx(qr[1], qr[0])
-    qc.ry(-pi * beta + pi / 2, qr[1])
+    qc.ry(pi * beta - pi / 2, qr[1])
     qc.cx(qr[0], qr[1])
-    qc.ry(-pi / 2 + pi * alpha, qr[1])
+    qc.ry(pi / 2 - pi * alpha, qr[1])
     qc.rz(-pi * gamma + pi / 2, qr[0])
     qc.cx(qr[1], qr[0])
     qc.rz(-pi / 2, qr[1])
