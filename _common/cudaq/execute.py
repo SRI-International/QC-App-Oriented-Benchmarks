@@ -471,9 +471,7 @@ def test_execution():
 # Launch execution of one batched circuit
 def execute_circuit_immed (circuit: list, num_shots: int):
     if verbose:
-        print(f'... execute_circuit({circuit}, {num_shots})')
-        
-    print(f'... cudaq execute_circuit({circuit}, {num_shots})')
+        print(f'... execute_circuit_immed({circuit}, {num_shots})')
 
     #active_circuit = copy.copy(batched_circuit)
     #active_circuit["launch_time"] = time.time()
