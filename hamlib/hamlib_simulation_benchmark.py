@@ -726,19 +726,19 @@ def run(min_qubits: int = 2,
                                 
                         term_contributions = None
                         
-                    # Record relevant performance metrics
-                    computed_time = round((time.time() - ts), 3)
-                    metrics_object["exp_time_computed"] = computed_time
+                # Record relevant performance metrics
+                computed_time = round((time.time() - ts), 3)
+                metrics_object["exp_time_computed"] = computed_time
 
-                    total_energy = round(total_energy, 4)  
-                    metrics_object["exp_value_computed"] = total_energy
+                total_energy = round(total_energy, 4)  
+                metrics_object["exp_value_computed"] = total_energy
 
-                    metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
+                metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
 
-                    if num_circuits_to_execute > 0:
-                        print(f"... number of circuits executed = {num_circuits_to_execute}")
+                if num_circuits_to_execute > 0:
+                    print(f"... number of circuits executed = {num_circuits_to_execute}")
 
-                    print(f"... quantum execution time = {computed_time}")
+                print(f"... quantum execution time = {computed_time}")
                
                 
                 ##############################################
@@ -1025,7 +1025,7 @@ def execute_circuits_distribute_shots(
     
     # determine the number of shots to execute for each circuit, weighted by largest coefficient
     num_shots_list = get_distributed_shot_counts(total_shots, groups, ds_method)
-    print('shot list:', num_shots_list)
+
     if verbose or debug:
         print(f"  ... num_shots_list = {num_shots_list}")  
     
