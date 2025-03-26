@@ -26,6 +26,7 @@
 import os, sys
 import time
 import copy
+import qcb_mpi as mpi
 
 # import metrics module relative to top level of package
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -140,7 +141,11 @@ def set_execution_target(backend_id=None, provider_backend=None,
         backend = provider_backend
     
     # now set the execution target to the given backend_id
-    cudaq.set_target(backend_id)
+    if mpi.enabled():
+        option_string="mgpu,fp32"
+    else:
+        option_string="fp32"
+    cudaq.set_target(backend_id, option=option_string)
     
     # create an informative device name used by the metrics module
     device_name = backend_id

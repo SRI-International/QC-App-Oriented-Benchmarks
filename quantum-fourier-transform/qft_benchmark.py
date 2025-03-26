@@ -28,6 +28,10 @@ def qedc_benchmarks_init(api: str = "qiskit"):
     api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
     sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
 
+    import qcb_mpi as mpi
+    globals()["mpi"] = mpi
+    mpi.init()
+
     import execute as ex
     globals()["ex"] = ex
 
@@ -226,6 +230,7 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
             if verbose: print(f"... s_int={s_int} bitset={bitset}")
             
             # create the circuit for given qubit size and secret string, store time metric
+            mpi.barrier()
             ts = time.time()
             qc = QuantumFourierTransform(num_qubits, s_int, bitset, method)       
             metrics.store_metric(input_size, s_int, 'create_time', time.time()-ts)
@@ -241,11 +246,12 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
        
     ##########
     
-    # draw a sample circuit
-    kernel_draw()
+    if mpi.leader():
+        # draw a sample circuit
+        kernel_draw()
 
-    # Plot metrics for all circuit sizes                         
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
+        # Plot metrics for all circuit sizes                         
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
 
 #######################
 # MAIN
