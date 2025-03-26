@@ -52,6 +52,10 @@ def qedc_benchmarks_init(api: str = "qiskit"):
     api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
     sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
 
+    import qcb_mpi as mpi
+    globals()["mpi"] = mpi
+    mpi.init()
+
     import execute as ex
     globals()["ex"] = ex
 
@@ -511,7 +515,7 @@ def run(min_qubits: int = 2,
         num_hamiltonian_terms = len(sparse_pauli_terms)
         print(f"... number of terms in Hamiltonian = {num_hamiltonian_terms}")
         
-        if save_dataset_file:
+        if save_dataset_file and mpi.leader():
             save_one_hamlib_dataset(dataset = sparse_pauli_terms, dataset_name = dataset_name)
          
         metrics_object = {}
@@ -524,7 +528,7 @@ def run(min_qubits: int = 2,
         # in the case of random paulis, method = 3: loop over multiple random pauli circuits
         # otherwise, loop over the same circuit, executing it num_circuits times 
         for circuit_id in range(num_circuits):
-
+            mpi.barrier()
             ts = time.time()
             
             ##############################
@@ -817,12 +821,13 @@ def run(min_qubits: int = 2,
     # we want to write file every time we have new data.
     # but if file is busy, we get error, do it at end for now
     app_name = f"HamLib-obs-{hamiltonian_name}"
-    store_app_metrics(app_name, backend_id, metrics_array)
+    if mpi.leader():
+        store_app_metrics(app_name, backend_id, metrics_array)
 
     ########################
     # Display Sample Circuit
     
-    if draw_circuits:
+    if draw_circuits and mpi.leader():
         kernel_draw(hamiltonian, method)
     
     ##########################
@@ -853,7 +858,7 @@ def run(min_qubits: int = 2,
     if not plot_results:
         return
         
-    if not do_observables:
+    if mpi.leader() and not do_observables:
         metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
     
     if do_observables:
@@ -867,7 +872,8 @@ def run(min_qubits: int = 2,
         if backend_id is None:
             backend_id = "qasm_simulator"
         
-        plot_from_data(suptitle, metrics_array, backend_id, options)
+        if mpi.leader():
+            plot_from_data(suptitle, metrics_array, backend_id, options)
 
   
     
@@ -1234,6 +1240,7 @@ def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     
     ### print(f"... using group method: {group_method}")
 
+    mpi.barrier()
     ts = time.time()
     
     # use no grouping or the most basic method "simple"

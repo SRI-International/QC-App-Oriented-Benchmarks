@@ -25,6 +25,10 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 	api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
 	sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
 
+	import qcb_mpi as mpi
+	globals()["mpi"] = mpi
+	mpi.init()
+
 	import execute as ex
 	globals()["ex"] = ex
 
@@ -188,6 +192,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 				theta = init_phase
 		
 			# create the circuit for given qubit size and theta, store time metric
+			mpi.barrier()
 			ts = time.time()
 			qc = PhaseEstimation(num_qubits, theta)
 			metrics.store_metric(num_qubits, theta, 'create_time', time.time() - ts)
@@ -203,11 +208,12 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 
 	##########
 
-	# draw a sample circuit
-	kernel_draw()
+	if mpi.leader():
+		# draw a sample circuit
+		kernel_draw()
 
-	# Plot metrics for all circuit sizes
-	metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
+		# Plot metrics for all circuit sizes
+		metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 
 #######################
