@@ -689,6 +689,8 @@ def run(min_qubits: int = 2,
                             True if group_method is not None else False
                         )
                         
+                        num_circuits_to_execute = len(pauli_term_groups)
+                        
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                             qc, num_qubits, pauli_str_list
                         ) # qc is an array with the kernel and dependent parameters
