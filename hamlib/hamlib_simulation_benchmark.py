@@ -895,11 +895,15 @@ def execute_circuits(
 
     # if backend_id == "nvidia":
     if api_ == "cudaq":
-        results = []
+        counts_array = []
         for circuit in circuits:
             result = ex.execute_circuit_immed(circuit, num_shots)
-            results.append(result.get_counts())
-        results = ExecResult(results)
+            counts_array.append(result.get_counts())
+        
+        if len(counts_array) < 2:
+            results = ExecResult(counts_array[0])
+        else:
+            results = ExecResult(counts_array)
 
     # Set up the backend for execution
     elif backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
