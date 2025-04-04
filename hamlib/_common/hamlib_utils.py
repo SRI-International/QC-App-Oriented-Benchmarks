@@ -15,6 +15,7 @@ import zipfile
 import json
 from typing import Dict, Optional   # for backwards compat <= py 3.10
 from dataclasses import dataclass
+import qcb_mpi as mpi
 
 verbose = False
 
@@ -95,6 +96,9 @@ def load_hamlib_file(filename: str):
             print(f"... download HamLib zip file and extract hdf5 file: {filename}")
         
         # Download the HamLib zip file and extract the hdf5 file from wihin
+        #   - Only the MPI leader will download and extract file
+        downloaded = True
+        extracted_path = ""
         try:
             
             extracted_path = download_and_extract(filename, fullname)
@@ -102,6 +106,10 @@ def load_hamlib_file(filename: str):
                 print(f"  ... extracted_path = {extracted_path}")
       
         except Exception:
+            downloaded = False
+
+        downloaded = mpi.bcast(downloaded)
+        if not downloaded:
             extracted_path = None
             print(f"ERROR: can not download the requested HamLib file from: {fullname}")
             
@@ -335,22 +343,24 @@ def download_and_extract(filename, url):
         print(f"  ... download_and_extract({filename},{url})", flush=True)
         
     download_dir = "downloaded_hamlib_files"
-    os.makedirs(download_dir, exist_ok=True)
+    if mpi.leader():
+        os.makedirs(download_dir, exist_ok=True)
     local_zip_path = os.path.join(download_dir, os.path.basename(url))
     
     # Download the file
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(local_zip_path, 'wb') as file:
-            file.write(response.content)
-        # print(f"Downloaded {local_zip_path} successfully.")
-    else:
-        raise Exception(f"Failed to download from {url}.")
+    if mpi.leader():
+        response = requests.get(url)
+        if response.status_code == 200:
+            with open(local_zip_path, 'wb') as file:
+                file.write(response.content)
+            # print(f"Downloaded {local_zip_path} successfully.")
+        else:
+            raise Exception(f"Failed to download from {url}.")
 
-    # Unzip the file
-    with zipfile.ZipFile(local_zip_path, 'r') as zip_ref:
-        zip_ref.extractall(download_dir)
-        # print(f"Extracted to {download_dir}.")
+        # Unzip the file
+        with zipfile.ZipFile(local_zip_path, 'r') as zip_ref:
+            zip_ref.extractall(download_dir)
+            # print(f"Extracted to {download_dir}.")
     
     # Return the path to the directory containing the extracted files
     return download_dir
@@ -686,8 +696,9 @@ def generate_json_for_hdf5_input(file_input):
         if variable_values:
             results[base_filename] = variable_values
 
-    with open('downloaded_hamlib_files/sample_input_json.json', 'w') as f:
-        json.dump(results, f, indent=2)
+    if mpi.leader():
+        with open('downloaded_hamlib_files/sample_input_json.json', 'w') as f:
+            json.dump(results, f, indent=2)
 
 
 def view_hdf5_structure():

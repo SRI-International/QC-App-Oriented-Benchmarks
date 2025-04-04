@@ -36,7 +36,7 @@ from datetime import datetime
 import traceback
 import matplotlib.cm as cm
 import copy
-
+import qcb_mpi as mpi
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
 
@@ -451,7 +451,8 @@ def report_metrics_for_group (group):
 def report_metrics ():   
     # loop over all groups and print metrics for that group
     for group in circuit_metrics:
-        report_metrics_for_group(group)
+        if mpi.leader():
+            report_metrics_for_group(group)
 
        
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete
@@ -472,8 +473,9 @@ def finalize_group(group, report=True):
     #print(f"  ... group_done = {group} {group_done}")
     if group_done and report:
         aggregate_metrics_for_group(group)
-        print("************")
-        report_metrics_for_group(group)
+        if mpi.leader():
+            print("************")
+            report_metrics_for_group(group)
         
     # sort the group metrics (sometimes they come back out of order)
     sort_group_metrics()
@@ -518,8 +520,9 @@ def finalize_group_2_level(group):
         process_circuit_metrics_2_level(group)
         
         aggregate_metrics_for_group(group)
-        print("************")
-        report_metrics_for_group(group)
+        if mpi.leader():
+            print("************")
+            report_metrics_for_group(group)
         
     # sort the group metrics (sometimes they come back out of order)
     sort_group_metrics()
