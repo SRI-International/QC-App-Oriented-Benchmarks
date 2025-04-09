@@ -689,6 +689,8 @@ def run(min_qubits: int = 2,
                             True if group_method is not None else False
                         )
                         
+                        num_circuits_to_execute = len(pauli_term_groups)
+                        
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                             qc, num_qubits, pauli_str_list
                         ) # qc is an array with the kernel and dependent parameters
@@ -895,11 +897,15 @@ def execute_circuits(
 
     # if backend_id == "nvidia":
     if api_ == "cudaq":
-        results = []
+        counts_array = []
         for circuit in circuits:
             result = ex.execute_circuit_immed(circuit, num_shots)
-            results.append(result.get_counts())
-        results = ExecResult(results)
+            counts_array.append(result.get_counts())
+        
+        if len(counts_array) < 2:
+            results = ExecResult(counts_array[0])
+        else:
+            results = ExecResult(counts_array)
 
     # Set up the backend for execution
     elif backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
