@@ -46,8 +46,10 @@ omit_initial_elapsed_time_factor = 10
 
 
 _markers = [ ".", "s", "*", "h", "P", "X", "d" ]
-_colors = [ "coral", "C0", "C2", "C4", "C5", "C6", "C7", "C8" ]
-_styles = [ "dotted", "solid" ]
+_colors = [ "coral", "lightseagreen", "C2", "C4", "slateblue", "magenta", "yellowgreen", "royalblue" ]
+#_colors = [ "coral", "C0", "C1", "C2", "C3", "C4", "C5", "C6" ]
+#_styles = [ "dotted", "solid" ]
+_styles = [ "dashed", "solid" ]
 
     
 #################################################
@@ -777,9 +779,10 @@ def plot_expectation_time_metrics_2(suptitle="",
         color = _colors[i] if i < len(_colors) else _colors[-1]
         marker = _markers[i] if i < len(_markers) else _markers[-1]
         style = _styles[i] if i < len(_styles) else _styles[-1]
+        lwidth = 1.5 if i > 0 else 2.0
         
         ax1.plot(groups[i][:len(times[i])], times[i], label=labels[i],
-                    linestyle=style, marker=marker, color=color)
+                    linewidth=lwidth, linestyle=style, marker=marker, color=color)
     
     # Add legend
     ax1.legend()
