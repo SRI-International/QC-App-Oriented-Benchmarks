@@ -401,7 +401,7 @@ def run(min_qubits: int = 2,
     # configure the QED-C Benchmark package for use with the given API
     HamilatonianSimulation, kernel_draw = qedc_benchmarks_init(api)
     
-    print(f"{benchmark_name} Benchmark Program - Qiskit")
+    print(f"{benchmark_name} Benchmark Program - {api}")
     
     # Create context identifier
     if context is None: context = f"{benchmark_name} Benchmark"
@@ -414,7 +414,7 @@ def run(min_qubits: int = 2,
     
     hamiltonian_name = hamiltonian
     
-    if verbose:
+    if verbose == True or verbose == False:
         print(f"... hamiltonian and params = {hamiltonian_name}, {hamiltonian_params}")    
         print(f"... group_method = {group_method}")
     

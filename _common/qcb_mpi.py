@@ -58,7 +58,7 @@ if "mpi4py" not in sys.modules:
         if initialized:
             return
         
-        print("Initializing MPI...No MPI Module Loaded",flush=True)        
+        #print("Initializing MPI...No MPI Module Loaded",flush=True)        
         rank = 0
         size = 0
         initialized = True
