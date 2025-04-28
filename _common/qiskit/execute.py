@@ -146,15 +146,22 @@ class BenchmarkResult:
         super().__init__()
         self.qiskit_result = qiskit_result
         self.metadata = qiskit_result.metadata
+        self._counts = None
+
+    def set_counts(self, counts):
+        self._counts = counts
 
     def get_counts(self, qc=0):
         # TODO: need to refactor the caller of get_counts not to submit QuantumCircuit
         # and use index instead to be compatible with PrimitiveResult.
         # `qc` is intentionally ignored.
+        if self._counts:
+            return self._counts
         qc_index = 0 # this should point to the index of the circuit in a pub
-        bitvals = next(iter(self.qiskit_result[qc_index].data.values()))
-        counts = bitvals.get_counts()
-        return counts
+        # merge outcomes of all classical registers
+        bitvals = self.qiskit_result[qc_index].join_data()
+        self._counts = bitvals.get_counts()
+        return self._counts
 
 # Special Job object class to hold job information for custom executors
 class Job:
@@ -300,7 +307,13 @@ def set_execution_target(backend_id='qasm_simulator',
     
     elif backend_id == "statevector_sampler":
         from qiskit.primitives import StatevectorSampler
-        sampler = StatevectorSampler()
+        sampler = StatevectorSampler()  # does not support mid-circuit measurement
+
+    elif backend_id == "aer_sampler":
+        from qiskit_aer import AerSimulator
+        from qiskit_aer.primitives import SamplerV2 as AerSampler
+        sampler = AerSampler()  # support mid-circuit measurement
+        backend = AerSimulator()
 
     # handle 'fake' backends here
     elif 'fake' in backend_id:
@@ -665,7 +678,7 @@ def execute_circuit(circuit):
             
             #************************************************
             # Initiate execution for all other backends and noiseless simulator
-            else:            
+            else:
      
                 # if set, transpile many times and pick shortest circuit
                 # DEVNOTE: this does not handle parameters yet, or optimizations
@@ -697,11 +710,11 @@ def execute_circuit(circuit):
                 #*************************************
                 # perform circuit execution on backend
                 logger.info(f'Running trans_qc, shots={shots}')
-                st = time.time() 
+                st = time.time()
 
                 if sampler:
                     # set job tags if SamplerV2 on IBM Quantum Platform
-                    if hasattr(sampler, "options"):
+                    if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
                         sampler.options.environment.job_tags = job_tags
 
                     # turn input into pub-like
@@ -767,7 +780,6 @@ def wait_on_job_result(job, active_circuit):
             retry_count += 1
             result = job.result()
             break
-                         
         except Exception:
             print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
             if verbose: print(traceback.format_exc())
@@ -886,8 +898,7 @@ def transpile_for_metrics(qc):
 # DEVNOTE: currently this only caches a single circuit
 def transpile_and_bind_circuit(circuit, params, backend, basis_gates=None,
                 optimization_level=None, layout_method=None, routing_method=None,
-                seed_transpiler=None):
-                
+                seed_transpiler=0):
     logger.info('transpile_and_bind_circuit()')
     st = time.time()
         
@@ -1464,6 +1475,13 @@ def check_jobs(completion_handler=None):
             print("... circuit execution failed.")
             if hasattr(job, "error_message"):
                 print(f"    job = {job.job_id()}  {job.error_message()}")
+            else:
+                try:
+                    _ = job.result()
+                except Exception as ex:
+                    print(f"    job = {job.job_id()}  '{ex}'")
+                    if verbose:
+                        print(traceback.format_exc())
 
         if status == JobStatus.DONE or status == JobStatus.CANCELLED or status == JobStatus.ERROR or status == 'DONE' or status =='CANCELLED' or status == 'ERROR':
             #if verbose: print("Job status is ", job.status() )
