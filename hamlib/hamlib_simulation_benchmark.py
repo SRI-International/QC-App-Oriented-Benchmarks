@@ -939,7 +939,7 @@ def execute_circuits(
     
     # handle special case using IBM Runtime Sampler Primitive
     elif ex.sampler is not None:
-        print("... using Qiskit Runtime Sampler")
+        # print("... using Qiskit Runtime Sampler")
         
         from qiskit import transpile
 
@@ -955,7 +955,7 @@ def execute_circuits(
      
     # handle all other backends here
     else:
-        print(f"... using Qiskit run() with {backend_id}")
+        # print(f"... using Qiskit run() with {backend_id}")
         
         from qiskit import transpile
         
@@ -1163,75 +1163,77 @@ def get_distributed_shot_counts(
         num_shots: int = 100,
         groups: list = None,
         ds_method: str = 'max_sq',
-    ) -> List:
-    
-#     # loop over all groups, to find the largest coefficient in each group
-#     max_weights = []
-#     for group in groups:
-#         #print(group)
-#         max_weight = 0
-#         for pauli, coeff in group:
-#             #print(f"  ... coeff = {coeff}")
-#             max_weight = max(max_weight, np.real(abs(coeff)))
-            
-#         max_weights.append(max_weight)
+) -> List:
+    #     # loop over all groups, to find the largest coefficient in each group
+    #     max_weights = []
+    #     for group in groups:
+    #         #print(group)
+    #         max_weight = 0
+    #         for pauli, coeff in group:
+    #             #print(f"  ... coeff = {coeff}")
+    #             max_weight = max(max_weight, np.real(abs(coeff)))
+
+    #         max_weights.append(max_weight)
 
     # loop over all groups, to find the sum of coefficient in each group
-#     norm_weights = []
-#     for group in groups:
-#         #print(group)
-#         sum_weight = 0
-#         for pauli, coeff in group:
-#             #print(f"  ... coeff = {coeff}")
-#             sum_weight += np.real(abs(coeff))
-            
-#         norm_weights.append(sum_weight/len(group))
+    #     norm_weights = []
+    #     for group in groups:
+    #         #print(group)
+    #         sum_weight = 0
+    #         for pauli, coeff in group:
+    #             #print(f"  ... coeff = {coeff}")
+    #             sum_weight += np.real(abs(coeff))
 
-        
-# #     # compute a normalized distribution over all groups
-# #     total_weights = sum(max_weights)
-# #     max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
-    
-# #     # compute shots counts based on these weights
-# #     num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
-     
-#     # compute a normalized distribution over all groups
-#     total_weights = sum(norm_weights)
-#     norm_weights_normalized = [norm_weight / total_weights for norm_weight in norm_weights]
-    
-#     # compute shots counts based on these weights
-#     num_shots_list = [int(mwn * num_shots) for mwn in norm_weights_normalized]
-    
-    
+    #         norm_weights.append(sum_weight/len(group))
+
+    # #     # compute a normalized distribution over all groups
+    # #     total_weights = sum(max_weights)
+    # #     max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
+
+    # #     # compute shots counts based on these weights
+    # #     num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
+
+    #     # compute a normalized distribution over all groups
+    #     total_weights = sum(norm_weights)
+    #     norm_weights_normalized = [norm_weight / total_weights for norm_weight in norm_weights]
+
+    #     # compute shots counts based on these weights
+    #     num_shots_list = [int(mwn * num_shots) for mwn in norm_weights_normalized]
+
     # add shots to first group until the total is same as the given total shot count
-#     one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
+    #     one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
     weights = []
     for group in groups:
-        w_sqs =  [abs(coeff)**2 for pauli, coeff in group] 
+        w_sqs = [abs(coeff) ** 2 for pauli, coeff in group]
         ws = [abs(coeff) for pauli, coeff in group]
-    
+
         if ds_method == 'max_sq':
             weights.append(max(w_sqs))
         elif ds_method == 'mean_sq':
-            weights.append(sum(w_sqs)/len(w_sqs))
+            weights.append(sum(w_sqs) / len(w_sqs))
         elif ds_method == 'max':
             weights.append(max(ws))
         else:
-            weights.append(sum(ws)/len(ws))
-        
+            weights.append(sum(ws) / len(ws))
+
     # Step 2: Normalize weights to compute shot proportions
     total_weight = sum(weights)
-    shot_allocations = [int((w / total_weight) * num_shots) for w in weights]
+    # shot_allocations = [int((w / total_weight) * num_shots) for w in weights]
+    # make sure we don't have 0 shot allocation
+    shot_allocations = [max(1, int((w / total_weight) * num_shots)) for w in weights]
 
     # Step 3: Adjust to ensure total shots match exactly
     while sum(shot_allocations) < num_shots:
         max_index = np.argmax(shot_allocations)
         shot_allocations[max_index] += 1
+    while sum(shot_allocations) > num_shots:
+        max_index = np.argmax(shot_allocations)
+        shot_allocations[max_index] -= 1
     # print('shot allocation:', shot_allocations)
-       
+
     return shot_allocations
- 
- 
+
+
 ########################################
 # UTILITY FUNCTIONS (TEMPORARY)
 
