@@ -214,6 +214,41 @@ def plot_all_cumulative_metrics(suptitle=None,
 
 #####################################
 
+
+def get_errors(
+        hamiltonian_name: str,
+        backend_id: str,
+        num_qubits: int,
+        group_method: str,
+        num_shots: int,
+        exact_energies,
+        computed_energies
+):
+    """
+        return the errors
+    Args:
+        errors (list or array): List of error values.
+    """
+    errors = [computed - exact for computed, exact in zip(computed_energies, exact_energies)]
+    base_ham_name = os.path.basename(hamiltonian_name)
+
+    title = "Error Distribution with Key Metrics"
+    title += f"\nHam={base_ham_name}, qubits={num_qubits}, gm={group_method}, shots={num_shots}"
+
+    errors = np.array(errors)
+
+    # Compute key error metrics
+    std_dev = np.std(errors)  # Standard deviation (σ)
+    mean_error = np.mean(errors)  # Mean error (detects bias)
+    bias_direction = "positive" if mean_error > 0 else "negative"
+    if abs(mean_error) > 0.5 * (np.max(errors) - np.min(errors)) / 4:  # Using range-based threshold
+        print(f"⚠️ Warning: Significant {bias_direction} bias detected in the error distribution!")
+    else:
+        print("✅ No significant bias detected.")
+    return std_dev, mean_error
+
+
+
 # method to plot cumulative accuracy ratio vs. number of qubits
 def plot_cumulative_metrics(suptitle="",
             x_data:list=None, x_label:str="",
