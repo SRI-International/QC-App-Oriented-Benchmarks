@@ -77,11 +77,11 @@ def do_execute(backend_id: str, circuits: list, num_shots: int,
     # Execute all of the circuits to obtain array of result objects
     ###### results = backend.run(circuits, num_shots=num_shots, noise_model=execute.noise).result()
 
-    results = hamlib_simulation_benchmark.execute_circuits(
-                                    backend_id = backend_id,
-                                    circuits = circuits,
-                                    num_shots = int(num_shots / len(circuits))
-                                    )
+    # results = hamlib_simulation_benchmark.execute_circuits(
+    #                                 backend_id = backend_id,
+    #                                 circuits = circuits,
+    #                                 num_shots = int(num_shots / len(circuits))
+    #                                 )
                                     
     # call api-specific function to execute circuits
     if not distribute_shots:

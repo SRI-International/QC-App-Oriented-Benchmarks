@@ -402,12 +402,17 @@ def calculate_expectation_from_measurements_k_commute(num_qubits, results, pauli
     total_exp_x = 0
     
     debug = False
-   
+    print(dir(results))
+    print('--------')
+
+    print(results[0].data.meas.get_counts())
     # Loop over each group and its corresponding measurement results
     if len(pauli_term_groups) > 1:
         num_group = 0
-        for group, result in zip(pauli_term_groups, results.get_counts()):
-            counts = result
+        for group_idx, group in enumerate(pauli_term_groups):
+            counts = results[group_idx].data.meas.get_counts()
+        # for group, result in zip(pauli_term_groups, results[0].data.meas.get_counts()):
+        #     counts = result
             
             if debug:
                 print(f"  ... group = {group}")
@@ -434,7 +439,7 @@ def calculate_expectation_from_measurements_k_commute(num_qubits, results, pauli
                 
     # results object has different structure when only one circuit, process specially here
     else:
-        counts = results.get_counts()
+        counts = results[0].data.meas.get_counts()
         group = pauli_term_groups[0]
 
         if debug:
