@@ -74,15 +74,7 @@ def do_execute(backend_id: str, circuits: list, num_shots: int,
     ### print(f"... begin executing {len(circuits)} circuits ...")
     ts = time.time()
     
-    # Execute all of the circuits to obtain array of result objects
-    ###### results = backend.run(circuits, num_shots=num_shots, noise_model=execute.noise).result()
-
-    results = hamlib_simulation_benchmark.execute_circuits(
-                                    backend_id = backend_id,
-                                    circuits = circuits,
-                                    num_shots = int(num_shots / len(circuits))
-                                    )
-                                    
+    # Execute all of the circuits to obtain array of result objects                              
     # call api-specific function to execute circuits
     if not distribute_shots:
         #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
@@ -107,7 +99,7 @@ def do_execute(backend_id: str, circuits: list, num_shots: int,
     
     exec_time = round(time.time()-ts, 3)
     metrics_object["execute_circuits_time"] = exec_time
-    ###print(f"... finished executing {len(circuits)} circuits, total execution time = {exec_time} sec.\n")
+    ### print(f"... finished executing {len(circuits)} circuits, total execution time = {exec_time} sec.\n")
     return results, pauli_term_groups
 
 
