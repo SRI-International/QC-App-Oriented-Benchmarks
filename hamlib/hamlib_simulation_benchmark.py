@@ -983,10 +983,11 @@ def execute_circuits(
     return results
         
 
-# class BenchmarkResult is made for Sampler runs. This is because
-# qiskit primitive job result instances don't have a get_counts method 
+# The class BenchmarkResult is designed for use with IBM Sampler runs. 
+# The qiskit primitive job result instances don't have a get_counts method 
 # like backend results do. As such, a get counts method is calculated
 # from the quasi distributions and shots taken.
+# This provides a normalized return value across all benchmarks.
 class BenchmarkResult:
 
     def __init__(self, qiskit_result):
@@ -1009,19 +1010,20 @@ class BenchmarkResult:
 # class ExecResult is made for multi-circuit runs. 
 class ExecResult(object):
 
-    def __init__(self, counts_array):
+    def __init__(self, counts):
         super().__init__()
-        #self.qiskit_result = qiskit_result
-        #self.metadata = qiskit_result.metadata
-        self.counts = counts_array
+        
+        # Store the count distributions as they will be returned
+        # A single count object for one circuit, and an array of count object for array of circuits
+        if isinstance(counts, list):
+            if len(counts) < 2:
+                self.counts = counts[0]
+            else:
+                self.counts = counts
+        else:
+            self.counts = counts
 
     def get_counts(self, qc=0):
-        # counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
-        # for key in counts.keys():
-        #     counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])
-        #qc_index = 0 # this should point to the index of the circuit in a pub
-        #bitvals = next(iter(self.qiskit_result[qc_index].data.values()))
-        #counts = bitvals.get_counts()
         return self.counts
  
  
@@ -1085,8 +1087,7 @@ def execute_circuits_distribute_shots(
         group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
         
         if debug:
-#             print(f"  circuit_list after bucketing = {circuit_list}")
-#             print(f"  ... group_list after bucketing = {group_list}") 
+            # print(f"  circuit_list after bucketing = {circuit_list}")
             print(f"  ... group_list after bucketing....") 
             for group in group_list:
                 for g in group:
@@ -1096,16 +1097,16 @@ def execute_circuits_distribute_shots(
         
         if verbose or debug:
             print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
-                
+        
+        # Loop over the circuit lists associated with each bucket
         counts_array = []
-        #for circuit in circuits:
         for circuits, num_shots in zip(circuit_list, bucket_avg_shots):
         
             if debug:
                 # print(f"  ...    cccc = {circuits}")
                 print(f"... len circs = {len(circuits)}")
             
-            # execute this list of circuits, same shots each
+            # execute this list of circuits, with same shots for each circuit in list
             results = execute_circuits(
                     backend_id = backend_id,
                     #circuits = [circuit],
@@ -1113,23 +1114,18 @@ def execute_circuits_distribute_shots(
                     num_shots = num_shots
                     )
             
-            # Qiskit returns and array if array executed, but single counts for one circuit
+            # accumulate list of returned raw count dicts to parallel the group list
+            # Qiskit returns an array of counts if array executed, but single counts for one circuit
             if len(circuits) > 1:                           
-                counts = results.get_counts()
+                for counts in results.get_counts():
+                    counts_array.append(counts)
             else:
-                counts = [results.get_counts()]
-                
-            for counts2 in counts:
-                counts_array.append(counts2)
-            
-            #counts_array.append(results.get_counts())
+                counts_array.append(results.get_counts())
 
-        # similarly, construct a Result object with counts structure to match circuits
-        if len(counts_array) < 2:
-            results = ExecResult(counts_array[0])
-        else:
-            results = ExecResult(counts_array)
-             
+        # Construct a Result object with counts structure to match circuits
+        results = ExecResult(counts_array)
+    
+        # Create a flattened list of all groups
         group_list = [item for sublist in group_list for item in sublist]
         
         if debug:
