@@ -880,7 +880,6 @@ def run(min_qubits: int = 2,
         if mpi.leader():
             plot_from_data(suptitle, metrics_array, backend_id, options)
 
-  
     
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
@@ -907,11 +906,9 @@ def execute_circuits(
         for circuit in circuits:
             result = ex.execute_circuit_immed(circuit, num_shots)
             counts_array.append(result.get_counts())
-        
-        if len(counts_array) < 2:
-            results = ExecResult(counts_array[0])
-        else:
-            results = ExecResult(counts_array)
+            
+        # Construct a Result object with counts structure to match circuits
+        results = ExecResult(counts_array)
 
     # Set up the backend for execution
     elif backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
@@ -1046,7 +1043,6 @@ def execute_circuits_distribute_shots(
         print(f"... execute_circuits_distribute_shots({backend_id}, {len(circuits)}, {num_shots}, {groups})")
                   
     # distribute shots; obtain total and distribute according to weights
-    # (weighting not implemented yet)
     circuit_count = len(circuits)
     total_shots = num_shots         # to match current behavior
     if verbose or debug:
@@ -1058,115 +1054,83 @@ def execute_circuits_distribute_shots(
     if verbose or debug:
         print(f"  ... num_shots_list = {num_shots_list}")  
     
-    # The "new" approach that uses bucketing, to reduce number of circuits to be executed
-    if new_way:
-        if debug:
-            print("************* NEW WAY")
-            for group in groups:
-                print(group)
-                   
-            # print(f"  in circuits = {circuits}")
-        
-        # determine optimal bucketing for these circuits, based on distribution of shots needed
-        from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
-        
-        # get buckets of terms with similar shots counts, and index of original position
-        max_buckets = 3 if len(groups) < 50 else 4
-        buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=max_buckets)
-        
-        # find the average number of shots required for each bucket
-        # (sum of all shots for all circuits, nested, should be same as the incoming total)
-        bucket_avg_shots = compute_bucket_averages(buckets_kmeans)
-        
-        if debug:
-            print('  ... bucket kmeans:', buckets_kmeans)
-            print('  ... indices_kmeans:', indices_kmeans)
-            print('  ... bucket_avg_shots:', bucket_avg_shots)
-        
-        circuit_list = [[circuits[idx] for idx in indices] for indices in indices_kmeans]   
-        group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
-        
-        if debug:
-            # print(f"  circuit_list after bucketing = {circuit_list}")
-            print(f"  ... group_list after bucketing....") 
-            for group in group_list:
-                for g in group:
-                    print(g)
-                print('-----')
-
-        
-        if verbose or debug:
-            print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
-        
-        # Loop over the circuit lists associated with each bucket
-        counts_array = []
-        for circuits, num_shots in zip(circuit_list, bucket_avg_shots):
-        
-            if debug:
-                # print(f"  ...    cccc = {circuits}")
-                print(f"... len circs = {len(circuits)}")
-            
-            # execute this list of circuits, with same shots for each circuit in list
-            results = execute_circuits(
-                    backend_id = backend_id,
-                    #circuits = [circuit],
-                    circuits = circuits,
-                    num_shots = num_shots
-                    )
-            
-            # accumulate list of returned raw count dicts to parallel the group list
-            # Qiskit returns an array of counts if array executed, but single counts for one circuit
-            if len(circuits) > 1:                           
-                for counts in results.get_counts():
-                    counts_array.append(counts)
-            else:
-                counts_array.append(results.get_counts())
-
-        # Construct a Result object with counts structure to match circuits
-        results = ExecResult(counts_array)
+    # This approach  uses bucketing, to reduce number of circuits to be executed
+    if debug:
+        print("************* NEW WAY")
+        for group in groups:
+            print(group)
+               
+        # print(f"  in circuits = {circuits}")
     
-        # Create a flattened list of all groups
-        group_list = [item for sublist in group_list for item in sublist]
-        
-        if debug:
-            print(f"... results.get_counts() = {results.get_counts()}")
-            print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
-            print(f"... group_list len = {len(group_list)}")
-            print(f"  ... group_list after subgroups = ")
-            for group in group_list:
-                print(group)
-
-        return results, group_list
+    # determine optimal bucketing for these circuits, based on distribution of shots needed
+    from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
     
-    # The "old" approach that executes every circuit, but with weighted num shots
-    else:
+    # get buckets of terms with similar shots counts, and index of original position
+    max_buckets = 3 if len(groups) < 50 else 4
+    buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=max_buckets)
+    
+    # find the average number of shots required for each bucket
+    # (sum of all shots for all circuits, nested, should be same as the incoming total)
+    bucket_avg_shots = compute_bucket_averages(buckets_kmeans)
+    
+    if debug:
+        print('  ... bucket kmeans:', buckets_kmeans)
+        print('  ... indices_kmeans:', indices_kmeans)
+        print('  ... bucket_avg_shots:', bucket_avg_shots)
+    
+    circuit_list = [[circuits[idx] for idx in indices] for indices in indices_kmeans]   
+    group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
+    
+    if debug:
+        # print(f"  circuit_list after bucketing = {circuit_list}")
+        print(f"  ... group_list after bucketing....") 
+        for group in group_list:
+            for g in group:
+                print(g)
+            print('-----')
+    
+    if verbose or debug:
+        print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
+    
+    # Loop over the circuit lists associated with each bucket
+    counts_array = []
+    for circuits, num_shots in zip(circuit_list, bucket_avg_shots):
+    
         if debug:
-            print("************* OLD WAY")
-            
-        counts_array = []
-        for circuit, num_shots in zip(circuits, num_shots_list):
-            
-            # execute this list of circuits, same shots each
-            results = execute_circuits(
-                    backend_id = backend_id,
-                    circuits = [circuit],
-                    num_shots = num_shots
-                    )
-                                           
-            counts = results.get_counts()
-            counts_array.append(counts)
+            # print(f"  ...    cccc = {circuits}")
+            print(f"... len circs = {len(circuits)}")
         
-        if len(circuits) < 2:
-            results = ExecResult(counts)
+        # execute this list of circuits, with same shots for each circuit in list
+        results = execute_circuits(
+                backend_id = backend_id,
+                #circuits = [circuit],
+                circuits = circuits,
+                num_shots = num_shots
+                )
+        
+        # accumulate list of returned raw count dicts to parallel the group list
+        # Qiskit returns an array of counts if array executed, but single counts for one circuit
+        if len(circuits) > 1:                           
+            for counts in results.get_counts():
+                counts_array.append(counts)
         else:
-            results = ExecResult(counts_array)
-        
-        if debug:        
-            print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
-            print(f"... groups len = {len(groups)}")
-            
-        return results, groups
+            counts_array.append(results.get_counts())
 
+    # Construct a Result object with counts structure to match circuits
+    results = ExecResult(counts_array)
+
+    # Create a flattened list of all groups
+    group_list = [item for sublist in group_list for item in sublist]
+    
+    if debug:
+        print(f"... results.get_counts() = {results.get_counts()}")
+        print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
+        print(f"... group_list len = {len(group_list)}")
+        print(f"  ... group_list after subgroups = ")
+        for group in group_list:
+            print(group)
+
+    return results, group_list
     
 # From the given list of term groups, distribute the total shot count, returning num_shots by group
 def get_distributed_shot_counts(
@@ -1175,41 +1139,6 @@ def get_distributed_shot_counts(
         ds_method: str = 'max_sq',
 ) -> List:
     #     # loop over all groups, to find the largest coefficient in each group
-    #     max_weights = []
-    #     for group in groups:
-    #         #print(group)
-    #         max_weight = 0
-    #         for pauli, coeff in group:
-    #             #print(f"  ... coeff = {coeff}")
-    #             max_weight = max(max_weight, np.real(abs(coeff)))
-
-    #         max_weights.append(max_weight)
-
-    # loop over all groups, to find the sum of coefficient in each group
-    #     norm_weights = []
-    #     for group in groups:
-    #         #print(group)
-    #         sum_weight = 0
-    #         for pauli, coeff in group:
-    #             #print(f"  ... coeff = {coeff}")
-    #             sum_weight += np.real(abs(coeff))
-
-    #         norm_weights.append(sum_weight/len(group))
-
-    # #     # compute a normalized distribution over all groups
-    # #     total_weights = sum(max_weights)
-    # #     max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
-
-    # #     # compute shots counts based on these weights
-    # #     num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
-
-    #     # compute a normalized distribution over all groups
-    #     total_weights = sum(norm_weights)
-    #     norm_weights_normalized = [norm_weight / total_weights for norm_weight in norm_weights]
-
-    #     # compute shots counts based on these weights
-    #     num_shots_list = [int(mwn * num_shots) for mwn in norm_weights_normalized]
-
     # add shots to first group until the total is same as the given total shot count
     #     one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
     weights = []
@@ -1228,7 +1157,7 @@ def get_distributed_shot_counts(
 
     # Step 2: Normalize weights to compute shot proportions
     total_weight = sum(weights)
-    # shot_allocations = [int((w / total_weight) * num_shots) for w in weights]
+    
     # make sure we don't have 0 shot allocation
     shot_allocations = [max(1, int((w / total_weight) * num_shots)) for w in weights]
 
@@ -1239,6 +1168,7 @@ def get_distributed_shot_counts(
     while sum(shot_allocations) > num_shots:
         max_index = np.argmax(shot_allocations)
         shot_allocations[max_index] -= 1
+        
     # print('shot allocation:', shot_allocations)
 
     return shot_allocations
