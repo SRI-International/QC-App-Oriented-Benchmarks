@@ -915,7 +915,8 @@ def execute_circuits(
 
     # Set up the backend for execution
     elif backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
-    
+        #print("... using Qiskit QASM Simulator")
+        
         # Initialize simulator backend
         from qiskit_aer import Aer
         if backend_id == "statevector_simulator":
@@ -935,13 +936,18 @@ def execute_circuits(
             noise_model = None
         
         # all circuits get the same number of shots as given 
+        #print("circuits = ", circuits)
         results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
+        #print("results = ", results)
+        #print("results.counts = ", results.get_counts())
     
     # handle special case using IBM Runtime Sampler Primitive
     elif ex.sampler is not None:
-        # print("... using Qiskit Runtime Sampler")
+        #print("... using Qiskit Runtime Sampler")
         
         from qiskit import transpile
+        
+        #print("circuits = ", circuits)
 
         # circuits need to be transpiled first, post Qiskit 1.0
         trans_qcs = transpile(circuits, ex.backend)
@@ -951,11 +957,15 @@ def execute_circuits(
         
         # wrap the Sampler result object's data in a compatible Result object 
         sampler_result = job.result()
+        #print("sampler_result = ", sampler_result)
+        
         results = BenchmarkResult(sampler_result)
+        #print("results = ", results)
+        #print("results.counts = ", results.get_counts())
      
     # handle all other backends here
     else:
-        # print(f"... using Qiskit run() with {backend_id}")
+        #print(f"... using Qiskit run() with {backend_id}")
         
         from qiskit import transpile
         
@@ -991,8 +1001,10 @@ class BenchmarkResult:
             bitvals = next(iter(result.data.values()))
             counts = bitvals.get_counts()
             count_array.append(counts)
-            
-        return count_array
+        
+        # return raw counts object if only a single circuit executed, otherwise the array
+        # this is done for consistency with all of the QED-C benchmark framework and Qiskit simulator
+        return count_array if len(count_array) > 1 else count_array[0]
 
 # class ExecResult is made for multi-circuit runs. 
 class ExecResult(object):
@@ -1109,6 +1121,8 @@ def execute_circuits_distribute_shots(
                 
             for counts2 in counts:
                 counts_array.append(counts2)
+            
+            #counts_array.append(results.get_counts())
 
         # similarly, construct a Result object with counts structure to match circuits
         if len(counts_array) < 2:
