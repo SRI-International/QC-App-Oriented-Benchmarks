@@ -630,30 +630,17 @@ def run(min_qubits: int = 2,
                         # generate an array of circuits, one for each pauli_string in list
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                                 qc, num_qubits, pauli_str_list)
-                        
-                        if verbose:                 
-                            for circuit, group in list(zip(circuits, pauli_term_groups)):
-                                print(group)
-                                #print(circuit)
 
-                        # call api-specific function to execute circuits
-                        if not distribute_shots:
-                            print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
-                            # execute the entire list of circuits, same shots each
-                            results = execute_circuits(
-                                    backend_id = backend_id,
-                                    circuits = circuits,
-                                    num_shots = int(num_shots / len(circuits))
-                                    )
-                        else:
-                            # execute with shots distributed by weight of coefficients
-                            results, pauli_term_groups = execute_circuits_distribute_shots(
-                                    backend_id = backend_id,
-                                    circuits = circuits,
-                                    num_shots = num_shots,
-                                    groups = pauli_term_groups
-                                    )
-                                
+                        # execute the circuits with given number of shots on specified backend
+                        # apply weighted shot distribution, if specified
+                        results, pauli_term_groups = execute_circuits_enhanced(
+                                backend_id = backend_id,
+                                circuits = circuits,
+                                num_shots = num_shots,
+                                distribute_shots = distribute_shots,
+                                pauli_term_groups = pauli_term_groups
+                                )
+                                    
                         # Compute the total energy for the Hamiltonian
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                                 num_qubits, results, pauli_term_groups)
@@ -686,7 +673,8 @@ def run(min_qubits: int = 2,
                 # special case for CUDA Q Observables
                 elif api == "cudaq":
                     if group_method != "SpinOperator":
-                        print(f"... executing circuits via sampling, without using CUDA-Q Observe, group_method = {group_method}")
+                        print(f"... using CUDA-Q Sampling, group_method = {group_method}")
+                        
                         # Generate circuits for each Pauli term
                         pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
                             num_qubits, sparse_pauli_terms,
@@ -698,28 +686,16 @@ def run(min_qubits: int = 2,
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                             qc, num_qubits, pauli_str_list
                         ) # qc is an array with the kernel and dependent parameters
-                        
-                        print(f"... number of circuits to execute: {len(circuits)}")
 
-                        if verbose:
-                            for circuit, group in zip(circuits, pauli_term_groups):
-                                print(group)
-
-                        # Execute circuits
-                        if not distribute_shots:
-                            print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
-                            results = execute_circuits(
-                                backend_id=backend_id,
-                                circuits=circuits,
-                                num_shots=int(num_shots / len(circuits)),
-                            )
-                        else:
-                            results, pauli_term_groups = execute_circuits_distribute_shots(
-                                backend_id=backend_id,
-                                circuits=circuits,
-                                num_shots=num_shots,
-                                groups=pauli_term_groups,
-                            )
+                        # execute the circuits with given number of shots on specified backend
+                        # apply weighted shot distribution, if specified
+                        results, pauli_term_groups = execute_circuits_enhanced(
+                                backend_id = backend_id,
+                                circuits = circuits,
+                                num_shots = num_shots,
+                                distribute_shots = distribute_shots,
+                                pauli_term_groups = pauli_term_groups
+                                )
 
                         # Compute total energy from measurements
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
@@ -880,13 +856,58 @@ def run(min_qubits: int = 2,
         if mpi.leader():
             plot_from_data(suptitle, metrics_array, backend_id, options)
 
-    
+
+#################################################################
+#################################################################
+# EXECUTE CIRCUITS (ENHANCED)
+ 
+def execute_circuits_enhanced(
+        backend_id: str = None,
+        circuits: list = None,
+        num_shots: int = 100,
+        distribute_shots: bool = False,
+        pauli_term_groups: list = None,
+        ds_method: str = 'max_sq',
+    ) -> list:
+    """
+    Execute an array of circuits with the given number of shots on the specified backend.
+    With default execution, the shots are divided evenly across all circuits in the group.
+    If "distribute_shots" is set to True, the pauli_term_groups are used to distribute shots
+    across the circuits based on the weights of the coefficients in the terms of the group 
+    and according to the ds_method (default = 'max_sq').
+    """
+    if verbose:                 
+        for circuit, group in list(zip(circuits, pauli_term_groups)):
+            print(group)
+            #print(circuit)
+
+    # call api-specific function to execute circuits
+    if not distribute_shots:
+        #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
+        # execute the entire list of circuits, same shots each
+        results = execute_circuits(
+                backend_id = backend_id,
+                circuits = circuits,
+                num_shots = int(num_shots / len(circuits))
+                )
+    else:
+        # execute with shots distributed by weight of coefficients
+        results, pauli_term_groups = execute_circuits_distribute_shots(
+                backend_id = backend_id,
+                circuits = circuits,
+                num_shots = num_shots,
+                groups = pauli_term_groups,
+                ds_method = ds_method,
+                )
+                
+    return results, pauli_term_groups
+  
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
 
 # This code is provided here to augment the default API/execute functions,
 # specifically to enable execution of an array of circuits for observable calculations.
-# This code will be moved up into the _common/API/execute methods later (210131).
+# This code will be moved up into the _common/API/execute methods later (TL: 210509).
 
 def execute_circuits(
         backend_id: str = None,
@@ -1027,8 +1048,7 @@ class ExecResult(object):
 #########################################
 # EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
 
-# 250302 TL: Leaving these options in until we are sure all works well.
-new_way = True
+# 250302 TL: Leaving this option in until we are sure all works well.
 debug = False
     
 def execute_circuits_distribute_shots(
@@ -1173,7 +1193,7 @@ def get_distributed_shot_counts(
 
     return shot_allocations
 
-
+                        
 ########################################
 # UTILITY FUNCTIONS (TEMPORARY)
 
@@ -1184,7 +1204,7 @@ def get_distributed_shot_counts(
 
 def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     """
-    Group the Pauli terms accourding to the given group method: "None", "simple", "N"
+    Group the Pauli terms according to the given group method: "None", "simple", "N"
     """
     # have to do this here, due to logic of the "api" code; improve these imports later 
     import observables
