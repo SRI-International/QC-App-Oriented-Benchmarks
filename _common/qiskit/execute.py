@@ -749,7 +749,7 @@ def execute_circuit(circuit):
                     job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
 
                 if use_m3:
-                    m3_mitigation[job] = (mit, qubits)
+                    m3_mitigation[job.job_id()] = (mit, qubits)
 
                 logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
                 if verbose_time: print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
@@ -1200,8 +1200,9 @@ def job_complete(job):
         if isinstance(result_counts, list):
             total_counts = dict()
             for count in result_counts:
-                if job in m3_mitigation:
-                    mit, qubits = m3_mitigation[job]
+                job_id = job.job_id()
+                if job_id in m3_mitigation:
+                    mit, qubits = m3_mitigation[job_id]
                     count = mit.apply_correction(count, qubits).nearest_probability_distribution()
                 total_counts = dict(Counter(total_counts) + Counter(count))
                 
@@ -1216,8 +1217,9 @@ def job_complete(job):
             results.data.counts = total_counts
             result.results = [ results ]
         else:
-            if job in m3_mitigation:
-                mit, qubits = m3_mitigation[job]
+            job_id = job.job_id()
+            if job_id in m3_mitigation:
+                mit, qubits = m3_mitigation[job_id]
                 count = mit.apply_correction(result_counts, qubits).nearest_probability_distribution()
                 result.set_counts(count)
             
