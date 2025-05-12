@@ -76,6 +76,11 @@ session_count = 0
 session = None
 sampler = None
 
+# M3 mitigation
+use_m3 = False
+m3_mitigation = {}
+m3_cache = {}
+
 # Use the IBM Quantum Platform system; default is to use the IBM Cloud
 use_ibm_quantum_platform = False
 
@@ -266,11 +271,18 @@ def set_execution_target(backend_id='qasm_simulator',
     global use_ibm_quantum_platform
     global use_sessions
     global session_count
+    global use_m3
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
 
     # default to qasm_simulator if None passed in
     if backend_id == None:
         backend_id="qasm_simulator"
+
+    if exec_options is None:
+        exec_options = {}
+
+    # set M3 options
+    use_m3 = exec_options.get("use_m3", False)
         
     # if a custom provider backend is given, use it ...
     # Note: in this case, the backend_id is an identifier that shows up in plots
@@ -711,6 +723,20 @@ def execute_circuit(circuit):
                 # perform circuit execution on backend
                 logger.info(f'Running trans_qc, shots={shots}')
                 st = time.time()
+                if use_m3:
+                    from mthree import M3Mitigation
+                    from mthree.utils import final_measurement_mapping
+                    mapping = final_measurement_mapping(trans_qc)
+                    qubits = tuple(mapping.values())
+                    sorted_qubits = tuple(sorted(set(qubits)))
+                    if sorted_qubits in m3_cache:
+                        mit = m3_cache[sorted_qubits]
+                        logger.info(f"Use cached M3 {sorted_qubits=}")
+                    else:
+                        mit = M3Mitigation(backend)
+                        mit.cals_from_system(sorted_qubits, runtime_mode=session)
+                        m3_cache[sorted_qubits] = mit
+                        logger.info(f"Calibrating M3 {sorted_qubits=}")
 
                 if sampler:
                     # set job tags if SamplerV2 on IBM Quantum Platform
@@ -721,6 +747,9 @@ def execute_circuit(circuit):
                     job = sampler.run([trans_qc], shots=shots)
                 else:
                     job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
+
+                if use_m3:
+                    m3_mitigation[job.job_id()] = (mit, qubits)
 
                 logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
                 if verbose_time: print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
@@ -1167,13 +1196,17 @@ def job_complete(job):
         # <result> contains results from multiple circuits
         # DEVNOTE: This will need to change; currently the only case where we have multiple result counts
         # is when using randomly_compile; later, there will be other cases
-        if not use_sessions and type(result.get_counts()) == list:
+        result_counts = result.get_counts()
+        if isinstance(result_counts, list):
             total_counts = dict()
-            for count in result.get_counts():
+            for count in result_counts:
+                job_id = job.job_id()
+                if job_id in m3_mitigation:
+                    mit, qubits = m3_mitigation[job_id]
+                    count = mit.apply_correction(count, qubits).nearest_probability_distribution()
                 total_counts = dict(Counter(total_counts) + Counter(count))
                 
             # make a copy of the result object so we can return a modified version
-            orig_result = result
             result = copy.copy(result) 
 
             # replace the results array with an array containing only the first results object
@@ -1183,6 +1216,12 @@ def job_complete(job):
             results.shots = actual_shots
             results.data.counts = total_counts
             result.results = [ results ]
+        else:
+            job_id = job.job_id()
+            if job_id in m3_mitigation:
+                mit, qubits = m3_mitigation[job_id]
+                count = mit.apply_correction(result_counts, qubits).nearest_probability_distribution()
+                result.set_counts(count)
             
         try:
             result_handler(active_circuit["qc"],
