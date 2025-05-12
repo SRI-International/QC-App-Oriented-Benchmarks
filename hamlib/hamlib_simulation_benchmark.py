@@ -1098,11 +1098,11 @@ def execute_circuits_distribute_shots(
         print('  ... indices_kmeans:', indices_kmeans)
         print('  ... bucket_avg_shots:', bucket_avg_shots)
     
-    circuit_list = [[circuits[idx] for idx in indices] for indices in indices_kmeans]   
+    circuits_list = [[circuits[idx] for idx in indices] for indices in indices_kmeans]   
     group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
     
     if debug:
-        # print(f"  circuit_list after bucketing = {circuit_list}")
+        # print(f"  circuits_list after bucketing = {circuits_list}")
         print(f"  ... group_list after bucketing....") 
         for group in group_list:
             for g in group:
@@ -1111,33 +1111,14 @@ def execute_circuits_distribute_shots(
     
     if verbose or debug:
         print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
-    
-    # Loop over the circuit lists associated with each bucket
-    counts_array = []
-    for circuits, num_shots in zip(circuit_list, bucket_avg_shots):
-    
-        if debug:
-            # print(f"  ...    cccc = {circuits}")
-            print(f"... len circs = {len(circuits)}")
-        
-        # execute this list of circuits, with same shots for each circuit in list
-        results = execute_circuits(
-                backend_id = backend_id,
-                #circuits = [circuit],
-                circuits = circuits,
-                num_shots = num_shots
-                )
-        
-        # accumulate list of returned raw count dicts to parallel the group list
-        # Qiskit returns an array of counts if array executed, but single counts for one circuit
-        if len(circuits) > 1:                           
-            for counts in results.get_counts():
-                counts_array.append(counts)
-        else:
-            counts_array.append(results.get_counts())
 
-    # Construct a Result object with counts structure to match circuits
-    results = ExecResult(counts_array)
+    # Execute each circuit in the list using the num_shots in the associated num_shots_list
+    # Accumulate the count dicts in results object as if circuits were executed individually
+    results = execute_circuits_with_mixed_shots(
+        backend_id = backend_id,
+        circuits_list = circuits_list,
+        num_shots_list = bucket_avg_shots,
+        )
 
     # Create a flattened list of all groups
     group_list = [item for sublist in group_list for item in sublist]
@@ -1151,7 +1132,8 @@ def execute_circuits_distribute_shots(
             print(group)
 
     return results, group_list
-    
+
+
 # From the given list of term groups, distribute the total shot count, returning num_shots by group
 def get_distributed_shot_counts(
         num_shots: int = 100,
@@ -1193,6 +1175,43 @@ def get_distributed_shot_counts(
 
     return shot_allocations
 
+#####################
+
+def execute_circuits_with_mixed_shots(
+        backend_id: str = None,
+        circuits_list: list = None,
+        num_shots_list: List[int] = None,
+    ):
+    
+    # Loop over the circuit lists associated with each bucket
+    counts_array = []
+    for circuits, num_shots in zip(circuits_list, num_shots_list):
+    
+        if debug:
+            # print(f"  ...    cccc = {circuits}")
+            print(f"... len circs = {len(circuits)}")
+        
+        # execute this list of circuits, with same shots for each circuit in list
+        results = execute_circuits(
+                backend_id = backend_id,
+                #circuits = [circuit],
+                circuits = circuits,
+                num_shots = num_shots
+                )
+        
+        # accumulate list of returned raw count dicts to parallel the group list
+        # Qiskit returns an array of counts if array executed, but single counts for one circuit
+        if len(circuits) > 1:                           
+            for counts in results.get_counts():
+                counts_array.append(counts)
+        else:
+            counts_array.append(results.get_counts())
+
+    # Construct a Result object with counts structure to match circuits
+    results = ExecResult(counts_array)
+    
+    return results
+    
                         
 ########################################
 # UTILITY FUNCTIONS (TEMPORARY)
