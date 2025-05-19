@@ -915,135 +915,8 @@ def execute_circuits(
         num_shots: int = 100
     ) -> list:
 
-    if verbose:
-        print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
-
-    if backend_id == None:
-        backend_id == "qasm_simulator"
-
-    # if backend_id == "nvidia":
-    if api_ == "cudaq":
-        counts_array = []
-        for circuit in circuits:
-            result = ex.execute_circuit_immed(circuit, num_shots)
-            counts_array.append(result.get_counts())
-            
-        # Construct a Result object with counts structure to match circuits
-        results = ExecResult(counts_array)
-
-    # Set up the backend for execution
-    elif backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
-        #print("... using Qiskit QASM Simulator")
-        
-        # Initialize simulator backend
-        from qiskit_aer import Aer
-        if backend_id == "statevector_simulator":
-            #backend = Aer.get_backend('statevector_simulator')
-            backend = Aer.get_backend('qasm_simulator')
-        else:
-            backend = Aer.get_backend('qasm_simulator')
-            
-        #print(f"... backend_id = {backend_id}")
-   
-        # Execute all of the circuits to obtain array of result objects
-        if backend_id != "statevector_simulator" and ex.noise is not None:
-            #print("**************** executing with noise")
-            noise_model = ex.noise
-            
-        else:
-            noise_model = None
-        
-        # all circuits get the same number of shots as given 
-        #print("circuits = ", circuits)
-        results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
-        #print("results = ", results)
-        #print("results.counts = ", results.get_counts())
+    return ex.execute_circuits_immed(backend_id, circuits, num_shots)
     
-    # handle special case using IBM Runtime Sampler Primitive
-    elif ex.sampler is not None:
-        #print("... using Qiskit Runtime Sampler")
-        
-        from qiskit import transpile
-        
-        #print("circuits = ", circuits)
-
-        # circuits need to be transpiled first, post Qiskit 1.0
-        trans_qcs = transpile(circuits, ex.backend)
-        
-        # execute the circuits using the Sampler Primitive (required for IBM Runtime Qiskit 1.3
-        job = ex.sampler.run(trans_qcs, shots=num_shots)
-        
-        # wrap the Sampler result object's data in a compatible Result object 
-        sampler_result = job.result()
-        #print("sampler_result = ", sampler_result)
-        
-        results = BenchmarkResult(sampler_result)
-        #print("results = ", results)
-        #print("results.counts = ", results.get_counts())
-     
-    # handle all other backends here
-    else:
-        #print(f"... using Qiskit run() with {backend_id}")
-        
-        from qiskit import transpile
-        
-        # DEVNOTE: This line is specific to IonQ Aria-1 simulation; comment out
-        # ex.backend.set_options(noise_model="aria-1")
-        
-        # circuits need to be transpiled first, post Qiskit 1.0
-        trans_qcs = transpile(circuits, ex.backend)
-        
-        # execute the circuits using backend.run()
-        job = ex.backend.run(trans_qcs, shots=num_shots)
-        
-        results = job.result()
-          
-    return results
-        
-
-# The class BenchmarkResult is designed for use with IBM Sampler runs. 
-# The qiskit primitive job result instances don't have a get_counts method 
-# like backend results do. As such, a get counts method is calculated
-# from the quasi distributions and shots taken.
-# This provides a normalized return value across all benchmarks.
-class BenchmarkResult:
-
-    def __init__(self, qiskit_result):
-        super().__init__()
-        self.qiskit_result = qiskit_result
-        self.metadata = qiskit_result.metadata
-
-    def get_counts(self):
-        count_array = []
-        for result in self.qiskit_result:    
-            # convert the quasi distribution bit values to shots distribution
-            bitvals = next(iter(result.data.values()))
-            counts = bitvals.get_counts()
-            count_array.append(counts)
-        
-        # return raw counts object if only a single circuit executed, otherwise the array
-        # this is done for consistency with all of the QED-C benchmark framework and Qiskit simulator
-        return count_array if len(count_array) > 1 else count_array[0]
-
-# class ExecResult is made for multi-circuit runs. 
-class ExecResult(object):
-
-    def __init__(self, counts):
-        super().__init__()
-        
-        # Store the count distributions as they will be returned
-        # A single count object for one circuit, and an array of count object for array of circuits
-        if isinstance(counts, list):
-            if len(counts) < 2:
-                self.counts = counts[0]
-            else:
-                self.counts = counts
-        else:
-            self.counts = counts
-
-    def get_counts(self, qc=0):
-        return self.counts
- 
  
 #########################################
 # EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
@@ -1211,7 +1084,27 @@ def execute_circuits_with_mixed_shots(
     results = ExecResult(counts_array)
     
     return results
-    
+
+# class ExecResult is made for multi-circuit runs. 
+class ExecResult(object):
+
+    def __init__(self, counts):
+        super().__init__()
+        
+        # Store the count distributions as they will be returned
+        # A single count object for one circuit, and an array of count object for array of circuits
+        if isinstance(counts, list):
+            if len(counts) < 2:
+                self.counts = counts[0]
+            else:
+                self.counts = counts
+        else:
+            self.counts = counts
+
+    def get_counts(self, qc=0):
+        return self.counts
+ 
+ 
                         
 ########################################
 # UTILITY FUNCTIONS (TEMPORARY)

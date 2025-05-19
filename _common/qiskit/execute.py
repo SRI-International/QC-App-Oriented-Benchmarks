@@ -1513,6 +1513,123 @@ def check_jobs(completion_handler=None):
 def test_execution():
     pass
 
+########################################
+# NEW CODE 
+
+# The following functions have been moved here from the hamlib benchmark.
+# This transition and merge of new code developed in the hamlib benchmark is a work-in-progress.
+# The code below will be gradually integrated into this module in stages (TL: 250519)
+
+# This function performs multiple circuit execution, which the other functions in this module do not yet
+def execute_circuits_immed(
+        backend_id: str = None,
+        circuits: list = None,
+        num_shots: int = 100
+    ) -> list:
+    """
+    Execute a list of circuits on the given backend with the given number of shots.
+    """
+    
+    if verbose:
+        print(f"... execute_cicuits_immed({backend_id}, {len(circuits)}, {num_shots})")
+
+    if backend_id == None:
+        backend_id == "qasm_simulator"
+
+    # Set up the backend for execution
+    if backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
+        #print("... using Qiskit QASM Simulator")
+        
+        # Initialize simulator backend
+        from qiskit_aer import Aer
+        if backend_id == "statevector_simulator":
+            #backend = Aer.get_backend('statevector_simulator')
+            this_backend = Aer.get_backend('qasm_simulator')
+        else:
+            this_backend = Aer.get_backend('qasm_simulator')
+            
+        #print(f"... backend_id = {backend_id}")
+   
+        # Execute all of the circuits to obtain array of result objects
+        if backend_id != "statevector_simulator" and noise is not None:
+            #print("**************** executing with noise")
+            noise_model = noise
+            
+        else:
+            noise_model = None
+        
+        # all circuits get the same number of shots as given 
+        #print("circuits = ", circuits)
+        results = this_backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
+        #print("results = ", results)
+        #print("results.counts = ", results.get_counts())
+    
+    # handle special case using IBM Runtime Sampler Primitive
+    elif sampler is not None:
+        #print("... using Qiskit Runtime Sampler")
+        
+        from qiskit import transpile
+        
+        #print("circuits = ", circuits)
+
+        # circuits need to be transpiled first, post Qiskit 1.0
+        trans_qcs = transpile(circuits, backend)
+        
+        # execute the circuits using the Sampler Primitive (required for IBM Runtime Qiskit 1.3
+        job = sampler.run(trans_qcs, shots=num_shots)
+        
+        # wrap the Sampler result object's data in a compatible Result object 
+        sampler_result = job.result()
+        #print("sampler_result = ", sampler_result)
+        
+        results = BenchmarkResult2(sampler_result)
+        #print("results = ", results)
+        #print("results.counts = ", results.get_counts())
+     
+    # handle all other backends here
+    else:
+        #print(f"... using Qiskit run() with {backend_id}")
+        
+        from qiskit import transpile
+        
+        # DEVNOTE: This line is specific to IonQ Aria-1 simulation; comment out
+        # backend.set_options(noise_model="aria-1")
+        
+        # circuits need to be transpiled first, post Qiskit 1.0
+        trans_qcs = transpile(circuits, backend)
+        
+        # execute the circuits using backend.run()
+        job = backend.run(trans_qcs, shots=num_shots)
+        
+        results = job.result()
+          
+    return results
+        
+
+# The class BenchmarkResult is designed for use with IBM Sampler runs. 
+# The qiskit primitive job result instances don't have a get_counts method 
+# like backend results do. As such, a get counts method is calculated
+# from the quasi distributions and shots taken.
+# This provides a normalized return value across all benchmarks.
+class BenchmarkResult2:
+
+    def __init__(self, qiskit_result):
+        super().__init__()
+        self.qiskit_result = qiskit_result
+        self.metadata = qiskit_result.metadata
+
+    def get_counts(self):
+        count_array = []
+        for result in self.qiskit_result:    
+            # convert the quasi distribution bit values to shots distribution
+            bitvals = next(iter(result.data.values()))
+            counts = bitvals.get_counts()
+            count_array.append(counts)
+        
+        # return raw counts object if only a single circuit executed, otherwise the array
+        # this is done for consistency with all of the QED-C benchmark framework and Qiskit simulator
+        return count_array if len(count_array) > 1 else count_array[0]
+
 
 ########################################
 # DEPRECATED METHODS

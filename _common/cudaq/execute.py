@@ -471,6 +471,12 @@ def test_execution():
 ###################################################################
 # IMMEDIATE EXECUTION
 
+# NEW CODE 
+
+# The following functions have been moved here from the hamlib benchmark.
+# This transition and merge of new code developed in the hamlib benchmark is a work-in-progress.
+# The code below will be gradually integrated into this module in stages (TL: 250519)
+
 # Execute a circuit with its parameters and return result without batching
 
 # Launch execution of one batched circuit
@@ -600,5 +606,46 @@ def execute_circuit_immed (circuit: list, num_shots: int):
     
     # return a Qiskit-like result object 
     return result
- 
+
+# This function performs multiple circuit execution
+def execute_circuits_immed(
+        backend_id: str = None,
+        circuits: list = None,
+        num_shots: int = 100
+    ) -> list:
+    """
+    Execute a list of circuits on the given backend with the given number of shots.
+    """
     
+    if verbose:
+        print(f"... execute_cicuits_immed({backend_id}, {len(circuits)}, {num_shots})")
+        
+    counts_array = []
+    for circuit in circuits:
+        result = execute_circuit_immed(circuit, num_shots)
+        counts_array.append(result.get_counts())
+        
+    # Construct a Result object with counts structure to match circuits
+    results = ExecResult(counts_array)
+    
+    return results
+    
+        
+# class ExecResult is made for multi-circuit runs. 
+class ExecResult(object):
+
+    def __init__(self, counts):
+        super().__init__()
+        
+        # Store the count distributions as they will be returned
+        # A single count object for one circuit, and an array of count object for array of circuits
+        if isinstance(counts, list):
+            if len(counts) < 2:
+                self.counts = counts[0]
+            else:
+                self.counts = counts
+        else:
+            self.counts = counts
+
+    def get_counts(self, qc=0):
+        return self.counts       
