@@ -145,7 +145,8 @@ import time
 
 from qiskit import QuantumCircuit
 from qiskit_aer import Aer
-from qiskit.primitives import Estimator
+#from qiskit.primitives import Estimator
+from qiskit_ibm_runtime import Estimator
 
 from qiskit.quantum_info import Operator, Pauli
 from qiskit.quantum_info import SparsePauliOp

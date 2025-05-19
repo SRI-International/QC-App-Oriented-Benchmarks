@@ -65,49 +65,24 @@ def create_measurement_circuts(qc, num_qubits, pauli_term_groups, pauli_str_list
 def do_execute(backend_id: str, circuits: list, num_shots: int,
         pauli_term_groups: list, distribute_shots: bool = False, ds_method: str = 'max_sq'):
     
-    # Initialize simulator backend
-    
-    #from qiskit_aer import Aer
-    #####backend = Aer.get_backend('qasm_simulator')
-    #backend = Aer.get_backend('statevector_simulator')     # doesn't work, only returns 1 shot
-    
     ### print(f"... begin executing {len(circuits)} circuits ...")
     ts = time.time()
-    
-    # Execute all of the circuits to obtain array of result objects
-    ###### results = backend.run(circuits, num_shots=num_shots, noise_model=execute.noise).result()
 
-    results = hamlib_simulation_benchmark.execute_circuits(
-                                    backend_id = backend_id,
-                                    circuits = circuits,
-                                    num_shots = int(num_shots / len(circuits))
-                                    )
-                                    
-    # call api-specific function to execute circuits
-    if not distribute_shots:
-        #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
-        # execute the entire list of circuits, same shots each
-        results = hamlib_simulation_benchmark.execute_circuits(
-                backend_id = backend_id,
-                circuits = circuits,
-                num_shots = int(num_shots / len(circuits))
-                )
-    else:
-        # execute with shots distributed by weight of coefficients
-        results, pauli_term_groups = hamlib_simulation_benchmark.execute_circuits_distribute_shots(
-                backend_id = backend_id,
-                circuits = circuits,
-                num_shots = num_shots,
-                groups = pauli_term_groups,
-                ds_method = ds_method,
-                )     
-
-    #for ca in results.get_counts():
-    #    print(ca)
+    # execute the circuits with given number of shots on specified backend
+    # apply weighted shot distribution, if specified
+    results, pauli_term_groups = hamlib_simulation_benchmark.execute_circuits_enhanced(
+            backend_id = backend_id,
+            circuits = circuits,
+            num_shots = num_shots,
+            distribute_shots = distribute_shots,
+            pauli_term_groups = pauli_term_groups,
+            ds_method = ds_method,
+            )        
     
     exec_time = round(time.time()-ts, 3)
     metrics_object["execute_circuits_time"] = exec_time
-    ###print(f"... finished executing {len(circuits)} circuits, total execution time = {exec_time} sec.\n")
+    ### print(f"... finished executing {len(circuits)} circuits, total execution time = {exec_time} sec.\n")
+    
     return results, pauli_term_groups
 
 

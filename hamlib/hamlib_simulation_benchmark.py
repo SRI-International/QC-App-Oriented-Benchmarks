@@ -630,30 +630,17 @@ def run(min_qubits: int = 2,
                         # generate an array of circuits, one for each pauli_string in list
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                                 qc, num_qubits, pauli_str_list)
-                        
-                        if verbose:                 
-                            for circuit, group in list(zip(circuits, pauli_term_groups)):
-                                print(group)
-                                #print(circuit)
 
-                        # call api-specific function to execute circuits
-                        if not distribute_shots:
-                            print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
-                            # execute the entire list of circuits, same shots each
-                            results = execute_circuits(
-                                    backend_id = backend_id,
-                                    circuits = circuits,
-                                    num_shots = int(num_shots / len(circuits))
-                                    )
-                        else:
-                            # execute with shots distributed by weight of coefficients
-                            results, pauli_term_groups = execute_circuits_distribute_shots(
-                                    backend_id = backend_id,
-                                    circuits = circuits,
-                                    num_shots = num_shots,
-                                    groups = pauli_term_groups
-                                    )
-                                
+                        # execute the circuits with given number of shots on specified backend
+                        # apply weighted shot distribution, if specified
+                        results, pauli_term_groups = execute_circuits_enhanced(
+                                backend_id = backend_id,
+                                circuits = circuits,
+                                num_shots = num_shots,
+                                distribute_shots = distribute_shots,
+                                pauli_term_groups = pauli_term_groups
+                                )
+                                    
                         # Compute the total energy for the Hamiltonian
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                                 num_qubits, results, pauli_term_groups)
@@ -686,7 +673,8 @@ def run(min_qubits: int = 2,
                 # special case for CUDA Q Observables
                 elif api == "cudaq":
                     if group_method != "SpinOperator":
-                        print(f"... executing circuits via sampling, without using CUDA-Q Observe, group_method = {group_method}")
+                        print(f"... using CUDA-Q Sampling, group_method = {group_method}")
+                        
                         # Generate circuits for each Pauli term
                         pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
                             num_qubits, sparse_pauli_terms,
@@ -698,28 +686,16 @@ def run(min_qubits: int = 2,
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                             qc, num_qubits, pauli_str_list
                         ) # qc is an array with the kernel and dependent parameters
-                        
-                        print(f"... number of circuits to execute: {len(circuits)}")
 
-                        if verbose:
-                            for circuit, group in zip(circuits, pauli_term_groups):
-                                print(group)
-
-                        # Execute circuits
-                        if not distribute_shots:
-                            print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
-                            results = execute_circuits(
-                                backend_id=backend_id,
-                                circuits=circuits,
-                                num_shots=int(num_shots / len(circuits)),
-                            )
-                        else:
-                            results, pauli_term_groups = execute_circuits_distribute_shots(
-                                backend_id=backend_id,
-                                circuits=circuits,
-                                num_shots=num_shots,
-                                groups=pauli_term_groups,
-                            )
+                        # execute the circuits with given number of shots on specified backend
+                        # apply weighted shot distribution, if specified
+                        results, pauli_term_groups = execute_circuits_enhanced(
+                                backend_id = backend_id,
+                                circuits = circuits,
+                                num_shots = num_shots,
+                                distribute_shots = distribute_shots,
+                                pauli_term_groups = pauli_term_groups
+                                )
 
                         # Compute total energy from measurements
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
@@ -880,14 +856,58 @@ def run(min_qubits: int = 2,
         if mpi.leader():
             plot_from_data(suptitle, metrics_array, backend_id, options)
 
+
+#################################################################
+#################################################################
+# EXECUTE CIRCUITS (ENHANCED)
+ 
+def execute_circuits_enhanced(
+        backend_id: str = None,
+        circuits: list = None,
+        num_shots: int = 100,
+        distribute_shots: bool = False,
+        pauli_term_groups: list = None,
+        ds_method: str = 'max_sq',
+    ) -> list:
+    """
+    Execute an array of circuits with the given number of shots on the specified backend.
+    With default execution, the shots are divided evenly across all circuits in the group.
+    If "distribute_shots" is set to True, the pauli_term_groups are used to distribute shots
+    across the circuits based on the weights of the coefficients in the terms of the group 
+    and according to the ds_method (default = 'max_sq').
+    """
+    if verbose:                 
+        for circuit, group in list(zip(circuits, pauli_term_groups)):
+            print(group)
+            #print(circuit)
+
+    # call api-specific function to execute circuits
+    if not distribute_shots:
+        #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
+        # execute the entire list of circuits, same shots each
+        results = execute_circuits(
+                backend_id = backend_id,
+                circuits = circuits,
+                num_shots = int(num_shots / len(circuits))
+                )
+    else:
+        # execute with shots distributed by weight of coefficients
+        results, pauli_term_groups = execute_circuits_distribute_shots(
+                backend_id = backend_id,
+                circuits = circuits,
+                num_shots = num_shots,
+                groups = pauli_term_groups,
+                ds_method = ds_method,
+                )
+                
+    return results, pauli_term_groups
   
-    
 ########################################
 # CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
 
 # This code is provided here to augment the default API/execute functions,
 # specifically to enable execution of an array of circuits for observable calculations.
-# This code will be moved up into the _common/API/execute methods later (210131).
+# This code will be moved up into the _common/API/execute methods later (TL: 210509).
 
 def execute_circuits(
         backend_id: str = None,
@@ -907,15 +927,14 @@ def execute_circuits(
         for circuit in circuits:
             result = ex.execute_circuit_immed(circuit, num_shots)
             counts_array.append(result.get_counts())
-        
-        if len(counts_array) < 2:
-            results = ExecResult(counts_array[0])
-        else:
-            results = ExecResult(counts_array)
+            
+        # Construct a Result object with counts structure to match circuits
+        results = ExecResult(counts_array)
 
     # Set up the backend for execution
     elif backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
-    
+        #print("... using Qiskit QASM Simulator")
+        
         # Initialize simulator backend
         from qiskit_aer import Aer
         if backend_id == "statevector_simulator":
@@ -935,13 +954,18 @@ def execute_circuits(
             noise_model = None
         
         # all circuits get the same number of shots as given 
+        #print("circuits = ", circuits)
         results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
+        #print("results = ", results)
+        #print("results.counts = ", results.get_counts())
     
     # handle special case using IBM Runtime Sampler Primitive
     elif ex.sampler is not None:
-        print("... using Qiskit Runtime Sampler")
+        #print("... using Qiskit Runtime Sampler")
         
         from qiskit import transpile
+        
+        #print("circuits = ", circuits)
 
         # circuits need to be transpiled first, post Qiskit 1.0
         trans_qcs = transpile(circuits, ex.backend)
@@ -951,11 +975,15 @@ def execute_circuits(
         
         # wrap the Sampler result object's data in a compatible Result object 
         sampler_result = job.result()
+        #print("sampler_result = ", sampler_result)
+        
         results = BenchmarkResult(sampler_result)
+        #print("results = ", results)
+        #print("results.counts = ", results.get_counts())
      
     # handle all other backends here
     else:
-        print(f"... using Qiskit run() with {backend_id}")
+        #print(f"... using Qiskit run() with {backend_id}")
         
         from qiskit import transpile
         
@@ -973,10 +1001,11 @@ def execute_circuits(
     return results
         
 
-# class BenchmarkResult is made for Sampler runs. This is because
-# qiskit primitive job result instances don't have a get_counts method 
+# The class BenchmarkResult is designed for use with IBM Sampler runs. 
+# The qiskit primitive job result instances don't have a get_counts method 
 # like backend results do. As such, a get counts method is calculated
 # from the quasi distributions and shots taken.
+# This provides a normalized return value across all benchmarks.
 class BenchmarkResult:
 
     def __init__(self, qiskit_result):
@@ -991,33 +1020,35 @@ class BenchmarkResult:
             bitvals = next(iter(result.data.values()))
             counts = bitvals.get_counts()
             count_array.append(counts)
-            
-        return count_array
+        
+        # return raw counts object if only a single circuit executed, otherwise the array
+        # this is done for consistency with all of the QED-C benchmark framework and Qiskit simulator
+        return count_array if len(count_array) > 1 else count_array[0]
 
 # class ExecResult is made for multi-circuit runs. 
 class ExecResult(object):
 
-    def __init__(self, counts_array):
+    def __init__(self, counts):
         super().__init__()
-        #self.qiskit_result = qiskit_result
-        #self.metadata = qiskit_result.metadata
-        self.counts = counts_array
+        
+        # Store the count distributions as they will be returned
+        # A single count object for one circuit, and an array of count object for array of circuits
+        if isinstance(counts, list):
+            if len(counts) < 2:
+                self.counts = counts[0]
+            else:
+                self.counts = counts
+        else:
+            self.counts = counts
 
     def get_counts(self, qc=0):
-        # counts= self.qiskit_result.quasi_dists[0].binary_probabilities()
-        # for key in counts.keys():
-        #     counts[key] = int(counts[key] * self.qiskit_result.metadata[0]['shots'])
-        #qc_index = 0 # this should point to the index of the circuit in a pub
-        #bitvals = next(iter(self.qiskit_result[qc_index].data.values()))
-        #counts = bitvals.get_counts()
         return self.counts
  
  
 #########################################
 # EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
 
-# 250302 TL: Leaving these options in until we are sure all works well.
-new_way = True
+# 250302 TL: Leaving this option in until we are sure all works well.
 debug = False
     
 def execute_circuits_distribute_shots(
@@ -1032,7 +1063,6 @@ def execute_circuits_distribute_shots(
         print(f"... execute_circuits_distribute_shots({backend_id}, {len(circuits)}, {num_shots}, {groups})")
                   
     # distribute shots; obtain total and distribute according to weights
-    # (weighting not implemented yet)
     circuit_count = len(circuits)
     total_shots = num_shots         # to match current behavior
     if verbose or debug:
@@ -1044,194 +1074,145 @@ def execute_circuits_distribute_shots(
     if verbose or debug:
         print(f"  ... num_shots_list = {num_shots_list}")  
     
-    # The "new" approach that uses bucketing, to reduce number of circuits to be executed
-    if new_way:
-        if debug:
-            print("************* NEW WAY")
-            for group in groups:
-                print(group)
-                   
-            # print(f"  in circuits = {circuits}")
-        
-        # determine optimal bucketing for these circuits, based on distribution of shots needed
-        from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
-        
-        # get buckets of terms with similar shots counts, and index of original position
-        max_buckets = 3 if len(groups) < 50 else 4
-        buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=max_buckets)
-        
-        # find the average number of shots required for each bucket
-        # (sum of all shots for all circuits, nested, should be same as the incoming total)
-        bucket_avg_shots = compute_bucket_averages(buckets_kmeans)
-        
-        if debug:
-            print('  ... bucket kmeans:', buckets_kmeans)
-            print('  ... indices_kmeans:', indices_kmeans)
-            print('  ... bucket_avg_shots:', bucket_avg_shots)
-        
-        circuit_list = [[circuits[idx] for idx in indices] for indices in indices_kmeans]   
-        group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
-        
-        if debug:
-#             print(f"  circuit_list after bucketing = {circuit_list}")
-#             print(f"  ... group_list after bucketing = {group_list}") 
-            print(f"  ... group_list after bucketing....") 
-            for group in group_list:
-                for g in group:
-                    print(g)
-                print('-----')
-
-        
-        if verbose or debug:
-            print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
-                
-        counts_array = []
-        #for circuit in circuits:
-        for circuits, num_shots in zip(circuit_list, bucket_avg_shots):
-        
-            if debug:
-                # print(f"  ...    cccc = {circuits}")
-                print(f"... len circs = {len(circuits)}")
-            
-            # execute this list of circuits, same shots each
-            results = execute_circuits(
-                    backend_id = backend_id,
-                    #circuits = [circuit],
-                    circuits = circuits,
-                    num_shots = num_shots
-                    )
-            
-            # Qiskit returns and array if array executed, but single counts for one circuit
-            if len(circuits) > 1:                           
-                counts = results.get_counts()
-            else:
-                counts = [results.get_counts()]
-                
-            for counts2 in counts:
-                counts_array.append(counts2)
-
-        # similarly, construct a Result object with counts structure to match circuits
-        if len(counts_array) < 2:
-            results = ExecResult(counts_array[0])
-        else:
-            results = ExecResult(counts_array)
-             
-        group_list = [item for sublist in group_list for item in sublist]
-        
-        if debug:
-            print(f"... results.get_counts() = {results.get_counts()}")
-            print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
-            print(f"... group_list len = {len(group_list)}")
-            print(f"  ... group_list after subgroups = ")
-            for group in group_list:
-                print(group)
-
-        return results, group_list
+    # This approach  uses bucketing, to reduce number of circuits to be executed
+    if debug:
+        print("************* NEW WAY")
+        for group in groups:
+            print(group)
+               
+        # print(f"  in circuits = {circuits}")
     
-    # The "old" approach that executes every circuit, but with weighted num shots
-    else:
-        if debug:
-            print("************* OLD WAY")
-            
-        counts_array = []
-        for circuit, num_shots in zip(circuits, num_shots_list):
-            
-            # execute this list of circuits, same shots each
-            results = execute_circuits(
-                    backend_id = backend_id,
-                    circuits = [circuit],
-                    num_shots = num_shots
-                    )
-                                           
-            counts = results.get_counts()
-            counts_array.append(counts)
-        
-        if len(circuits) < 2:
-            results = ExecResult(counts)
-        else:
-            results = ExecResult(counts_array)
-        
-        if debug:        
-            print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
-            print(f"... groups len = {len(groups)}")
-            
-        return results, groups
-
+    # determine optimal bucketing for these circuits, based on distribution of shots needed
+    from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
     
+    # get buckets of terms with similar shots counts, and index of original position
+    max_buckets = 3 if len(groups) < 50 else 4
+    buckets_kmeans, indices_kmeans = bucket_numbers_kmeans(num_shots_list, max_buckets=max_buckets)
+    
+    # find the average number of shots required for each bucket
+    # (sum of all shots for all circuits, nested, should be same as the incoming total)
+    bucket_avg_shots = compute_bucket_averages(buckets_kmeans)
+    
+    if debug:
+        print('  ... bucket kmeans:', buckets_kmeans)
+        print('  ... indices_kmeans:', indices_kmeans)
+        print('  ... bucket_avg_shots:', bucket_avg_shots)
+    
+    circuits_list = [[circuits[idx] for idx in indices] for indices in indices_kmeans]   
+    group_list = [[groups[idx] for idx in indices] for indices in indices_kmeans]
+    
+    if debug:
+        # print(f"  circuits_list after bucketing = {circuits_list}")
+        print(f"  ... group_list after bucketing....") 
+        for group in group_list:
+            for g in group:
+                print(g)
+            print('-----')
+    
+    if verbose or debug:
+        print(f"  ... bucketed shots list after bucketing = {buckets_kmeans} avg = {bucket_avg_shots}")
+
+    # Execute each circuit in the list using the num_shots in the associated num_shots_list
+    # Accumulate the count dicts in results object as if circuits were executed individually
+    results = execute_circuits_with_mixed_shots(
+        backend_id = backend_id,
+        circuits_list = circuits_list,
+        num_shots_list = bucket_avg_shots,
+        )
+
+    # Create a flattened list of all groups
+    group_list = [item for sublist in group_list for item in sublist]
+    
+    if debug:
+        print(f"... results.get_counts() = {results.get_counts()}")
+        print(f"... results.get_counts() ({len(results.get_counts())}) = {results.get_counts()}")
+        print(f"... group_list len = {len(group_list)}")
+        print(f"  ... group_list after subgroups = ")
+        for group in group_list:
+            print(group)
+
+    return results, group_list
+
+
 # From the given list of term groups, distribute the total shot count, returning num_shots by group
 def get_distributed_shot_counts(
         num_shots: int = 100,
         groups: list = None,
         ds_method: str = 'max_sq',
-    ) -> List:
-    
-#     # loop over all groups, to find the largest coefficient in each group
-#     max_weights = []
-#     for group in groups:
-#         #print(group)
-#         max_weight = 0
-#         for pauli, coeff in group:
-#             #print(f"  ... coeff = {coeff}")
-#             max_weight = max(max_weight, np.real(abs(coeff)))
-            
-#         max_weights.append(max_weight)
-
-    # loop over all groups, to find the sum of coefficient in each group
-#     norm_weights = []
-#     for group in groups:
-#         #print(group)
-#         sum_weight = 0
-#         for pauli, coeff in group:
-#             #print(f"  ... coeff = {coeff}")
-#             sum_weight += np.real(abs(coeff))
-            
-#         norm_weights.append(sum_weight/len(group))
-
-        
-# #     # compute a normalized distribution over all groups
-# #     total_weights = sum(max_weights)
-# #     max_weights_normalized = [max_weight / total_weights for max_weight in max_weights]
-    
-# #     # compute shots counts based on these weights
-# #     num_shots_list = [int(mwn * num_shots) for mwn in max_weights_normalized]
-     
-#     # compute a normalized distribution over all groups
-#     total_weights = sum(norm_weights)
-#     norm_weights_normalized = [norm_weight / total_weights for norm_weight in norm_weights]
-    
-#     # compute shots counts based on these weights
-#     num_shots_list = [int(mwn * num_shots) for mwn in norm_weights_normalized]
-    
-    
+) -> List:
+    #     # loop over all groups, to find the largest coefficient in each group
     # add shots to first group until the total is same as the given total shot count
-#     one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
+    #     one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
     weights = []
     for group in groups:
-        w_sqs =  [abs(coeff)**2 for pauli, coeff in group] 
+        w_sqs = [abs(coeff) ** 2 for pauli, coeff in group]
         ws = [abs(coeff) for pauli, coeff in group]
-    
+
         if ds_method == 'max_sq':
             weights.append(max(w_sqs))
         elif ds_method == 'mean_sq':
-            weights.append(sum(w_sqs)/len(w_sqs))
+            weights.append(sum(w_sqs) / len(w_sqs))
         elif ds_method == 'max':
             weights.append(max(ws))
         else:
-            weights.append(sum(ws)/len(ws))
-        
+            weights.append(sum(ws) / len(ws))
+
     # Step 2: Normalize weights to compute shot proportions
     total_weight = sum(weights)
-    shot_allocations = [int((w / total_weight) * num_shots) for w in weights]
+    
+    # make sure we don't have 0 shot allocation
+    shot_allocations = [max(1, int((w / total_weight) * num_shots)) for w in weights]
 
     # Step 3: Adjust to ensure total shots match exactly
     while sum(shot_allocations) < num_shots:
         max_index = np.argmax(shot_allocations)
         shot_allocations[max_index] += 1
+    while sum(shot_allocations) > num_shots:
+        max_index = np.argmax(shot_allocations)
+        shot_allocations[max_index] -= 1
+        
     # print('shot allocation:', shot_allocations)
-       
+
     return shot_allocations
- 
- 
+
+#####################
+
+def execute_circuits_with_mixed_shots(
+        backend_id: str = None,
+        circuits_list: list = None,
+        num_shots_list: List[int] = None,
+    ):
+    
+    # Loop over the circuit lists associated with each bucket
+    counts_array = []
+    for circuits, num_shots in zip(circuits_list, num_shots_list):
+    
+        if debug:
+            # print(f"  ...    cccc = {circuits}")
+            print(f"... len circs = {len(circuits)}")
+        
+        # execute this list of circuits, with same shots for each circuit in list
+        results = execute_circuits(
+                backend_id = backend_id,
+                #circuits = [circuit],
+                circuits = circuits,
+                num_shots = num_shots
+                )
+        
+        # accumulate list of returned raw count dicts to parallel the group list
+        # Qiskit returns an array of counts if array executed, but single counts for one circuit
+        if len(circuits) > 1:                           
+            for counts in results.get_counts():
+                counts_array.append(counts)
+        else:
+            counts_array.append(results.get_counts())
+
+    # Construct a Result object with counts structure to match circuits
+    results = ExecResult(counts_array)
+    
+    return results
+    
+                        
 ########################################
 # UTILITY FUNCTIONS (TEMPORARY)
 
@@ -1242,7 +1223,7 @@ def get_distributed_shot_counts(
 
 def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     """
-    Group the Pauli terms accourding to the given group method: "None", "simple", "N"
+    Group the Pauli terms according to the given group method: "None", "simple", "N"
     """
     # have to do this here, due to logic of the "api" code; improve these imports later 
     import observables
