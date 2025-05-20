@@ -301,7 +301,53 @@ def convert_sparse_to_full(sparse_pauli_terms, num_qubits: int = 0):
     
     # Convert all terms
     return [(convert_term(term), coeff) for term, coeff in sparse_pauli_terms]
+
+# Utility function to comput pauli groups using one of several methods
+
+def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
+    """
+    Group the Pauli terms according to the given group method: "None", "simple", "N"
+    """
     
+    ### print(f"... using group method: {group_method}")
+
+    ts = time.time()
+    
+    # use no grouping or the most basic method "simple"
+    if group_method == None or group_method == "simple":
+    
+        # Flag to control optimize by use of commuting groups
+        use_commuting_groups = False
+        if group_method == "simple":
+            use_commuting_groups = True
+    
+        # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
+        pauli_term_groups, pauli_str_list = group_pauli_terms_for_execution(
+                num_qubits, sparse_pauli_terms, use_commuting_groups)
+    
+    # use k-commuting algorithm
+    else:
+        from generate_pauli_groups import compute_groups
+        pauli_term_groups = compute_groups(num_qubits, sparse_pauli_terms, k)
+    
+    #print(f"\n... Number of groups created: {len(pauli_term_groups)}")
+    #print(f"... Pauli Term Groups:")
+    #for group in pauli_term_groups:
+        #print(group)
+    
+    group_time = round(time.time()-ts, 3)
+    #print(f"\n... finished grouping terms, total grouping time = {group_time} sec.\n")
+    
+    # for each group, create a merged pauli string from all the terms in the group
+    pauli_str_list = []
+    for group in pauli_term_groups:
+        merged_pauli_str = merge_pauli_terms(group, num_qubits)
+        pauli_str_list.append(merged_pauli_str)
+    
+    #print(f"\n... Merged Pauli strings, one per group:\n  {pauli_str_list}\n")
+
+    return pauli_term_groups, pauli_str_list
+
 
 # ####################################################################################
 # CALCULATE EXPECTATION VALUE FUNCTIONS
