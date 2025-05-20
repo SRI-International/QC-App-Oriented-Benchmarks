@@ -877,7 +877,7 @@ def execute_circuits_enhanced(
     if not distribute_shots:
         #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
         # execute the entire list of circuits, same shots each
-        results = execute_circuits(
+        results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 circuits = circuits,
                 num_shots = int(num_shots / len(circuits))
@@ -894,21 +894,6 @@ def execute_circuits_enhanced(
                 
     return results, pauli_term_groups
   
-########################################
-# CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
-
-# This code is provided here to augment the default API/execute functions,
-# specifically to enable execution of an array of circuits for observable calculations.
-# This code will be moved up into the _common/API/execute methods later (TL: 210509).
-
-def execute_circuits(
-        backend_id: str = None,
-        circuits: list = None,
-        num_shots: int = 100
-    ) -> list:
-
-    return ex.execute_circuits_immed(backend_id, circuits, num_shots)
-    
  
 #########################################
 # EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
@@ -1057,7 +1042,7 @@ def execute_circuits_with_mixed_shots(
             print(f"... len circs = {len(circuits)}")
         
         # execute this list of circuits, with same shots for each circuit in list
-        results = execute_circuits(
+        results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 #circuits = [circuit],
                 circuits = circuits,
