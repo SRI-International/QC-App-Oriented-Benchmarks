@@ -541,44 +541,64 @@ def run(min_qubits: int = 2,
                 # use this to track how many circuits will be executed
                 num_circuits_to_execute = 0
                 
-                # group options only used in Qiskit version, for now
+                # build pauli groups for Qiskit version
                 if api == None or api == 'qiskit':
                     
-                    # if NOT using Estimator
-                    if group_method != "estimator":
+                    ## if using Estimator, no grouping required
+                    if group_method == "estimator":
+                        pass
                     
-                        # arrange Hamiltonian terms into groups as specified
-                        if group_method == None or group_method == 'simple':
+                    ## for None or "simple", arrange Hamiltonian terms into groups as specified
+                    elif group_method == None or group_method == 'simple':
+                    
+                        # Flag to control optimize by use of commuting groups
+                        use_commuting_groups = False
+                        if group_method == 'simple':
+                            use_commuting_groups = True
                         
-                            # Flag to control optimize by use of commuting groups
-                            use_commuting_groups = False
-                            if group_method == 'simple':
-                                use_commuting_groups = True
-                            
-                            # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
-                            pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
-                                    num_qubits, sparse_pauli_terms, use_commuting_groups)
-                 
-                        # arrange terms using k-commuting groups
-                        elif group_method != "estimator":
-                            # treat "N" specially, converting to num_qubits
-                            if group_method == "N":
-                                this_group_method = num_qubits
-                            else:
-                                this_group_method = int(group_method)
+                        # group Pauli terms for execution, optionally combining commuting terms into groups.
+                        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                                num_qubits, sparse_pauli_terms, use_commuting_groups)
+                                
+                        num_circuits_to_execute = len(pauli_term_groups)
+             
+                    ## for 1, k, or "N", arrange terms using k-commuting groups
+                    else:
+                        # treat "N" specially, assuming k = num_qubits
+                        if group_method == "N":
+                            this_group_method = num_qubits
+                        else:
+                            this_group_method = int(group_method)
 
-                            from generate_pauli_groups import compute_groups
-                            pauli_term_groups = compute_groups(
-                                            this_group_method, sparse_pauli_terms, 1)
-                                            
-                            # for each group, create a merged pauli string from all the terms in the group
-                            # DEVNOTE: move these 4 lines to a function in observables
-                            pauli_str_list = []
-                            for group in pauli_term_groups:
-                                merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
-                                pauli_str_list.append(merged_pauli_str)
+                        from generate_pauli_groups import compute_groups
+                        pauli_term_groups = compute_groups(
+                                        this_group_method, sparse_pauli_terms, 1)
+                                        
+                        # for each group, create a merged pauli string from all the terms in the group
+                        # DEVNOTE: move these 4 lines to a function in observables
+                        pauli_str_list = []
+                        for group in pauli_term_groups:
+                            merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
+                            pauli_str_list.append(merged_pauli_str)
         
                         num_circuits_to_execute = len(pauli_term_groups)
+                
+                # build pauli groups for CUDA-Q version (only if sampling)
+                elif api == "cudaq":
+                    if group_method != "SpinOperator":
+                        print(f"... using CUDA-Q Sampling, group_method = {group_method}")
+                        
+                        # Generate circuits for each Pauli term
+                        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                            num_qubits, sparse_pauli_terms,
+                            True if group_method is not None else False
+                        )
+                        
+                        num_circuits_to_execute = len(pauli_term_groups)
+                
+                metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
+                if num_circuits_to_execute > 0:
+                    print(f"... number of circuits to execute = {num_circuits_to_execute}")
                         
             #######################
             # Base Circuit Creation            
@@ -624,30 +644,8 @@ def run(min_qubits: int = 2,
             else:               
                 if api == None or api == 'qiskit':
                     
-                    # if NOT using Estimator
-                    if group_method != "estimator":
-   
-                        # generate an array of circuits, one for each pauli_string in list
-                        circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
-                                qc, num_qubits, pauli_str_list)
-
-                        # execute the circuits with given number of shots on specified backend
-                        # apply weighted shot distribution, if specified
-                        results, pauli_term_groups = execute_circuits_enhanced(
-                                backend_id = backend_id,
-                                circuits = circuits,
-                                num_shots = num_shots,
-                                distribute_shots = distribute_shots,
-                                pauli_term_groups = pauli_term_groups
-                                )
-                                    
-                        # Compute the total energy for the Hamiltonian
-                        total_energy, term_contributions = observables.calculate_expectation_from_measurements(
-                                                                num_qubits, results, pauli_term_groups)
-                        total_energy = np.real(total_energy)
-                        
-                    # if using Qiskit Estimator
-                    else:
+                    ## using Qisit Estimator     
+                    if group_method == "estimator":
                         print("... using Qiskit Estimator primitive.")
                         
                         # DEVNOTE: We may want to surface the actual Estimator call instead. 
@@ -666,23 +664,45 @@ def run(min_qubits: int = 2,
                         print(f"... Estimator computation time = {estimator_time} sec")
 
                         print(f"... Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
-                         
+                        
                         total_energy = estimator_energy
                         term_contributions = None
-                
-                # special case for CUDA Q Observables
+                        
+                    ## using Qiskit sampling and local estimation
+                    else:                     
+                        # generate an array of circuits, one for each pauli_string in list
+                        circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
+                                qc, num_qubits, pauli_str_list)
+
+                        # execute the circuits with given number of shots on specified backend
+                        # apply weighted shot distribution, if specified
+                        results, pauli_term_groups = execute_circuits_enhanced(
+                                backend_id = backend_id,
+                                circuits = circuits,
+                                num_shots = num_shots,
+                                distribute_shots = distribute_shots,
+                                pauli_term_groups = pauli_term_groups
+                                )
+                                    
+                        # Compute the total energy for the Hamiltonian
+                        total_energy, term_contributions = observables.calculate_expectation_from_measurements(
+                                                                num_qubits, results, pauli_term_groups)
+                        total_energy = np.real(total_energy)
+                                       
+                # special case for CUDA-Q Observables
                 elif api == "cudaq":
-                    if group_method != "SpinOperator":
-                        print(f"... using CUDA-Q Sampling, group_method = {group_method}")
-                        
-                        # Generate circuits for each Pauli term
-                        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
-                            num_qubits, sparse_pauli_terms,
-                            True if group_method is not None else False
-                        )
-                        
-                        num_circuits_to_execute = len(pauli_term_groups)
-                        
+                
+                    ## using CUDA-Q get_expectation method
+                    if group_method == "SpinOperator":
+                        #print("... using CUDA Q SpinOperator and observe()")
+
+                        total_energy = hamlib_simulation_kernel.get_expectation(
+                                qc, num_qubits, sparse_pauli_terms)
+                                
+                        term_contributions = None
+                    
+                    ## using CUDA-Q sampling method
+                    else:                    
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                             qc, num_qubits, pauli_str_list
                         ) # qc is an array with the kernel and dependent parameters
@@ -702,26 +722,14 @@ def run(min_qubits: int = 2,
                             num_qubits, results, pauli_term_groups
                         )
                         total_energy = np.real(total_energy)
-
-                    else:
-                        #print("... using CUDA Q Observe.")
-
-                        total_energy = hamlib_simulation_kernel.get_expectation(
-                                qc, num_qubits, sparse_pauli_terms)
-                                
-                        term_contributions = None
                         
+                #########
                 # Record relevant performance metrics
                 computed_time = round((time.time() - ts), 3)
                 metrics_object["exp_time_computed"] = computed_time
 
                 total_energy = round(total_energy, 4)  
                 metrics_object["exp_value_computed"] = total_energy
-
-                metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
-
-                if num_circuits_to_execute > 0:
-                    print(f"... number of circuits executed = {num_circuits_to_execute}")
 
                 print(f"... quantum execution time = {computed_time}")
                
