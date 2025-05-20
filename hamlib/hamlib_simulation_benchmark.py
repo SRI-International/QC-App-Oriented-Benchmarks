@@ -814,31 +814,23 @@ def run(min_qubits: int = 2,
     ##########################
     # Display Plots of Results
     
-    # Plot metrics for all circuit sizes
-    base_ham_name = os.path.basename(hamiltonian)
-    if do_observables:
-        options = {"ham": base_ham_name,
-                "params": hamiltonian_params,
-                "method": method,
-                "gm": group_method,
-                "K": K,
-                "t": t,
-                "shots": num_shots,
-                "reps": max_circuits} 
-    else:
-        options = {"ham": base_ham_name,
-                #"params": hamiltonian_params,
-                "method": method,
-                #"gm": group_method,
-                "K": K,
-                "t": t,
-                "shots": num_shots,
-                "reps": max_circuits} 
-    
-
     if not plot_results:
         return
-        
+     
+    # Plot metrics for all circuit sizes
+    base_ham_name = os.path.basename(hamiltonian)
+
+    options = {"ham": base_ham_name,
+            "params": hamiltonian_params,
+            "method": method,
+            "K": K,
+            "t": t,
+            "shots": num_shots,
+            "reps": max_circuits}
+            
+    if do_observables:
+        options.update({ "gm": group_method })
+    
     if mpi.leader() and not do_observables:
         metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
     
