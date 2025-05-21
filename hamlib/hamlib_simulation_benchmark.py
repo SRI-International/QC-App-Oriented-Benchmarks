@@ -541,11 +541,13 @@ def run(min_qubits: int = 2,
                 # use this to track how many circuits will be executed
                 num_circuits_to_execute = 0
                 
+                ##########
                 # build pauli groups for Qiskit version
                 if api == None or api == 'qiskit':
                     
                     ## if using Estimator, no grouping required
                     if group_method == "estimator":
+                        print("... using Qiskit Estimator primitive.")
                         pass
                     
                     ## for None or "simple", arrange Hamiltonian terms into groups as specified
@@ -583,9 +585,17 @@ def run(min_qubits: int = 2,
         
                         num_circuits_to_execute = len(pauli_term_groups)
                 
+                ##########
                 # build pauli groups for CUDA-Q version (only if sampling)
                 elif api == "cudaq":
-                    if group_method != "SpinOperator":
+                
+                    ## using CUDA-Q get_expectation method, no grouping required
+                    if group_method == "SpinOperator":
+                        #print("... using CUDA-Q SpinOperator and observe()")
+                        pass
+                    
+                    ## using CUDA-Q sampling
+                    else:
                         print(f"... using CUDA-Q Sampling, group_method = {group_method}")
                         
                         # Generate circuits for each Pauli term
@@ -646,8 +656,6 @@ def run(min_qubits: int = 2,
                     
                     ## using Qisit Estimator     
                     if group_method == "estimator":
-                        print("... using Qiskit Estimator primitive.")
-                        
                         # DEVNOTE: We may want to surface the actual Estimator call instead. 
 
                         # Ensure that the pauli_terms are in 'full' format, not 'sparse' - convert if necessary
@@ -694,8 +702,6 @@ def run(min_qubits: int = 2,
                 
                     ## using CUDA-Q get_expectation method
                     if group_method == "SpinOperator":
-                        #print("... using CUDA Q SpinOperator and observe()")
-
                         total_energy = hamlib_simulation_kernel.get_expectation(
                                 qc, num_qubits, sparse_pauli_terms)
                                 
@@ -1103,7 +1109,7 @@ def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     """
     mpi.barrier()
     
-    return find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=k)
+    return observables.find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=k)
 
 
 #######################
