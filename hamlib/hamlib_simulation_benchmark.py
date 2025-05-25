@@ -541,44 +541,74 @@ def run(min_qubits: int = 2,
                 # use this to track how many circuits will be executed
                 num_circuits_to_execute = 0
                 
-                # group options only used in Qiskit version, for now
+                ##########
+                # build pauli groups for Qiskit version
                 if api == None or api == 'qiskit':
                     
-                    # if NOT using Estimator
-                    if group_method != "estimator":
+                    ## if using Estimator, no grouping required
+                    if group_method == "estimator":
+                        print("... using Qiskit Estimator primitive.")
+                        pass
                     
-                        # arrange Hamiltonian terms into groups as specified
-                        if group_method == None or group_method == 'simple':
+                    ## for None or "simple", arrange Hamiltonian terms into groups as specified
+                    elif group_method == None or group_method == 'simple':
+                    
+                        # Flag to control optimize by use of commuting groups
+                        use_commuting_groups = False
+                        if group_method == 'simple':
+                            use_commuting_groups = True
                         
-                            # Flag to control optimize by use of commuting groups
-                            use_commuting_groups = False
-                            if group_method == 'simple':
-                                use_commuting_groups = True
-                            
-                            # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
-                            pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
-                                    num_qubits, sparse_pauli_terms, use_commuting_groups)
-                 
-                        # arrange terms using k-commuting groups
-                        elif group_method != "estimator":
-                            # treat "N" specially, converting to num_qubits
-                            if group_method == "N":
-                                this_group_method = num_qubits
-                            else:
-                                this_group_method = int(group_method)
+                        # group Pauli terms for execution, optionally combining commuting terms into groups.
+                        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                                num_qubits, sparse_pauli_terms, use_commuting_groups)
+                                
+                        num_circuits_to_execute = len(pauli_term_groups)
+             
+                    ## for 1, k, or "N", arrange terms using k-commuting groups
+                    else:
+                        # treat "N" specially, assuming k = num_qubits
+                        if group_method == "N":
+                            this_group_method = num_qubits
+                        else:
+                            this_group_method = int(group_method)
 
-                            from generate_pauli_groups import compute_groups
-                            pauli_term_groups = compute_groups(
-                                            this_group_method, sparse_pauli_terms, 1)
-                                            
-                            # for each group, create a merged pauli string from all the terms in the group
-                            # DEVNOTE: move these 4 lines to a function in observables
-                            pauli_str_list = []
-                            for group in pauli_term_groups:
-                                merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
-                                pauli_str_list.append(merged_pauli_str)
+                        from generate_pauli_groups import compute_groups
+                        pauli_term_groups = compute_groups(
+                                        this_group_method, sparse_pauli_terms, 1)
+                                        
+                        # for each group, create a merged pauli string from all the terms in the group
+                        # DEVNOTE: move these 4 lines to a function in observables
+                        pauli_str_list = []
+                        for group in pauli_term_groups:
+                            merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
+                            pauli_str_list.append(merged_pauli_str)
         
                         num_circuits_to_execute = len(pauli_term_groups)
+                
+                ##########
+                # build pauli groups for CUDA-Q version (only if sampling)
+                elif api == "cudaq":
+                
+                    ## using CUDA-Q get_expectation method, no grouping required
+                    if group_method == "SpinOperator":
+                        #print("... using CUDA-Q SpinOperator and observe()")
+                        pass
+                    
+                    ## using CUDA-Q sampling
+                    else:
+                        print(f"... using CUDA-Q Sampling, group_method = {group_method}")
+                        
+                        # Generate circuits for each Pauli term
+                        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
+                            num_qubits, sparse_pauli_terms,
+                            True if group_method is not None else False
+                        )
+                        
+                        num_circuits_to_execute = len(pauli_term_groups)
+                
+                metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
+                if num_circuits_to_execute > 0:
+                    print(f"... number of circuits to execute = {num_circuits_to_execute}")
                         
             #######################
             # Base Circuit Creation            
@@ -624,9 +654,30 @@ def run(min_qubits: int = 2,
             else:               
                 if api == None or api == 'qiskit':
                     
-                    # if NOT using Estimator
-                    if group_method != "estimator":
-   
+                    ## using Qisit Estimator     
+                    if group_method == "estimator":
+                        # DEVNOTE: We may want to surface the actual Estimator call instead. 
+
+                        # Ensure that the pauli_terms are in 'full' format, not 'sparse' - convert if necessary
+                        est_pauli_terms = observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits=num_qubits)
+                        est_pauli_terms = observables.swap_pauli_list(est_pauli_terms)
+
+                        #ts = time.time()
+
+                        # DEVNOTE: backend_id not actually used yet
+                        estimator_energy = observables.estimate_expectation_with_estimator(
+                                backend_id, qc, est_pauli_terms, num_shots=num_shots)
+
+                        estimator_time = round(time.time()-ts, 3)
+                        print(f"... Estimator computation time = {estimator_time} sec")
+
+                        print(f"... Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
+                        
+                        total_energy = estimator_energy
+                        term_contributions = None
+                        
+                    ## using Qiskit sampling and local estimation
+                    else:                     
                         # generate an array of circuits, one for each pauli_string in list
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                                 qc, num_qubits, pauli_str_list)
@@ -645,44 +696,19 @@ def run(min_qubits: int = 2,
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                                 num_qubits, results, pauli_term_groups)
                         total_energy = np.real(total_energy)
-                        
-                    # if using Qiskit Estimator
-                    else:
-                        print("... using Qiskit Estimator primitive.")
-                        
-                        # DEVNOTE: We may want to surface the actual Estimator call instead. 
-
-                        # Ensure that the pauli_terms are in 'full' format, not 'sparse' - convert if necessary
-                        est_pauli_terms = observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits=num_qubits)
-                        est_pauli_terms = observables.swap_pauli_list(est_pauli_terms)
-
-                        #ts = time.time()
-
-                        # DEVNOTE: backend_id not actually used yet
-                        estimator_energy = observables.estimate_expectation_with_estimator(
-                                backend_id, qc, est_pauli_terms, num_shots=num_shots)
-
-                        estimator_time = round(time.time()-ts, 3)
-                        print(f"... Estimator computation time = {estimator_time} sec")
-
-                        print(f"... Expectation value, computed using Qiskit Estimator: {round(np.real(estimator_energy), 4)}\n")
-                         
-                        total_energy = estimator_energy
-                        term_contributions = None
-                
-                # special case for CUDA Q Observables
+                                       
+                # special case for CUDA-Q Observables
                 elif api == "cudaq":
-                    if group_method != "SpinOperator":
-                        print(f"... using CUDA-Q Sampling, group_method = {group_method}")
-                        
-                        # Generate circuits for each Pauli term
-                        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
-                            num_qubits, sparse_pauli_terms,
-                            True if group_method is not None else False
-                        )
-                        
-                        num_circuits_to_execute = len(pauli_term_groups)
-                        
+                
+                    ## using CUDA-Q get_expectation method
+                    if group_method == "SpinOperator":
+                        total_energy = hamlib_simulation_kernel.get_expectation(
+                                qc, num_qubits, sparse_pauli_terms)
+                                
+                        term_contributions = None
+                    
+                    ## using CUDA-Q sampling method
+                    else:                    
                         circuits = hamlib_simulation_kernel.create_circuits_for_pauli_terms(
                             qc, num_qubits, pauli_str_list
                         ) # qc is an array with the kernel and dependent parameters
@@ -702,26 +728,14 @@ def run(min_qubits: int = 2,
                             num_qubits, results, pauli_term_groups
                         )
                         total_energy = np.real(total_energy)
-
-                    else:
-                        #print("... using CUDA Q Observe.")
-
-                        total_energy = hamlib_simulation_kernel.get_expectation(
-                                qc, num_qubits, sparse_pauli_terms)
-                                
-                        term_contributions = None
                         
+                #########
                 # Record relevant performance metrics
                 computed_time = round((time.time() - ts), 3)
                 metrics_object["exp_time_computed"] = computed_time
 
                 total_energy = round(total_energy, 4)  
                 metrics_object["exp_value_computed"] = total_energy
-
-                metrics_object["num_circuits_to_execute"] = num_circuits_to_execute
-
-                if num_circuits_to_execute > 0:
-                    print(f"... number of circuits executed = {num_circuits_to_execute}")
 
                 print(f"... quantum execution time = {computed_time}")
                
@@ -814,31 +828,23 @@ def run(min_qubits: int = 2,
     ##########################
     # Display Plots of Results
     
-    # Plot metrics for all circuit sizes
-    base_ham_name = os.path.basename(hamiltonian)
-    if do_observables:
-        options = {"ham": base_ham_name,
-                "params": hamiltonian_params,
-                "method": method,
-                "gm": group_method,
-                "K": K,
-                "t": t,
-                "shots": num_shots,
-                "reps": max_circuits} 
-    else:
-        options = {"ham": base_ham_name,
-                #"params": hamiltonian_params,
-                "method": method,
-                #"gm": group_method,
-                "K": K,
-                "t": t,
-                "shots": num_shots,
-                "reps": max_circuits} 
-    
-
     if not plot_results:
         return
-        
+     
+    # Plot metrics for all circuit sizes
+    base_ham_name = os.path.basename(hamiltonian)
+
+    options = {"ham": base_ham_name,
+            "params": hamiltonian_params,
+            "method": method,
+            "K": K,
+            "t": t,
+            "shots": num_shots,
+            "reps": max_circuits}
+            
+    if do_observables:
+        options.update({ "gm": group_method })
+    
     if mpi.leader() and not do_observables:
         metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
     
@@ -885,7 +891,7 @@ def execute_circuits_enhanced(
     if not distribute_shots:
         #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
         # execute the entire list of circuits, same shots each
-        results = execute_circuits(
+        results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 circuits = circuits,
                 num_shots = int(num_shots / len(circuits))
@@ -902,148 +908,6 @@ def execute_circuits_enhanced(
                 
     return results, pauli_term_groups
   
-########################################
-# CUSTOM ADAPTATION OF EXECUTE FUNCTIONS
-
-# This code is provided here to augment the default API/execute functions,
-# specifically to enable execution of an array of circuits for observable calculations.
-# This code will be moved up into the _common/API/execute methods later (TL: 210509).
-
-def execute_circuits(
-        backend_id: str = None,
-        circuits: list = None,
-        num_shots: int = 100
-    ) -> list:
-
-    if verbose:
-        print(f"... execute_cicuits({backend_id}, {len(circuits)}, {num_shots})")
-
-    if backend_id == None:
-        backend_id == "qasm_simulator"
-
-    # if backend_id == "nvidia":
-    if api_ == "cudaq":
-        counts_array = []
-        for circuit in circuits:
-            result = ex.execute_circuit_immed(circuit, num_shots)
-            counts_array.append(result.get_counts())
-            
-        # Construct a Result object with counts structure to match circuits
-        results = ExecResult(counts_array)
-
-    # Set up the backend for execution
-    elif backend_id == "qasm_simulator" or backend_id == "statevector_simulator":
-        #print("... using Qiskit QASM Simulator")
-        
-        # Initialize simulator backend
-        from qiskit_aer import Aer
-        if backend_id == "statevector_simulator":
-            #backend = Aer.get_backend('statevector_simulator')
-            backend = Aer.get_backend('qasm_simulator')
-        else:
-            backend = Aer.get_backend('qasm_simulator')
-            
-        #print(f"... backend_id = {backend_id}")
-   
-        # Execute all of the circuits to obtain array of result objects
-        if backend_id != "statevector_simulator" and ex.noise is not None:
-            #print("**************** executing with noise")
-            noise_model = ex.noise
-            
-        else:
-            noise_model = None
-        
-        # all circuits get the same number of shots as given 
-        #print("circuits = ", circuits)
-        results = backend.run(circuits, shots=num_shots, noise_model=noise_model).result()
-        #print("results = ", results)
-        #print("results.counts = ", results.get_counts())
-    
-    # handle special case using IBM Runtime Sampler Primitive
-    elif ex.sampler is not None:
-        #print("... using Qiskit Runtime Sampler")
-        
-        from qiskit import transpile
-        
-        #print("circuits = ", circuits)
-
-        # circuits need to be transpiled first, post Qiskit 1.0
-        trans_qcs = transpile(circuits, ex.backend)
-        
-        # execute the circuits using the Sampler Primitive (required for IBM Runtime Qiskit 1.3
-        job = ex.sampler.run(trans_qcs, shots=num_shots)
-        
-        # wrap the Sampler result object's data in a compatible Result object 
-        sampler_result = job.result()
-        #print("sampler_result = ", sampler_result)
-        
-        results = BenchmarkResult(sampler_result)
-        #print("results = ", results)
-        #print("results.counts = ", results.get_counts())
-     
-    # handle all other backends here
-    else:
-        #print(f"... using Qiskit run() with {backend_id}")
-        
-        from qiskit import transpile
-        
-        # DEVNOTE: This line is specific to IonQ Aria-1 simulation; comment out
-        # ex.backend.set_options(noise_model="aria-1")
-        
-        # circuits need to be transpiled first, post Qiskit 1.0
-        trans_qcs = transpile(circuits, ex.backend)
-        
-        # execute the circuits using backend.run()
-        job = ex.backend.run(trans_qcs, shots=num_shots)
-        
-        results = job.result()
-          
-    return results
-        
-
-# The class BenchmarkResult is designed for use with IBM Sampler runs. 
-# The qiskit primitive job result instances don't have a get_counts method 
-# like backend results do. As such, a get counts method is calculated
-# from the quasi distributions and shots taken.
-# This provides a normalized return value across all benchmarks.
-class BenchmarkResult:
-
-    def __init__(self, qiskit_result):
-        super().__init__()
-        self.qiskit_result = qiskit_result
-        self.metadata = qiskit_result.metadata
-
-    def get_counts(self):
-        count_array = []
-        for result in self.qiskit_result:    
-            # convert the quasi distribution bit values to shots distribution
-            bitvals = next(iter(result.data.values()))
-            counts = bitvals.get_counts()
-            count_array.append(counts)
-        
-        # return raw counts object if only a single circuit executed, otherwise the array
-        # this is done for consistency with all of the QED-C benchmark framework and Qiskit simulator
-        return count_array if len(count_array) > 1 else count_array[0]
-
-# class ExecResult is made for multi-circuit runs. 
-class ExecResult(object):
-
-    def __init__(self, counts):
-        super().__init__()
-        
-        # Store the count distributions as they will be returned
-        # A single count object for one circuit, and an array of count object for array of circuits
-        if isinstance(counts, list):
-            if len(counts) < 2:
-                self.counts = counts[0]
-            else:
-                self.counts = counts
-        else:
-            self.counts = counts
-
-    def get_counts(self, qc=0):
-        return self.counts
- 
  
 #########################################
 # EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
@@ -1192,7 +1056,7 @@ def execute_circuits_with_mixed_shots(
             print(f"... len circs = {len(circuits)}")
         
         # execute this list of circuits, with same shots for each circuit in list
-        results = execute_circuits(
+        results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 #circuits = [circuit],
                 circuits = circuits,
@@ -1211,64 +1075,41 @@ def execute_circuits_with_mixed_shots(
     results = ExecResult(counts_array)
     
     return results
-    
+
+# class ExecResult is made for multi-circuit runs. 
+class ExecResult(object):
+
+    def __init__(self, counts):
+        super().__init__()
+        
+        # Store the count distributions as they will be returned
+        # A single count object for one circuit, and an array of count object for array of circuits
+        if isinstance(counts, list):
+            if len(counts) < 2:
+                self.counts = counts[0]
+            else:
+                self.counts = counts
+        else:
+            self.counts = counts
+
+    def get_counts(self, qc=0):
+        return self.counts
+ 
                         
 ########################################
 # UTILITY FUNCTIONS (TEMPORARY)
 
-# The functions included in this section will be moved/merged with other lower-level functions.
-# These have been developed iteratively up in the example notebooks and the code is being incrementally 
-# moved down to lower modules.  For now, these functions are shared by several of the demo notebooks
-# as they are being developed.
+# This function is called from several of the testing notebooks assuming that it is in this benchmark file.
+# The code itself has been moved to observables.py, but the barrier for mpi needs to be invoked
+# here since this is the only module that knows about mpi.
 
 def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     """
     Group the Pauli terms according to the given group method: "None", "simple", "N"
     """
-    # have to do this here, due to logic of the "api" code; improve these imports later 
-    import observables
-    
-    ### print(f"... using group method: {group_method}")
-
     mpi.barrier()
-    ts = time.time()
     
-    # use no grouping or the most basic method "simple"
-    if group_method == None or group_method == "simple":
-    
-        # Flag to control optimize by use of commuting groups
-        use_commuting_groups = False
-        if group_method == "simple":
-            use_commuting_groups = True
-    
-        # group Pauli terms for quantum execution, optionally combining commuting terms into groups.
-        pauli_term_groups, pauli_str_list = observables.group_pauli_terms_for_execution(
-                num_qubits, sparse_pauli_terms, use_commuting_groups)
-    
-    # use k-commuting algorithm
-    else:
-        from generate_pauli_groups import compute_groups
-        pauli_term_groups = compute_groups(num_qubits, sparse_pauli_terms, k)
-    
-    #print(f"\n... Number of groups created: {len(pauli_term_groups)}")
-    #print(f"... Pauli Term Groups:")
-    #for group in pauli_term_groups:
-        #print(group)
-    
-    group_time = round(time.time()-ts, 3)
-    #print(f"\n... finished grouping terms, total grouping time = {group_time} sec.\n")
-    
-    # for each group, create a merged pauli string from all the terms in the group
-    # DEVNOTE: move these 4 lines to a function in observables
-    pauli_str_list = []
-    for group in pauli_term_groups:
-        merged_pauli_str = observables.merge_pauli_terms(group, num_qubits)
-        pauli_str_list.append(merged_pauli_str)
-    
-    #print(f"\n... Merged Pauli strings, one per group:\n  {pauli_str_list}\n")
-
-    return pauli_term_groups, pauli_str_list
-
+    return observables.find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=k)
 
 
 #######################
