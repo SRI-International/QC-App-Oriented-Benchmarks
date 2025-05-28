@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=68.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qc-app-oriented-benchmarks"
+version = "1.0.0"
+description = '"Application-Oriented Performance Benchmarks for Quantum Computing"'
+authors = [{name = "Thomas Lubinski, Sonika Johri, Paul Varosy, Jeremiah Coleman, Luning Zhao, Jason Necaise, Charles H. Baldwin, Karl Mayer, Timothy Proctor", email = "tlubinski@quantumcircuits.com"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.9"
+dependencies = [
+  "qiskit>=1.2.0",
+  "qiskit_ibm_runtime>=0.32.0",
+  "qiskit-aer>=0.15.1",
+  "matplotlib>=3.9.0",
+]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown; charset=UTF-8"
+
+[project.urls]
+Homepage = "https://github.com/SRI-International/QC-App-Oriented-Benchmarks"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "flake8",
+]
+build = [
+    
+]
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+packages = [
+    "deutsch-jozsa.qiskit",
+    "bernstein-vazirani.qiskit",
+    "hidden-shift.qiskit",
+    "quantum-fourier-transform.qiskit",
+    "grovers.qiskit",
+    "phase-estimation.qiskit",
+    "hhl.qiskit",
+    "amplitude-estimation.qiskit",
+    "monte-carlo.qiskit",
+    "hamiltonian-simulation.qiskit",
+    "vqe.qiskit",
+    "shors.qiskit",
+]
+
+# === Formatting === #
+[tool.black]
+line-length = 130
+
+[tool.isort]
+line_length = 130
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "."
+
+ignore_missing_imports = true
