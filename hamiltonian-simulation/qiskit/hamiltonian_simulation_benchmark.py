@@ -18,12 +18,17 @@ import sys
 import time
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
+try:
+    from qc_app_benchmarks.common.qiskit import execute as ex
+    from qc_app_benchmarks.common import metrics as metrics
+    from qc_app_benchmarks.hamiltonian_simulation.qiskit.hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
+except ModuleNotFoundError:
+    sys.path[1:1] = ["_common", "_common/qiskit"]
+    sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 
-import execute as ex
-import metrics as metrics
-from hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
+    import execute as ex
+    import metrics as metrics
+    from hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"

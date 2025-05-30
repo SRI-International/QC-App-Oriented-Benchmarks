@@ -8,13 +8,17 @@ import time
 
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
-import execute as ex
-import metrics as metrics
-
-#from qft_benchmark import inv_qft_gate
-from pe_kernel import PhaseEstimation, kernel_draw
+try:
+    from qc_app_benchmarks.common.qiskit import execute as ex
+    from qc_app_benchmarks.common import metrics as metrics
+    from qc_app_benchmarks.phase_estimation.qiskit.pe_kernel import PhaseEstimation, kernel_draw
+except ModuleNotFoundError:
+    sys.path[1:1] = ["_common", "_common/qiskit"]
+    sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
+    import execute as ex
+    import metrics as metrics
+    #from qft_benchmark import inv_qft_gate
+    from pe_kernel import PhaseEstimation, kernel_draw
 
 # Benchmark Name
 benchmark_name = "Phase Estimation"

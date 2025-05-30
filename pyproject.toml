@@ -1,0 +1,100 @@
+[build-system]
+requires = ["setuptools>=68.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qc-app-oriented-benchmarks"
+version = "1.0.0"
+description = '"Application-Oriented Performance Benchmarks for Quantum Computing"'
+authors = [{name = "Thomas Lubinski, Sonika Johri, Paul Varosy, Jeremiah Coleman, Luning Zhao, Jason Necaise, Charles H. Baldwin, Karl Mayer, Timothy Proctor", email = "tlubinski@quantumcircuits.com"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.9"
+dependencies = [
+  "qiskit>=1.2.0",
+  "qiskit_ibm_runtime>=0.32.0",
+  "qiskit-aer>=0.15.1",
+  "matplotlib>=3.9.0",
+]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown; charset=UTF-8"
+
+[project.urls]
+Homepage = "https://github.com/SRI-International/QC-App-Oriented-Benchmarks"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "flake8",
+]
+build = [
+    
+]
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+packages = [
+    "qc_app_benchmarks.common",
+    "qc_app_benchmarks.common.qiskit",
+    "qc_app_benchmarks.deutsch_jozsa.qiskit",
+    "qc_app_benchmarks.bernstein_vazirani.qiskit",
+    "qc_app_benchmarks.hidden_shift.qiskit",
+    "qc_app_benchmarks.quantum_fourier_transform.qiskit",
+    "qc_app_benchmarks.grovers.qiskit",
+    "qc_app_benchmarks.phase_estimation.qiskit",
+    "qc_app_benchmarks.hhl.qiskit",
+    "qc_app_benchmarks.amplitude_estimation.qiskit",
+    "qc_app_benchmarks.monte_carlo.common",
+    "qc_app_benchmarks.monte_carlo.qiskit",
+    "qc_app_benchmarks.hamiltonian_simulation._common",
+    "qc_app_benchmarks.hamiltonian_simulation.qiskit",
+    "qc_app_benchmarks.vqe.qiskit",
+    "qc_app_benchmarks.shors.common",
+    "qc_app_benchmarks.shors.qiskit"
+]
+
+[tool.setuptools.package-dir]
+"qc_app_benchmarks.common" = "_common"
+"qc_app_benchmarks.common.qiskit" = "_common/qiskit"
+"qc_app_benchmarks.deutsch_jozsa.qiskit" = "deutsch-jozsa/qiskit"
+"qc_app_benchmarks.bernstein_vazirani.qiskit" = "bernstein-vazirani/qiskit"
+"qc_app_benchmarks.hidden_shift.qiskit" = "hidden-shift/qiskit"
+"qc_app_benchmarks.quantum_fourier_transform.qiskit" = "quantum-fourier-transform/qiskit"
+"qc_app_benchmarks.grovers.qiskit" = "grovers/qiskit"
+"qc_app_benchmarks.phase_estimation.qiskit" = "phase-estimation/qiskit"
+"qc_app_benchmarks.hhl.qiskit" = "hhl/qiskit"
+"qc_app_benchmarks.amplitude_estimation.qiskit" = "amplitude-estimation/qiskit"
+"qc_app_benchmarks.monte_carlo.common" = "monte-carlo/_common"
+"qc_app_benchmarks.monte_carlo.qiskit" = "monte-carlo/qiskit"
+"qc_app_benchmarks.hamiltonian_simulation._common" = "hamiltonian-simulation/_common"
+"qc_app_benchmarks.hamiltonian_simulation.qiskit" = "hamiltonian-simulation/qiskit"
+"qc_app_benchmarks.vqe.qiskit" = "vqe/qiskit"
+"qc_app_benchmarks.shors.common" = "shors/_common"
+"qc_app_benchmarks.shors.qiskit" = "shors/qiskit"
+
+[tool.setuptools.package-data]
+"qc_app_benchmarks.hamiltonian_simulation._common" = ["*.json"]
+"qc_app_benchmarks.vqe.qiskit" = ["ansatzes/*.txt", "Hamiltonians/*.txt"]
+
+# === Formatting === #
+[tool.black]
+line-length = 130
+
+[tool.isort]
+line_length = 130
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "."
+
+ignore_missing_imports = true

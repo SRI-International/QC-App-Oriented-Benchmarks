@@ -8,12 +8,16 @@ import time
 
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
-import execute as ex
-import metrics as metrics
-
-from grovers_kernel import GroversSearch, kernel_draw, _use_mcx_shim
+try:
+    from qc_app_benchmarks.common.qiskit import execute as ex
+    from qc_app_benchmarks.common import metrics as metrics
+    from qc_app_benchmarks.grovers.qiskit.grovers_kernel import GroversSearch, kernel_draw, _use_mcx_shim
+except ModuleNotFoundError:
+    sys.path[1:1] = ["_common", "_common/qiskit"]
+    sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
+    import execute as ex
+    import metrics as metrics
+    from grovers_kernel import GroversSearch, kernel_draw, _use_mcx_shim
 
 # Benchmark Name
 benchmark_name = "Grover's Search"

@@ -11,20 +11,26 @@ pi = np.pi
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-import sparse_Ham_sim as shs
-import uniform_controlled_rotation as ucr
+try:
+    import qc_app_benchmarks.hhl.qiskit.sparse_Ham_sim as shs
+    import qc_app_benchmarks.hhl.qiskit.uniform_controlled_rotation as ucr
+    from qc_app_benchmarks.common.qiskit import execute as ex
+    from qc_app_benchmarks.common import metrics as metrics
+except ModuleNotFoundError:
+    import sparse_Ham_sim as shs
+    import uniform_controlled_rotation as ucr
 
-# include QFT in this list, so we can refer to the QFT sub-circuit definition
-#sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
-#sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+    # include QFT in this list, so we can refer to the QFT sub-circuit definition
+    #sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
+    #sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
 
-# cannot use the QFT common yet, as HHL seems to use reverse bit order
-sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
-#from qft_benchmark import qft_gate, inv_qft_gate
+    # cannot use the QFT common yet, as HHL seems to use reverse bit order
+    sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
+    sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+    #from qft_benchmark import qft_gate, inv_qft_gate
 
-import execute as ex
-import metrics as metrics
+    import execute as ex
+    import metrics as metrics
 
 # Benchmark Name
 benchmark_name = "HHL"

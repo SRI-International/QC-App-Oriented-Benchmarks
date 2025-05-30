@@ -9,10 +9,14 @@ import time
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
-import execute as ex
-import metrics as metrics
+try:
+    from qc_app_benchmarks.common.qiskit import execute as ex
+    from qc_app_benchmarks.common import metrics as metrics
+except ModuleNotFoundError:
+    sys.path[1:1] = [ "_common", "_common/qiskit" ]
+    sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
+    import execute as ex
+    import metrics as metrics
 
 # Benchmark Name
 benchmark_name = "Quantum Fourier Transform"

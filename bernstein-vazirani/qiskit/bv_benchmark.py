@@ -11,12 +11,16 @@ import time
 
 import numpy as np
 
-sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
-import execute as ex
-import metrics as metrics
-
-from bv_kernel import BersteinVazirani, kernel_draw
+try:
+    from qc_app_benchmarks.common.qiskit import execute as ex
+    from qc_app_benchmarks.common import metrics as metrics
+    from qc_app_benchmarks.bernstein_vazirani.qiskit.bv_kernel import BersteinVazirani, kernel_draw
+except ModuleNotFoundError:
+    sys.path[1:1] = [ "_common", "_common/qiskit" ]
+    sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
+    import execute as ex
+    import metrics as metrics
+    from bv_kernel import BersteinVazirani, kernel_draw
 
 # Benchmark Name
 benchmark_name = "Bernstein-Vazirani"

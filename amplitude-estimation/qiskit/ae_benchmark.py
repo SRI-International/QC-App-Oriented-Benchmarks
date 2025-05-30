@@ -9,11 +9,16 @@ import time
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
-import execute as ex
-import metrics as metrics
-from qft_benchmark import inv_qft_gate
+try:
+    from qc_app_benchmarks.common.qiskit import execute as ex
+    from qc_app_benchmarks.common import metrics as metrics
+    from qc_app_benchmarks.quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate
+except ModuleNotFoundError:
+    sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
+    sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+    import execute as ex
+    import metrics as metrics
+    from qft_benchmark import inv_qft_gate
 
 # Benchmark Name
 benchmark_name = "Amplitude Estimation"

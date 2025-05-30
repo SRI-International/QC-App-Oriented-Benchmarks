@@ -13,10 +13,14 @@ from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.synthesis import LieTrotter
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
-import execute as ex
-import metrics as metrics
+try:
+    from qc_app_benchmarks.common.qiskit import execute as ex
+    from qc_app_benchmarks.common import metrics as metrics
+except ModuleNotFoundError:
+    sys.path[1:1] = ["_common", "_common/qiskit"]
+    sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
+    import execute as ex
+    import metrics as metrics
 
 # Benchmark Name
 benchmark_name = "VQE Simulation"

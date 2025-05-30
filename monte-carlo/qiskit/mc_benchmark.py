@@ -13,12 +13,18 @@ from numpy.polynomial.polynomial import polyfit
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit.circuit.library.standard_gates.ry import RYGate
 
-sys.path[1:1] = ["_common", "_common/qiskit", "monte-carlo/_common", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../monte-carlo/_common", "../../quantum-fourier-transform/qiskit"]
-import execute as ex
-import mc_utils as mc_utils
-import metrics as metrics
-from qft_benchmark import inv_qft_gate
+try:
+    from qc_app_benchmarks.common.qiskit import execute as ex
+    from qc_app_benchmarks.common import metrics as metrics
+    import qc_app_benchmarks.monte_carlo.common.mc_utils as mc_utils
+    from qc_app_benchmarks.quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate
+except ModuleNotFoundError:
+    sys.path[1:1] = ["_common", "_common/qiskit", "monte-carlo/_common", "quantum-fourier-transform/qiskit"]
+    sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../monte-carlo/_common", "../../quantum-fourier-transform/qiskit"]
+    import execute as ex
+    import mc_utils as mc_utils
+    import metrics as metrics
+    from qft_benchmark import inv_qft_gate
 
 # Benchmark Name
 benchmark_name = "Monte Carlo Sampling"
