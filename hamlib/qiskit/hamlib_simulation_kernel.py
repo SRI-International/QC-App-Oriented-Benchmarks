@@ -406,8 +406,10 @@ def create_circuit_from_op(
         QCI_ = i_state
     
     # Append K trotter steps
+    evo_inverse = [x.inverse() for x in evo]
+    
     circuit = append_trotter_steps(num_trotter_steps,
-            evo if not use_inverse_flag else evo.inverse(),
+            evo if not use_inverse_flag else evo_inverse,
             num_qubits,
             circuit)
 
@@ -417,9 +419,9 @@ def create_circuit_from_op(
 
     # append simple inverse Trotter steps if method 3
     if method == 3:  
-        inv = evo.inverse()
-        inv.name = "e^iHt"
-        circuit = append_trotter_steps(num_trotter_steps, inv, ham_op, circuit)
+        inv = evo_inverse
+        for x in inv: x.name = "e^iHt"
+        circuit = append_trotter_steps(num_trotter_steps, inv, ham_op.num_qubits, circuit)
         if num_qubits <= 6:
             INV_ = inv
         
