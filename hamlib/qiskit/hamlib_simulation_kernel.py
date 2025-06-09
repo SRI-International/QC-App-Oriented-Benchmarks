@@ -421,7 +421,7 @@ def create_circuit_from_op(
     if method == 3:  
         inv = evo_inverse
         for x in inv: x.name = "e^iHt"
-        circuit = append_trotter_steps(num_trotter_steps, inv, ham_op.num_qubits, circuit)
+        circuit = append_trotter_steps(num_trotter_steps, inv, num_qubits, circuit)
         if num_qubits <= 6:
             INV_ = inv
         
