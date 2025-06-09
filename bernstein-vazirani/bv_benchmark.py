@@ -189,15 +189,16 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 			if method == 2:
 				mid_circuit_qubit_group.append(2)
 			
-			# If we only want the circuits:
-			if get_circuits:	
-				all_qcs.append(BersteinVazirani(num_qubits, s_int, bitset, method))
-				continue
-			
 			# create the circuit for given qubit size and secret string, store time metric
 			ts = time.time()
 			qc = BersteinVazirani(num_qubits, s_int, bitset, method)	   
 			metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
+
+			# If we only want the circuits:
+			if get_circuits:	
+				all_qcs.append(qc)
+				# Continue to skip sumbitting the circuit for execution. 
+				continue
 			
 			# submit circuit for execution on target (simulator, cloud simulator, or hardware)
 			ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
