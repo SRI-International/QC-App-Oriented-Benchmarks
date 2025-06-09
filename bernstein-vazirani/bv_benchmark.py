@@ -208,7 +208,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	
 	# Early return if we just want the circuits
 	if get_circuits:
-		print(f"Returning circuits")
+		print(f"************\nReturning circuits")
 		return all_qcs
 
 	# Wait for all active circuits to complete; report metrics when groups complete
