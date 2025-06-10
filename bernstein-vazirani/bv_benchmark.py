@@ -122,8 +122,10 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	# Variable for new qubit group ordering if using mid_circuit measurements
 	mid_circuit_qubit_group = []
 
-	# Variable to store all created circuits to return
-	all_qcs = []
+	# Variable to store all created circuits to return and their creation info
+	if get_circuits:
+		all_qcs = []
+		all_qcs_info = []
 
 	# If using mid_circuit measurements, set transform qubit group to true
 	transform_qubit_group = True if method == 2 else False
@@ -163,6 +165,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 			print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
 		else:
 			print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+			hold_qcs = []
+			hold_qcs_info = []
 		
 		# determine range of secret strings to loop over
 		if 2**(input_size) <= max_circuits:
@@ -191,12 +195,18 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 			
 			# create the circuit for given qubit size and secret string, store time metric
 			ts = time.time()
-			qc = BersteinVazirani(num_qubits, s_int, bitset, method)	   
-			metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
+			qc = BersteinVazirani(num_qubits, s_int, bitset, method)
+			create_time = time.time() - ts	   
+			metrics.store_metric(num_qubits, s_int, 'create_time', create_time)
 
 			# If we only want the circuits:
 			if get_circuits:	
-				all_qcs.append(qc)
+				hold_qcs.append(qc)
+				hold_qcs_info.append({ 
+					"secret_string": s_int, 
+					"num_qubits": num_qubits,
+					"create_time": create_time,
+				})
 				# Continue to skip sumbitting the circuit for execution. 
 				continue
 			
@@ -205,12 +215,16 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 			  
 		# Wait for some active circuits to complete; report metrics when groups complete
 		if not get_circuits:
-			ex.throttle_execution(metrics.finalize_group)  
+			ex.throttle_execution(metrics.finalize_group)
+		else:
+			all_qcs.append(hold_qcs) 
+			all_qcs_info.append(hold_qcs_info) 
 	
 	# Early return if we just want the circuits
 	if get_circuits:
 		print(f"************\nReturning circuits")
-		return all_qcs
+		# Returns circuits and their information in 2-D list 
+		return all_qcs, all_qcs_info
 
 	# Wait for all active circuits to complete; report metrics when groups complete
 	ex.finalize_execution(metrics.finalize_group)
