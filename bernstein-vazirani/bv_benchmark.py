@@ -192,9 +192,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 			
 			# create the circuit for given qubit size and secret string, store time metric
 			ts = time.time()
-			qc = BersteinVazirani(num_qubits, s_int, bitset, method)
-			create_time = time.time() - ts	   
-			metrics.store_metric(num_qubits, s_int, 'create_time', create_time)
+			qc = BersteinVazirani(num_qubits, s_int, bitset, method)	   
+			metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
 			# If we only want the circuits:
 			if get_circuits:	
