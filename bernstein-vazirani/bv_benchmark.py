@@ -125,7 +125,6 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	# Variable to store all created circuits to return and their creation info
 	if get_circuits:
 		all_qcs = []
-		all_qcs_info = []
 
 	# If using mid_circuit measurements, set transform qubit group to true
 	transform_qubit_group = True if method == 2 else False
@@ -200,11 +199,6 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 			# If we only want the circuits:
 			if get_circuits:	
 				all_qcs.append(qc)
-				all_qcs_info.append({ 
-					"secret_string": s_int, 
-					"num_qubits": num_qubits,
-					"create_time": create_time,
-				})
 				# Continue to skip sumbitting the circuit for execution. 
 				continue
 			
@@ -217,7 +211,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	# Early return if we just want the circuits
 	if get_circuits:
 		print(f"************\nReturning circuits and circuit information")
-		return all_qcs, all_qcs_info
+		return all_qcs, metrics.circuit_metrics
 
 	# Wait for all active circuits to complete; report metrics when groups complete
 	ex.finalize_execution(metrics.finalize_group)
