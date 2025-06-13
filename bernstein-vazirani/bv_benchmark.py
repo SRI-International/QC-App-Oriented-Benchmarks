@@ -212,8 +212,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 			ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
 			  
 		# Wait for some active circuits to complete; report metrics when groups complete
-		if not get_circuits:
-			ex.throttle_execution(metrics.finalize_group)
+		ex.throttle_execution(metrics.finalize_group)
 	
 	# Early return if we just want the circuits
 	if get_circuits:
