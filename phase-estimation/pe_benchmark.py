@@ -142,7 +142,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 	# Initialize metrics module
 	metrics.init_metrics()
 
-	# If we want to return circuits, store them
+	# Variable to store all created circuits to return
 	if get_circuits:
 		all_qcs = []
 
@@ -204,7 +204,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 			qc = PhaseEstimation(num_qubits, theta)
 			metrics.store_metric(num_qubits, theta, 'create_time', time.time() - ts)
 
-			# Store information if returning circuits
+			# Store each circuit if we want to return them
 			if get_circuits:
 				all_qcs.append(qc)
 				# Continue to skip sumbitting the circuit for execution. 
@@ -216,7 +216,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 		# Wait for some active circuits to complete; report metrics when groups complete
 		ex.throttle_execution(metrics.finalize_group)
 
-	# Early return if we just want the circuits
+	# Early return if we want the circuits and creation information
 	if get_circuits:
 		print(f"************\nReturning circuits and circuit information")
 		return all_qcs, metrics
