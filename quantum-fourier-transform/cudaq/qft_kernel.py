@@ -72,7 +72,7 @@ def qft_kernel (num_qubits: int, secret_int: int, init_phases: List[float], meth
 	# corresponds to the length of the hidden bitstring.
 	qubits = cudaq.qvector(num_qubits)
 	
-	# method 1 is the mirror circuit version of QFT followe by IQFT
+	# method 1 is the mirror circuit version of QFT followed by IQFT
 	if method == 1:
 
 		# Rotate each qubit into its initial state, 0 or 1
@@ -118,7 +118,7 @@ def barrier(qubits: cudaq.qview, num_qubits: int):
 		swap(qubits[i*2], qubits[i*2 + 1])
 			
 			
-def QuantumFourierTransform (num_qubits: int, secret_int: int, init_phase: List[float], method: int = 1):
+def QuantumFourierTransform (num_qubits: int, secret_int: int, init_phase: List[float], method: int = 1, use_midcircuit_measurement = False):
 
 	qc = [qft_kernel, [num_qubits, secret_int, init_phase, method]]
 	
