@@ -118,7 +118,7 @@ def barrier(qubits: cudaq.qview, num_qubits: int):
 		swap(qubits[i*2], qubits[i*2 + 1])
 			
 			
-def QuantumFourierTransform (num_qubits: int, secret_int: int, init_phase: List[float], method: int = 1, use_midcircuit_measurement = False):
+def QuantumFourierTransform (num_qubits: int, secret_int: int, init_phase: List[float], method: int = 1, use_midcircuit_measurement: bool = False):
 
 	qc = [qft_kernel, [num_qubits, secret_int, init_phase, method]]
 	
