@@ -134,7 +134,7 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots, met
 
 # Execute program with default parameters
 def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
-        method=1, input_value=None,
+        method=1, use_midcircuit_measurement = False, input_value=None,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None):
@@ -232,7 +232,7 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
             # create the circuit for given qubit size and secret string, store time metric
             mpi.barrier()
             ts = time.time()
-            qc = QuantumFourierTransform(num_qubits, s_int, bitset, method)       
+            qc = QuantumFourierTransform(num_qubits, s_int, bitset, method, use_midcircuit_measurement)       
             metrics.store_metric(input_size, s_int, 'create_time', time.time()-ts)
             
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
@@ -272,6 +272,7 @@ def get_args():
     parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--use_midcircuit_measurement", "-mid", action="store_true", help="Use dynamic circuit")
     return parser.parse_args()
     
 # if main, execute method
@@ -293,6 +294,7 @@ if __name__ == '__main__':
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots=args.num_shots,
         method=args.method,
+        use_midcircuit_measurement=args.use_midcircuit_measurement,
         input_value=args.input_value,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
