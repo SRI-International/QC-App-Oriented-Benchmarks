@@ -47,7 +47,7 @@ def iqft(register: cudaq.qview):
     
 @cudaq.kernel           
 #def pe_kernel (num_qubits: int, theta: float, do_uopt: bool):
-def pe_kernel (num_qubits: int, theta: float):
+def pe_kernel (num_qubits: int, theta: float, use_midcircuit_measurement: bool):
     M_PI = 3.1415926536
     
     init_phase = 2 * M_PI * theta
@@ -89,9 +89,9 @@ def pe_kernel (num_qubits: int, theta: float):
     mz(counting_qubits)
         
  
-def PhaseEstimation (num_qubits: int, theta: float):
+def PhaseEstimation (num_qubits: int, theta: float, use_midcircuit_measurement: bool):
 
-    qc = [pe_kernel, [num_qubits, theta]]
+    qc = [pe_kernel, [num_qubits, theta, use_midcircuit_measurement]]
     
     global QC_
     if num_qubits <= 6:
