@@ -36,7 +36,9 @@ from datetime import datetime
 import traceback
 import matplotlib.cm as cm
 import copy
-import qcb_mpi as mpi
+
+from qc_app_benchmarks.common import qcb_mpi as mpi
+
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
 
