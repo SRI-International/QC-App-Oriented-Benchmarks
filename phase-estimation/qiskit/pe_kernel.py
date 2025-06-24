@@ -45,11 +45,15 @@ def PhaseEstimation(num_qubits, theta, use_midcircuit_measurement):
 
     qc.barrier()
     
+    # Dynamic circuits can only be added using "compose" because they are not unitary.
+    # The "append" method requires the added circuit to be unitary, which dynamic circuits are not.
+
     if use_midcircuit_measurement:
         dynamic_inv_qft = dyn_inv_qft_gate(num_counting_qubits)
         qc.compose(dynamic_inv_qft, qubits=qr[:num_counting_qubits], clbits = cr[:num_counting_qubits], inplace=True)
     else:
-        qc.append(inv_qft_gate(num_counting_qubits), qr[:num_counting_qubits])
+        static_inv_qft = inv_qft_gate(num_counting_qubits)
+        qc.append(static_inv_qft, qr[:num_counting_qubits])
 
     qc.barrier()
     
@@ -57,12 +61,19 @@ def PhaseEstimation(num_qubits, theta, use_midcircuit_measurement):
     qc.measure([qr[m] for m in range(num_counting_qubits)], list(range(num_counting_qubits)))
 
     # save smaller circuit example for display
-    global QC_, U_
+    global QC_, U_, QFTI_, QFTDI_
     if QC_ == None or num_qubits <= 5:
         if num_qubits < 9: QC_ = qc
     if U_ == None or num_qubits <= 5:
         if num_qubits < 9: U_ = U
-        
+    
+    if use_midcircuit_measurement:
+        if QFTDI_ == None or num_qubits <= 5:
+            if num_qubits < 9: QFTI_ = dynamic_inv_qft
+    else:
+        if QFTI_ == None or num_qubits <= 5:
+            if num_qubits < 9: QFTI_ = static_inv_qft
+    
     # collapse the 3 sub-circuit levels used in this benchmark (for qiskit)
     qc2 = qc.decompose().decompose().decompose()
     

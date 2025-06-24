@@ -61,8 +61,9 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
         
         qc.barrier()
 
-        # if dynamic circuit flag is used, it uses dynamic Inverse QFT, otherwise it 
-        # uses a static Inverse QFT
+        # Uses dynamic inverse QFT if the flag is set; otherwise, use static version.
+        # Dynamic circuits can only be added using "compose" because they are not unitary.
+        # The "append" method requires the added circuit to be unitary, which dynamic circuits are not.
         if use_midcircuit_measurement:
             dynamic_inv_qft = dyn_inv_qft_gate(input_size)
             qc.compose(dynamic_inv_qft, qubits=qr, clbits = cr, inplace=True)
@@ -102,10 +103,10 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
             num_gates+=1
             
         depth += 1
- 
+        
         if use_midcircuit_measurement:
             dynamic_inv_qft = dyn_inv_qft_gate(input_size)
-            qc.compose(dynamic_inv_qft, qubits=qr, clbits = cr, inplace=True)
+            qc.compose(dynamic_inv_qft, qr[:], clbits = cr, inplace=True)
         else:
             qc.append(inv_qft_gate(input_size).to_instruction(), qr)
         
