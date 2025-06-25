@@ -1,10 +1,12 @@
 # HamLib Simulation - Benchmark Program
 
-Important Note:  The README for this benchmark has not yet been updated to reflect the most recent work-in-progress regarding the computation of observable values.  The initial benchmark work was described in the our paper:
+**Important Note:**  The README for this benchmark has not yet been updated to reflect the most recent work-in-progress regarding the computation of observable values.  The initial benchmark work was described in the our paper (Sep 2024):
 
-&nbsp;&nbsp;&nbsp;&nbsp;[A Comprehensive Cross-Model Framework for Benchmarking the Performance of Quantum Hamiltonian Simulations](https://arxiv.org/abs/2409.06919) 
+&nbsp;&nbsp;&nbsp;&nbsp;[A Comprehensive Cross-Model Framework for Benchmarking the Performance of Quantum Hamiltonian Simulations](https://arxiv.org/abs/2409.06919)  
 
-However, major enhancements are in process that provide a more complete benchmark that not only measures the fidelity of execution of a single Hamiltonian simulation circuit, but also computes observable values, such as energy, from the Hamiltonian.  The documentation will be updated soon.
+A follow-on paper (Apr 2025) focused on major enhancements (now released in this directory) that provide a more complete benchmark that includes the computation of observable values, such as energy, from the Hamiltonian.
+
+&nbsp;&nbsp;&nbsp;&nbsp;[A Practical Framework for Assessing the Performance of Observable Estimation in Quantum Simulation](https://arxiv.org/abs/2504.09813)
 
 --- 
 
