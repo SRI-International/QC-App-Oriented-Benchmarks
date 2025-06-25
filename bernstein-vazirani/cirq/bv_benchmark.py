@@ -3,17 +3,14 @@ Bernstein-Vazirani Benchmark Program - Cirq
 """
 
 from collections import defaultdict
-import sys
 import time
 
 import cirq
 import numpy as np
 
-sys.path[1:1] = [ "_common", "_common/cirq" ]
-sys.path[1:1] = [ "../../_common", "../../_common/cirq" ]
-import cirq_utils as cirq_utils
-import execute as ex
-import metrics as metrics
+from qc_app_benchmarks.common.cirq import cirq_utils as cirq_utils
+from qc_app_benchmarks.common.cirq import execute as ex
+from qc_app_benchmarks.common import metrics as metrics
 
 np.random.seed(0)
 

@@ -6,7 +6,6 @@ Bernstein-Vazirani Benchmark Program
 # This benchmark program runs at the API-specific level of the named benchmark directory.
 # It will be deprecated in favor of the API-independent version at the top-level.
 
-import sys
 import time
 
 import numpy as np

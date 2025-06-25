@@ -42,8 +42,14 @@ zip-safe = false
 include-package-data = true
 packages = [
     "qc_app_benchmarks.common",
+    "qc_app_benchmarks.common.braket",
+    "qc_app_benchmarks.common.cirq",
+    "qc_app_benchmarks.common.cudaq",
     "qc_app_benchmarks.common.qiskit",
     "qc_app_benchmarks.deutsch_jozsa.qiskit",
+    "qc_app_benchmarks.bernstein_vazirani.braket",
+    "qc_app_benchmarks.bernstein_vazirani.cirq",
+    "qc_app_benchmarks.bernstein_vazirani.cudaq",
     "qc_app_benchmarks.bernstein_vazirani.qiskit",
     "qc_app_benchmarks.hidden_shift.qiskit",
     "qc_app_benchmarks.quantum_fourier_transform.qiskit",
@@ -62,8 +68,14 @@ packages = [
 
 [tool.setuptools.package-dir]
 "qc_app_benchmarks.common" = "_common"
+"qc_app_benchmarks.common.braket" = "_common/braket"
+"qc_app_benchmarks.common.cirq" = "_common/cirq"
+"qc_app_benchmarks.common.cudaq" = "_common/cudaq"
 "qc_app_benchmarks.common.qiskit" = "_common/qiskit"
 "qc_app_benchmarks.deutsch_jozsa.qiskit" = "deutsch-jozsa/qiskit"
+"qc_app_benchmarks.bernstein_vazirani.braket" = "bernstein-vazirani/braket"
+"qc_app_benchmarks.bernstein_vazirani.cirq" = "bernstein-vazirani/cirq"
+"qc_app_benchmarks.bernstein_vazirani.cudaq" = "bernstein-vazirani/cudaq"
 "qc_app_benchmarks.bernstein_vazirani.qiskit" = "bernstein-vazirani/qiskit"
 "qc_app_benchmarks.hidden_shift.qiskit" = "hidden-shift/qiskit"
 "qc_app_benchmarks.quantum_fourier_transform.qiskit" = "quantum-fourier-transform/qiskit"
