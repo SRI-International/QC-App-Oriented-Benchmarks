@@ -69,7 +69,7 @@ def PhaseEstimation(num_qubits, theta, use_midcircuit_measurement):
     
     if use_midcircuit_measurement:
         if QFTDI_ == None or num_qubits <= 5:
-            if num_qubits < 9: QFTI_ = dynamic_inv_qft
+            if num_qubits < 9: QFTDI_ = dynamic_inv_qft
     else:
         if QFTI_ == None or num_qubits <= 5:
             if num_qubits < 9: QFTI_ = static_inv_qft
@@ -162,10 +162,11 @@ def kernel_draw():
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nPhase Operator 'U' = "); print(U_ if U_ != None else "  ... too large!")
-    if QFTI_ == None:
+    if QFTDI_ != None:
         print("\nDynamic Inverse QFT Circuit ="); print(QFTDI_ if QFTDI_ != None else "  ... too large!")
     else:
         print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
+
     
     
     
