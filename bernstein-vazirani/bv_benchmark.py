@@ -124,7 +124,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 
 	# Variable to store all created circuits to return and their creation info
 	if get_circuits:
-		all_qcs = []
+		all_qcs = {}
 
 	# If using mid_circuit measurements, set transform qubit group to true
 	transform_qubit_group = True if method == 2 else False
@@ -164,6 +164,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 			print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
 		else:
 			print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+			# Initialize dictionary to store circuits for this qubit group. 
+			all_qcs[str(num_qubits)] = {}
 		
 		# determine range of secret strings to loop over
 		if 2**(input_size) <= max_circuits:
@@ -197,7 +199,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 
 			# If we only want the circuits:
 			if get_circuits:	
-				all_qcs.append(qc)
+				all_qcs[str(num_qubits)][str(s_int)] = qc
 				# Continue to skip sumbitting the circuit for execution. 
 				continue
 			
@@ -210,7 +212,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	# Early return if we just want the circuits
 	if get_circuits:
 		print(f"************\nReturning circuits and circuit information")
-		return all_qcs, metrics
+		return all_qcs, metrics.circuit_metrics
 
 	# Wait for all active circuits to complete; report metrics when groups complete
 	ex.finalize_execution(metrics.finalize_group)
