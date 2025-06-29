@@ -2,16 +2,13 @@
 Bernstein-Vazirani Benchmark Program - Braket
 """
 
-import sys
 import time
 
 from braket.circuits import Circuit      # AWS imports: Import Braket SDK modules
 import numpy as np
 
-sys.path[1:1] = [ "_common", "_common/braket" ]
-sys.path[1:1] = [ "../../_common", "../../_common/braket" ]
-import execute as ex
-import metrics as metrics
+from qc_app_benchmarks.common.braket import execute as ex
+from qc_app_benchmarks.common import metrics as metrics
 
 np.random.seed(0)
 

@@ -6,36 +6,32 @@ Bernstein-Vazirani Benchmark Program
 # This benchmark program runs at the top level of the named benchmark directory.
 # It uses the "api" parameter to select the API to be used for kernel construction and execution.
 
-import os, sys
 import time
 import numpy as np
+
+from qc_app_benchmarks.common import metrics as metrics
 
 ############### Configure API
 # 
 # Configure the QED-C Benchmark package for use with the given API
 def qedc_benchmarks_init(api: str = "qiskit"):
 
-	if api == None: api = "qiskit"
+	match api:
+		case "braket":
+			from qc_app_benchmarks.common.braket import execute as ex
+			from qc_app_benchmarks.bernstein_vazirani.braket.bv_kernel import BersteinVazirani, kernel_draw
+		case "cirq":
+			from qc_app_benchmarks.common.cirq import execute as ex
+			from qc_app_benchmarks.bernstein_vazirani.cirq.bv_kernel import BersteinVazirani, kernel_draw
+		case "cudaq":
+			from qc_app_benchmarks.common.cudaq import execute as ex
+			from qc_app_benchmarks.bernstein_vazirani.cudaq.bv_kernel import BersteinVazirani, kernel_draw
+		case _:  # qiskit is default
+			from qc_app_benchmarks.common.qiskit import execute as ex
+			from qc_app_benchmarks.bernstein_vazirani.qiskit.bv_kernel import BersteinVazirani, kernel_draw
 
-	current_dir = os.path.dirname(os.path.abspath(__file__))
-	down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
-	sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
-
-	up_dir = os.path.abspath(os.path.join(current_dir, ".."))
-	common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
-	sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-	
-	api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
-	sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
-
-	import execute as ex
 	globals()["ex"] = ex
-
-	import metrics as metrics
-	globals()["metrics"] = metrics
-
-	from bv_kernel import BersteinVazirani, kernel_draw
-	
+	globals()["metrics"] = metrics	
 	return BersteinVazirani, kernel_draw
 
 # Benchmark Name
