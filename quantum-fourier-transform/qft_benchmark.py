@@ -214,7 +214,7 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
             print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
         else:
             print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
-			# Initialize dictionary to store circuits for this qubit group. 
+            # Initialize dictionary to store circuits for this qubit group. 
             all_qcs[str(num_qubits)] = {}
         
         # determine range of secret strings to loop over
