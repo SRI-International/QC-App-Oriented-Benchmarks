@@ -95,7 +95,7 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 		method=1, input_value=None,
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
-		context=None, api=None):
+		context=None, api=None, get_circuits=False):
 
 	# configure the QED-C Benchmark package for use with the given API
 	HiddenShift, kernel_draw = qedc_benchmarks_init(api)
@@ -113,6 +113,10 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 	if context is None: context = f"{benchmark_name} Benchmark"
 	
 	##########
+
+	# Variable to store all created circuits to return
+	if get_circuits:
+		all_qcs = {}
 	
 	# Initialize metrics module
 	metrics.init_metrics()
@@ -140,7 +144,12 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 		# determine number of circuits to execute for this group
 		num_circuits = min(2 ** (num_qubits), max_circuits)
 		
-		print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+		if not get_circuits:
+			print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+		else:
+			print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+			# Initialize dictionary to store circuits for this qubit group. 
+			all_qcs[str(num_qubits)] = {}
 		
 		# determine range of secret strings to loop over
 		if 2**(num_qubits) <= max_circuits:
@@ -168,11 +177,22 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 			qc = HiddenShift(num_qubits, s_int, bitset, method)
 			metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
+			# If we only want the circuits:
+			if get_circuits:	
+				all_qcs[str(num_qubits)][str(s_int)] = qc
+				# Continue to skip sumbitting the circuit for execution. 
+				continue
+
 			# submit circuit for execution on target (simulator, cloud simulator, or hardware)
 			ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
 		
 		# Wait for some active circuits to complete; report metrics when groups complete
 		ex.throttle_execution(metrics.finalize_group)
+	
+	# Early return if we just want the circuits
+	if get_circuits:
+		print(f"************\nReturning circuits and circuit information")
+		return all_qcs, metrics.circuit_metrics
 	
 	# Wait for all active circuits to complete; report metrics when groups complete
 	ex.finalize_execution(metrics.finalize_group)
