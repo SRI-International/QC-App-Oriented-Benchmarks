@@ -8,18 +8,19 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 # saved subcircuits circuits for printing
 QC_ = None
+QFTDI_ = None
 QFTI_ = None
 U_ = None
 
 ############### Circuit Definition
 
-def PhaseEstimation(num_qubits, theta):
+def PhaseEstimation(num_qubits, theta, use_midcircuit_measurement):
     
     qr = QuantumRegister(num_qubits)
     
     num_counting_qubits = num_qubits - 1 # only 1 state qubit
     
-    cr = ClassicalRegister(num_counting_qubits)
+    cr = ClassicalRegister(num_counting_qubits, name = "c0")
     qc = QuantumCircuit(qr, cr, name=f"qpe-{num_qubits}-{theta}")
 
     # initialize counting qubits in superposition
@@ -44,26 +45,38 @@ def PhaseEstimation(num_qubits, theta):
 
     qc.barrier()
     
-    # inverse quantum Fourier transform only on counting qubits
-    qc.append(inv_qft_gate(num_counting_qubits), qr[:num_counting_qubits])
-    
+    # Dynamic circuits can only be added using "compose" because they are not unitary.
+    # The "append" method requires the added circuit to be unitary, which dynamic circuits are not.
+
+    if use_midcircuit_measurement:
+        dynamic_inv_qft = dyn_inv_qft_gate(num_counting_qubits)
+        qc.compose(dynamic_inv_qft, qubits=qr[:num_counting_qubits], clbits = cr[:num_counting_qubits], inplace=True)
+    else:
+        static_inv_qft = inv_qft_gate(num_counting_qubits)
+        qc.append(static_inv_qft, qr[:num_counting_qubits])
+
     qc.barrier()
     
     # measure counting qubits
     qc.measure([qr[m] for m in range(num_counting_qubits)], list(range(num_counting_qubits)))
 
     # save smaller circuit example for display
-    global QC_, U_, QFTI_
+    global QC_, U_, QFTI_, QFTDI_
     if QC_ == None or num_qubits <= 5:
         if num_qubits < 9: QC_ = qc
     if U_ == None or num_qubits <= 5:
         if num_qubits < 9: U_ = U
-    if QFTI_ == None or num_qubits <= 5:
-        if num_qubits < 9: QFTI_ = inv_qft_gate(num_counting_qubits)
-        
+    
+    if use_midcircuit_measurement:
+        if QFTDI_ == None or num_qubits <= 5:
+            if num_qubits < 9: QFTDI_ = dynamic_inv_qft
+    else:
+        if QFTI_ == None or num_qubits <= 5:
+            if num_qubits < 9: QFTI_ = static_inv_qft
+    
     # collapse the 3 sub-circuit levels used in this benchmark (for qiskit)
     qc2 = qc.decompose().decompose().decompose()
-            
+    
     # return a handle on the circuit
     return qc2
 
@@ -106,6 +119,41 @@ def inv_qft_gate(input_size):
     # return a handle on the circuit
     return qc
 
+############### Dynamic Inverse QFT Circuit
+
+def dyn_inv_qft_gate(input_size):
+   
+    global QFTDI_, num_gates, depth
+    qr = QuantumRegister(input_size, name="q_dyn_inv")
+    cr = ClassicalRegister(input_size, name = "c0")
+    qc = QuantumCircuit(qr, cr, name="dyn_inv_qft")
+
+    # mirror the static inv-QFT loop order, but with mid-circuit feed-forward
+    for i_qubit in reversed(range(input_size)):
+        hidx = input_size - 1 - i_qubit
+
+        # H on the “hidx” wire
+        qc.h(qr[hidx])
+        qc.barrier()
+
+        # measure for feed-forward
+        qc.measure(qr[hidx], cr[hidx])
+        qc.barrier()
+
+        # if measured == 1, apply RZ(-θ) on each target
+        if hidx < input_size - 1:
+            for j in reversed(range(i_qubit)):
+                θ = math.pi / (2 ** (i_qubit - j))
+                with qc.if_test((cr[hidx], 1)):
+                    qc.rz(-θ, qr[input_size - 1 - j])
+        qc.barrier()
+
+    # cache a small-size example for printing
+    if QFTDI_ is None and input_size <= 5:
+        QFTDI_ = qc
+
+    return qc
+
 ############### BV Circuit Drawer
 
 # Draw the circuits of this benchmark program
@@ -114,6 +162,11 @@ def kernel_draw():
     # print a sample circuit
     print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     print("\nPhase Operator 'U' = "); print(U_ if U_ != None else "  ... too large!")
-    print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
+    if QFTDI_ != None:
+        print("\nDynamic Inverse QFT Circuit ="); print(QFTDI_ if QFTDI_ != None else "  ... too large!")
+    else:
+        print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
+
+    
     
     

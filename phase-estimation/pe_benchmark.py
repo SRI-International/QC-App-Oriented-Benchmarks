@@ -112,7 +112,7 @@ def bitstring_to_theta(counts, num_counting_qubits):
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
+def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100, use_midcircuit_measurement=False,
 		init_phase=None,
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
@@ -203,7 +203,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 			# create the circuit for given qubit size and theta, store time metric
 			mpi.barrier()
 			ts = time.time()
-			qc = PhaseEstimation(num_qubits, theta)
+			qc = PhaseEstimation(num_qubits, theta, use_midcircuit_measurement)
 			metrics.store_metric(num_qubits, theta, 'create_time', time.time() - ts)
 
 			# Store each circuit if we want to return them
@@ -255,6 +255,7 @@ def get_args():
 	parser.add_argument("--init_phase", "-p", default=0.0, help="Input Phase Value", type=float)
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+	parser.add_argument("--use_midcircuit_measurement", "-mid", action="store_true", help="Use dynamic circuit")
 	return parser.parse_args()
 	
 # if main, execute method
@@ -276,6 +277,7 @@ if __name__ == '__main__':
 		skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
 		num_shots=args.num_shots,
 		#method=args.method,
+		use_midcircuit_measurement=args.use_midcircuit_measurement,
 		init_phase=args.init_phase,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else {},
