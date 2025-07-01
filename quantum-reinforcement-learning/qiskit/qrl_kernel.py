@@ -1,5 +1,4 @@
 from qiskit import QuantumCircuit
-import numpy as np
 
 def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
     qc = QuantumCircuit(n_qubits)
@@ -16,8 +15,7 @@ def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurem
     qc.measure_all()
     return qc
 
-def calculate_gradients(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
-    grads = np.zeros(w_params.shape)
+def get_gradient_cirucits(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
     grads_list = []
     for i in range(w_params):
         w_n_params = w_params.copy()
@@ -26,6 +24,5 @@ def calculate_gradients(n_qubits, n_layers, initial_state, w_params, n_measureme
         w_n_params[i] -= np.pi
         grads_list.append(generate_pqc_circuit(n_qubits, n_layers, initial_state, w_n_params, n_measurements, index))
     
-    ## TODO: Run circits from the grads_list and calculate the gradients
-    
-    return grads
+    return grads_list
+
