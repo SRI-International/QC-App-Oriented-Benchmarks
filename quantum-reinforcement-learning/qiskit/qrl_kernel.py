@@ -1,4 +1,12 @@
+'''
+Quantum Reinforcement Learning Program - Qiskit Kernel
+(C) Quantum Economic Development Consortium (QED-C) 2025.
+'''
+
 from qiskit import QuantumCircuit
+import numpy as np
+
+QC_ = None # Quantum Circuit
 
 def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
     qc = QuantumCircuit(n_qubits)
@@ -13,6 +21,10 @@ def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurem
         for i in range(n_qubits-1):
             qc.cz(i, i+1)
     qc.measure_all()
+
+    global QC_
+    if QC_ == None or n_qubits <= 6:
+        if n_qubits < 9: QC_ = qc
     return qc
 
 def get_gradient_cirucits(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
@@ -26,3 +38,11 @@ def get_gradient_cirucits(n_qubits, n_layers, initial_state, w_params, n_measure
     
     return grads_list
 
+############### QRL Circuit Drawer
+
+# Draw the circuits of this benchmark program
+
+def kernel_draw():
+    print("Sample Circuit:");
+    print(QC_ if QC_ != None else "  ... too large!")
+    
