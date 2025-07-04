@@ -454,9 +454,20 @@ def report_metrics ():
         if mpi.leader():
             report_metrics_for_group(group)
 
+import inspect
+def get_benchmark_id():
+    # Inspect the call stack to find the calling script
+    stack = inspect.stack()
+    for frame in stack:
+        caller_path = frame.filename
+        if "benchmark.py" in caller_path:
+            benchmark_folder = os.path.basename(os.path.dirname(os.path.dirname(caller_path)))
+            return benchmark_folder
+    return "unknown"
+    
        
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete
-def finalize_group(group, report=True):
+def finalize_group(group, report=True, benchmark_id=None):
     group = str(group)
     
     #print(f"... finalize group={group}")
@@ -476,12 +487,16 @@ def finalize_group(group, report=True):
         if mpi.leader():
             print("************")
             report_metrics_for_group(group)
+    
+    if benchmark_id is None:
+        benchmark_id = get_benchmark_id()
         
     # sort the group metrics (sometimes they come back out of order)
-    sort_group_metrics()
+    sort_group_metrics(benchmark_id=benchmark_id, backend_id=get_backend_id())
+
     
 # sort the group array as integers, then all metrics relative to it
-def sort_group_metrics():
+def sort_group_metrics(benchmark_id=None, backend_id=None, save_path="execution_log.json"):
 
     # get groups as integer, then sort each metric with it
     igroups = [int(group) for group in group_metrics["groups"]]
@@ -493,6 +508,28 @@ def sort_group_metrics():
     # save the sorted group names when all done 
     xy = sorted(zip(igroups, group_metrics["groups"]))    
     group_metrics["groups"] = [y for x, y in xy]
+
+    # Prepare full snapshot under benchmark_id (and optionally backend)
+    new_entry = {
+        "backend_id": backend_id or "unknown",
+        "group_metrics": group_metrics
+    }
+
+    # Load existing file or create new
+    if os.path.exists(save_path):
+        with open(save_path) as f:
+            all_benchmark_data = json.load(f)
+    else:
+        all_benchmark_data = {}
+
+    # Add or update current benchmark block
+    all_benchmark_data[benchmark_id] = new_entry
+
+    # Save everything back to disk
+    with open(save_path, "w") as f:
+        json.dump(all_benchmark_data, f, indent=2)
+
+    # print(f"Appended metrics for '{benchmark_id}' to '{save_path}'")
 
 
 ######################################################
@@ -846,7 +883,9 @@ def get_backend_title(backend_id=None):
 # Extract short app name from the title passed in by user
 def get_appname_from_title(suptitle):
     appname = suptitle[len('Benchmark Results - '):len(suptitle)]
-    appname = appname[:appname.index(' - ')]
+
+    if " - " in appname:
+        appname = appname[:appname.index(' - ')]
     
     # for creating plot image filenames replace spaces
     appname = appname.replace(' ', '-') 
@@ -861,7 +900,15 @@ import matplotlib.pyplot as plt
 dir_path = os.path.dirname(os.path.realpath(__file__))
 maxcut_style = os.path.join(dir_path,'maxcut.mplstyle')
 # plt.style.use(style_file)
-    
+
+# Delete execution_log.json if it exists
+def delete_metrics_file(path="execution_log.json"):
+    if os.path.exists(path):
+        os.remove(path)
+        # print(f"Deleted '{path}'")
+    else:
+        print(f"File '{path}' not found. Nothing to delete.")
+        
 # Plot bar charts for each metric over all groups
 def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", options=None):
     
@@ -1428,6 +1475,8 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
         #display plot
         if show_plot_images:
             plt.show()
+
+    delete_metrics_file()   # Delete execution_log.json if it exists
 
 # Return the minimum value in an array, but if all elements 0, return 0.001
 def get_nonzero_min(array):
@@ -2727,7 +2776,8 @@ def plot_metrics_optgaps (suptitle="",
         # show the plot for user to see
         if show_plot_images:
             plt.show()
-
+    
+    delete_metrics_file()   # Delete execution_log.json if it exists
 
     ############################################################
     ##### Detailed optimality gaps plot
