@@ -121,9 +121,12 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
     global QC_    
     if QC_ == None or num_qubits <= 5:
         if num_qubits < 9: QC_ = qc
-        
+    
+    # collapse the sub-circuit levels used in this benchmark (for qiskit)
+    qc2 = qc.decompose()
+            
     # return a handle on the circuit
-    return qc
+    return qc2
 
 ############### QFT Circuit
 
