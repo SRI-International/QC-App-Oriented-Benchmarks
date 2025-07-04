@@ -38,8 +38,7 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
         qc.barrier()
 
         # perform QFT on the input
-        static_qft_gate = qft_gate(input_size)
-        qc.compose(static_qft_gate, qubits=qr, inplace=True)
+        qc.append(qft_gate(input_size).to_instruction(), qr)
 
 
         # End with Hadamard on all qubits (to measure the z rotations)
@@ -192,7 +191,6 @@ def inv_qft_gate(input_size):
     
     if QFTI_ == None or input_size <= 5:
         if input_size < 9: QFTI_= qc
-        print(QFTI_)
         
     return qc
 
