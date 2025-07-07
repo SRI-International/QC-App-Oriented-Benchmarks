@@ -38,7 +38,34 @@ def iqft(register: cudaq.qview):
 			for j in range(0, num_crzs):
 				divisor = 2 ** (j + 1)
 				r1.ctrl( -M_PI / divisor , register[ri_qubit], register[ri_qubit - j - 1])		
-				
+
+
+# Dynamic Inverse Quantum Fourier Transform
+@cudaq.kernel
+def dyn_iqft(register: cudaq.qview):
+	M_PI = 3.1415926536
+	ctr = 0
+	input_size = register.size()
+
+	# Walk through each qubit in reverse logical order
+	for i_qubit in range(input_size):
+		ri_qubit = input_size - i_qubit - 1
+
+		# Precede with an H gate (applied to all qubits)
+		h(register[ri_qubit])
+		
+		#reset(register[ri_qubit])
+
+		num_crzs = input_size - i_qubit - 1
+
+		# If not the last qubit, apply the cascade of controlled Rz(–θ)
+		if i_qubit < input_size - 1:
+			for j in range(0, num_crzs):
+				divisor = 2 ** (j + 1)
+				if  mz(register[ri_qubit]):
+					rz(-M_PI / divisor, register[ri_qubit - j - 1])
+	
+
 # Quantum Fourier Transform
 @cudaq.kernel
 def qft(register: cudaq.qview):
@@ -64,8 +91,9 @@ def qft(register: cudaq.qview):
 		# follow each set of rotations with an H gate (applied to all qubits)
 		h(register[i_qubit])
 
+
 @cudaq.kernel			
-def qft_kernel (num_qubits: int, secret_int: int, init_phases: List[float], method: int = 1):
+def qft_kernel (num_qubits: int, secret_int: int, init_phases: List[float], method: int = 1, use_midcircuit_measurement: bool = False):
 	M_PI = 3.1415926536
 	
 	# Allocate the specified number of qubits - this
@@ -97,7 +125,11 @@ def qft_kernel (num_qubits: int, secret_int: int, init_phases: List[float], meth
 		barrier(qubits, num_qubits)
 			
 		# Apply inverse quantum Fourier transform
-		iqft(qubits)
+
+		if use_midcircuit_measurement: 
+			dyn_iqft(qubits)
+		else:
+			iqft(qubits)
 
 		# Measure to gather sampling statistics
 		mz(qubits)
@@ -120,8 +152,9 @@ def barrier(qubits: cudaq.qview, num_qubits: int):
 			
 def QuantumFourierTransform (num_qubits: int, secret_int: int, init_phase: List[float], method: int = 1, use_midcircuit_measurement: bool = False):
 
-	qc = [qft_kernel, [num_qubits, secret_int, init_phase, method]]
 	
+	qc = [qft_kernel, [num_qubits, secret_int, init_phase, method, use_midcircuit_measurement]]
+
 	global QC_
 	if num_qubits <= 6:
 		QC_ = qc
