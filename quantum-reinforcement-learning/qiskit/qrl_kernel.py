@@ -3,8 +3,9 @@ Quantum Reinforcement Learning Program - Qiskit Kernel
 (C) Quantum Economic Development Consortium (QED-C) 2025.
 '''
 
-from qiskit import QuantumCircuit
+from qiskit import QuantumCircuit, transpile
 import numpy as np
+from qiskit_aer import AerSimulator
 
 QC_ = None # Quantum Circuit
 
@@ -26,6 +27,16 @@ def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurem
     if QC_ == None or n_qubits <= 6:
         if n_qubits < 9: QC_ = qc
     return qc
+
+def ideal_simulation(qc):
+    
+    simulator =  AerSimulator()
+    qc_trans = transpile(qc, simulator)
+    result = simulator.run(qc_trans).result()
+    counts = result.get_counts()
+    
+    return counts
+
 
 def get_gradient_cirucits(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
     grads_list = []
