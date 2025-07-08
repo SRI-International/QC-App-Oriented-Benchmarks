@@ -83,6 +83,7 @@ def get_args():
 	parser.add_argument("--num_layers", "-l", default=2, help="Number of layers", type=int)  
 	parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
 	parser.add_argument("--init_state", "-state", default=1, help="Initial State to be encoded", type=int)
+	parser.add_argument("--n_measurements", "-nmeas", nargs='+', default=[], help="List of measurement operations indices", type=int)
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
 	return parser.parse_args()
@@ -91,7 +92,7 @@ def get_args():
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, num_shots=100,
-		method=1, num_layers = 2, init_state = 1, backend_id=None, provider_backend=None,
+		method=1, num_layers = 2, init_state = 1, n_meas = [], backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
 		context=None, api=None, get_circuits=False):
 
@@ -155,7 +156,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, num_shots=100,
 				ts = time.time()
 
 				params = generate_rotation_params(num_layers, num_qubits)
-				qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params)	   
+				qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, n_meas)	   
 				metrics.store_metric(num_qubits, str(init_state), 'create_time', time.time()-ts)
 
 				# If we only want the circuits:
@@ -211,10 +212,9 @@ if __name__ == '__main__':
 		method=args.method,
 		num_layers=args.num_layers,
 		init_state = args.init_state,
+		n_meas= args.n_measurements,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else {},
 		api=args.api
 		)
-   
-
-      
+  
