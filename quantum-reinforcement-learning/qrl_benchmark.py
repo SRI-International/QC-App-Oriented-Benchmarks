@@ -50,17 +50,26 @@ def analyze_and_print_result (qc, result):
 	# obtain counts from the result object
 	counts = result.get_counts(qc)
 	
-	# correct distribution is measuring the key 100% of the time
+	# correct distribution is simulated classically
 	correct_dist = ideal_simulation(qc)
 	# use our polarization fidelity rescaling
 	fidelity = metrics.polarization_fidelity(counts, correct_dist)
 		
 	return counts, fidelity
 
+############### Convert integer state to bitlist
+
+# Convert initial state passed as intger to a bitlist of length of num of qubits
+# Ex Input (init_string = 3, num_qubits = 4) -> Output [1, 0, 1, 0]
+
 def int_to_bitlist(init_string: int, num_qubits: int):
     if init_string >= 2**num_qubits:
         raise ValueError(f"{init_string} cannot be represented in {num_qubits} bits.")
     return [int(b) for b in format(init_string, f'0{num_qubits}b')]
+
+############### Generate list of random parameters
+
+# generate a random list of initial parameters 
 
 def generate_rotation_params(num_layers, num_qubits, seed=0):
     if seed is not None:
@@ -68,6 +77,8 @@ def generate_rotation_params(num_layers, num_qubits, seed=0):
 
     total_params = 2 * num_layers * num_qubits
     return [random.uniform(0, 2 * np.pi) for _ in range(total_params)]
+
+############### Argument parser
 
 import argparse
 def get_args():
@@ -106,7 +117,6 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, num_shots=100,
 		max_qubits = max(3, max_qubits)
 		min_qubits = min(max(3, min_qubits), max_qubits)
 		skip_qubits = max(1, skip_qubits)
-		#print(f"min, max qubits = {min_qubits} {max_qubits}")
 
 		# create context identifier
 		if context is None: context = f"{benchmark_name} ({method}) Benchmark"
