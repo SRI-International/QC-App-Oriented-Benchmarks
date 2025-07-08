@@ -7,8 +7,9 @@ from qiskit import QuantumCircuit, transpile
 import numpy as np
 from qiskit_aer import AerSimulator
 
-QC_ = None # Quantum Circuit
+QC_ = None # Quantum Circuit saved for display
 
+############### PQC Circuit Definition for QRL
 def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurements = []):
     
     if len(n_measurements) == 0:
@@ -38,6 +39,10 @@ def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurem
         if n_qubits < 9: QC_ = qc
     return qc
 
+############### Ideal circuit simulation 
+
+# Calculate the noiseless counts
+
 def ideal_simulation(qc):
     
     simulator =  AerSimulator()
@@ -47,6 +52,7 @@ def ideal_simulation(qc):
 
     return counts
 
+############### Circuit definitions for gradient calculations
 
 def get_gradient_cirucits(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
     grads_list = []
