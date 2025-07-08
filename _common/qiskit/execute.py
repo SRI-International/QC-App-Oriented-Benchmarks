@@ -43,7 +43,7 @@ from qiskit_aer.noise import NoiseModel, ReadoutError
 from qiskit_aer.noise import depolarizing_error, reset_error
 
 # QED-C modules
-import metrics
+from _common import metrics
 
 ##########################
 # JOB MANAGEMENT VARIABLES 
