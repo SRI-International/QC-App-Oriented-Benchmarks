@@ -25,10 +25,15 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 	globals()["ex"] = execute_module
 	
 	# Get the kernel file for the api 
-	kernel_path = f"bernstein_vazirani.{api}.bv_kernel"
-	kernel = import_module(kernel_path)
+	# kernel_path = f"bernstein_vazirani.{api}.bv_kernel"
+	# kernel = import_module(kernel_path)
 	
-	return getattr(kernel, "BersteinVazirani"), getattr(kernel, "kernel_draw")
+	# return getattr(kernel, "BersteinVazirani"), getattr(kernel, "kernel_draw")
+
+	# OR use the method from the _common file
+	from _common.qedc_init import get_from_kernel
+	to_get = ["BersteinVazirani", "kernel_draw"]
+	return get_from_kernel("bernstein_vazirani", "bv_kernel", api, to_get)
 
 # Benchmark Name
 benchmark_name = "Bernstein-Vazirani"
