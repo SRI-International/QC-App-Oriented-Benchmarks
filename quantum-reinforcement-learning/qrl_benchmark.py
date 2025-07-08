@@ -1,5 +1,5 @@
 import os, sys
-import time
+import time, random
 import numpy as np
 
 ############### Configure API
@@ -31,7 +31,7 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 
     from qrl_kernel import generate_pqc_circuits, ideal_simulation, kernel_draw
     
-    return generate_pqc_circuits,ideal_simulation, kernel_draw
+    return generate_pqc_circuits, ideal_simulation, kernel_draw
 
 
 benchmark_name = 'Quantum-Reinforcement-Learning'
@@ -46,9 +46,7 @@ verbose = False
 # Analyze and print measured results
 # Expected result is simulated
 
-def analyze_and_print_result (qc, result, num_qubits, num_shots):
-    # size of input is one less than available qubits
-	
+def analyze_and_print_result (qc, result):
 	# obtain counts from the result object
 	counts = result.get_counts(qc)
 	
@@ -59,8 +57,17 @@ def analyze_and_print_result (qc, result, num_qubits, num_shots):
 		
 	return counts, fidelity
 
+def int_to_bitlist(init_string: int, num_qubits: int):
+    if init_string >= 2**num_qubits:
+        raise ValueError(f"{init_string} cannot be represented in {num_qubits} bits.")
+    return [int(b) for b in format(init_string, f'0{num_qubits}b')]
 
-      
+def generate_rotation_params(num_layers, num_qubits, seed=0):
+    if seed is not None:
+        random.seed(seed)  # Optional for reproducibility
+
+    total_params = 2 * num_layers * num_qubits
+    return [random.uniform(0, 2 * np.pi) for _ in range(total_params)]
 
 import argparse
 def get_args():
@@ -73,12 +80,114 @@ def get_args():
 	parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
 	parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
 	parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
-	parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
+	parser.add_argument("--num_layers", "-l", default=2, help="Number of layers", type=int)  
 	parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
+	parser.add_argument("--init_state", "-state", default=1, help="Initial State to be encoded", type=int)
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
 	return parser.parse_args()
+
+################ Benchmark Loop
+
+# Execute program with default parameters
+def run (min_qubits=3, max_qubits=6, skip_qubits=1, num_shots=100,
+		method=1, num_layers = 2, init_state = 1, backend_id=None, provider_backend=None,
+		hub="ibm-q", group="open", project="main", exec_options=None,
+		context=None, api=None, get_circuits=False):
+
+	# configure the QED-C Benchmark package for use with the given API
+	generate_pqc_circuits, ideal_simulation, kernel_draw = qedc_benchmarks_init(api)
 	
+	print(f"{benchmark_name} ({method}) Benchmark Program ")
+
+	# validate parameters (smallest circuit is 3 qubits)
+	max_qubits = max(3, max_qubits)
+	min_qubits = min(max(3, min_qubits), max_qubits)
+	skip_qubits = max(1, skip_qubits)
+	#print(f"min, max qubits = {min_qubits} {max_qubits}")
+
+	# create context identifier
+	if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+
+	init_state = int_to_bitlist(init_state, num_qubits)
+	
+	##########
+
+	# Variable to store all created circuits to return and their creation info
+	if get_circuits:
+		all_qcs = {}
+
+	
+	# Initialize metrics module
+	metrics.init_metrics()
+
+	# Define custom result handler
+	def execution_handler (qc, result, num_qubits, init_state, num_shots):  
+	 
+		# determine fidelity of result set
+		num_qubits = int(num_qubits)
+		counts, fidelity = analyze_and_print_result(qc, result)
+		metrics.store_metric(num_qubits, str(init_state), 'fidelity', fidelity)
+
+	# Initialize execution module using the execution result handler above and specified backend_id
+	ex.init_execution(execution_handler)
+	ex.set_execution_target(backend_id, provider_backend=provider_backend,
+			hub=hub, group=group, project=project, exec_options=exec_options,
+			context=context)
+
+	# for noiseless simulation, set noise model to be None
+	# ex.set_noise_model(None)
+
+	##########
+	
+	# Execute Benchmark Program N times for multiple circuit sizes
+	# Accumulate metrics asynchronously as circuits complete
+	for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+		if get_circuits:
+			print(f"************\nCreating circuit with num_qubits = {num_qubits}")
+		else:
+			print(f"************\nExecuting circuit with num_qubits = {num_qubits}")
+			# Initialize dictionary to store circuits for this qubit group. 
+			all_qcs[str(num_qubits)] = {}
+
+			# create the circuit for given qubit size and secret string, store time metric
+			ts = time.time()
+
+			params = generate_rotation_params(num_layers, num_qubits)
+			qc = generate_pqc_circuits(num_qubits, num_layers, init_state, params)	   
+			metrics.store_metric(num_qubits, str(init_state), 'create_time', time.time()-ts)
+
+			# If we only want the circuits:
+			if get_circuits:	
+				all_qcs[str(num_qubits)] = qc
+				# Continue to skip sumbitting the circuit for execution. 
+				continue
+			
+			# submit circuit for execution on target (simulator, cloud simulator, or hardware)
+			ex.submit_circuit(qc, num_qubits, str(init_state), shots=num_shots)
+			  
+		# Wait for some active circuits to complete; report metrics when groups complete
+		ex.throttle_execution(metrics.finalize_group)
+	
+	# Early return if we just want the circuits
+	if get_circuits:
+		print(f"************\nReturning circuits and circuit information")
+		return all_qcs, metrics.circuit_metrics
+
+	# Wait for all active circuits to complete; report metrics when groups complete
+	ex.finalize_execution(metrics.finalize_group)
+	   
+	##########
+	
+	# draw a sample circuit
+	kernel_draw()
+
+	# Plot metrics for all circuit sizes
+	metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
+						 transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
+
+#######################
+
 # if main, execute method
 if __name__ == '__main__': 
 	args = get_args()
@@ -95,9 +204,11 @@ if __name__ == '__main__':
 	
 	# execute benchmark program
 	run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
-		skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
+		skip_qubits=args.skip_qubits,
 		num_shots=args.num_shots,
 		method=args.method,
+		num_layers=args.num_layers,
+		init_state = args.init_state,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else {},
 		api=args.api

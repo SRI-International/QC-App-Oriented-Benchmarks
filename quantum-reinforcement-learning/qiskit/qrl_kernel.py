@@ -9,11 +9,17 @@ from qiskit_aer import AerSimulator
 
 QC_ = None # Quantum Circuit
 
-def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
-    qc = QuantumCircuit(n_qubits)
+def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurements = []):
+    
+    if len(n_measurements) == 0:
+        n_measurements = list(range(n_qubits))
+    
+    qc = QuantumCircuit(n_qubits, len(n_measurements))
+    
     for i in range(len(initial_state)):
         if initial_state[i] == 1:
             qc.x(i)
+    
     for layer in range(n_layers):
         for i in range(n_qubits):
             idx = layer * n_qubits + i
@@ -21,7 +27,11 @@ def generate_pqc_circuit(n_qubits, n_layers, initial_state, w_params, n_measurem
             qc.rz(w_params[idx+1], i)
         for i in range(n_qubits-1):
             qc.cz(i, i+1)
-    qc.measure_all()
+    
+    midx = 0
+    for i in n_measurements:
+        qc.measure(i, midx)
+        midx += 1
 
     global QC_
     if QC_ == None or n_qubits <= 6:
@@ -34,7 +44,7 @@ def ideal_simulation(qc):
     qc_trans = transpile(qc, simulator)
     result = simulator.run(qc_trans).result()
     counts = result.get_counts()
-    
+
     return counts
 
 
