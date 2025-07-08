@@ -23,3 +23,14 @@ def get_from_kernel(benchmark_name: str, kernel_name: str, api: str, to_get: lis
     
     return output
 
+def get_execute_module(api: str):
+    """
+    Args:
+        api: the api to run the benchmark on.
+    
+    Returns:
+        The execute module for the api.
+    """
+
+    path_to_execute = f"_common.{api}.execute"
+    return import_module(path_to_execute)

@@ -20,14 +20,18 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 	if api == None: api = "qiskit"
 
 	# Import the execute module depending on the api
-	path_to_execute = f"_common.{api}.execute"
-	execute_module = import_module(path_to_execute)
-	globals()["ex"] = execute_module
+	# path_to_execute = f"_common.{api}.execute"
+	# execute_module = import_module(path_to_execute)
+	# globals()["ex"] = execute_module
+
+	# OR use the method from the _common file
+	from _common.qedc_init import get_execute_module
+	globals()["ex"] =  get_execute_module(api)
+
 	
 	# Get the kernel file for the api 
 	# kernel_path = f"bernstein_vazirani.{api}.bv_kernel"
 	# kernel = import_module(kernel_path)
-	
 	# return getattr(kernel, "BersteinVazirani"), getattr(kernel, "kernel_draw")
 
 	# OR use the method from the _common file
