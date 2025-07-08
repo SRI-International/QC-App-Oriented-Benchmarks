@@ -1,27 +1,26 @@
 from importlib import import_module
+from types import ModuleType
 
-def get_from_kernel(benchmark_name: str, kernel_name: str, api: str, to_get: list[str]):
+
+def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str]) -> list[ModuleType]:
     """
     Args:
+        api: the api to run the benchmark on.
         benchmark_name: the name of the benchmark.
-        kernel_name: the name of the kernel file for the benchmark.
-        api: the api to run the benchmark on. 
-        to_get: list of classes/method. to get from the kernel. 
+        module_names: the name of the modules to import.
     
     Returns:
-        A list of the to_get classes/methods.
-        Note that the order will be the same as the to_get list. 
+        A list of the modules in the order of module_names. 
     """
-    kernel_path = f"{benchmark_name}.{api}.{kernel_name}"
+    if api is None: api = "qiskit"
 
-    kernel = import_module(kernel_path)
+    modules = []
 
-    output = []
-
-    for name in to_get:
-        output.append(getattr(kernel, name))
+    for module_name in module_names:
+        module_path = f"{benchmark_name}.{api}.{module_name}"
+        modules.append(import_module(module_path))
     
-    return output
+    return modules
 
 def get_execute_module(api: str):
     """
@@ -32,5 +31,8 @@ def get_execute_module(api: str):
         The execute module for the api.
     """
 
+    if api is None: api = "qiskit"
+
     path_to_execute = f"_common.{api}.execute"
+    
     return import_module(path_to_execute)
