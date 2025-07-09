@@ -79,7 +79,6 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 
 	# configure the QED-C Benchmark package for use with the given API
 	qedc_benchmarks_init(api, "bernstein_vazirani", ["bv_kernel"])
-	
 	import bv_kernel as kernel
 	import execute as ex 
 	
@@ -231,7 +230,6 @@ if __name__ == '__main__':
 	# configure the QED-C Benchmark package for use with the given API
 	# (done here so we can set verbose for now)
 	qedc_benchmarks_init(args.api, "bernstein_vazirani", ["bv_kernel"])
-
 	import execute as ex
 	
 	# special argument handling
