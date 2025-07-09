@@ -91,6 +91,7 @@ def get_args():
 	parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
 	parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
 	parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
+	parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
 	parser.add_argument("--num_layers", "-l", default=2, help="Number of layers", type=int)  
 	parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
 	parser.add_argument("--init_state", "-state", default=1, help="Initial State to be encoded", type=int)
@@ -102,7 +103,7 @@ def get_args():
 ################ Benchmark Loop
 
 # Execute program with default parameters
-def run (min_qubits=3, max_qubits=6, skip_qubits=1, num_shots=100,
+def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=100,
 		method=1, num_layers = 2, init_state = 1, n_meas = [], backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
 		context=None, api=None, get_circuits=False):
@@ -110,7 +111,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, num_shots=100,
 	# configure the QED-C Benchmark package for use with the given API
 	generate_pqc_circuit, ideal_simulation, kernel_draw = qedc_benchmarks_init(api)
 	
-	print(f"{benchmark_name} ({method}) Benchmark Program ")
+	print(f"{benchmark_name} ({method}) Benchmark Program")
 
 	if method == 1:
 		# validate parameters (smallest circuit is 3 qubits)
@@ -132,12 +133,12 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, num_shots=100,
 		metrics.init_metrics()
 
 		# Define custom result handler
-		def execution_handler (qc, result, num_qubits, init_state, num_shots):  
+		def execution_handler (qc, result, num_qubits, idx, num_shots):  
 		
 			# determine fidelity of result set
 			num_qubits = int(num_qubits)
 			counts, fidelity = analyze_and_print_result(qc, result)
-			metrics.store_metric(num_qubits, str(init_state), 'fidelity', fidelity)
+			metrics.store_metric(num_qubits, idx, 'fidelity', fidelity)
 
 		# Initialize execution module using the execution result handler above and specified backend_id
 		ex.init_execution(execution_handler)
@@ -162,21 +163,22 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, num_shots=100,
 				
 				init_state_list = int_to_bitlist(init_state, num_qubits)
 
-				# create the circuit for given qubit size and secret string, store time metric
-				ts = time.time()
+				for idx in range(max_circuits):
+					params = generate_rotation_params(num_layers, num_qubits, seed = idx)
+					# create the circuit for given qubit size and secret string, store time metric
+					mpi.barrier()
+					ts = time.time()
+					qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, n_meas)	   
+					metrics.store_metric(num_qubits, idx, 'create_time', time.time()-ts)
 
-				params = generate_rotation_params(num_layers, num_qubits)
-				qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, n_meas)	   
-				metrics.store_metric(num_qubits, str(init_state), 'create_time', time.time()-ts)
-
-				# If we only want the circuits:
-				if get_circuits:	
-					all_qcs[str(num_qubits)] = qc
-					# Continue to skip sumbitting the circuit for execution. 
-					continue
-				
-				# submit circuit for execution on target (simulator, cloud simulator, or hardware)
-				ex.submit_circuit(qc, num_qubits, str(init_state), shots=num_shots)
+					# If we only want the circuits:
+					if get_circuits:	
+						all_qcs[str(num_qubits)][idx] = qc
+						# Continue to skip sumbitting the circuit for execution. 
+						continue
+					
+					# submit circuit for execution on target (simulator, cloud simulator, or hardware)
+					ex.submit_circuit(qc, num_qubits, idx, shots=num_shots)
 				
 			# Wait for some active circuits to complete; report metrics when groups complete
 			ex.throttle_execution(metrics.finalize_group)
@@ -218,6 +220,7 @@ if __name__ == '__main__':
 	# execute benchmark program
 	run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
 		skip_qubits=args.skip_qubits,
+		max_circuits=args.max_circuits,
 		num_shots=args.num_shots,
 		method=args.method,
 		num_layers=args.num_layers,
