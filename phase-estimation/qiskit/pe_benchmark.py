@@ -1,18 +1,20 @@
-"""
-Phase Estimation Benchmark Program - Qiskit
-"""
+'''
+Phase Estimation Benchmark Program
+(C) Quantum Economic Development Consortium (QED-C) 2024.
+'''
 
 import sys
 import time
 
 import numpy as np
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+sys.path[1:1] = ["_common", "_common/qiskit"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 import execute as ex
 import metrics as metrics
-from qft_benchmark import inv_qft_gate
+
+#from qft_benchmark import inv_qft_gate
+from pe_kernel import PhaseEstimation, kernel_draw
 
 # Benchmark Name
 benchmark_name = "Phase Estimation"
@@ -21,70 +23,8 @@ np.random.seed(0)
 
 verbose = False
 
-# saved subcircuits circuits for printing
-QC_ = None
-QFTI_ = None
-U_ = None
 
-############### Circuit Definition
-
-def PhaseEstimation(num_qubits, theta):
-    
-    qr = QuantumRegister(num_qubits)
-    
-    num_counting_qubits = num_qubits - 1 # only 1 state qubit
-    
-    cr = ClassicalRegister(num_counting_qubits)
-    qc = QuantumCircuit(qr, cr, name=f"qpe-{num_qubits}-{theta}")
-
-    # initialize counting qubits in superposition
-    for i in range(num_counting_qubits):
-        qc.h(qr[i])
-
-    # change to |1> in state qubit, so phase will be applied by cphase gate
-    qc.x(num_counting_qubits)
-
-    qc.barrier()
-
-    repeat = 1
-    for j in reversed(range(num_counting_qubits)):
-        # controlled operation: adds phase exp(i*2*pi*theta*repeat) to the state |1>
-        #                       does nothing to state |0>
-        cp, _ = CPhase(2*np.pi*theta, repeat)
-        qc.append(cp, [j, num_counting_qubits])
-        repeat *= 2
-
-    #Define global U operator as the phase operator
-    _, U = CPhase(2*np.pi*theta, 1)
-
-    qc.barrier()
-    
-    # inverse quantum Fourier transform only on counting qubits
-    qc.append(inv_qft_gate(num_counting_qubits), qr[:num_counting_qubits])
-    
-    qc.barrier()
-    
-    # measure counting qubits
-    qc.measure([qr[m] for m in range(num_counting_qubits)], list(range(num_counting_qubits)))
-
-    # save smaller circuit example for display
-    global QC_, U_, QFTI_
-    if QC_ == None or num_qubits <= 5:
-        if num_qubits < 9: QC_ = qc
-    if U_ == None or num_qubits <= 5:
-        if num_qubits < 9: U_ = U
-    if QFTI_ == None or num_qubits <= 5:
-        if num_qubits < 9: QFTI_ = inv_qft_gate(num_counting_qubits)
-    return qc
-
-#Construct the phase gates and include matching gate representation as readme circuit
-def CPhase(angle, exponent):
-
-    qc = QuantumCircuit(1, name=f"U^{exponent}")
-    qc.p(angle*exponent, 0)
-    phase_gate = qc.to_gate().control(1)
-
-    return phase_gate, qc
+############### Analyze Result
 
 # Analyze and print measured results
 # Expected result is always theta, so fidelity calc is simple
@@ -96,20 +36,24 @@ def analyze_and_print_result(qc, result, num_counting_qubits, theta, num_shots):
     # calculate expected output histogram
     correct_dist = theta_to_bitstring(theta, num_counting_qubits)
     
-    # generate thermal_dist to be comparable to correct_dist
-    thermal_dist = metrics.uniform_dist(num_counting_qubits)
-
-    # convert counts, expectation, and thermal_dist to app form for visibility
+    # generate thermal_dist and ap form of thermal_dist to be comparable to correct_dist
+    if num_counting_qubits < 15:
+        thermal_dist = metrics.uniform_dist(num_counting_qubits)
+        app_thermal_dist = bitstring_to_theta(thermal_dist, num_counting_qubits)
+    else :
+        thermal_dist = None
+        app_thermal_dist = None
+        
+    # convert counts expectation to app form for visibility
     # app form of correct distribution is measuring theta correctly 100% of the time
     app_counts = bitstring_to_theta(counts, num_counting_qubits)
-    app_correct_dist = {theta: 1.0}
-    app_thermal_dist = bitstring_to_theta(thermal_dist, num_counting_qubits)
-
+    app_correct_dist = {theta: 1.0} 
+    
     if verbose:
         print(f"For theta {theta}, expected: {correct_dist} measured: {counts}")
-        print(f"   ... For theta {theta} thermal_dist: {thermal_dist}")
+        #print(f"   ... For theta {theta} thermal_dist: {thermal_dist}")
         print(f"For theta {theta}, app expected: {app_correct_dist} measured: {app_counts}")
-        print(f"   ... For theta {theta} app_thermal_dist: {app_thermal_dist}")
+        #print(f"   ... For theta {theta} app_thermal_dist: {app_thermal_dist}")
         
     # use polarization fidelity with rescaling
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
@@ -132,8 +76,8 @@ def theta_to_bitstring(theta, num_counting_qubits):
 # Convert bitstring to theta representation, useful for debugging
 def bitstring_to_theta(counts, num_counting_qubits):
     theta_counts = {}
-    for key in counts.keys():
-        r = counts[key]
+    for item in counts.items():
+        key, r = item
         theta = int(key,2) / (2**num_counting_qubits)
         if theta not in theta_counts.keys():
             theta_counts[theta] = 0
@@ -145,7 +89,8 @@ def bitstring_to_theta(counts, num_counting_qubits):
 
 # Execute program with default parameters
 def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
-        backend_id='qasm_simulator', provider_backend=None,
+        init_phase=None,
+        backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 
@@ -194,7 +139,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         np.random.seed(0)
 
         # as circuit width grows, the number of counting qubits is increased
-        num_counting_qubits = num_qubits - num_state_qubits - 1
+        num_counting_qubits = num_qubits - num_state_qubits
 
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_counting_qubits), max_circuits)
@@ -203,23 +148,29 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         
         # determine range of secret strings to loop over
         if 2**(num_counting_qubits) <= max_circuits:
-            theta_range = [i/(2**(num_counting_qubits)) for i in list(range(num_circuits))]
+            theta_choices = list(range(num_circuits))
         else:
-            theta_range = [i/(2**(num_counting_qubits)) for i in np.random.choice(2**(num_counting_qubits), num_circuits, False)]
+            theta_choices = np.random.randint(1, 2**(num_counting_qubits), num_circuits + 10)
+            theta_choices = list(set(theta_choices))[0:num_circuits]
+            
+        # scale choices to 1.0
+        theta_range = [i/(2**(num_counting_qubits)) for i in theta_choices]
 
         # loop over limited # of random theta choices
         for theta in theta_range:
+            theta = float(theta) 
+            
+            # if initial phase passed in, use it instead of random values
+            if init_phase:
+                theta = init_phase
+        
             # create the circuit for given qubit size and theta, store time metric
             ts = time.time()
-
             qc = PhaseEstimation(num_qubits, theta)
             metrics.store_metric(num_qubits, theta, 'create_time', time.time() - ts)
-
-            # collapse the 3 sub-circuit levels used in this benchmark (for qiskit)
-            qc2 = qc.decompose().decompose().decompose()
             
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, theta, num_shots)
+            ex.submit_circuit(qc, num_qubits, theta, num_shots)
 
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
@@ -228,15 +179,58 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
-    
-    # print a sample circuit
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    print("\nPhase Operator 'U' = "); print(U_ if U_ != None else "  ... too large!")
-    print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
+
+    # draw a sample circuit
+    kernel_draw()
 
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
 
+#######################
+# MAIN
+
+import argparse
+def get_args():
+    parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
+    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
+    parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
+    parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits", type=int)
+    parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
+    parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
+    parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
+    parser.add_argument("--init_phase", "-p", default=0.0, help="Input Phase Value", type=float)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    return parser.parse_args()
+    
 # if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__': 
+    args = get_args()
+    
+    # configure the QED-C Benchmark package for use with the given API
+    # (done here so we can set verbose for now)
+    #PhaseEstimation, kernel_draw = qedc_benchmarks_init(args.api)
+    
+    # special argument handling
+    ex.verbose = args.verbose
+    verbose = args.verbose
+    
+    if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
+    
+    # execute benchmark program
+    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
+        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
+        num_shots=args.num_shots,
+        #method=args.method,
+        init_phase=args.init_phase,
+        backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
+        #api=args.api
+        )
+   
+

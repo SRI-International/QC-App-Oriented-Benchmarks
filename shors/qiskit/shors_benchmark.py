@@ -243,7 +243,8 @@ def ShorsAlgorithm(number, base, method, verbose=verbose):
             qc.barrier()
 
             # Reset the counting qubit to 0 if the previous measurement was 1
-            qc.x(qr_counting).c_if(cr_aux,1)
+            with qc.if_test((cr_aux,1)):
+                qc.x(qr_counting)
             qc.h(qr_counting)
 
             cUa_gate = controlled_Ua(n, base,2**(2*n-1-k), number)
@@ -255,7 +256,8 @@ def ShorsAlgorithm(number, base, method, verbose=verbose):
 
             # perform inverse QFT --> Rotations conditioned on previous outcomes
             for i in range(2**k):
-                qc.p(getAngle(i, k), qr_counting[0]).c_if(cr_data, i)
+                with qc.if_test((cr_data, i)):
+                    qc.p(getAngle(i, k), qr_counting[0])
 
             qc.h(qr_counting)
             qc.measure(qr_counting[0], cr_data[k])
@@ -338,7 +340,7 @@ def analyze_and_print_result(qc, result, num_qubits, order, num_shots, method):
 
 # Execute program with default parameters
 def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
-        verbose=verbose, backend_id='qasm_simulator', provider_backend=None,
+        verbose=verbose, backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 

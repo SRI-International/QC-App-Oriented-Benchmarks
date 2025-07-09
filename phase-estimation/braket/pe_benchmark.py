@@ -89,13 +89,20 @@ def analyze_and_print_result (qc, result, num_counting_qubits, theta):
             counts_str[measurement] += counts_r[measurement_r]
         else:
             counts_str[measurement] = counts_r[measurement_r]
-
+    
     # get results as times a particular theta was measured
     counts = bitstring_to_theta(counts_str, num_counting_qubits)
+
+    # Convert keys of counts to strings
+    counts = {str(key): value for key, value in counts.items()}
+    
     if verbose: print(f"For theta value {theta}, measured thetas: {counts}")
 
     # correct distribution is measuring theta 100% of the time
     correct_dist = {theta: 1.0}
+
+    # convert the keys of the correct_dist dictionary into strings
+    correct_dist = {str(key): value for key, value in correct_dist.items()}  
 
     # generate thermal_dist with amplitudes instead, to be comparable to correct_dist
     bit_thermal_dist = metrics.uniform_dist(num_counting_qubits)

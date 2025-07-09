@@ -8,7 +8,7 @@ The repository is maintained by members of the Quantum Economic Development Cons
 
 A variety of "reference applications" are provided. At the current stage in the evolution of quantum computing hardware, some applications will perform better on one hardware target, while a completely different set may execute better on another target. They are designed to provide users a quantum "jump start", so to speak, eliminating the need to develop for themselves uniform code patterns that facilitate quick development, deployment, and experimentation. 
 
-The QED-C committee that developed these benchmarks released a paper (Oct 2021) describing the theory and methodology supporting this work at
+The QED-C committee released its first paper (Oct 2021) describing the theory and methodology supporting this work at
 
 &nbsp;&nbsp;&nbsp;&nbsp;[Application-Oriented Performance Benchmarks for Quantum Computing](https://arxiv.org/abs/2110.03137)
 
@@ -16,9 +16,15 @@ The QED-C committee released a second paper (Feb 2023) describing the addition o
 
 &nbsp;&nbsp;&nbsp;&nbsp;[Optimization Applications as Quantum Performance Benchmarks](https://arxiv.org/abs/2302.02278)
 
-Recently, the group recently another paper (Feb 2024) with additional benchmark programs and improvements to the framework at
+The group added another paper (Feb 2024) with additional benchmark programs and improvements to the framework at
 
 &nbsp;&nbsp;&nbsp;&nbsp;[Quantum Algorithm Exploration using Application-Oriented Performance Benchmarks](https://arxiv.org/abs/2402.08985)
+
+Recently, the group released a fourth paper (Sep 2024) and a fifth (Apr 2025) with a deep focus on measuring performance of Quantum Hamiltonians Simulations at
+
+&nbsp;&nbsp;&nbsp;&nbsp;[A Comprehensive Cross-Model Framework for Benchmarking the Performance of Quantum Hamiltonian Simulations](https://arxiv.org/abs/2409.06919)
+
+&nbsp;&nbsp;&nbsp;&nbsp;[A Practical Framework for Assessing the Performance of Observable Estimation in Quantum Simulation](https://arxiv.org/abs/2504.09813)
 
 See the [Implementation Status](#implementation-status) section below for the latest report on benchmarks implemented to date.
 
@@ -33,6 +39,7 @@ The directory names and the currently supported environments are:
     qiskit      -- IBM Qiskit
     cirq        -- Google Cirq
     braket      -- Amazon Braket
+    cudaq       -- NVIDIA CUDA-Q (WIP)
     ocean       -- D-Wave Ocean
 ```  
 The goal has been to make the implementation of each algorithm identical across the different target environments, with the processing and reporting of results as similar as possible. Each application directory includes a README file with information specific to that application or algorithm. Below we list the benchmarks we have implemented with a suggested order of approach; the benchmarks in levels 1 and 2 are simpler and a good place to start for beginners, while levels 3 and 4 are more complicated and might build off of intuition and reasoning developed in earlier algorithms. Level 5 includes newly released benchmarks based on iterative execution done within hybrid algorithms.
@@ -43,7 +50,7 @@ Complexity of Benchmark Algorithms (Increasing Difficulty)
     1: Deutsch-Jozsa, Bernstein-Vazirani, Hidden Shift
     2: Quantum Fourier Transform, Grover's Search
     3: Phase Estimation, Amplitude Estimation, HHL Linear Solver
-    4: Monte Carlo, Hamiltonian Simulation, Variational Quantum Eigensolver, Shor's Order Finding
+    4: Monte Carlo, Hamiltonian (and HamLib) Simulation, Variational Quantum Eigensolver, Shor's Order Finding Algorithm
     5: MaxCut, Hydrogen-Lattice
 ```
 
@@ -59,7 +66,7 @@ In addition to the application directories at the highest level, there are sever
 
 ## Setup and Configuration
 
-The prototype benchmark applications are easy to run and contain few dependencies. The primary dependency is on the Python packages needed for the target environment in which you would like to execute the examples.
+The benchmark applications are easy to run and contain few dependencies. The primary dependency is on the Python packages needed for the target environment in which you would like to execute the examples.
 
 In the [`Preparing to Run Benchmarks`](./_setup/) section you will find a subdirectory for each of the target environments that contains a README with everything you need to know to install and configure the specific environment in which you would like to run.
 
@@ -115,7 +122,7 @@ The second cell of the Jupyter Notebook contains commented code with references 
 
 Applications are often deployed into Container Management Frameworks such as Docker, Kubernetes, and the like. 
 
-The Prototype Benchmarks repository includes support for the creation of a unique *'container image'* for each of the supported API environments. You can find the instructions and all the necessary build files in a folder at the top level named [**`_containerbuildfiles`**](./_containerbuildfiles/).
+The Application-Oriented Benchmarks repository includes support for the creation of a unique *'container image'* for each of the supported API environments. You can find the instructions and all the necessary build files in a folder at the top level named [**`_containerbuildfiles`**](./_containerbuildfiles/).
 The benchmark program image can be deployed into a container management framework and executed as any other application in that framework.
 
 Once built, deployed, and launched, the container process invokes a Jupyter Notebook from which you can run all the available benchmarks.
@@ -129,9 +136,9 @@ Once built, deployed, and launched, the container process invokes a Jupyter Note
 
 ## Implementation Status
 
-Below is a table showing the degree to which the benchmarks have been implemented in each of the target platforms (as of the last update to this branch):
+Below is a table showing the degree to which the benchmarks have been implemented in each of the target frameworks (as of the last update to this branch):
 
-![Prototype Benchmarks - Implementation Status](./_doc/images/proto_benchmarks_status.png)
+![Application-Oriented Benchmarks - Implementation Status](./_doc/images/proto_benchmarks_status.png)
 
 
 

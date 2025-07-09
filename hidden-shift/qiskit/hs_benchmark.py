@@ -1,17 +1,19 @@
-"""
-Hidden Shift Benchmark Program - Qiskit
-"""
+'''
+Hidden Shift Benchmark Program
+(C) Quantum Economic Development Consortium (QED-C) 2024.
+'''
 
 import sys
 import time
 
 import numpy as np
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 sys.path[1:1] = [ "_common", "_common/qiskit" ]
 sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
 import execute as ex
 import metrics as metrics
+
+from hs_kernel import HiddenShift, kernel_draw
 
 # Benchmark Name
 benchmark_name = "Hidden Shift"
@@ -19,100 +21,29 @@ benchmark_name = "Hidden Shift"
 np.random.seed(0)
 
 verbose = False
-
-# saved circuits for display
-QC_ = None
-Uf_ = None
-Ug_ = None
-
-############### Circuit Definition
-
-# Uf oracle where Uf|x> = f(x)|x>, f(x) = {-1,1}
-def Uf_oracle(num_qubits, secret_int):
-    # Initialize qubits qubits
-    qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name="Uf")
-
-    # Perform X on each qubit that matches a bit in secret string
-    s = ('{0:0'+str(num_qubits)+'b}').format(secret_int)
-    for i_qubit in range(num_qubits):
-        if s[num_qubits-1-i_qubit]=='1':
-            qc.x(qr[i_qubit])
-
-    for i_qubit in range(0,num_qubits-1,2):
-        qc.cz(qr[i_qubit], qr[i_qubit+1])
-
-    # Perform X on each qubit that matches a bit in secret string
-    s = ('{0:0'+str(num_qubits)+'b}').format(secret_int)
-    for i_qubit in range(num_qubits):
-        if s[num_qubits-1-i_qubit]=='1':
-            qc.x(qr[i_qubit])
-
-    return qc
-
-# Generate Ug oracle where Ug|x> = g(x)|x>, g(x) = f(x+s)
-def Ug_oracle(num_qubits):
-    # Initialize first n qubits
-    qr = QuantumRegister(num_qubits)
-    qc = QuantumCircuit(qr, name="Ug")
-
-    for i_qubit in range(0,num_qubits-1,2):
-        qc.cz(qr[i_qubit], qr[i_qubit+1])
-
-    return qc
-
-def HiddenShift (num_qubits, secret_int):
     
-    # allocate qubits
-    qr = QuantumRegister(num_qubits); cr = ClassicalRegister(num_qubits)
-    qc = QuantumCircuit(qr, cr, name=f"hs-{num_qubits}-{secret_int}")
+# Routine to convert the secret integer into an array of integers, each representing one bit
+# DEVNOTE: do we need to convert to string, or can we just keep shifting?
+def str_to_ivec(input_size: int, s_int: int):
+
+    # convert the secret integer into a string so we can scan the characters
+    s = ('{0:0' + str(input_size) + 'b}').format(s_int)
     
-    # Start with Hadamard on all input qubits
-    for i_qubit in range(num_qubits):
-         qc.h(qr[i_qubit])
-
-    qc.barrier()
-
-    # Generate Uf oracle where Uf|x> = f(x)|x>, f(x) = {-1,1}
-    Uf = Uf_oracle(num_qubits, secret_int)
-    qc.append(Uf,qr)
-
-    qc.barrier()
+    # create an array to hold one integer per bit
+    bitset = []
     
-    # Again do Hadamard on all qubits
-    for i_qubit in range(num_qubits):
-         qc.h(qr[i_qubit])
+    # assign bits in reverse order of characters in string
+    for i in range(input_size):
 
-    qc.barrier()
-
-    # Generate Ug oracle where Ug|x> = g(x)|x>, g(x) = f(x+s)
-    Ug = Ug_oracle(num_qubits)
-    qc.append(Ug,qr)
-
-    qc.barrier()
-
-    # End with Hadamard on all qubits
-    for i_qubit in range(num_qubits):
-         qc.h(qr[i_qubit])
-        
-    qc.barrier()
+        if s[input_size - 1 - i] == '1':
+            bitset.append(1)
+        else:
+            bitset.append(0)
     
-    # measure all qubits
-    qc.measure(qr, cr)
-
-    # save smaller circuit example for display
-    global QC_, Uf_, Ug_
-    if QC_ == None or num_qubits <= 6:
-        if num_qubits < 9: QC_ = qc
-    if Uf_ == None or num_qubits <= 6:
-        if num_qubits < 9: Uf_ = Uf
-    if Ug_ == None or num_qubits <= 6:
-        if num_qubits < 9: Ug_ = Ug
-        
-    # return a handle on the circuit
-    return qc
-
-############### Circuit end
+    return bitset
+    
+    
+############### Result Data Analysis
 
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
@@ -120,10 +51,11 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
     
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    if verbose: print(f"For secret int {secret_int} measured: {counts}")
+    if verbose: print(f"For secret int {secret_int} measured: {counts}")   
     
     # create the key that is expected to have all the measurements (for this circuit)
     key = format(secret_int, f"0{num_qubits}b")
+    if verbose: print(f"... key = {key}")
     
     # correct distribution is measuring the key 100% of the time
     correct_dist = {key: 1.0}
@@ -137,7 +69,8 @@ def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 
 # Execute program with default parameters
 def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=100,
-        backend_id='qasm_simulator', provider_backend=None,
+        method=1, input_value=None,
+        backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):
 
@@ -176,8 +109,8 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
     
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1, 2):
-
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+        
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_qubits), max_circuits)
         
@@ -187,21 +120,30 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
         if 2**(num_qubits) <= max_circuits:
             s_range = list(range(num_circuits))
         else:
-            s_range = np.random.choice(2**(num_qubits), num_circuits, False)
+            # create selection larger than needed and remove duplicates (faster than random.choice())
+            s_range = np.random.randint(1, 2**(num_qubits), num_circuits + 10)
+            s_range = list(set(s_range))[0:max_circuits]
         
         # loop over limited # of secret strings for this
         for s_int in s_range:
+            s_int = int(s_int)
         
+            # if user specifies input_value, use it instead
+            # DEVNOTE: if max_circuits used, this will generate separate bar for each num_circuits
+            if input_value is not None:
+                s_int = input_value
+                
+            # convert the secret int string to array of integers, each representing one bit
+            bitset = str_to_ivec(num_qubits, s_int)
+            if verbose: print(f"... s_int={s_int} bitset={bitset}")
+            
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = HiddenShift(num_qubits, s_int)
+            qc = HiddenShift(num_qubits, s_int, bitset, method)
             metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
-            # collapse the sub-circuit levels used in this benchmark (for qiskit)
-            qc2 = qc.decompose()
-
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
+            ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
         
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
@@ -211,13 +153,57 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 
     ##########
     
-    # print a sample circuit
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
-    print("\nQuantum Oracle 'Ug' ="); print(Ug_ if Ug_ != None else " ... too large!")
+    # draw a sample circuit
+    kernel_draw()
 
     # Plot metrics for all circuit sizes
     metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
 
+
+#######################
+# MAIN
+
+import argparse
+def get_args():
+    parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
+    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
+    parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
+    parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits", type=int)
+    parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
+    parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
+    parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
+    parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    return parser.parse_args()
+    
 # if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__': 
+    args = get_args()
+    
+    # configure the QED-C Benchmark package for use with the given API
+    # (done here so we can set verbose for now)
+    #HiddenShift, kernel_draw = qedc_benchmarks_init(args.api)
+    
+    # special argument handling
+    ex.verbose = args.verbose
+    verbose = args.verbose
+    
+    if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
+    
+    # execute benchmark program
+    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
+        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
+        num_shots=args.num_shots,
+        method=args.method,
+        input_value=args.input_value,
+        backend_id=args.backend_id,
+        exec_options = {"noise_model" : None} if args.nonoise else {},
+        #api=args.api
+        )
+   
+

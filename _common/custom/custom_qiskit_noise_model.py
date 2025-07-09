@@ -5,8 +5,9 @@
 # Note: this custom definition is the same as the default noise model provided
 # The code is provided here for users to copy to their own file and customize
 
-from qiskit.providers.aer.noise import NoiseModel, ReadoutError
-from qiskit.providers.aer.noise import depolarizing_error, reset_error
+# Noise Model imports
+from qiskit_aer.noise import NoiseModel, ReadoutError
+from qiskit_aer.noise import depolarizing_error, reset_error
 
 def my_noise_model():
     

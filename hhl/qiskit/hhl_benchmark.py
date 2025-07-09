@@ -564,10 +564,12 @@ def true_distr(A, b=0):
 def postselect(outcomes, return_probs=True):
     
     mar_out = {}
-    for b_str in outcomes:
+    for b_str, counts in outcomes.items():
+        # SamplerV2 result does not include white spaces between classical registers
+        # E.g., backend.run: "0 0", SamplerV2: "00"
+        b_str = b_str.replace(" ", "")
         if b_str[0] == '1':
-            counts = outcomes[b_str]
-            mar_out[b_str[2:]] = counts
+            mar_out[b_str[1:]] = counts
             
     # compute postselection rate
     ps_shots = sum(mar_out.values())
@@ -650,7 +652,7 @@ def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
 
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
         method = 1, use_best_widths=True, min_register_qubits=1,
-        backend_id='qasm_simulator', provider_backend=None,
+        backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):  
 
@@ -707,7 +709,7 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
         min_clock_qubits=1, max_clock_qubits=3,
         max_circuits=3, num_shots=100,
         method=2, use_best_widths=False, min_register_qubits=1,
-        backend_id='qasm_simulator', provider_backend=None,
+        backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None):  
     
@@ -852,4 +854,3 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
 
 # if main, execute method
 if __name__ == '__main__': run()
-   

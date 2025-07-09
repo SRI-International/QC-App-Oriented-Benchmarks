@@ -184,7 +184,7 @@ def plot_worst_best_init_conditions(worst_dict, best_dict):
 
 
 def radar_plot(min_qubits=4, max_qubits=6, num_shots=1000, restarts=10, objective_func_type='approx_ratio',
-               rounds=1, degree=3, backend_id='qasm_simulator', provider_backend=None,
+               rounds=1, degree=3, backend_id=None, provider_backend=None,
                hub="ibm-q", group="open", project="main", exec_options=None,
                ):
 

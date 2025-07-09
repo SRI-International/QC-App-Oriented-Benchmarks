@@ -36,7 +36,7 @@ from datetime import datetime
 import traceback
 import matplotlib.cm as cm
 import copy
-
+import qcb_mpi as mpi
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
 
@@ -68,6 +68,9 @@ verbose = False
 
 # Option to save metrics to data file
 save_metrics = True
+
+# Option to merge new group metrics into existing
+merge_group_metrics = False
 
 # Suffix to append to filename of DATA- files
 data_suffix = ""
@@ -448,7 +451,8 @@ def report_metrics_for_group (group):
 def report_metrics ():   
     # loop over all groups and print metrics for that group
     for group in circuit_metrics:
-        report_metrics_for_group(group)
+        if mpi.leader():
+            report_metrics_for_group(group)
 
        
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete
@@ -469,8 +473,9 @@ def finalize_group(group, report=True):
     #print(f"  ... group_done = {group} {group_done}")
     if group_done and report:
         aggregate_metrics_for_group(group)
-        print("************")
-        report_metrics_for_group(group)
+        if mpi.leader():
+            print("************")
+            report_metrics_for_group(group)
         
     # sort the group metrics (sometimes they come back out of order)
     sort_group_metrics()
@@ -515,8 +520,9 @@ def finalize_group_2_level(group):
         process_circuit_metrics_2_level(group)
         
         aggregate_metrics_for_group(group)
-        print("************")
-        report_metrics_for_group(group)
+        if mpi.leader():
+            print("************")
+            report_metrics_for_group(group)
         
     # sort the group metrics (sometimes they come back out of order)
     sort_group_metrics()
@@ -2824,11 +2830,18 @@ def store_app_metrics (backend_id, circuit_metrics, group_metrics, app, start_ti
     if app not in shared_data:
         shared_data[app] = { "circuit_metrics":None, "group_metrics":None }
     
-    shared_data[app]["backend_id"] = backend_id
-    shared_data[app]["start_time"] = start_time
-    shared_data[app]["end_time"] = end_time
+    # if merging data, merge the new data into the existing group metrics
+    if merge_group_metrics:
+        #merged_metrics = do_merge_group_metrics(existing_metrics, new_metrics) 
+        shared_data[app]["group_metrics"] = do_merge_group_metrics(shared_data[app]["group_metrics"], group_metrics) 
     
-    shared_data[app]["group_metrics"] = group_metrics
+    # otherwise overwrite (the default mode)
+    else:
+        shared_data[app]["backend_id"] = backend_id
+        shared_data[app]["start_time"] = start_time
+        shared_data[app]["end_time"] = end_time
+        
+        shared_data[app]["group_metrics"] = group_metrics
 
     # if saving raw circuit data, add it too
     #shared_data[app]["circuit_metrics"] = circuit_metrics
@@ -2899,7 +2912,33 @@ def load_app_metrics (api, backend_id):
         #print(group_metrics)
         
     return shared_data
+
+# Merge a new set of metrics into the existing set
+def do_merge_group_metrics(existing_metrics, new_metrics):
+
+    # Create a dictionary to map groups to their index in the existing metrics
+    group_index_map = {group: idx for idx, group in enumerate(existing_metrics['groups'])}
+
+    # Iterate through the new metrics
+    for idx, group in enumerate(new_metrics['groups']):
+        if group in group_index_map:
+            # If the group exists, update its metrics
+            existing_idx = group_index_map[group]
+            for key in existing_metrics:
+                if key != 'groups':
+                    existing_metrics[key][existing_idx] = new_metrics[key][idx]
+        else:
+            # If the group doesn't exist, add it to the existing metrics
+            existing_metrics['groups'].append(group)
+            for key in existing_metrics:
+                if key != 'groups':
+                    existing_metrics[key].append(new_metrics[key][idx])
             
+            # Update the group_index_map
+            group_index_map[group] = len(existing_metrics['groups']) - 1
+
+    return existing_metrics
+          
             
 ##############################################
 # VOLUMETRIC PLOT
