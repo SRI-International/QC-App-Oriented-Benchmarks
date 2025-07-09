@@ -10,7 +10,7 @@ import time
 import numpy as np
 
 from _common import metrics
-from _common import qedc_init
+from _common.qedc_init import qedc_benchmarks_init
 
 # Benchmark Name
 benchmark_name = "Bernstein-Vazirani"
@@ -78,10 +78,10 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 		context=None, api=None, get_circuits=False):
 
 	# configure the QED-C Benchmark package for use with the given API
-	if globals().get("ex") is None:
-		globals()["ex"] =  qedc_init.get_execute_module(api)
-	modules = qedc_init.qedc_benchmarks_init(api, "bernstein_vazirani", ["bv_kernel"])
-	kernel = modules[0]
+	qedc_benchmarks_init(api, "bernstein_vazirani", ["bv_kernel"])
+	
+	import bv_kernel as kernel
+	import execute as ex 
 	
 	print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
@@ -230,7 +230,9 @@ if __name__ == '__main__':
 	
 	# configure the QED-C Benchmark package for use with the given API
 	# (done here so we can set verbose for now)
-	globals()["ex"] =  qedc_init.get_execute_module(args.api)
+	qedc_benchmarks_init(args.api, "bernstein_vazirani", ["bv_kernel"])
+
+	import execute as ex
 	
 	# special argument handling
 	ex.verbose = args.verbose
