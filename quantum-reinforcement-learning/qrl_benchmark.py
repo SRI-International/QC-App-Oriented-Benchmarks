@@ -71,7 +71,7 @@ def int_to_bitlist(init_string: int, num_qubits: int):
 
 # generate a random list of initial parameters 
 
-def generate_rotation_params(num_layers, num_qubits, seed=0):
+def generate_rotation_params(num_layers: int, num_qubits: int, seed=0):
     if seed is not None:
         random.seed(seed)  # Optional for reproducibility
 
