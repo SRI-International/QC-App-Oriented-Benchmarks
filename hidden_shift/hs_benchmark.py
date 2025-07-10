@@ -6,38 +6,12 @@ Hidden Shift Benchmark Program
 # This benchmark program runs at the top level of the named benchmark directory.
 # It uses the "api" parameter to select the API to be used for kernel construction and execution.
 
-import os, sys
 import time
 import numpy as np
 
-############### Configure API
-# 
-# Configure the QED-C Benchmark package for use with the given API
-def qedc_benchmarks_init(api: str = "qiskit"):
+from _common import metrics
+from _common.qedc_init import qedc_benchmarks_init
 
-	if api == None: api = "qiskit"
-
-	current_dir = os.path.dirname(os.path.abspath(__file__))
-	down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
-	sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
-
-	up_dir = os.path.abspath(os.path.join(current_dir, ".."))
-	common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
-	sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-	
-	api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
-	sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
-
-	import execute as ex
-	globals()["ex"] = ex
-
-	import metrics as metrics
-	globals()["metrics"] = metrics
-
-	from hs_kernel import HiddenShift, kernel_draw
-	
-	return HiddenShift, kernel_draw
-	
 # Benchmark Name
 benchmark_name = "Hidden Shift"
 
@@ -98,7 +72,10 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 		context=None, api=None, get_circuits=False):
 
 	# configure the QED-C Benchmark package for use with the given API
-	HiddenShift, kernel_draw = qedc_benchmarks_init(api)
+	# configure the QED-C Benchmark package for use with the given API
+	qedc_benchmarks_init(api, "hidden_shift", ["hs_kernel"])
+	import hs_kernel as kernel
+	import execute as ex 
 	
 	print(f"{benchmark_name} Benchmark Program - Qiskit")
 
@@ -174,7 +151,7 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 			
 			# create the circuit for given qubit size and secret string, store time metric
 			ts = time.time()
-			qc = HiddenShift(num_qubits, s_int, bitset, method)
+			qc = kernel.HiddenShift(num_qubits, s_int, bitset, method)
 			metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
 
 			# If we only want the circuits:
@@ -200,7 +177,7 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 	##########
 	
 	# draw a sample circuit
-	kernel_draw()
+	kernel.kernel_draw()
 
 	# Plot metrics for all circuit sizes
 	metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
@@ -233,7 +210,8 @@ if __name__ == '__main__':
 	
 	# configure the QED-C Benchmark package for use with the given API
 	# (done here so we can set verbose for now)
-	HiddenShift, kernel_draw = qedc_benchmarks_init(args.api)
+	qedc_benchmarks_init(args.api, "hidden_shift", ["hs_kernel"])
+	import execute as ex 
 	
 	# special argument handling
 	ex.verbose = args.verbose

@@ -6,41 +6,12 @@ Quantum Fourier Transform Benchmark Program
 # This benchmark program runs at the top level of the named benchmark directory.
 # It uses the "api" parameter to select the API to be used for kernel construction and execution.
 
-import os, sys
 import time
 import numpy as np
 
-############### Configure API
-# 
-# Configure the QED-C Benchmark package for use with the given API
-def qedc_benchmarks_init(api: str = "qiskit"):
-
-    if api == None: api = "qiskit"
-
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
-    sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
-
-    up_dir = os.path.abspath(os.path.join(current_dir, ".."))
-    common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
-    sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-    
-    api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
-    sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
-
-    import qcb_mpi as mpi
-    globals()["mpi"] = mpi
-    mpi.init()
-
-    import execute as ex
-    globals()["ex"] = ex
-
-    import metrics as metrics
-    globals()["metrics"] = metrics
-
-    from qft_kernel import QuantumFourierTransform, kernel_draw
-    
-    return QuantumFourierTransform, kernel_draw
+from _common import qcb_mpi as mpi
+from _common import metrics
+from _common.qedc_init import qedc_benchmarks_init
 
 
 # Benchmark Name
@@ -140,7 +111,11 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
         context=None, api=None, get_circuits=False):
 
     # configure the QED-C Benchmark package for use with the given API
-    QuantumFourierTransform, kernel_draw = qedc_benchmarks_init(api)
+    qedc_benchmarks_init(api, "quantum_fourier_transform", ["qft_kernel"])
+    import qft_kernel as kernel
+    import execute as ex
+	
+    mpi.init()
     
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
@@ -241,7 +216,7 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
             # create the circuit for given qubit size and secret string, store time metric
             mpi.barrier()
             ts = time.time()
-            qc = QuantumFourierTransform(num_qubits, s_int, bitset, method, use_midcircuit_measurement)       
+            qc = kernel.QuantumFourierTransform(num_qubits, s_int, bitset, method, use_midcircuit_measurement)       
             metrics.store_metric(input_size, s_int, 'create_time', time.time()-ts)
             
             # If we only want the circuits:
@@ -268,7 +243,7 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
     
     if mpi.leader():
         # draw a sample circuit
-        kernel_draw()
+        kernel.kernel_draw()
 
         # Plot metrics for all circuit sizes                         
         metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
@@ -301,7 +276,8 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    QuantumFourierTransform, kernel_draw = qedc_benchmarks_init(args.api)
+    qedc_benchmarks_init(args.api, "quantum_fourier_transform", ["qft_kernel"])
+    import execute as ex
     
     # special argument handling
     ex.verbose = args.verbose
