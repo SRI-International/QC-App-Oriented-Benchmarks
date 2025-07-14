@@ -10,7 +10,7 @@ import numpy as np
 from _common.qiskit import execute as ex
 from _common import metrics as metrics
 
-from grovers_kernel import GroversSearch, kernel_draw, _use_mcx_shim
+from grovers.qiskit.grovers_kernel import GroversSearch, kernel_draw, _use_mcx_shim
 
 # Benchmark Name
 benchmark_name = "Grover's Search"
