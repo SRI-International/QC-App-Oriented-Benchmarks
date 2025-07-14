@@ -4,17 +4,14 @@ Quantum Fourier Transform Benchmark Program - Cirq
 
 from collections import defaultdict
 import math
-import sys
 import time
 
 import cirq
 import numpy as np
 
-sys.path[1:1] = [ "_common", "_common/cirq" ]
-sys.path[1:1] = [ "../../_common", "../../_common/cirq" ]
-import cirq_utils as cirq_utils
-import execute as ex
-import metrics as metrics
+from _common.cirq import cirq_utils as cirq_utils
+from _common.cirq import execute as ex
+from _common import metrics as metrics
 
 np.random.seed(0)
 
