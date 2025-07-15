@@ -1,19 +1,16 @@
-import hamiltonian_simulation_kernel as kernel
-import hamiltonian_simulation_benchmark as benchmark
+from hamiltonian_simulation.qiskit import hamiltonian_simulation_kernel as kernel
+from hamiltonian_simulation.qiskit import hamiltonian_simulation_benchmark as benchmark
 import numpy as np
 import os
 import json
-import sys
 
 from qiskit.primitives import Sampler
 from qiskit_algorithms import TrotterQRTE, TimeEvolutionProblem
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../_common"]
-import execute as ex
-import metrics as metrics
-import hamiltonian_simulation_exact as exact
-from hamiltonian_simulation_kernel import (
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
+from hamiltonian_simulation._common import hamiltonian_simulation_exact as exact
+from hamiltonian_simulation.qiskit.hamiltonian_simulation_kernel import (
     HamiltonianKernel,
     HeisenbergHamiltonianKernel,
     TfimHamiltonianKernel,
