@@ -6,17 +6,11 @@ The script simulates hydrogen chains of different lengths (num_qubits), construc
 
 # Note this version doesn't have classical optimization, so it's not going to be as accurate as the other one
 
-
-import sys
-
-sys.path[1:1] = [ "_common", "_common/Dev", "hydrogen-lattice/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
-
 import numpy as np
-from ansatz import PUCCD
-from simulator import Simulator
+from hydrogen_lattice.Dev.ansatz import PUCCD
+from hydrogen_lattice.Dev.simulator import Simulator
 from pathlib import Path
-import common
+from hydrogen_lattice._common import common
 import os
 from qiskit.opflow.primitive_ops import PauliSumOp
 import matplotlib.pyplot as plt

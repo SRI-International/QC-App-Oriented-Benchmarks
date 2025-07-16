@@ -31,14 +31,8 @@ from matplotlib.patches import Rectangle, Patch
 import numpy as np
 import math
 
-# add to the path variable the path to the metrics module
-import sys
-
-sys.path[1:1] = [ "_common", "_common/qiskit", "hydrogen-lattice/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
-
 # import the metrics module
-import metrics as metrics
+from _common import metrics as metrics
 
 h_lattice_metrics = metrics.circuit_metrics_detail
 

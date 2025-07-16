@@ -27,13 +27,10 @@ from sklearn.preprocessing import MinMaxScaler, normalize
 from sklearn.metrics import accuracy_score, mean_squared_error
 from noisyopt import minimizeSPSA
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", '../../image-recognition/_common/']
-
 # benchmark-specific imports
-import execute as ex
-import metrics as metrics
-import image_recognition_metrics as img_metrics
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
+from image_recognition._common import image_recognition_metrics as img_metrics
 
 # DEVNOTE: this logging feature should be moved to common level
 logger = logging.getLogger(__name__)

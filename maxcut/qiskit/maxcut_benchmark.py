@@ -8,7 +8,6 @@ import logging
 import math
 import os
 import re
-import sys
 import time
 from collections import namedtuple
 
@@ -20,11 +19,9 @@ from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
 
 # QED-C imports
-sys.path[1:1] = [ "_common", "_common/qiskit", "maxcut/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../maxcut/_common/" ]
-import common
-import execute as ex
-import metrics as metrics
+from maxcut._common import common
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
 
 # DEVNOTE: this logging feature should be moved to common level
 logger = logging.getLogger(__name__)
