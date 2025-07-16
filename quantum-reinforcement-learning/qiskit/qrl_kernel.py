@@ -19,15 +19,21 @@ def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_pa
     
     for i in range(len(initial_state)):
         if initial_state[i] == 1:
-            qc.x(i)
+            qc.rx(w_params[i], i)
+    
+    qc.barrier()
     
     for layer in range(n_layers):
         for i in range(n_qubits):
-            idx = layer * n_qubits + i
-            qc.rx(w_params[idx], i)
+            idx = (layer + 1) * n_qubits + i 
+            qc.ry(w_params[idx], i)
             qc.rz(w_params[idx+1], i)
+        qc.barrier()
         for i in range(n_qubits-1):
             qc.cz(i, i+1)
+        qc.barrier()
+    
+    
     
     midx = 0
     for i in n_measurements:

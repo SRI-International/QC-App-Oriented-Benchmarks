@@ -75,7 +75,7 @@ def generate_rotation_params(num_layers: int, num_qubits: int, seed=0):
     if seed is not None:
         random.seed(seed)  # Optional for reproducibility
 
-    total_params = 2 * num_layers * num_qubits
+    total_params = 2 * num_layers * num_qubits + num_qubits
     return [random.uniform(0, 2 * np.pi) for _ in range(total_params)]
 
 ############### Argument parser
@@ -99,6 +99,9 @@ def get_args():
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
 	return parser.parse_args()
+
+############### Training loop
+
 
 ################ Benchmark Loop
 
