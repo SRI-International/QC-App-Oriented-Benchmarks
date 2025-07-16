@@ -3,7 +3,6 @@ HHL Benchmark Program - Qiskit
 
 """
 
-import sys
 import time
 
 import numpy as np
@@ -11,20 +10,14 @@ pi = np.pi
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-import sparse_Ham_sim as shs
-import uniform_controlled_rotation as ucr
-
-# include QFT in this list, so we can refer to the QFT sub-circuit definition
-#sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
-#sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+from hhl.qiskit import sparse_Ham_sim as shs
+from hhl.qiskit import uniform_controlled_rotation as ucr
 
 # cannot use the QFT common yet, as HHL seems to use reverse bit order
-sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
-#from qft_benchmark import qft_gate, inv_qft_gate
+# from quantum_fourier_transform.qiskit.qft_benchmark import qft_gate, inv_qft_gate
 
-import execute as ex
-import metrics as metrics
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
 
 # Benchmark Name
 benchmark_name = "HHL"

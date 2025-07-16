@@ -3,19 +3,15 @@ Shor's Order Finding Algorithm Benchmark - Qiskit
 """
 
 import math
-import sys
 import time
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = ["_common", "_common/qiskit", "shors/_common", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common", "../../quantum-fourier-transform/qiskit"]
-import execute as ex
-import metrics as metrics
-from shors_utils import getAngles, getAngle, modinv, generate_base
-from qft_benchmark import inv_qft_gate
-from qft_benchmark import qft_gate
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
+from shors._common.shors_utils import getAngles, getAngle, modinv, generate_base
+from quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate, qft_gate
 
 # Benchmark Name
 benchmark_name = "Shor's Order Finding"

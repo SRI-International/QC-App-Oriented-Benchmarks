@@ -2,16 +2,12 @@
 Hamiltonian-Simulation (Transverse Field Ising Model) Benchmark Program - Qiskit
 """
 
-import sys
-
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 import time
 import numpy as np
 np.random.seed(0)
-import execute as ex
-import metrics as metrics
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
 
 verbose = False
 

@@ -4,17 +4,14 @@ Hamiltonian-Simulation Benchmark Program - Braket
 
 import json
 import os
-import sys
 import time
 
 import numpy as np
 
 from braket.circuits import Circuit  # AWS imports: Import Braket SDK modules
 
-sys.path[1:1] = [ "_common", "_common/braket" ]
-sys.path[1:1] = [ "../../_common", "../../_common/braket" ]
-import execute as ex
-import metrics as metrics
+from _common.braket import execute as ex
+from _common import metrics as metrics
 
 np.random.seed(0)
 
