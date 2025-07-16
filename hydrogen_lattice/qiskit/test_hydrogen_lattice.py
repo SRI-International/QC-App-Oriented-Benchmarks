@@ -1,4 +1,4 @@
-import hydrogen_lattice_benchmark
+from hydrogen_lattice.qiskit import hydrogen_lattice_benchmark
 import numpy as np
 from scipy.optimize import minimize
 
