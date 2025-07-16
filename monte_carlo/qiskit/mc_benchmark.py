@@ -4,7 +4,6 @@ Monte Carlo Sampling Benchmark Program via Amplitude Estimation- Qiskit
 
 import copy
 import functools
-import sys
 import time
 
 import numpy as np
@@ -13,12 +12,10 @@ from numpy.polynomial.polynomial import polyfit
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit.circuit.library.standard_gates.ry import RYGate
 
-sys.path[1:1] = ["_common", "_common/qiskit", "monte-carlo/_common", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../monte-carlo/_common", "../../quantum-fourier-transform/qiskit"]
-import execute as ex
-import mc_utils as mc_utils
-import metrics as metrics
-from qft_benchmark import inv_qft_gate
+from _common.qiskit import execute as ex
+from monte_carlo._common import mc_utils as mc_utils
+from _common import metrics as metrics
+from quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate
 
 # Benchmark Name
 benchmark_name = "Monte Carlo Sampling"

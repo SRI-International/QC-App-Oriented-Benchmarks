@@ -14,16 +14,12 @@ HamiltonianSimulationExact runs a classical calculation that perfectly simulates
 
 import json
 import os
-import sys
 import time
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
-
-import execute as ex
-import metrics as metrics
-from hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
+from hamiltonian_simulation.qiskit.hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"

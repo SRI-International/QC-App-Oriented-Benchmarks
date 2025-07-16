@@ -4,20 +4,16 @@ Shor's Order Finding Algorithm Benchmark - Cirq
 
 from collections import defaultdict
 import math
-import sys
 import time
 
 import cirq
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/cirq", "shors/_common", "quantum-fourier-transform/cirq"]
-sys.path[1:1] = ["../../_common", "../../_common/cirq", "../../shors/_common", "../../quantum-fourier-transform/cirq"]
-import cirq_utils as cirq_utils
-import execute as ex
-import metrics as metrics
-from shors_utils import getAngles, modinv, generate_base
-from qft_benchmark import inv_qft_gate
-from qft_benchmark import qft_gate
+from _common.cirq import cirq_utils as cirq_utils
+from _common.cirq import execute as ex
+from _common import metrics as metrics
+from shors._common.shors_utils import getAngles, modinv, generate_base
+from quantum_fourier_transform.cirq.qft_benchmark import inv_qft_gate, qft_gate
 
 np.random.seed(0)
 
