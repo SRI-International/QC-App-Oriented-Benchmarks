@@ -2,16 +2,13 @@
 Deutsch-Jozsa Benchmark Program - Qiskit
 """
 
-import sys
 import time
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = [ "_common", "_common/qiskit" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit" ]
-import execute as ex
-import metrics as metrics
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
 
 # Benchmark Name
 benchmark_name = "Deutsch-Jozsa"
