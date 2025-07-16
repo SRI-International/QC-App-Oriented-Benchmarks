@@ -40,32 +40,6 @@ def iqft(register: cudaq.qview):
 				r1.ctrl( -M_PI / divisor , register[ri_qubit], register[ri_qubit - j - 1])		
 
 
-# Dynamic Inverse Quantum Fourier Transform
-@cudaq.kernel
-def dyn_iqft(register: cudaq.qview):
-	M_PI = 3.1415926536
-	ctr = 0
-	input_size = register.size()
-
-	# Walk through each qubit in reverse logical order
-	for i_qubit in range(input_size):
-		ri_qubit = input_size - i_qubit - 1
-
-		# Precede with an H gate (applied to all qubits)
-		h(register[ri_qubit])
-		
-		#reset(register[ri_qubit])
-
-		num_crzs = input_size - i_qubit - 1
-
-		# If not the last qubit, apply the cascade of controlled Rz(–θ)
-		if i_qubit < input_size - 1:
-			for j in range(0, num_crzs):
-				divisor = 2 ** (j + 1)
-				if  mz(register[ri_qubit]):
-					rz(-M_PI / divisor, register[ri_qubit - j - 1])
-	
-
 # Quantum Fourier Transform
 @cudaq.kernel
 def qft(register: cudaq.qview):
@@ -92,8 +66,8 @@ def qft(register: cudaq.qview):
 		h(register[i_qubit])
 
 
-@cudaq.kernel			
-def qft_kernel (num_qubits: int, secret_int: int, init_phases: List[float], method: int = 1, use_midcircuit_measurement: bool = False):
+@cudaq.kernel
+def qft_kernel(num_qubits: int, secret_int: int, init_phases: List[float], method: int = 1, use_midcircuit_measurement: bool = False):
 	M_PI = 3.1415926536
 	
 	# Allocate the specified number of qubits - this
@@ -108,12 +82,9 @@ def qft_kernel (num_qubits: int, secret_int: int, init_phases: List[float], meth
 			if phase > 0:
 				x(qubits[num_qubits - index - 1])	
 		
-		barrier(qubits, num_qubits)
-			
-		# Apply inverse quantum Fourier transform
-		qft(qubits)
+		input_size = qubits.size()
 
-		barrier(qubits, num_qubits)
+		qft(qubits)
 			
 		# some compilers recognize the QFT and IQFT in series and collapse them to identity;
 		# perform a set of rotations to add one to the secret_int to avoid this collapse
@@ -122,12 +93,29 @@ def qft_kernel (num_qubits: int, secret_int: int, init_phases: List[float], meth
 			divisor = 2 ** (i_q)
 			rz( 1 * M_PI / divisor , qubits[ri_q])
 		
-		barrier(qubits, num_qubits)
-			
-		# Apply inverse quantum Fourier transform
+		# note: Dynamic circuits are only supported for monolithic kernels, therefore, we
+		# cannot do a function call to a circuit containing dynamic circuits as of July 16, 2025.
+		if use_midcircuit_measurement:
+			# Apply inverse quantum Fourier transform
+			for i_qubit in range(input_size):
+				ri_qubit = input_size - i_qubit - 1				# map to cudaq qubits
+				
+				# precede with an H gate (applied to all qubits)
+				h(qubits[ri_qubit])
+				
+				# number of controlled Z rotations to perform at this level
+				num_crzs = input_size - i_qubit - 1
 
-		if use_midcircuit_measurement: 
-			dyn_iqft(qubits)
+				# perform measurement of the given qubit and store it in meas variable
+				meas = mz(qubits[ri_qubit])
+				#reset(qubits[ri_qubit]) #reset is depreciated in the new cudaq version
+				
+				# if not the highest order qubit, add multiple controlled RZs of decreasing angle
+				if meas:
+					if i_qubit < input_size - 1:   
+						for j in range(0, num_crzs):
+							divisor = 2 ** (j + 1)
+							rz( -M_PI / divisor , qubits[ri_qubit - j - 1])	
 		else:
 			iqft(qubits)
 
@@ -141,6 +129,7 @@ def qft_kernel (num_qubits: int, secret_int: int, init_phases: List[float], meth
 		mz(qubits)
 		
 	pass
+
 
 #DEVNOTE: use this as a barrier when drawing circuit; comment out otherwise
 @cudaq.kernel
@@ -171,4 +160,7 @@ def kernel_draw():
 	else:
 		print("	 ... too large!")
 	
+	 
+
+
 	 
