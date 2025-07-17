@@ -71,12 +71,15 @@ def int_to_bitlist(init_string: int, num_qubits: int):
 
 # generate a random list of initial parameters 
 
-def generate_rotation_params(num_layers: int, num_qubits: int, seed=0):
+def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: int = 0, seed: int = 0):
     if seed is not None:
         random.seed(seed)  # Optional for reproducibility
 
-    total_params = 2 * num_layers * num_qubits + num_qubits
-    return [random.uniform(0, 2 * np.pi) for _ in range(total_params)]
+    main_param_count = 2 * num_layers * num_qubits + num_qubits
+    main_params = [random.uniform(0, 2 * np.pi) for _ in range(main_param_count)]
+    scaling_params = [random.uniform(0, 1) for _ in range(num_op_scaling)]
+
+    return main_params + scaling_params
 
 ############### Argument parser
 
@@ -95,12 +98,11 @@ def get_args():
 	parser.add_argument("--num_layers", "-l", default=2, help="Number of layers", type=int)  
 	parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
 	parser.add_argument("--init_state", "-state", default=1, help="Initial State to be encoded", type=int)
-	parser.add_argument("--n_measurements", "-nmeas", nargs='+', default=[], help="List of measurement operations indices", type=int)
+	parser.add_argument("--n_measurements", "-nmeas", default=0, help="Number of measurement operations", type=int)
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
 	return parser.parse_args()
 
-############### Training Schedule
 
 
 ################ Benchmark Loop
@@ -212,9 +214,14 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 		e.make_env()
 		e.reset()
 		
+		# Calculate parameters for quantum circuits
+		num_qubits = int(np.sqrt(e.get_observation_size()))
+		num_actions = e.get_num_of_actions()
+
+		# init params
+		params = generate_rotation_params(num_layers, num_qubits, num_actions)
 
 
-		
 
 	else:
 		print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")

@@ -10,10 +10,12 @@ from qiskit_aer import AerSimulator
 QC_ = None # Quantum Circuit saved for display
 
 ############### PQC Circuit Definition for QRL
-def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measurements = []):
+def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measure: int = 0):
     
-    if len(n_measurements) == 0:
+    if n_measure == 0:
         n_measurements = list(range(n_qubits))
+    else:
+        n_measurements = list(range(n_measure))
     
     qc = QuantumCircuit(n_qubits, len(n_measurements))
     
