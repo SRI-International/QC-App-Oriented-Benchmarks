@@ -1,7 +1,7 @@
 import os, sys
 import time, random
 import numpy as np
-from _common.env_utils import make_env
+from _common.env_utils import environment
 
 ############### Configure API
 # 
