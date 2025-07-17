@@ -15,7 +15,7 @@ import zipfile
 import json
 from typing import Dict, Optional   # for backwards compat <= py 3.10
 from dataclasses import dataclass
-import qcb_mpi as mpi
+from _common import qcb_mpi as mpi
 
 verbose = False
 
