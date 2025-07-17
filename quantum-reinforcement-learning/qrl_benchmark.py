@@ -1,6 +1,7 @@
 import os, sys
 import time, random
 import numpy as np
+from _common.env_utils import make_env
 
 ############### Configure API
 # 
@@ -100,7 +101,7 @@ def get_args():
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
 	return parser.parse_args()
 
-############### Training loop
+############### Training Schedule
 
 
 ################ Benchmark Loop

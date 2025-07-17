@@ -33,8 +33,6 @@ def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_pa
             qc.cz(i, i+1)
         qc.barrier()
     
-    
-    
     midx = 0
     for i in n_measurements:
         qc.measure(i, midx)
