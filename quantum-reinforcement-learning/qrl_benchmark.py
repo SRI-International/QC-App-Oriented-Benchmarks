@@ -1,7 +1,6 @@
 import os, sys
 import time, random
 import numpy as np
-from _common.env_utils import environment
 
 ############### Configure API
 # 
@@ -202,6 +201,21 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 
 		# Plot metrics for all circuit sizes
 		metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
+	
+	elif method == 2:
+		try:
+			from _common.env_utils import Environment
+		except Exception as e:
+			print(f"{benchmark_name} ({method}) Benchmark cannot run due to \t {e!r}.")
+
+		e = Environment()
+		e.make_env()
+		e.reset()
+		
+
+
+		
+
 	else:
 		print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")
 

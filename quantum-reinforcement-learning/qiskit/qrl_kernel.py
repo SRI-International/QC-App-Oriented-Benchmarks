@@ -60,7 +60,7 @@ def ideal_simulation(qc):
 
 def get_gradient_cirucits(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
     grads_list = []
-    for i in range(w_params):
+    for i in range(len(w_params)):
         w_n_params = w_params.copy()
         w_n_params[i] += np.pi/2
         grads_list.append(generate_pqc_circuit(n_qubits, n_layers, initial_state, w_n_params, n_measurements, index))

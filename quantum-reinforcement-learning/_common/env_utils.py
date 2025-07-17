@@ -1,6 +1,6 @@
 import gymnasium as gym
 
-class environment:
+class Environment:
     env = None
 
     def make_env(self, render_mode=None, is_slippery=True, map_name="4x4"):
@@ -25,6 +25,7 @@ class environment:
 
     def reset(self, seed = 0):
         obs, _ = self.env.reset()
+        print(f"Environment reset: obs: {obs}")
         return obs
 
     def sample(self):
