@@ -13,17 +13,20 @@ perfectly simulates hamiltonian evolution, although it does not scale well.
 
 import json
 import os
-import sys
 import time
 import math
 import numpy as np
 from typing import Dict, Optional   # for backwards compat <= py 3.10
 from typing import Union, List, Tuple
 
-sys.path[1:1] = ["_common"]
+from hamlib._common import evolution_exact
+from hamlib._common import metric_plots
+from hamlib._common import hamlib_utils
+from hamlib._common import observables
+from _common import qcb_mpi as mpi
+from _common import metrics
+from _common.qedc_init import qedc_benchmarks_init
 
-import evolution_exact
-import metric_plots
 
 ############### Configure API
 #
@@ -34,55 +37,6 @@ import metric_plots
 # Configure the QED-C Benchmark package for use with the given API
 
 api_ = "qiskit" 
-
-def qedc_benchmarks_init(api: str = "qiskit"):
-
-    global api_
-    if api == None: api = "qiskit"
-    api_ = api
-
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
-    sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
-
-    up_dir = os.path.abspath(os.path.join(current_dir, ".."))
-    common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
-    sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-    
-    api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
-    sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
-
-    import qcb_mpi as mpi
-    globals()["mpi"] = mpi
-    mpi.init()
-
-    import execute as ex
-    globals()["ex"] = ex
-
-    import metrics as metrics
-    globals()["metrics"] = metrics
-
-    import hamlib_utils as hamlib_utils
-    globals()["hamlib_utils"] = hamlib_utils
-    
-    import observables as observables
-    globals()["observables"] = observables
-    
-    import hamlib_simulation_kernel as hamlib_simulation_kernel
-    globals()["hamlib_simulation_kernel"] = hamlib_simulation_kernel
-
-    # there must be a better way to do this
-    from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw
-    globals()["HamiltonianSimulation"] = HamiltonianSimulation
-    globals()["kernel_draw"] = kernel_draw
-    
-    # this is only needed while testing the old exact evolution functions; remove soon (250125)
-    if api == 'qiskit':
-        from hamlib_simulation_kernel import initial_state
-        globals()["initial_state"] = initial_state
-    
-    return HamiltonianSimulation, kernel_draw
-    
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
@@ -192,7 +146,7 @@ def analyze_and_print_result(
     # for method 1, compute expected dist using ideal quantum simulation of the circuit provided
     if method == 1:
     
-        from hamiltonian_simulation_exact import HamiltonianSimulation_Noiseless
+        from hamlib._common.hamiltonian_simulation_exact import HamiltonianSimulation_Noiseless
         
         if verbose:
             print(f"... begin noiseless simulation for expected distribution for id={type} ...")
@@ -399,7 +353,9 @@ def run(min_qubits: int = 2,
     """
     
     # configure the QED-C Benchmark package for use with the given API
-    HamilatonianSimulation, kernel_draw = qedc_benchmarks_init(api)
+    qedc_benchmarks_init(api, "hamlib", ["hamlib_simulation_kernel"])
+    import hamlib_simulation_kernel as kernel
+    import execute as ex 
     
     print(f"{benchmark_name} Benchmark Program - {api}")
     
@@ -572,7 +528,7 @@ def run(min_qubits: int = 2,
                         else:
                             this_group_method = int(group_method)
 
-                        from generate_pauli_groups import compute_groups
+                        from hamlib._common.generate_pauli_groups import compute_groups
                         pauli_term_groups = compute_groups(
                                         this_group_method, sparse_pauli_terms, 1)
                                         
@@ -617,7 +573,7 @@ def run(min_qubits: int = 2,
             global bitstring_dict
             
             # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
-            qc, bitstring = HamiltonianSimulation(
+            qc, bitstring = kernel.HamiltonianSimulation(
                 num_qubits = num_qubits,
                 ham_op = sparse_pauli_terms,               
                 K = K,
@@ -823,7 +779,7 @@ def run(min_qubits: int = 2,
     # Display Sample Circuit
     
     if draw_circuits and mpi.leader():
-        kernel_draw(hamiltonian, method)
+        kernel.kernel_draw(hamiltonian, method)
     
     ##########################
     # Display Plots of Results
@@ -947,7 +903,7 @@ def execute_circuits_distribute_shots(
         # print(f"  in circuits = {circuits}")
     
     # determine optimal bucketing for these circuits, based on distribution of shots needed
-    from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
+    from hamlib._common.shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
     
     # get buckets of terms with similar shots counts, and index of original position
     max_buckets = 3 if len(groups) < 50 else 4
@@ -1394,7 +1350,9 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    HamiltonianSimulation, kernel_draw = qedc_benchmarks_init(args.api)
+    qedc_benchmarks_init(api, "hamlib", ["hamlib_simulation_kernel"])
+    import hamlib_simulation_kernel
+    import execute as ex 
     
     # special argument handling
     ex.verbose = args.verbose
