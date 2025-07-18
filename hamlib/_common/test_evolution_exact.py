@@ -1,7 +1,7 @@
 
 import numpy as np
 
-import evolution_exact
+from hamlib._common import evolution_exact
 
 H_terms = [
     ('XXII', 0.5),

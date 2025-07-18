@@ -1,12 +1,12 @@
 import random
-from new_functions import create_measurement_circuts, do_execute, compute_energy
-from new_functions import compute_exact_value
+from hamlib._common.new_functions import create_measurement_circuts, do_execute, compute_energy
+from hamlib._common.new_functions import compute_exact_value
 from qiskit_aer import Aer
-import execute
-import hamlib_simulation_benchmark
-import observables
-import hamlib_simulation_kernel
-from new_functions import create_measurement_circuts, do_execute, compute_energy
+from _common.qiskit import execute
+from hamlib import hamlib_simulation_benchmark
+from hamlib._common import observables
+from hamlib.qiskit import hamlib_simulation_kernel
+from hamlib._common.new_functions import create_measurement_circuts, do_execute, compute_energy
 from qiskit.circuit.library import EfficientSU2
 import numpy as np
 import time
@@ -162,7 +162,7 @@ def do_random_state_loop(num_qubits, sparse_pauli_terms, group_method, num_shots
     exact_energies = []
     computed_energies = []
     metrics_array = []
-    from new_functions import initialize_metrics_row
+    from hamlib._common.new_functions import initialize_metrics_row
 
     print("")
     

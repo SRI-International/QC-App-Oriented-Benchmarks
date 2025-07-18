@@ -1,5 +1,5 @@
 
-import hamlib_utils
+from hamlib._common import hamlib_utils
 
 hamlib_utils.verbose = True
 
