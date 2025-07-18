@@ -272,7 +272,7 @@ if __name__ == '__main__':
 		method=args.method,
 		num_layers=args.num_layers,
 		init_state=args.init_state,
-		n_measurement= args.n_measurements,
+		n_measurements= args.n_measurements,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else {},
 		api=args.api
