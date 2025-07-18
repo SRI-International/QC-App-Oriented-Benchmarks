@@ -11,11 +11,11 @@ QC_ = None # Quantum Circuit saved for display
 
 ############### PQC Circuit Definition for QRL
 @cudaq.kernel
-def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measurements = []):
+def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measurements : int):
 
-    if len(n_measurements) == 0:
-        n_measurements = list(range(n_qubits))
-
+    if n_measurements == 0:
+        n_measurements = n_qubits
+        
     qc = cudaq.qvector(n_qubits)
 
     for i in range(initial_state):

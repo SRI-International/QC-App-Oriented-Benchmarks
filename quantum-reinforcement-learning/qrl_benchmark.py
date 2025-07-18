@@ -103,13 +103,22 @@ def get_args():
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
 	return parser.parse_args()
 
+################ QRL Schedules
+
+def schedule (exploration, step):
+	exp_max = 1.0
+	exp_min = 0.01
+
+	slope = (exp_min - exp_max) / exploration
+
+	return max(slope * step + exp_max, exp_min)
 
 
 ################ Benchmark Loop
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=100,
-		method=1, num_layers = 2, init_state = 1, n_meas = [], backend_id=None, provider_backend=None,
+		method=1, num_layers = 2, init_state = 1, n_measurements = 0, backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
 		context=None, api=None, get_circuits=False):
 
@@ -173,7 +182,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 					# create the circuit for given qubit size and secret string, store time metric
 					mpi.barrier()
 					ts = time.time()
-					qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, n_meas)	   
+					qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, n_measurements)	   
 					metrics.store_metric(num_qubits, idx, 'create_time', time.time()-ts)
 
 					# If we only want the circuits:
@@ -212,14 +221,27 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 
 		e = Environment()
 		e.make_env()
-		e.reset()
 		
 		# Calculate parameters for quantum circuits
 		num_qubits = int(np.sqrt(e.get_observation_size()))
 		num_actions = e.get_num_of_actions()
+		total_steps = 100 # Keep the defaults and expose this to the 
+		exploration_fraction = 0.35 # Expose run method
 
 		# init params
 		params = generate_rotation_params(num_layers, num_qubits, num_actions)
+
+		for step in range(total_steps):
+			e.reset()
+			eps = schedule(exploration_fraction * total_steps, step)
+
+			if random.random() < eps:
+				action = e.sample()
+			else:
+				# do nothing
+				action = 0
+
+			obs, reward, term, trunc, info = e.step(action)
 
 
 
@@ -249,8 +271,8 @@ if __name__ == '__main__':
 		num_shots=args.num_shots,
 		method=args.method,
 		num_layers=args.num_layers,
-		init_state = args.init_state,
-		n_meas= args.n_measurements,
+		init_state=args.init_state,
+		n_measurement= args.n_measurements,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else {},
 		api=args.api
