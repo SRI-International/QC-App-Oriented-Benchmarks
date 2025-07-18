@@ -71,12 +71,15 @@ def int_to_bitlist(init_string: int, num_qubits: int):
 
 # generate a random list of initial parameters 
 
-def generate_rotation_params(num_layers: int, num_qubits: int, seed=0):
+def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: int = 0, seed: int = 0):
     if seed is not None:
         random.seed(seed)  # Optional for reproducibility
 
-    total_params = 2 * num_layers * num_qubits
-    return [random.uniform(0, 2 * np.pi) for _ in range(total_params)]
+    main_param_count = 2 * num_layers * num_qubits + num_qubits
+    main_params = [random.uniform(0, 2 * np.pi) for _ in range(main_param_count)]
+    scaling_params = [random.uniform(0, 1) for _ in range(num_op_scaling)]
+
+    return main_params + scaling_params
 
 ############### Argument parser
 
@@ -95,16 +98,27 @@ def get_args():
 	parser.add_argument("--num_layers", "-l", default=2, help="Number of layers", type=int)  
 	parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
 	parser.add_argument("--init_state", "-state", default=1, help="Initial State to be encoded", type=int)
-	parser.add_argument("--n_measurements", "-nmeas", nargs='+', default=[], help="List of measurement operations indices", type=int)
+	parser.add_argument("--n_measurements", "-nmeas", default=0, help="Number of measurement operations", type=int)
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
 	return parser.parse_args()
+
+################ QRL Schedules
+
+def schedule (exploration, step):
+	exp_max = 1.0
+	exp_min = 0.01
+
+	slope = (exp_min - exp_max) / exploration
+
+	return max(slope * step + exp_max, exp_min)
+
 
 ################ Benchmark Loop
 
 # Execute program with default parameters
 def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=100,
-		method=1, num_layers = 2, init_state = 1, n_meas = [], backend_id=None, provider_backend=None,
+		method=1, num_layers = 2, init_state = 1, n_measurements = 0, backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
 		context=None, api=None, get_circuits=False):
 
@@ -168,7 +182,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 					# create the circuit for given qubit size and secret string, store time metric
 					mpi.barrier()
 					ts = time.time()
-					qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, n_meas)	   
+					qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, n_measurements)	   
 					metrics.store_metric(num_qubits, idx, 'create_time', time.time()-ts)
 
 					# If we only want the circuits:
@@ -198,6 +212,39 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 
 		# Plot metrics for all circuit sizes
 		metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
+	
+	elif method == 2:
+		try:
+			from _common.env_utils import Environment
+		except Exception as e:
+			print(f"{benchmark_name} ({method}) Benchmark cannot run due to \t {e!r}.")
+
+		e = Environment()
+		e.make_env()
+		
+		# Calculate parameters for quantum circuits
+		num_qubits = int(np.sqrt(e.get_observation_size()))
+		num_actions = e.get_num_of_actions()
+		total_steps = 100 # Keep the defaults and expose this to the 
+		exploration_fraction = 0.35 # Expose run method
+
+		# init params
+		params = generate_rotation_params(num_layers, num_qubits, num_actions)
+
+		for step in range(total_steps):
+			e.reset()
+			eps = schedule(exploration_fraction * total_steps, step)
+
+			if random.random() < eps:
+				action = e.sample()
+			else:
+				# do nothing
+				action = 0
+
+			obs, reward, term, trunc, info = e.step(action)
+
+
+
 	else:
 		print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")
 
@@ -224,8 +271,8 @@ if __name__ == '__main__':
 		num_shots=args.num_shots,
 		method=args.method,
 		num_layers=args.num_layers,
-		init_state = args.init_state,
-		n_meas= args.n_measurements,
+		init_state=args.init_state,
+		n_measurements= args.n_measurements,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else {},
 		api=args.api
