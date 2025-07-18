@@ -847,6 +847,7 @@ def execute_circuits_enhanced(
     if not distribute_shots:
         #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
         # execute the entire list of circuits, same shots each
+        import execute as ex
         results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 circuits = circuits,
@@ -1012,6 +1013,7 @@ def execute_circuits_with_mixed_shots(
             print(f"... len circs = {len(circuits)}")
         
         # execute this list of circuits, with same shots for each circuit in list
+        import execute as ex
         results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 #circuits = [circuit],
