@@ -354,7 +354,7 @@ def run(min_qubits: int = 2,
     
     # configure the QED-C Benchmark package for use with the given API
     qedc_benchmarks_init(api, "hamlib", ["hamlib_simulation_kernel"])
-    import hamlib_simulation_kernel as kernel
+    import hamlib_simulation_kernel
     import execute as ex 
     
     print(f"{benchmark_name} Benchmark Program - {api}")
@@ -573,7 +573,7 @@ def run(min_qubits: int = 2,
             global bitstring_dict
             
             # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
-            qc, bitstring = kernel.HamiltonianSimulation(
+            qc, bitstring = hamlib_simulation_kernel.HamiltonianSimulation(
                 num_qubits = num_qubits,
                 ham_op = sparse_pauli_terms,               
                 K = K,
@@ -779,7 +779,7 @@ def run(min_qubits: int = 2,
     # Display Sample Circuit
     
     if draw_circuits and mpi.leader():
-        kernel.kernel_draw(hamiltonian, method)
+        hamlib_simulation_kernel.kernel_draw(hamiltonian, method)
     
     ##########################
     # Display Plots of Results
