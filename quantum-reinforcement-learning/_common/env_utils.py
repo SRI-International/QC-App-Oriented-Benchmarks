@@ -1,4 +1,5 @@
 import gymnasium as gym
+from gymnasium.wrappers import TimeLimit
 
 class Environment:
     env = None
@@ -21,7 +22,10 @@ class Environment:
             is_slippery=is_slippery, 
             map_name=map_name
         )
-        
+    
+    def set_max_steps_per_episode(self, max_episode_steps = 20):
+        self.env = TimeLimit(self.env, max_episode_steps = max_episode_steps)
+    
 
     def reset(self, seed = 0):
         obs, _ = self.env.reset()
