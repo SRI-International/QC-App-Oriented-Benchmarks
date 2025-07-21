@@ -406,11 +406,6 @@ def set_execution_target(backend_id='qasm_simulator',
                 Session,
             )
 
-            #######@@@@@@@@@@@@@@##############
-            from qiskit.circuit import IfElseOp
-            from qiskit.transpiler import generate_preset_pass_manager
-            #######@@@@@@@@@@@@@@##############
-
             # set use_ibm_quantum_platform if provided by user - NOTE: this will modify the global setting
             use_ibm_quantum_platform = exec_options.get("use_ibm_quantum_platform", use_ibm_quantum_platform)
 
@@ -427,15 +422,7 @@ def set_execution_target(backend_id='qasm_simulator',
 
             try:
                 service = QiskitRuntimeService(channel=channel, instance=instance)
-
                 backend = service.backend(backend_name)
-                
-                #######@@@@@@@@@@@@@@##############
-                # print("CODE ACCESSED HERE")
-                backend.target.add_instruction(IfElseOp, name="if_else")
-                #######@@@@@@@@@@@@@@##############
-
-            
             except Exception as ex:
                 print(authentication_error_msg.format(backend_id))
                 raise ex
@@ -467,13 +454,6 @@ def set_execution_target(backend_id='qasm_simulator',
             options = SamplerOptions(**options_dict if options_dict else {})
             print(f"... execute using Sampler on {backend_name=} with {options=}")
             sampler = SamplerV2(session if session else backend, options=options)
-            
-            #Note: is this really required?
-            #######@@@@@@@@@@@@@@##############
-            sampler.options.experimental = {"execution_path" : "gen3-experimental"}
-            #######@@@@@@@@@@@@@@##############
-
-
 
     # create an informative device name for plots
     device_name = backend_id
@@ -763,17 +743,7 @@ def execute_circuit(circuit):
                     if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
                         sampler.options.environment.job_tags = job_tags
 
-
-                    #######@@@@@@@@@@@@@@##############
-
-                    # pm = generate_preset_pass_manager(optimization_level=1, target=backend.target)
-                    # isa_circuit = pm.run(trans_qc)
-                    # print("code accessed here")
-                    #######@@@@@@@@@@@@@@##############
-
                     # turn input into pub-like
-
-                    #job = sampler.run([isa_circuit], shots=shots)
                     job = sampler.run([trans_qc], shots=shots)
                 else:
                     job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
