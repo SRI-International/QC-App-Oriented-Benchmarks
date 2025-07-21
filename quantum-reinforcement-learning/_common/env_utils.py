@@ -1,5 +1,7 @@
 import gymnasium as gym
 from gymnasium.wrappers import TimeLimit
+import random
+import numpy as np
 
 class Environment:
     env = None
@@ -44,3 +46,28 @@ class Environment:
     def get_observation_size(self):
         return self.env.observation_space.n
     
+class ReplayBuffer:
+    def __init__(self, capacity: int):
+        self.capacity = capacity
+        self.buffer = []
+        self.pointer = 0
+    
+    def add_buffer_item(self, obs, next_obs, action, reward, done):
+        if len(self.buffer) < self.capacity:
+            self.buffer.append((obs, next_obs, action, reward, done))
+        else:
+            self.buffer[self.pointer] = (obs, next_obs, action, reward, done)
+            self.pointer += 1
+            self.pointer = self.pointer % self.capacity # Always keeps the pointer in range [0, self.capacity)
+    
+    def sample_batch_from_buffer(self, batch_size: int):
+        batch = random.sample(self.buffer, batch_size)
+        obs, next_obs, actions, rewards, dones = zip(*batch)
+
+        return (
+            np.array(obs),
+            np.array(next_obs),
+            np.array(actions),
+            np.array(rewards),
+            np.array(dones)
+        )
