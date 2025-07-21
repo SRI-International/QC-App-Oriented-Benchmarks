@@ -293,7 +293,6 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 				qvals = process_result(result_array[-1])
 				action = qvals.index(max(qvals))
 
-
 			obs, reward, term, trunc, info = e.step(action)
 	
 
