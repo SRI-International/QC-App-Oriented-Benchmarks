@@ -3,7 +3,7 @@ import gymnasium as gym
 class Environment:
     env = None
 
-    def make_env(self, render_mode=None, is_slippery=True, map_name="4x4"):
+    def make_env(self, render_mode=None, is_slippery=False, map_name="4x4"):
         """
         Creates and returns a FrozenLake-v1 environment.
 

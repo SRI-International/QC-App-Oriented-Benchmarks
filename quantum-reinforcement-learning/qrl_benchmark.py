@@ -230,9 +230,9 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 
 		# init params
 		params = generate_rotation_params(num_layers, num_qubits, num_actions)
-
+		e.reset()
 		for step in range(total_steps):
-			e.reset()
+			#
 			eps = schedule(exploration_fraction * total_steps, step)
 
 			if random.random() < eps:
@@ -242,7 +242,10 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 				action = 0
 
 			obs, reward, term, trunc, info = e.step(action)
+			print(term, reward, trunc, action, obs, info)
 
+			if term:
+				break
 
 
 	else:
