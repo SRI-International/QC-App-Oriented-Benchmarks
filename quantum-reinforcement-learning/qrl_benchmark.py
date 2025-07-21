@@ -113,6 +113,40 @@ def schedule (exploration, step):
 
 	return max(slope * step + exp_max, exp_min)
 
+################ Process the counts to give qvals 
+
+def normalize_counts(counts, num_qubits=None):
+    """
+    Normalize the counts to get probabilities and convert to bitstrings.
+    """
+
+    normalizer = sum(counts.values())
+
+    try:
+        dict({str(int(key, 2)): value for key, value in counts.items()})
+        if num_qubits is None:
+            num_qubits = max(len(key) for key in counts)
+        bitstrings = {key.zfill(num_qubits): value for key, value in counts.items()}
+    except ValueError:
+        bitstrings = counts
+
+    probabilities = dict({key: value / normalizer for key, value in bitstrings.items()})
+    assert abs(sum(probabilities.values()) - 1) < 1e-9
+    return probabilities
+
+################ Process the counts to give qvals 
+
+def process_result(results, num_actions):
+	counts = results.get_counts()
+	counts = normalize_counts(counts, num_actions)
+	qvals = [0.0]*num_actions
+	
+	for key, val in counts.items():
+		for i, bit in enumerate(key):
+			if bit == '1':
+				qvals[i] += val
+	
+	return qvals
 
 ################ Benchmark Loop
 
@@ -215,12 +249,23 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 	
 	elif method == 2:
 		try:
-			from _common.env_utils import Environment
+			from _common.env_utils import Environment, ReplayBuffer
 		except Exception as e:
 			print(f"{benchmark_name} ({method}) Benchmark cannot run due to \t {e!r}.")
 
+		def execution_handler(qc, result, num_qubits, s_int, num_shots):
+			# Stores the results to the global saved_result variable
+			global saved_result
+			saved_result = result
+		
+		ex.max_jobs_active = 1
+		ex.init_execution(execution_handler)
+
+		result_array = []
+
 		e = Environment()
 		e.make_env()
+		rb = ReplayBuffer(10)
 		
 		# Calculate parameters for quantum circuits
 		num_qubits = int(np.sqrt(e.get_observation_size()))
@@ -230,7 +275,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 
 		# init params
 		params = generate_rotation_params(num_layers, num_qubits, num_actions)
-		e.reset()
+		obs = e.reset()
 		for step in range(total_steps):
 			#
 			eps = schedule(exploration_fraction * total_steps, step)
@@ -238,14 +283,19 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 			if random.random() < eps:
 				action = e.sample()
 			else:
-				# do nothing
-				action = 0
+				init_state_list = int_to_bitlist(obs, num_qubits)
+				qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_actions)
+				uid = "qrl_" + str(obs) + "_" + str(step)
+				ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
+				ex.finalize_execution(None, report_end=False)
+				global saved_result
+				result_array.append(saved_result)
+				qvals = process_result(result_array[-1])
+				action = qvals.index(max(qvals))
+
 
 			obs, reward, term, trunc, info = e.step(action)
-			print(term, reward, trunc, action, obs, info)
-
-			if term:
-				break
+	
 
 
 	else:
@@ -278,6 +328,6 @@ if __name__ == '__main__':
 		n_measurements= args.n_measurements,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else {},
-		api=args.api
+		api=args.api,
 		)
   
