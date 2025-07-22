@@ -11,35 +11,53 @@ QC_ = None # Quantum Circuit saved for display
 
 ############### PQC Circuit Definition for QRL
 def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measure: int = 0):
-    
+    """
+    Generate a parameterized quantum circuit (PQC) for quantum reinforcement learning.
+
+    Args:
+        n_qubits (int): Number of qubits in the circuit.
+        n_layers (int): Number of parameterized layers.
+        initial_state (list): List representing the initial state of each qubit (0 or 1) which is the bit string of the state.
+        w_params (list): List of rotation parameters and initial scaling parameters for the circuit.
+        n_measure (int, optional): Number of qubits to measure. If 0, measure all qubits.
+
+    Returns:
+        QuantumCircuit: The constructed quantum circuit.
+    """
+    # Determine which qubits to measure
     if n_measure == 0:
         n_measurements = list(range(n_qubits))
     else:
         n_measurements = list(range(n_measure))
     
+    # Create a quantum circuit with n_qubits and classical bits for measurements
     qc = QuantumCircuit(n_qubits, len(n_measurements))
     
+    # Prepare the initial state using RX rotations if initial_state[i] == 1
     for i in range(len(initial_state)):
         if initial_state[i] == 1:
             qc.rx(w_params[i], i)
     
-    qc.barrier()
+    qc.barrier()  # Add a barrier after state preparation
     
+    # Add parameterized layers
     for layer in range(n_layers):
         for i in range(n_qubits):
             idx = (layer + 1) * n_qubits + i 
             qc.ry(w_params[idx], i)
             qc.rz(w_params[idx+1], i)
-        qc.barrier()
+        qc.barrier()  # Barrier after single-qubit rotations
         for i in range(n_qubits-1):
-            qc.cz(i, i+1)
-        qc.barrier()
+            qc.cz(i, i+1)  # Add CZ entangling gates between neighboring qubits
+        qc.barrier()  # Barrier after entangling gates
     
+    # Measure the specified qubits
     midx = 0
     for i in n_measurements:
         qc.measure(i, midx)
         midx += 1
 
+    # Save the circuit for display if small enough
     global QC_
     if QC_ == None or n_qubits <= 6:
         if n_qubits < 9: QC_ = qc
@@ -50,22 +68,46 @@ def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_pa
 # Calculate the noiseless counts
 
 def ideal_simulation(qc):
-    
+    """
+    Simulate the quantum circuit without noise and return the measurement counts.
+
+    Args:
+        qc (QuantumCircuit): The quantum circuit to simulate.
+
+    Returns:
+        dict: Measurement outcome counts.
+    """
     simulator =  AerSimulator()
-    qc_trans = transpile(qc, simulator)
-    result = simulator.run(qc_trans).result()
-    counts = result.get_counts()
+    qc_trans = transpile(qc, simulator)  # Transpile the circuit for the simulator
+    result = simulator.run(qc_trans).result()  # Run the simulation
+    counts = result.get_counts()  # Get the measurement counts
 
     return counts
 
 ############### Circuit definitions for gradient calculations
 
-def get_gradient_cirucits(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
+def get_gradient_circuits(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
+    """
+    Generate circuits for parameter-shift gradient calculation.
+
+    Args:
+        n_qubits (int): Number of qubits.
+        n_layers (int): Number of layers.
+        initial_state (list): Initial state of the qubits.
+        w_params (list): List of parameters.
+        n_measurements (int): Number of measurements.
+        index (int): Index for circuit labeling or selection.
+
+    Returns:
+        list: List of circuits for gradient calculation.
+    """
     grads_list = []
     for i in range(len(w_params)):
         w_n_params = w_params.copy()
+        # Shift parameter i by +pi/2
         w_n_params[i] += np.pi/2
         grads_list.append(generate_pqc_circuit(n_qubits, n_layers, initial_state, w_n_params, n_measurements, index))
+        # Shift parameter i by -pi/2
         w_n_params[i] -= np.pi
         grads_list.append(generate_pqc_circuit(n_qubits, n_layers, initial_state, w_n_params, n_measurements, index))
     
@@ -76,6 +118,8 @@ def get_gradient_cirucits(n_qubits, n_layers, initial_state, w_params, n_measure
 # Draw the circuits of this benchmark program
 
 def kernel_draw():
+    """
+    Print a sample quantum circuit if available.
+    """
     print("Sample Circuit:");
     print(QC_ if QC_ != None else "  ... too large!")
-    
