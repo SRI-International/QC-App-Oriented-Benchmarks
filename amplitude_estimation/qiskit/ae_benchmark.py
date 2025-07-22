@@ -10,7 +10,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 from _common.qiskit import execute as ex
 from _common import metrics as metrics
-from quantum_fourier_transform.qiskit.qft_kernel import inv_qft_gate
+from quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate
 
 # Benchmark Name
 benchmark_name = "Amplitude Estimation"
