@@ -1,61 +1,58 @@
 '''
-Quantum Reinforcement Learning Program - Qiskit Kernel
+Quantum Reinforcement Learning Program - CUDA Quantum Kernel
 (C) Quantum Economic Development Consortium (QED-C) 2025.
 '''
 
-from qiskit import QuantumCircuit, transpile
+import cudaq
 import numpy as np
-from qiskit_aer import AerSimulator
 
+# saved circuits for display
 QC_ = None # Quantum Circuit saved for display
 
 ############### PQC Circuit Definition for QRL
-def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measure: int = 0):
+
+# Define a parameterized quantum circuit (PQC) for quantum reinforcement learning using CUDA Quantum
+@cudaq.kernel
+def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measurements : int):
     """
-    Generate a parameterized quantum circuit (PQC) for quantum reinforcement learning.
+    Generate a parameterized quantum circuit for QRL.
 
     Args:
         n_qubits (int): Number of qubits in the circuit.
         n_layers (int): Number of parameterized layers.
-        initial_state (list): List representing the initial state of each qubit (0 or 1) which is the bit string of the state.
-        w_params (list): List of rotation parameters and initial scaling parameters for the circuit.
-        n_measure (int, optional): Number of qubits to measure. If 0, measure all qubits.
+        initial_state (list): List representing the initial state of each qubit (0 or 1).
+        w_params (list): List of rotation parameters for the circuit.
+        n_measurements (int): Number of qubits to measure. If 0, measure all qubits.
 
     Returns:
-        QuantumCircuit: The constructed quantum circuit.
+        qc: The constructed CUDA Quantum circuit object.
     """
-    # Determine which qubits to measure
-    if n_measure == 0:
-        n_measurements = list(range(n_qubits))
-    else:
-        n_measurements = list(range(n_measure))
-    
-    # Create a quantum circuit with n_qubits and classical bits for measurements
-    qc = QuantumCircuit(n_qubits, len(n_measurements))
-    
+
+    # If n_measurements is 0, measure all qubits
+    if n_measurements == 0:
+        n_measurements = n_qubits
+        
+    # Create a quantum register/vector with n_qubits
+    qc = cudaq.qvector(n_qubits)
+
     # Prepare the initial state using RX rotations if initial_state[i] == 1
-    for i in range(len(initial_state)):
-        if initial_state[i] == 1:
-            qc.rx(w_params[i], i)
-    
-    qc.barrier()  # Add a barrier after state preparation
+    for i in range(initial_state):
+        if initial_state[i]:
+            rx(w_params[i], qc[i])
     
     # Add parameterized layers
     for layer in range(n_layers):
         for i in range(n_qubits):
             idx = (layer + 1) * n_qubits + i 
-            qc.ry(w_params[idx], i)
-            qc.rz(w_params[idx+1], i)
-        qc.barrier()  # Barrier after single-qubit rotations
+            ry(w_params[idx], qc[i])
+            rz(w_params[idx+1], qc[i])
+        # Add CZ entangling gates between neighboring qubits
         for i in range(n_qubits-1):
-            qc.cz(i, i+1)  # Add CZ entangling gates between neighboring qubits
-        qc.barrier()  # Barrier after entangling gates
+            cz(qc[i], qc[i+1])
     
     # Measure the specified qubits
-    midx = 0
     for i in n_measurements:
-        qc.measure(i, midx)
-        midx += 1
+        mz(qc[i])
 
     # Save the circuit for display if small enough
     global QC_
@@ -72,20 +69,17 @@ def ideal_simulation(qc):
     Simulate the quantum circuit without noise and return the measurement counts.
 
     Args:
-        qc (QuantumCircuit): The quantum circuit to simulate.
+        qc: The CUDA Quantum circuit to simulate.
 
     Returns:
-        dict: Measurement outcome counts.
+        counts: Measurement outcome counts.
     """
-    simulator =  AerSimulator()
-    qc_trans = transpile(qc, simulator)  # Transpile the circuit for the simulator
-    result = simulator.run(qc_trans).result()  # Run the simulation
-    counts = result.get_counts()  # Get the measurement counts
-
+    counts = cudaq.sample(qc)
     return counts
 
 ############### Circuit definitions for gradient calculations
 
+# Generate circuits for parameter-shift gradient calculation
 def get_gradient_circuits(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
     """
     Generate circuits for parameter-shift gradient calculation.
@@ -96,13 +90,13 @@ def get_gradient_circuits(n_qubits, n_layers, initial_state, w_params, n_measure
         initial_state (list): Initial state of the qubits.
         w_params (list): List of parameters.
         n_measurements (int): Number of measurements.
-        index (int): Index for circuit labeling or selection.
+        index: Index for circuit labeling or selection.
 
     Returns:
-        list: List of circuits for gradient calculation.
+        grads_list (list): List of circuits for gradient calculation.
     """
     grads_list = []
-    for i in range(len(w_params)):
+    for i in range(w_params):
         w_n_params = w_params.copy()
         # Shift parameter i by +pi/2
         w_n_params[i] += np.pi/2
@@ -113,13 +107,16 @@ def get_gradient_circuits(n_qubits, n_layers, initial_state, w_params, n_measure
     
     return grads_list
 
-############### QRL Circuit Drawer
+############### QRL circuit drawer
 
 # Draw the circuits of this benchmark program
-
 def kernel_draw():
     """
     Print a sample quantum circuit if available.
     """
     print("Sample Circuit:");
-    print(QC_ if QC_ != None else "  ... too large!")
+    if QC_ != None:
+        # Draw the saved circuit using CUDA Quantum's draw function
+        print(cudaq.draw(QC_[0], *QC_[1]))
+    else:
+        print("  ... too large!")
