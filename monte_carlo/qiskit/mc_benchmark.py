@@ -15,7 +15,7 @@ from qiskit.circuit.library.standard_gates.ry import RYGate
 from _common.qiskit import execute as ex
 from monte_carlo._common import mc_utils as mc_utils
 from _common import metrics as metrics
-from quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate
+from quantum_fourier_transform.qiskit.qft_kernel import inv_qft_gate
 
 # Benchmark Name
 benchmark_name = "Monte Carlo Sampling"

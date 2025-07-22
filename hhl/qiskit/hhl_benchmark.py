@@ -14,7 +14,7 @@ from hhl.qiskit import sparse_Ham_sim as shs
 from hhl.qiskit import uniform_controlled_rotation as ucr
 
 # cannot use the QFT common yet, as HHL seems to use reverse bit order
-# from quantum_fourier_transform.qiskit.qft_benchmark import qft_gate, inv_qft_gate
+# from quantum_fourier_transform.qiskit.qft_kernel import qft_gate, inv_qft_gate
 
 from _common.qiskit import execute as ex
 from _common import metrics as metrics

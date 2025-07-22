@@ -11,7 +11,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from _common.qiskit import execute as ex
 from _common import metrics as metrics
 from shors._common.shors_utils import getAngles, getAngle, modinv, generate_base
-from quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate, qft_gate
+from quantum_fourier_transform.qiskit.qft_kernel import inv_qft_gate, qft_gate
 
 # Benchmark Name
 benchmark_name = "Shor's Order Finding"
