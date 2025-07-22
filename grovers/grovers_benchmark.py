@@ -1,5 +1,5 @@
 '''
-Phase Estimation Benchmark Program
+Grovers Search Benchmark Program
 (C) Quantum Economic Development Consortium (QED-C) 2024.
 '''
 
