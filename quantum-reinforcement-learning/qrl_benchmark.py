@@ -10,6 +10,13 @@ def qedc_benchmarks_init(api: str = "qiskit"):
     Initialize the QED-C Benchmark environment for the specified API.
     Sets up sys.path for API-specific and common modules, imports and initializes
     required modules, and returns kernel functions.
+
+    Inputs:
+        api (str): Name of the quantum programming API to use (default: "qiskit").
+    Outputs:
+        generate_pqc_circuit (function): Function to generate parameterized quantum circuits.
+        ideal_simulation (function): Function to simulate the ideal output of a circuit.
+        kernel_draw (function): Function to draw a sample circuit.
     """
     if api == None: 
         api = "qiskit"  # Default to Qiskit if no API is specified
@@ -66,9 +73,17 @@ verbose = False
 def analyze_and_print_result (qc, result):
     """
     Analyze the result of a quantum circuit execution.
-    Returns the measured counts and the polarization fidelity with respect to the ideal simulation.
+
+    Inputs:
+        qc: Quantum circuit object.
+        result: Result object from circuit execution.
+
+    Outputs:
+        counts: Dictionary of measured counts from the result object.
+        fidelity: Polarization fidelity with respect to the ideal simulation.
     """
-    # obtain counts from the result object
+    # INPUT: qc (quantum circuit), result (execution result)
+    # OUTPUT: counts (dict), fidelity (float)
     counts = result.get_counts(qc)
     
     # correct distribution is simulated classically
@@ -87,7 +102,16 @@ def int_to_bitlist(init_string: int, num_qubits: int):
     """
     Convert an integer to a bitlist of length num_qubits.
     Raises ValueError if the integer cannot be represented in the given number of bits.
+
+    Inputs:
+        init_string (int): Integer to convert.
+        num_qubits (int): Length of the output bitlist.
+
+    Outputs:
+        bitlist (list of int): Bitlist representation of the integer.
     """
+    # INPUT: init_string (int), num_qubits (int)
+    # OUTPUT: bitlist (list of int)
     if init_string >= 2**num_qubits:
         raise ValueError(f"{init_string} cannot be represented in {num_qubits} bits.")
     return [int(b) for b in format(init_string, f'0{num_qubits}b')]
@@ -100,7 +124,18 @@ def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: i
     """
     Generate a list of random parameters for the PQC.
     Optionally includes scaling parameters and uses a seed for reproducibility.
+
+    Inputs:
+        num_layers (int): Number of layers in the PQC.
+        num_qubits (int): Number of qubits.
+        num_op_scaling (int): Number of scaling parameters to generate (default: 0).
+        seed (int): Random seed for reproducibility (default: 0).
+
+    Outputs:
+        params (list of float): List of random parameters for the PQC.
     """
+    # INPUT: num_layers (int), num_qubits (int), num_op_scaling (int), seed (int)
+    # OUTPUT: params (list of float)
     if seed is not None:
         random.seed(seed)  # Optional for reproducibility
 
@@ -118,8 +153,15 @@ import argparse
 def get_args():
     """
     Parse command-line arguments for the QRL benchmark.
-    Returns the parsed arguments.
+
+    Inputs:
+        None (reads from sys.argv)
+
+    Outputs:
+        args (argparse.Namespace): Parsed command-line arguments.
     """
+    # INPUT: None (reads from sys.argv)
+    # OUTPUT: args (argparse.Namespace)
     parser = argparse.ArgumentParser(description="Quantum-Reinforcement-Learning Benchmark")
     parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
     parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
@@ -143,8 +185,16 @@ def get_args():
 def schedule (exploration, step):
     """
     Linear schedule for exploration rate in reinforcement learning.
-    Returns the exploration probability for the given step.
+
+    Inputs:
+        exploration (float): Total number of exploration steps.
+        step (int): Current step.
+
+    Outputs:
+        exploration_probability (float): Exploration probability for the given step.
     """
+    # INPUT: exploration (float), step (int)
+    # OUTPUT: exploration_probability (float)
     exp_max = 1.0
     exp_min = 0.01
 
@@ -158,7 +208,16 @@ def normalize_counts(counts, num_qubits=None):
     """
     Normalize the counts to get probabilities and convert to bitstrings.
     If num_qubits is not specified, it is inferred from the keys.
+
+    Inputs:
+        counts (dict): Dictionary of counts from quantum measurement.
+        num_qubits (int, optional): Number of qubits (used for padding bitstrings).
+
+    Outputs:
+        probabilities (dict): Dictionary of bitstrings to normalized probabilities.
     """
+    # INPUT: counts (dict), num_qubits (int or None)
+    # OUTPUT: probabilities (dict)
     normalizer = sum(counts.values())
 
     try:
@@ -182,8 +241,16 @@ def normalize_counts(counts, num_qubits=None):
 def process_result(results, num_actions):
     """
     Process the result object to extract Q-values for each action.
-    Returns a list of Q-values, one per action.
+
+    Inputs:
+        results: Result object from circuit execution.
+        num_actions (int): Number of actions (qubits).
+
+    Outputs:
+        qvals (list of float): List of Q-values, one per action.
     """
+    # INPUT: results (result object), num_actions (int)
+    # OUTPUT: qvals (list of float)
     counts = results.get_counts()
     counts = normalize_counts(counts, num_actions)
     qvals = [0.0]*num_actions
@@ -206,7 +273,36 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
     """
     Main benchmark loop for Quantum Reinforcement Learning.
     Executes the benchmark for a range of qubit sizes and collects metrics.
+
+    Inputs:
+        min_qubits (int): Minimum number of qubits.
+        max_qubits (int): Maximum number of qubits.
+        skip_qubits (int): Step size for qubit range.
+        max_circuits (int): Number of circuit repetitions per qubit size.
+        num_shots (int): Number of shots per circuit.
+        method (int): Algorithm method to use.
+        num_layers (int): Number of layers in the PQC.
+        init_state (int): Initial state to encode.
+        n_measurements (int): Number of measurement operations.
+        backend_id (str): Backend identifier.
+        provider_backend: Provider backend object.
+        hub (str): IBMQ hub.
+        group (str): IBMQ group.
+        project (str): IBMQ project.
+        exec_options (dict): Execution options.
+        context (str): Context identifier.
+        api (str): Quantum programming API.
+        get_circuits (bool): If True, only generate and return circuits.
+
+    Outputs:
+        If get_circuits is True:
+            all_qcs (dict): Dictionary of generated circuits.
+            metrics.circuit_metrics (dict): Circuit metrics.
+        Otherwise:
+            None (results are handled via metrics and plots).
     """
+    # INPUT: see docstring above
+    # OUTPUT: see docstring above
     # configure the QED-C Benchmark package for use with the given API
     generate_pqc_circuit, ideal_simulation, kernel_draw = qedc_benchmarks_init(api)
     
@@ -233,6 +329,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 
         # Define custom result handler for circuit execution
         def execution_handler (qc, result, num_qubits, idx, num_shots):  
+            # INPUT: qc (quantum circuit), result (execution result), num_qubits (int), idx (int), num_shots (int)
+            # OUTPUT: None (stores metrics)
             # determine fidelity of result set
             num_qubits = int(num_qubits)
             counts, fidelity = analyze_and_print_result(qc, result)
@@ -306,6 +404,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
 
         # Define execution handler for QRL
         def execution_handler(qc, result, num_qubits, s_int, num_shots):
+            # INPUT: qc (quantum circuit), result (execution result), num_qubits (int), s_int (int), num_shots (int)
+            # OUTPUT: None (stores result globally)
             # Stores the results to the global saved_result variable
             global saved_result
             saved_result = result
