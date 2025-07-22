@@ -4,6 +4,7 @@ import random
 import numpy as np
 
 class Environment:
+    # Class to encapsulate the RL environment (FrozenLake)
     env = None
 
     def make_env(self, render_mode=None, is_slippery=False, map_name="4x4"):
@@ -18,6 +19,7 @@ class Environment:
         Returns:
             env (gym.Env): Initialized FrozenLake-v1 environment.
         """
+        # Create the FrozenLake environment with the specified parameters
         self.env = gym.make(
             "FrozenLake-v1", 
             render_mode=render_mode, 
@@ -26,41 +28,52 @@ class Environment:
         )
     
     def set_max_steps_per_episode(self, max_episode_steps = 20):
+        # Limit the maximum number of steps per episode using TimeLimit wrapper
         self.env = TimeLimit(self.env, max_episode_steps = max_episode_steps)
     
 
     def reset(self, seed = 0):
+        # Reset the environment to the initial state
         obs, _ = self.env.reset()
         print(f"Environment reset: obs: {obs}")
         return obs
 
     def sample(self):
+        # Sample a random action from the action space
         return self.env.action_space.sample()
     
     def step(self, action):
+        # Take a step in the environment using the given action
         return self.env.step(action)
     
     def get_num_of_actions(self):
+        # Return the number of possible actions
         return self.env.action_space.n
     
     def get_observation_size(self):
+        # Return the size of the observation space (number of states)
         return self.env.observation_space.n
     
 class ReplayBuffer:
+    # Simple replay buffer for storing and sampling experience tuples
     def __init__(self, capacity: int):
-        self.capacity = capacity
-        self.buffer = []
-        self.pointer = 0
+        self.capacity = capacity  # Maximum number of items in the buffer
+        self.buffer = []          # List to store experience tuples
+        self.pointer = 0          # Pointer for circular buffer replacement
     
     def add_buffer_item(self, obs, next_obs, action, reward, done):
+        # Add a new experience tuple to the buffer
         if len(self.buffer) < self.capacity:
+            # If buffer not full, append new item
             self.buffer.append((obs, next_obs, action, reward, done))
         else:
+            # If buffer full, overwrite the oldest item (circular buffer)
             self.buffer[self.pointer] = (obs, next_obs, action, reward, done)
             self.pointer += 1
             self.pointer = self.pointer % self.capacity # Always keeps the pointer in range [0, self.capacity)
     
     def sample_batch_from_buffer(self, batch_size: int):
+        # Randomly sample a batch of experience tuples from the buffer
         batch = random.sample(self.buffer, batch_size)
         obs, next_obs, actions, rewards, dones = zip(*batch)
 
