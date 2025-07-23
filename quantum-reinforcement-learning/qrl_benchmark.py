@@ -270,7 +270,7 @@ def process_result(results, num_actions):
 ################ Process the counts to give qvals 
 
 def calculate_gradients (num_qubits: int, num_layers: int, init_state: list, params: list, percentage_update: float):
-
+    return None
 
 ################ Benchmark Loop
 
@@ -420,23 +420,25 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
             global saved_result
             saved_result = result
         
-        ex.max_jobs_active = 1
+        
         ex.init_execution(execution_handler)
+        ex.max_jobs_active = 1
 
         result_array = []
-        learning_start = 10
-        target_update = 10
+        learning_start = 5
+        target_update = 5
         lr = 0.0001
+        batch_size = 5
 
         # Initialize environment and replay buffer
         e = Environment()
         e.make_env()
-        rb = ReplayBuffer(10)
+        rb = ReplayBuffer(batch_size)
         
         # Calculate parameters for quantum circuits
         num_qubits = int(np.sqrt(e.get_observation_size()))
         num_actions = e.get_num_of_actions()
-        total_steps = 1000 # Keep the defaults and expose this to the 
+        total_steps = 100 # Keep the defaults and expose this to the 
         exploration_fraction = 0.35 # Expose run method
 
         # init params
@@ -455,6 +457,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
                 action = e.sample()
             else:
                 # Exploitation: use quantum circuit to select action
+                print(step)
                 init_state_list = int_to_bitlist(obs, num_qubits)
                 qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_actions)
                 uid = "qrl_" + str(obs) + "_" + str(step)
@@ -462,19 +465,30 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
                 ex.finalize_execution(None, report_end=False)
                 global saved_result
                 result_array.append(saved_result)
-                qvals = process_result(result_array[-1])
+                qvals = process_result(result_array[-1], num_actions)
                 action = qvals.index(max(qvals))
+                print(step, obs, action, qvals)
 
             # Take the action in the environment
             next_obs, reward, term, trunc, info = e.step(action)
 
+            rb.add_buffer_item(obs, next_obs, action, reward, term)
+            obs = next_obs
+
+            if term:
+                obs = e.reset()
+
             if step > learning_start:
                 if step % target_update == 0:
-                    grads = calculate_grads(target_network_params)
-                    target_network_params = opt.step()
-
-            
-    
+                    batch = rb.sample_batch_from_buffer(batch_size)
+                    #ex.max_jobs_active = batch_size
+                    qc_arr = []
+                    for state in batch[rb.next_obs_idx]:
+                        uid = "qrl_target_params_batch_" + str(state) + "_" + str(step)
+                        init_state_list = int_to_bitlist(state, num_qubits)
+                        qc_arr.append(generate_pqc_circuit(num_qubits, num_layers, init_state_list, target_network_params, num_actions))
+                        ex.submit_circuit(qc_arr[-1], num_qubits, uid, shots = num_shots)
+                        ex.finalize_execution(None, report_end=False)               
     else:
         print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")
 

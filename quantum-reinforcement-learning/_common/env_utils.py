@@ -119,6 +119,11 @@ class ReplayBuffer:
         self.capacity = capacity  # Maximum number of items in the buffer
         self.buffer = []          # List to store experience tuples
         self.pointer = 0          # Pointer for circular buffer replacement
+        self.obs_idx = 0
+        self.next_obs_idx = 1
+        self.actions_idx = 2
+        self.rewards_idx = 3
+        self.dones_idx = 4
     
     def add_buffer_item(self, obs, next_obs, action, reward, done):
         """
