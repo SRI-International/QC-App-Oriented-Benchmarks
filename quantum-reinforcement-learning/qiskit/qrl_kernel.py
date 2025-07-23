@@ -84,34 +84,6 @@ def ideal_simulation(qc):
 
     return counts
 
-############### Circuit definitions for gradient calculations
-
-def get_gradient_circuits(n_qubits, n_layers, initial_state, w_params, n_measurements, index):
-    """
-    Generate circuits for parameter-shift gradient calculation.
-
-    Args:
-        n_qubits (int): Number of qubits.
-        n_layers (int): Number of layers.
-        initial_state (list): Initial state of the qubits.
-        w_params (list): List of parameters.
-        n_measurements (int): Number of measurements.
-        index (int): Index for circuit labeling or selection.
-
-    Returns:
-        list: List of circuits for gradient calculation.
-    """
-    grads_list = []
-    for i in range(len(w_params)):
-        w_n_params = w_params.copy()
-        # Shift parameter i by +pi/2
-        w_n_params[i] += np.pi/2
-        grads_list.append(generate_pqc_circuit(n_qubits, n_layers, initial_state, w_n_params, n_measurements, index))
-        # Shift parameter i by -pi/2
-        w_n_params[i] -= np.pi
-        grads_list.append(generate_pqc_circuit(n_qubits, n_layers, initial_state, w_n_params, n_measurements, index))
-    
-    return grads_list
 
 ############### QRL Circuit Drawer
 

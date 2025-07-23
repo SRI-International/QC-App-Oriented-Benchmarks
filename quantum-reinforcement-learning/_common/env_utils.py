@@ -1,3 +1,7 @@
+'''
+Quantum Fourier Transform Benchmark Program - Environment Files
+(C) Quantum Economic Development Consortium (QED-C) 2025.
+'''
 import gymnasium as gym
 from gymnasium.wrappers import TimeLimit
 import random
@@ -72,11 +76,11 @@ class Environment:
 
         Returns:
             tuple: (next_obs, reward, terminated, truncated, info)
-                next_obs (int): Next observation/state.
-                reward (float): Reward received after taking the action.
-                terminated (bool): Whether the episode has ended (success/failure).
-                truncated (bool): Whether the episode was truncated (e.g., time limit).
-                info (dict): Additional information.
+            next_obs (int): Next observation/state.
+            reward (float): Reward received after taking the action.
+            terminated (bool): Whether the episode has ended (success/failure).
+            truncated (bool): Whether the episode was truncated (e.g., time limit).
+            info (dict): Additional information.
         """
         return self.env.step(action)
     

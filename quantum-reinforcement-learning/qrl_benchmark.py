@@ -1,3 +1,7 @@
+'''
+Quantum Reinforcement Learning Benchmark Program
+(C) Quantum Economic Development Consortium (QED-C) 2025.
+'''
 import os, sys
 import time, random
 import numpy as np
@@ -263,6 +267,11 @@ def process_result(results, num_actions):
     
     return qvals
 
+################ Process the counts to give qvals 
+
+def calculate_gradients (num_qubits: int, num_layers: int, init_state: list, params: list, percentage_update: float):
+
+
 ################ Benchmark Loop
 
 # Execute program with default parameters
@@ -399,6 +408,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
         # Method 2: Quantum Reinforcement Learning with environment and replay buffer
         try:
             from _common.env_utils import Environment, ReplayBuffer
+            from _common.optimizers import Adam
         except Exception as e:
             print(f"{benchmark_name} ({method}) Benchmark cannot run due to \t {e!r}.")
 
@@ -414,6 +424,9 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
         ex.init_execution(execution_handler)
 
         result_array = []
+        learning_start = 10
+        target_update = 10
+        lr = 0.0001
 
         # Initialize environment and replay buffer
         e = Environment()
@@ -423,12 +436,16 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
         # Calculate parameters for quantum circuits
         num_qubits = int(np.sqrt(e.get_observation_size()))
         num_actions = e.get_num_of_actions()
-        total_steps = 100 # Keep the defaults and expose this to the 
+        total_steps = 1000 # Keep the defaults and expose this to the 
         exploration_fraction = 0.35 # Expose run method
 
         # init params
         params = generate_rotation_params(num_layers, num_qubits, num_actions)
+        target_network_params = params
+        opt = Adam(params, lr = lr)
+
         obs = e.reset()
+
         for step in range(total_steps):
             #
             eps = schedule(exploration_fraction * total_steps, step)
@@ -449,10 +466,15 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
                 action = qvals.index(max(qvals))
 
             # Take the action in the environment
-            obs, reward, term, trunc, info = e.step(action)
-    
-            
+            next_obs, reward, term, trunc, info = e.step(action)
 
+            if step > learning_start:
+                if step % target_update == 0:
+                    grads = calculate_grads(target_network_params)
+                    target_network_params = opt.step()
+
+            
+    
     else:
         print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")
 
