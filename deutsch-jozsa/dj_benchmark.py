@@ -142,7 +142,7 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
             ts = time.time()
             qc = DeutschJozsa(num_qubits, type)
             metrics.store_metric(num_qubits, type, 'create_time', time.time()-ts)
-            
+
             # collapse the sub-circuit levels used in this benchmark (for qiskit)
             qc2 = qc.decompose()
 
