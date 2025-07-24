@@ -151,6 +151,24 @@ def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: i
 
     return main_params + scaling_params
 
+############### Mean Squared Error Loss 
+
+def mse_loss(td_target, old_vals):
+    """
+    Computes the mean squared error between predictions and targets using lists.
+
+    Args:
+        predictions (list of float): Predicted values (Q-values)
+        targets (list of float): Target values (TD targets)
+
+    Returns:
+        float: Mean squared error
+    """
+    assert len(old_vals) == len(td_target), "Input lists must be the same length."
+
+    squared_errors = [(p - t) ** 2 for p, t in zip(td_target, old_vals)]
+    return sum(squared_errors) / len(squared_errors)
+
 ############### Argument parser
 
 import argparse
@@ -429,6 +447,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
         target_update = 5
         lr = 0.0001
         batch_size = 5
+        gamma = 0.95
 
         # Initialize environment and replay buffer
         e = Environment()
@@ -483,12 +502,34 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
                     batch = rb.sample_batch_from_buffer(batch_size)
                     #ex.max_jobs_active = batch_size
                     qc_arr = []
-                    for state in batch[rb.next_obs_idx]:
+                    td_res_arr = []
+                    td_vals = []
+                    td_target = []
+                    old_vals = []
+
+                    for state, done, reward in zip(batch[rb.next_obs_idx], batch[rb.dones_idx], batch[rb.rewards_idx]):
                         uid = "qrl_target_params_batch_" + str(state) + "_" + str(step)
                         init_state_list = int_to_bitlist(state, num_qubits)
                         qc_arr.append(generate_pqc_circuit(num_qubits, num_layers, init_state_list, target_network_params, num_actions))
                         ex.submit_circuit(qc_arr[-1], num_qubits, uid, shots = num_shots)
-                        ex.finalize_execution(None, report_end=False)               
+                        ex.finalize_execution(None, report_end=False)
+                        #global saved_result
+                        td_res_arr.append(saved_result)
+                        td_vals.append(max(process_result(td_res_arr[-1], num_actions)))
+                        td_target.append(reward + gamma * td_vals[-1] * (1 - done))
+                    
+                    for state, action in zip(batch[rb.obs_idx], batch[rb.actions_idx]):
+                        uid = "qrl_old_params_batch_" + str(state) + "_" + str(step)
+                        init_state_list = int_to_bitlist(state, num_qubits)
+                        qc_arr.append(generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_actions))
+                        ex.submit_circuit(qc_arr[-1], num_qubits, uid, shots = num_shots)
+                        ex.finalize_execution(None, report_end=False)
+                        #global saved_result
+                        old_vals.append(process_result(saved_result, num_actions)[action])
+
+                    loss = mse_loss(td_target, old_vals)
+                    print(step, loss)
+                        
     else:
         print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")
 
