@@ -23,15 +23,19 @@ class Adam:
         self.m = [0.0] * len(params)    # 1st moment
         self.v = [0.0] * len(params)    # 2nd moment
         self.t = 0                      # timestep
+        self.grads = [0.0] * len(params) # gradient parameters
 
-    def step(self, grads):
+    def step(self, grad_fn):
         """
         grads: list of gradients of the same length as self.params
         Returns the updated parameters.
         """
         self.t += 1
         updated = []
-        for i, (p, g) in enumerate(zip(self.params, grads)):
+        for i in range(len(self.params)):
+            self.grads[i] = grad_fn(i)
+        
+        for i, (p, g) in enumerate(zip(self.params, self.grads)):
             # Update biased first moment estimate
             self.m[i] = self.beta1 * self.m[i] + (1 - self.beta1) * g
             # Update biased second raw moment estimate

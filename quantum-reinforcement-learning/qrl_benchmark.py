@@ -2,7 +2,7 @@
 Quantum Reinforcement Learning Benchmark Program
 (C) Quantum Economic Development Consortium (QED-C) 2025.
 '''
-import os, sys
+import os, sys, copy
 import time, random
 import numpy as np
 
@@ -287,8 +287,34 @@ def process_result(results, num_actions):
 
 ################ Process the counts to give qvals 
 
-def calculate_gradients (num_qubits: int, num_layers: int, init_state: list, params: list, percentage_update: float):
-    return None
+def calculate_gradients (num_qubits: int, num_layers: int, batch_obs: list, params: list, n_measurements: int, num_shots:int, td_targets: list, actions: list, ex):
+    def parameter_shift(idx: int):
+        grad = 0.0
+        for init_state, td_target, action in zip(batch_obs, td_targets, actions):
+            init_state_list = int_to_bitlist(init_state, num_qubits)
+            ex.max_jobs_active = 1
+            params_p = copy.deepcopy(params)
+            params_p[idx] += np.pi / 2
+            qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params_p, n_measurements)
+            uid = "qrl_grad_calc_" + str(init_state) + "_plus" 
+            ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
+            ex.finalize_execution(None, report_end = False)
+            res_p = process_result(saved_result, n_measurements)
+
+            params_p[idx] -= np.pi 
+            qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params_p, n_measurements)
+            uid = "qrl_grad_calc_" + str(init_state) + "_minus" 
+            ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
+            ex.finalize_execution(None, report_end = False)
+            res_n = process_result(saved_result, n_measurements)
+
+            p_loss = mse_loss([td_target], [res_p[action]])
+            n_loss = mse_loss([td_target], [res_n[action]])
+
+            grad += 0.5 * (p_loss - n_loss)
+
+        return grad/len(batch_obs)           
+    return parameter_shift
 
 ################ Benchmark Loop
 
@@ -443,22 +469,25 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
         ex.max_jobs_active = 1
 
         result_array = []
-        learning_start = 5
-        target_update = 5
+        learning_start = 19
+        target_update = 10
+        params_update = 10
         lr = 0.0001
-        batch_size = 5
+        batch_size = params_update
         gamma = 0.95
+        total_steps = 1000 # Keep the defaults and expose this to the 
+        exploration_fraction = 0.35 # Expose run method
+        tau = 0.9
+        buffer_size = 2*params_update
 
         # Initialize environment and replay buffer
         e = Environment()
         e.make_env()
-        rb = ReplayBuffer(batch_size)
+        rb = ReplayBuffer(buffer_size)
         
         # Calculate parameters for quantum circuits
         num_qubits = int(np.sqrt(e.get_observation_size()))
         num_actions = e.get_num_of_actions()
-        total_steps = 100 # Keep the defaults and expose this to the 
-        exploration_fraction = 0.35 # Expose run method
 
         # init params
         params = generate_rotation_params(num_layers, num_qubits, num_actions)
@@ -486,8 +515,6 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
                 result_array.append(saved_result)
                 qvals = process_result(result_array[-1], num_actions)
                 action = qvals.index(max(qvals))
-                print(step, obs, action, qvals)
-
             # Take the action in the environment
             next_obs, reward, term, trunc, info = e.step(action)
 
@@ -498,13 +525,13 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
                 obs = e.reset()
 
             if step > learning_start:
-                if step % target_update == 0:
+                if step % params_update == 0:
                     batch = rb.sample_batch_from_buffer(batch_size)
                     #ex.max_jobs_active = batch_size
                     qc_arr = []
                     td_res_arr = []
                     td_vals = []
-                    td_target = []
+                    td_targets = []
                     old_vals = []
 
                     for state, done, reward in zip(batch[rb.next_obs_idx], batch[rb.dones_idx], batch[rb.rewards_idx]):
@@ -516,7 +543,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
                         #global saved_result
                         td_res_arr.append(saved_result)
                         td_vals.append(max(process_result(td_res_arr[-1], num_actions)))
-                        td_target.append(reward + gamma * td_vals[-1] * (1 - done))
+                        td_targets.append(reward + gamma * td_vals[-1] * (1 - done))
                     
                     for state, action in zip(batch[rb.obs_idx], batch[rb.actions_idx]):
                         uid = "qrl_old_params_batch_" + str(state) + "_" + str(step)
@@ -527,8 +554,13 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits = 3, num_shots=
                         #global saved_result
                         old_vals.append(process_result(saved_result, num_actions)[action])
 
-                    loss = mse_loss(td_target, old_vals)
-                    print(step, loss)
+                    #loss = mse_loss(td_targets, old_vals)
+                    grad_fn = calculate_gradients(num_qubits, num_layers, batch[rb.obs_idx], params, num_actions, num_shots, td_targets, batch[rb.actions_idx], ex)
+                    opt.step(grad_fn)
+                
+                if step % target_update == 0:
+                    for i, (t_param, param) in enumerate(zip(target_network_params, params)):
+                        target_network_params[i] = tau * param + (1 - tau) * t_param
                         
     else:
         print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")

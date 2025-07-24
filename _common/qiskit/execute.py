@@ -59,7 +59,7 @@ max_jobs_active = 10
 job_mode = False
 
 # Print progress of execution
-verbose = True
+verbose = False
 
 # Print additional time metrics for each stage of execution
 verbose_time = False
