@@ -260,7 +260,7 @@ def process_result(results, num_actions):
 
 ################ Calculate parameter gradients using parameter-shift rule
 
-def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, params: list, n_measurements: int, num_shots: int, td_targets: list, actions: list, ex):
+def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, params: list, n_measurements: int, num_shots: int, td_targets: list, actions: list, ex, qrl_metrics):
     """
     Calculate gradients of the loss function with respect to each parameter using the parameter-shift rule.
 
@@ -290,6 +290,7 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
             ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
             ex.finalize_execution(None, report_end = False)
             res_p = process_result(saved_result, n_measurements)
+            qrl_metrics.circuit_evaluations += 1
 
             params_p[idx] -= np.pi 
             qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params_p, n_measurements)
@@ -297,11 +298,13 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
             ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
             ex.finalize_execution(None, report_end = False)
             res_n = process_result(saved_result, n_measurements)
+            qrl_metrics.circuit_evaluations += 1
 
             p_loss = mse_loss([td_target], [res_p[action]])
             n_loss = mse_loss([td_target], [res_n[action]])
 
             grad += 0.5 * (p_loss - n_loss)
+            qrl_metrics.gradient_evaluations += 1
 
         return grad/len(batch_obs)           
     return parameter_shift
@@ -440,6 +443,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         try:
             from _common.env_utils import Environment, ReplayBuffer
             from _common.optimizers import Adam
+            from _common.qrl_metrics import qrl_metrics
         except Exception as e:
             print(f"{benchmark_name} ({method}) Benchmark cannot run due to \t {e!r}.")
 
@@ -472,6 +476,8 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         exploration_fraction = 0.35 # Expose run method
         tau = 0.9
         buffer_size = 2*params_update
+        qrl_metrics = qrl_metrics()
+        metric_print_interval = 25
 
         # Initialize environment and replay buffer
         e = Environment()
@@ -488,34 +494,45 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         opt = Adam(params, lr=lr)
 
         obs = e.reset()
+        qrl_metrics.env_evals += 1  
 
         for step in range(total_steps):
             # Compute exploration probability for this step
+            qrl_metrics.steps += 1
             eps = schedule(exploration_fraction * total_steps, step)
 
             if random.random() < eps:
                 # Exploration: sample a random action
                 action = e.sample()
+                qrl_metrics.env_evals += 1
+                qrl_metrics.explore_steps += 1
             else:
                 # Exploitation: use quantum circuit to select action
-                print(step)
                 init_state_list = int_to_bitlist(obs, num_qubits)
                 qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_actions)
                 uid = "qrl_" + str(obs) + "_" + str(step)
                 ex.submit_circuit(qc, num_qubits, uid, shots=num_shots)
                 ex.finalize_execution(None, report_end=False)
+                qrl_metrics.circuit_evaluations += 1
                 global saved_result
                 result_array.append(saved_result)
                 qvals = process_result(result_array[-1], num_actions)
                 action = qvals.index(max(qvals))
+                qrl_metrics.exploit_steps += 1
             # Take the action in the environment
             next_obs, reward, term, trunc, info = e.step(action)
+            qrl_metrics.env_evals += 1  
 
             rb.add_buffer_item(obs, next_obs, action, reward, term)
             obs = next_obs
 
             if term:
                 obs = e.reset()
+                qrl_metrics.env_evals += 1
+                qrl_metrics.num_episodes += 1
+            
+            if reward == 1.0:
+                qrl_metrics.num_success += 1
 
             if step > learning_start:
                 if step % params_update == 0:
@@ -533,6 +550,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                         qc_arr.append(generate_pqc_circuit(num_qubits, num_layers, init_state_list, target_network_params, num_actions))
                         ex.submit_circuit(qc_arr[-1], num_qubits, uid, shots=num_shots)
                         ex.finalize_execution(None, report_end=False)
+                        qrl_metrics.circuit_evaluations += 1
                         td_res_arr.append(saved_result)
                         td_vals.append(max(process_result(td_res_arr[-1], num_actions)))
                         td_targets.append(reward + gamma * td_vals[-1] * (1 - done))
@@ -543,15 +561,20 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                         qc_arr.append(generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_actions))
                         ex.submit_circuit(qc_arr[-1], num_qubits, uid, shots=num_shots)
                         ex.finalize_execution(None, report_end=False)
+                        qrl_metrics.circuit_evaluations += 1
                         old_vals.append(process_result(saved_result, num_actions)[action])
 
                     # Compute gradients and update parameters
-                    grad_fn = calculate_gradients(num_qubits, num_layers, batch[rb.obs_idx], params, num_actions, num_shots, td_targets, batch[rb.actions_idx], ex)
+                    grad_fn = calculate_gradients(num_qubits, num_layers, batch[rb.obs_idx], params, num_actions, num_shots, td_targets, batch[rb.actions_idx], ex, qrl_metrics)
                     opt.step(grad_fn)
                 
                 if step % target_update == 0:
                     for i, (t_param, param) in enumerate(zip(target_network_params, params)):
                         target_network_params[i] = tau * param + (1 - tau) * t_param
+                
+            if step % metric_print_interval:
+                qrl_metrics.print_metrics()
+
                         
     else:
         print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")
