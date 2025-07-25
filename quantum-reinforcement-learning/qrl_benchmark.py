@@ -309,6 +309,63 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
         return grad/len(batch_obs)           
     return parameter_shift
 
+################ Calculate loss func
+
+def calculate_loss(num_qubits: int, num_layers: int, batch_obs: list, n_measurements: int, num_shots: int, td_targets: list, actions: list, ex, qrl_metrics):
+    """
+    Returns a loss function for the QRL benchmark, which computes the mean squared error
+    between target values and PQC outputs for a batch of observations/actions.
+
+    Args:
+        num_qubits (int): Number of qubits in the PQC.
+        num_layers (int): Number of layers in the PQC.
+        batch_obs (list): Batch of initial states (as integers).
+        n_measurements (int): Number of measurement operations.
+        num_shots (int): Number of shots per circuit execution.
+        td_targets (list): Target values for each sample in the batch.
+        actions (list): Actions taken for each sample in the batch.
+        ex: Execution module for submitting and running circuits.
+        qrl_metrics: Metrics object for tracking circuit and gradient evaluations.
+
+    Returns:
+        loss_fn (function): A function that takes PQC parameters and returns the batch MSE loss.
+    """
+    def loss_fn(x0):
+        """
+        Computes the mean squared error loss for a batch of observations/actions
+        given a set of PQC parameters.
+
+        Args:
+            x0 (list): Current PQC parameter values.
+
+        Returns:
+            float: Mean squared error loss for the batch.
+        """
+        qvals = []  # List to store Q-values (PQC outputs) for each sample in the batch
+        for init_state, action in zip(batch_obs, actions):
+            # Convert integer state to bitlist for circuit initialization
+            init_state_list = int_to_bitlist(init_state, num_qubits)
+            # Limit to one active job at a time (serial execution)
+            ex.max_jobs_active = 1
+            # Generate the parameterized quantum circuit for this sample
+            qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, x0, n_measurements)
+            # Unique identifier for this circuit execution
+            uid = "qrl_grad_calc_" + str(init_state)
+            # Submit the circuit for execution
+            ex.submit_circuit(qc, num_qubits, uid, shots=num_shots)
+            # Finalize execution (wait for results)
+            ex.finalize_execution(None, report_end=False)
+            # Process the result to extract Q-values
+            res_p = process_result(saved_result, n_measurements)
+            # Update metrics for circuit and gradient evaluations
+            qrl_metrics.circuit_evaluations += 1
+            qrl_metrics.gradient_evaluations += 1
+            # Append the Q-value for the taken action
+            qvals.append(res_p[action])
+        # Compute and return the mean squared error loss for the batch
+        return mse_loss(td_targets, qvals)
+    return loss_fn
+    
 ################ Benchmark Loop
 
 def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
