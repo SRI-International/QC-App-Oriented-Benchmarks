@@ -548,7 +548,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
 
         # init params
         params = generate_rotation_params(num_layers, num_qubits, num_actions)
-        target_network_params = params
+        target_network_params = copy.deepcopy(params)
         opt = Adam(params, lr=lr)
 
         obs = e.reset()
