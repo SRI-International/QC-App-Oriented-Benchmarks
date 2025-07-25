@@ -43,7 +43,7 @@ def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_pa
     # Add parameterized layers
     for layer in range(n_layers):
         for i in range(n_qubits):
-            idx = (layer + 1) * n_qubits + i 
+            idx = (layer + 1) * n_qubits + i * 2
             qc.ry(w_params[idx], i)
             qc.rz(w_params[idx+1], i)
         qc.barrier()  # Barrier after single-qubit rotations

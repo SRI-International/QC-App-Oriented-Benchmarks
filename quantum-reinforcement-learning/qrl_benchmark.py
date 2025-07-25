@@ -256,6 +256,9 @@ def process_result(results, num_actions):
             if bit == '1':
                 qvals[i] += val
     
+    for i in range(len(qvals)):
+        qvals[i] = 1 - 2*qvals[i]
+
     return qvals
 
 ################ Calculate parameter gradients using parameter-shift rule
@@ -287,16 +290,20 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
             params_p[idx] += np.pi / 2
             qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params_p, n_measurements)
             uid = "qrl_grad_calc_" + str(init_state) + "_plus" 
+            c_time = time.time()
             ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
             ex.finalize_execution(None, report_end = False)
+            qrl_metrics.quantum_time += (time.time() - c_time)
             res_p = process_result(saved_result, n_measurements)
             qrl_metrics.circuit_evaluations += 1
 
             params_p[idx] -= np.pi 
             qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params_p, n_measurements)
-            uid = "qrl_grad_calc_" + str(init_state) + "_minus" 
+            uid = "qrl_grad_calc_" + str(init_state) + "_minus"
+            c_time = time.time()
             ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
             ex.finalize_execution(None, report_end = False)
+            qrl_metrics.quantum_time += (time.time() - c_time)
             res_n = process_result(saved_result, n_measurements)
             qrl_metrics.circuit_evaluations += 1
 
@@ -352,9 +359,11 @@ def calculate_loss(num_qubits: int, num_layers: int, batch_obs: list, n_measurem
             # Unique identifier for this circuit execution
             uid = "qrl_grad_calc_" + str(init_state)
             # Submit the circuit for execution
+            c_time = time.time()
             ex.submit_circuit(qc, num_qubits, uid, shots=num_shots)
             # Finalize execution (wait for results)
             ex.finalize_execution(None, report_end=False)
+            qrl_metrics.quantum_time += (time.time() - c_time)
             # Process the result to extract Q-values
             res_p = process_result(saved_result, n_measurements)
             # Update metrics for circuit and gradient evaluations
@@ -526,10 +535,10 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         learning_start = 19
         target_update = 10
         params_update = 10
-        lr = 0.0001
+        lr = 0.01
         batch_size = params_update
         gamma = 0.95
-        total_steps = 1000 # Keep the defaults and expose this to the 
+        total_steps = 100 # Keep the defaults and expose this to the 
         exploration_fraction = 0.35 # Expose run method
         tau = 0.9
         buffer_size = 2*params_update
@@ -553,7 +562,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
 
         obs = e.reset()
         qrl_metrics.env_evals += 1  
-
+        loss = 0.0
         for step in range(total_steps):
             # Compute exploration probability for this step
             step_time = time.time()
@@ -622,17 +631,20 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                         td_vals.append(max(process_result(td_res_arr[-1], num_actions)))
                         td_targets.append(reward + gamma * td_vals[-1] * (1 - done))
                     
-                    '''
+                    
                     for state, action in zip(batch[rb.obs_idx], batch[rb.actions_idx]):
                         uid = "qrl_old_params_batch_" + str(state) + "_" + str(step)
                         init_state_list = int_to_bitlist(state, num_qubits)
                         qc_arr.append(generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_actions))
+                        circ_start = time.time()
                         ex.submit_circuit(qc_arr[-1], num_qubits, uid, shots=num_shots)
                         ex.finalize_execution(None, report_end=False)
+                        qrl_metrics.quantum_time += (time.time() - circ_start)
                         qrl_metrics.circuit_evaluations += 1
                         old_vals.append(process_result(saved_result, num_actions)[action])
-                    '''
-
+                    
+                    loss = mse_loss(td_targets, old_vals)
+                    qrl_metrics.loss_history.append(loss)
                     # Compute gradients and update parameters
                     grad_time = time.time()
                     grad_fn = calculate_gradients(num_qubits, num_layers, batch[rb.obs_idx], params, num_actions, num_shots, td_targets, batch[rb.actions_idx], ex, qrl_metrics)
@@ -643,7 +655,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                     for i, (t_param, param) in enumerate(zip(target_network_params, params)):
                         target_network_params[i] = tau * param + (1 - tau) * t_param
                 
-            if step % metric_print_interval:
+            if step % metric_print_interval == 0:
                 qrl_metrics.total_time = time.time() - total_time
                 qrl_metrics.print_metrics()
 

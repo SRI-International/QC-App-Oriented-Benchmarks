@@ -22,6 +22,7 @@ class qrl_metrics:
         self.step_time = 0                # Time spent on a step (seconds)
         self.environment_time = 0         # Time spent interacting with the environment (seconds)
         self.gradient_time = 0            # Time spent computing gradients (seconds)
+        self.loss_history = []            # History of loss
     
     def calculate_average_return_per_run(self):
         """
