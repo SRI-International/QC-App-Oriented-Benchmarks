@@ -536,6 +536,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         qrl_metrics = qrl_metrics()
         metric_print_interval = 25
 
+        total_time = time.time()
         # Initialize environment and replay buffer
         e = Environment()
         e.make_env()
@@ -555,12 +556,15 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
 
         for step in range(total_steps):
             # Compute exploration probability for this step
+            step_time = time.time()
             qrl_metrics.steps += 1
             eps = schedule(exploration_fraction * total_steps, step)
 
             if random.random() < eps:
                 # Exploration: sample a random action
+                env_start = time.time()
                 action = e.sample()
+                qrl_metrics.environment_time += (time.time() - env_start)
                 qrl_metrics.env_evals += 1
                 qrl_metrics.explore_steps += 1
             else:
@@ -568,8 +572,10 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                 init_state_list = int_to_bitlist(obs, num_qubits)
                 qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_actions)
                 uid = "qrl_" + str(obs) + "_" + str(step)
+                circ_start = time.time()
                 ex.submit_circuit(qc, num_qubits, uid, shots=num_shots)
                 ex.finalize_execution(None, report_end=False)
+                qrl_metrics.quantum_time += (time.time() - circ_start)
                 qrl_metrics.circuit_evaluations += 1
                 global saved_result
                 result_array.append(saved_result)
@@ -577,7 +583,9 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                 action = qvals.index(max(qvals))
                 qrl_metrics.exploit_steps += 1
             # Take the action in the environment
+            env_start = time.time()
             next_obs, reward, term, trunc, info = e.step(action)
+            qrl_metrics.environment_time += (time.time() - env_start)
             qrl_metrics.env_evals += 1  
 
             rb.add_buffer_item(obs, next_obs, action, reward, term)
@@ -605,13 +613,16 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                         uid = "qrl_target_params_batch_" + str(state) + "_" + str(step)
                         init_state_list = int_to_bitlist(state, num_qubits)
                         qc_arr.append(generate_pqc_circuit(num_qubits, num_layers, init_state_list, target_network_params, num_actions))
+                        circ_start = time.time()
                         ex.submit_circuit(qc_arr[-1], num_qubits, uid, shots=num_shots)
                         ex.finalize_execution(None, report_end=False)
+                        qrl_metrics.quantum_time += (time.time() - circ_start)
                         qrl_metrics.circuit_evaluations += 1
                         td_res_arr.append(saved_result)
                         td_vals.append(max(process_result(td_res_arr[-1], num_actions)))
                         td_targets.append(reward + gamma * td_vals[-1] * (1 - done))
                     
+                    '''
                     for state, action in zip(batch[rb.obs_idx], batch[rb.actions_idx]):
                         uid = "qrl_old_params_batch_" + str(state) + "_" + str(step)
                         init_state_list = int_to_bitlist(state, num_qubits)
@@ -620,18 +631,23 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                         ex.finalize_execution(None, report_end=False)
                         qrl_metrics.circuit_evaluations += 1
                         old_vals.append(process_result(saved_result, num_actions)[action])
+                    '''
 
                     # Compute gradients and update parameters
+                    grad_time = time.time()
                     grad_fn = calculate_gradients(num_qubits, num_layers, batch[rb.obs_idx], params, num_actions, num_shots, td_targets, batch[rb.actions_idx], ex, qrl_metrics)
                     opt.step(grad_fn)
+                    qrl_metrics.gradient_time += (time.time() - grad_time)
                 
                 if step % target_update == 0:
                     for i, (t_param, param) in enumerate(zip(target_network_params, params)):
                         target_network_params[i] = tau * param + (1 - tau) * t_param
                 
             if step % metric_print_interval:
+                qrl_metrics.total_time = time.time() - total_time
                 qrl_metrics.print_metrics()
 
+            qrl_metrics.step_time += (time.time() - step_time)
                         
     else:
         print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")
