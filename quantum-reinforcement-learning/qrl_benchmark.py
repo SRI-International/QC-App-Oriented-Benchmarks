@@ -113,7 +113,7 @@ def int_to_bitlist(init_string: int, num_qubits: int):
 
 ############### Generate list of random parameters
 
-def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: int = 0, seed: int = 0):
+def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: int = 0, seed: int = 0, data_reupload: bool = False):
     """
     Generate a list of random parameters for the PQC.
     Optionally includes scaling parameters and uses a seed for reproducibility.
@@ -130,9 +130,13 @@ def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: i
     if seed is not None:
         random.seed(seed)  # Optional for reproducibility
 
+    reup_multiplier = 1
+    if data_reupload:
+        reup_multiplier = num_layers
     # Main parameters: 2 per layer per qubit, plus one per qubit
-    main_param_count = 2 * num_layers * num_qubits + num_qubits
+    main_param_count = 2 * num_layers * num_qubits + num_qubits * reup_multiplier
     main_params = [random.uniform(0, 2 * np.pi) for _ in range(main_param_count)]
+    #main_params = [i for i in range(main_param_count)]
     # Optional scaling parameters
     scaling_params = [random.uniform(0, 1) for _ in range(num_op_scaling)]
 
@@ -181,6 +185,7 @@ def get_args():
     parser.add_argument("--n_measurements", "-nmeas", default=0, help="Number of measurement operations", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--data_reupload", "-r", action="store_true", help="Enable data reupload")
     return parser.parse_args()
 
 ################ QRL Schedules
@@ -380,7 +385,7 @@ def calculate_loss(num_qubits: int, num_layers: int, batch_obs: list, n_measurem
 def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
         method=1, num_layers=2, init_state=1, n_measurements=0, backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):
+        context=None, api=None, get_circuits=False, data_reupload = False):
     """
     Main benchmark loop for Quantum Reinforcement Learning.
     Executes the benchmark for a range of qubit sizes and collects metrics.
@@ -471,11 +476,11 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                 init_state_list = int_to_bitlist(init_state, num_qubits)
 
                 for idx in range(max_circuits):
-                    params = generate_rotation_params(num_layers, num_qubits, seed=idx)
+                    params = generate_rotation_params(num_layers, num_qubits, seed=idx, data_reupload=data_reupload)
                     # create the circuit for given qubit size and secret string, store time metric
                     mpi.barrier()
                     ts = time.time()
-                    qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, n_measurements)       
+                    qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, n_measurements, data_reupload=data_reupload)       
                     metrics.store_metric(num_qubits, idx, 'create_time', time.time()-ts)
 
                     # If we only want the circuits:
@@ -694,5 +699,6 @@ if __name__ == '__main__':
         n_measurements=args.n_measurements,
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        data_reupload=args.data_reupload
         )

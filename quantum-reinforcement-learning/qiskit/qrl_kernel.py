@@ -10,7 +10,7 @@ from qiskit_aer import AerSimulator
 QC_ = None # Quantum Circuit saved for display
 
 ############### PQC Circuit Definition for QRL
-def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measure: int = 0):
+def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measure: int = 0, data_reupload = False):
     """
     Generate a parameterized quantum circuit (PQC) for quantum reinforcement learning.
 
@@ -30,22 +30,25 @@ def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_pa
     else:
         n_measurements = list(range(n_measure))
     
-    # Create a quantum circuit with n_qubits and classical bits for measurements
-    qc = QuantumCircuit(n_qubits, len(n_measurements))
-    
-    # Prepare the initial state using RX rotations if initial_state[i] == 1
-    for i in range(len(initial_state)):
-        if initial_state[i] == 1:
-            qc.rx(w_params[i], i)
-    
-    qc.barrier()  # Add a barrier after state preparation
+    # Create a quantum circuit with n_qubits and classical bits for measurementsa
+    qc = QuantumCircuit(n_qubits, len(n_measurements)) 
     
     # Add parameterized layers
     for layer in range(n_layers):
+        # Prepare the initial state using RX rotations if initial_state[i] == 1
+        if ((layer == 0) or (data_reupload)):
+            idx = layer * 3 * n_qubits
+            for i in range(len(initial_state)):
+                if initial_state[i] == 1:
+                    qc.rx(w_params[idx], i)
+                idx += 1
+            qc.barrier()  # Add a barrier after state preparation
         for i in range(n_qubits):
-            idx = (layer + 1) * n_qubits + i * 2
             qc.ry(w_params[idx], i)
-            qc.rz(w_params[idx+1], i)
+            idx += 1
+        for i in range(n_qubits):
+            qc.rz(w_params[idx], i)
+            idx += 1
         qc.barrier()  # Barrier after single-qubit rotations
         for i in range(n_qubits-1):
             qc.cz(i, i+1)  # Add CZ entangling gates between neighboring qubits
