@@ -419,6 +419,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     """
     # configure the QED-C Benchmark package for use with the given API
     generate_pqc_circuit, ideal_simulation, kernel_draw = qedc_benchmarks_init(api)
+    globals()['ideal_simulation'] = ideal_simulation
     
     print(f"{benchmark_name} ({method}) Benchmark Program")
 
@@ -460,6 +461,8 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         ex.set_execution_target(backend_id, provider_backend=provider_backend,
                 hub=hub, group=group, project=project, exec_options=exec_options,
                 context=context)
+        
+        ex.max_active_jobs = int((max_qubits + 1 - min_qubits) * (max_circuits / skip_qubits))  
 
         # for noiseless simulation, set noise model to be None
         # ex.set_noise_model(None)

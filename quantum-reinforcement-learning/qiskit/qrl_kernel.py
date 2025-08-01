@@ -10,7 +10,7 @@ from qiskit_aer import AerSimulator
 QC_ = None # Quantum Circuit saved for display
 
 ############### PQC Circuit Definition for QRL
-def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measure: int = 0, data_reupload = False):
+def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_params: list, n_measure: int = 0, data_reupload = False, add_barriers = False):
     """
     Generate a parameterized quantum circuit (PQC) for quantum reinforcement learning.
 
@@ -42,17 +42,20 @@ def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_pa
                 if initial_state[i] == 1:
                     qc.rx(w_params[idx], i)
                 idx += 1
-            qc.barrier()  # Add a barrier after state preparation
+            if add_barriers:
+                qc.barrier()  # Add a barrier after state preparation
         for i in range(n_qubits):
             qc.ry(w_params[idx], i)
             idx += 1
         for i in range(n_qubits):
             qc.rz(w_params[idx], i)
             idx += 1
-        qc.barrier()  # Barrier after single-qubit rotations
+        if add_barriers:
+            qc.barrier()  # Barrier after single-qubit rotations
         for i in range(n_qubits-1):
             qc.cz(i, i+1)  # Add CZ entangling gates between neighboring qubits
-        qc.barrier()  # Barrier after entangling gates
+        if add_barriers:
+            qc.barrier()  # Barrier after entangling gates
     
     # Measure the specified qubits
     midx = 0
