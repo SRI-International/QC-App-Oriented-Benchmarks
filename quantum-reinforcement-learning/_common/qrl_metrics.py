@@ -66,4 +66,4 @@ class qrl_metrics:
         print(f"  Environment Time: {self.environment_time:.4f} seconds")
         print(f"  Gradient Time: {self.gradient_time:.4f} seconds")
         avg_step_time = self.step_time / self.steps
-        print(f"  Average Step Time: {avg_step_time:.4f} seconds")
+        print(f"  Average Step Time: {avg_step_time:.4f} seconds", flush = True)
