@@ -23,6 +23,7 @@ class qrl_metrics:
         self.environment_time = 0         # Time spent interacting with the environment (seconds)
         self.gradient_time = 0            # Time spent computing gradients (seconds)
         self.loss_history = []            # History of loss
+        self.call_history = []            # History of calls to the PQC, environment, and gradient computation
     
     def calculate_average_return_per_run(self):
         """
