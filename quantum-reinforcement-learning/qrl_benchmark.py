@@ -314,6 +314,7 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
             uid = "qrl_grad_calc_" + str(init_state) + "_plus" 
             c_time = time.time()
             ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
+            qrl_metrics.call_history.append("quantum")
             ex.finalize_execution(None, report_end = False)
             qrl_metrics.quantum_time += (time.time() - c_time)
             res_p = process_result(saved_result, n_measurements)
@@ -324,6 +325,7 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
             uid = "qrl_grad_calc_" + str(init_state) + "_minus"
             c_time = time.time()
             ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
+            qrl_metrics.call_history.append("quantum")
             ex.finalize_execution(None, report_end = False)
             qrl_metrics.quantum_time += (time.time() - c_time)
             res_n = process_result(saved_result, n_measurements)
@@ -333,6 +335,7 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
             n_loss = mse_loss([td_target], [res_n[action]])
 
             grad += 0.5 * (p_loss - n_loss)
+            qrl_metrics.call_history.append("Classical")
             qrl_metrics.gradient_evaluations += 1
 
         return grad/len(batch_obs)           
@@ -400,7 +403,7 @@ def calculate_loss(num_qubits: int, num_layers: int, batch_obs: list, n_measurem
 ################ Benchmark Loop
 
 def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
-        method=1, num_layers=2, init_state=1, n_measurements=0, backend_id=None, provider_backend=None,
+        method=1, num_layers=2, init_state=1, n_measurements=0, num_qubits=3, backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, get_circuits=False, data_reupload = False):
     """
@@ -583,6 +586,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         # init params
         params = generate_rotation_params(num_layers, num_qubits, 0, data_reupload=data_reupload)
         target_network_params = copy.deepcopy(params)
+        #opt = Adam(params, lr=lr)
         opt = SPSA(params)
         #opt = Adam(params, lr=lr)
 
@@ -687,8 +691,98 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                 qrl_metrics.print_metrics()
 
             qrl_metrics.step_time += (time.time() - step_time)
+<<<<<<< HEAD
             qrl_metrics.update_history()
         qrl_metrics.plot_metrics()
+=======
+
+
+    elif method == 3:
+        # Method 3: Measuements pass
+        max_measurements = n_measurements
+        # create context identifier
+        if context is None: 
+            context = f"{benchmark_name} ({method}) Benchmark"
+        
+        # Variable to store all created circuits to return and their creation info
+        if get_circuits:
+            all_qcs = {}
+
+        # Initialize metrics module
+        metrics.init_metrics()
+
+        # Define custom result handler for circuit execution
+        def execution_handler(qc, result, num_qubits, idx, num_shots):  
+            """
+            Handle the execution result for a single circuit, storing fidelity metric.
+
+            Args:
+                qc: Quantum circuit object.
+                result: Execution result object.
+                num_qubits (int): Number of qubits.
+                idx (int): Circuit index.
+                num_shots (int): Number of shots.
+            """
+            num_qubits = int(num_qubits)
+            counts, fidelity = analyze_and_print_result(qc, result)
+            metrics.store_metric(num_qubits, idx, 'fidelity', fidelity)
+
+        # Initialize execution module using the execution result handler above and specified backend_id
+        ex.init_execution(execution_handler)
+        ex.set_execution_target(backend_id, provider_backend=provider_backend,
+                hub=hub, group=group, project=project, exec_options=exec_options,
+                context=context)
+        
+        #ex.max_active_jobs = int((max_qubits + 1 - min_qubits) * (max_circuits / skip_qubits))  
+
+        # for noiseless simulation, set noise model to be None
+        # ex.set_noise_model(None)
+
+        # Execute Benchmark Program N times for multiple circuit sizes
+        # Accumulate metrics asynchronously as circuits complete
+        for num_qubits_meas in range(1, max_measurements + 1, 1):
+            if get_circuits:
+                print(f"************\nCreating circuit with num_qubits = {num_qubits_meas}")
+                all_qcs[str(num_qubits_meas)] = {}
+            else:
+                print(f"************\nExecuting circuit with num_qubits = {num_qubits_meas}")
+                # Initialize dictionary to store circuits for this qubit group. 
+                init_state_list = int_to_bitlist(init_state, num_qubits)
+
+                for idx in range(max_circuits):
+                    params = generate_rotation_params(num_layers, num_qubits, seed=idx, data_reupload=data_reupload)
+                    # create the circuit for given qubit size and secret string, store time metric
+                    mpi.barrier()
+                    ts = time.time()
+                    qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_qubits_meas, data_reupload=data_reupload)       
+                    metrics.store_metric(num_qubits_meas, idx, 'create_time', time.time()-ts)
+
+                    # If we only want the circuits:
+                    if get_circuits:    
+                        all_qcs[str(num_qubits)][idx] = qc
+                        # Continue to skip submitting the circuit for execution. 
+                        continue
+                    
+                    # submit circuit for execution on target (simulator, cloud simulator, or hardware)
+                    ex.submit_circuit(qc, num_qubits_meas, idx, shots=num_shots)
+                
+            # Wait for some active circuits to complete; report metrics when groups complete
+            ex.throttle_execution(metrics.finalize_group)
+        
+        # Early return if we just want the circuits
+        if get_circuits:
+            print(f"************\nReturning circuits and circuit information")
+            return all_qcs, metrics.circuit_metrics
+
+        # Wait for all active circuits to complete; report metrics when groups complete
+        ex.finalize_execution(metrics.finalize_group)
+        
+        # draw a sample circuit
+        kernel_draw()
+
+        # Plot metrics for all circuit sizes
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {num_qubits} Qubits")
+>>>>>>> b3f25d3d50416592ad68575b519c776411c443ed
                         
     else:
         print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")
@@ -724,5 +818,6 @@ if __name__ == '__main__':
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
         api=args.api,
-        data_reupload=args.data_reupload
+        data_reupload=args.data_reupload,
+        num_qubits=args.num_qubits
         )
