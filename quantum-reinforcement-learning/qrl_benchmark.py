@@ -691,10 +691,8 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                 qrl_metrics.print_metrics()
 
             qrl_metrics.step_time += (time.time() - step_time)
-<<<<<<< HEAD
             qrl_metrics.update_history()
         qrl_metrics.plot_metrics()
-=======
 
 
     elif method == 3:
@@ -782,7 +780,6 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
 
         # Plot metrics for all circuit sizes
         metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {num_qubits} Qubits")
->>>>>>> b3f25d3d50416592ad68575b519c776411c443ed
                         
     else:
         print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")
