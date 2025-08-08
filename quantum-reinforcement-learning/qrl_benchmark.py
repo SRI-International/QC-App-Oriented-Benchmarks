@@ -135,7 +135,7 @@ def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: i
     for layer in range(num_layers):
         # --- RX block (only if layer == 0 or data_reupload is True)
         if layer == 0 or data_reupload:
-            rx_params = [random.uniform(0, 1) for _ in range(num_qubits)]
+            rx_params = [np.pi for _ in range(num_qubits)]
             params.extend(rx_params)
         else:
             # Skip over RX block
@@ -152,9 +152,6 @@ def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: i
     # --- Optional scaling params at the end
     scaling_params = [random.uniform(0, 1) for _ in range(num_op_scaling)]
     params.extend(scaling_params)
-
-    # Optional scaling parameters
-    scaling_params = [random.uniform(0, 1) for _ in range(num_op_scaling)]
 
     return params
 
@@ -562,16 +559,16 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         result_array = []
         learning_start = 50
         target_update = 20
-        params_update = 10
+        params_update = 20
         lr = 0.01
-        batch_size = 2*params_update
-        gamma = 0.95
-        total_steps = 30000 # Keep the defaults and expose this to the 
-        exploration_fraction = 0.4 # Expose run method
+        batch_size = 5
+        gamma = 0.97
+        total_steps = 100 # Keep the defaults and expose this to the 
+        exploration_fraction = 0.9 # Expose run method
         tau = 0.9
-        buffer_size = 10*batch_size
+        buffer_size = 200
         qrl_metrics = qrl_metrics()
-        metric_print_interval = 25
+        metric_print_interval = 50
 
         total_time = time.time()
         # Initialize environment and replay buffer
@@ -587,6 +584,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         params = generate_rotation_params(num_layers, num_qubits, 0, data_reupload=data_reupload)
         target_network_params = copy.deepcopy(params)
         opt = SPSA(params)
+        #opt = Adam(params, lr=lr)
 
         obs = e.reset()
         qrl_metrics.env_evals += 1  
@@ -660,7 +658,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                         td_targets.append(reward + gamma * td_vals[-1] * (1 - done))
                     
                     
-                    for state, action in zip(batch[rb.obs_idx], batch[rb.actions_idx]):
+                    '''for state, action in zip(batch[rb.obs_idx], batch[rb.actions_idx]):
                         uid = "qrl_old_params_batch_" + str(state) + "_" + str(step)
                         init_state_list = int_to_bitlist(state, num_qubits)
                         qc_arr.append(generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_actions, data_reupload=data_reupload))
@@ -672,12 +670,12 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                         old_vals.append(process_result(saved_result, num_actions)[action])
                     
                     loss = mse_loss(td_targets, old_vals)
-                    qrl_metrics.loss_history.append(loss)
+                    qrl_metrics.loss_history.append(loss)'''
                     # Compute gradients and update parameters
                     grad_time = time.time()
                     #grad_fn = calculate_gradients(num_qubits, num_layers, batch[rb.obs_idx], params, num_actions, num_shots, td_targets, batch[rb.actions_idx], data_reupload, ex, qrl_metrics)
                     grad_fn = calculate_loss(num_qubits, num_layers, batch[rb.obs_idx], num_actions, num_shots, td_targets, batch[rb.actions_idx], data_reupload, ex, qrl_metrics)
-                    opt.step(grad_fn)
+                    params = opt.step(grad_fn)
                     qrl_metrics.gradient_time += (time.time() - grad_time)
                 
                 if (step + 1) % target_update == 0:
@@ -689,6 +687,8 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                 qrl_metrics.print_metrics()
 
             qrl_metrics.step_time += (time.time() - step_time)
+            qrl_metrics.update_history()
+        qrl_metrics.plot_metrics()
                         
     else:
         print(f"{benchmark_name} ({method}) Benchmark Program not supported yet")

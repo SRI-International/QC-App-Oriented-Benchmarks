@@ -2,6 +2,7 @@
 Quantum Fourier Transform Benchmark Program - Metrics for QRL
 (C) Quantum Economic Development Consortium (QED-C) 2025.
 '''
+import matplotlib.pyplot as plt
 
 class qrl_metrics:
     """
@@ -23,6 +24,7 @@ class qrl_metrics:
         self.environment_time = 0         # Time spent interacting with the environment (seconds)
         self.gradient_time = 0            # Time spent computing gradients (seconds)
         self.loss_history = []            # History of loss
+        self.step_history = []
     
     def calculate_average_return_per_run(self):
         """
@@ -67,3 +69,50 @@ class qrl_metrics:
         print(f"  Gradient Time: {self.gradient_time:.4f} seconds")
         avg_step_time = self.step_time / self.steps
         print(f"  Average Step Time: {avg_step_time:.4f} seconds", flush = True)
+
+    def update_history(self):
+        self.step_history.append([self.circuit_evaluations, self.gradient_evaluations, self.num_episodes, self.num_success, self.env_evals, self.explore_steps, self.exploit_steps])
+
+    def plot_metrics(self):
+        circuit_evals = [row[0] for row in self.step_history]
+        gradient_evals = [row[1] for row in self.step_history]
+        num_episodes = [row[2] for row in self.step_history]
+        num_success = [row[3] for row in self.step_history]
+        env_evals = [row[4] for row in self.step_history]
+        explores = [row[5] for row in self.step_history]
+        exploits = [row[6] for row in self.step_history]
+
+        # Create x-axis as step index
+        x = list(range(1, len(self.step_history) + 1))
+
+        # Plot each metric in its own subplot with shared x-axis
+        fig, axs = plt.subplots(7, 1, figsize=(8, 12), sharex=True)
+
+        axs[0].plot(x, circuit_evals, marker='o')
+        axs[0].set_ylabel('Circuit Evals')
+        axs[0].set_ylim(bottom=0)
+
+        axs[1].plot(x, gradient_evals, marker='o')
+        axs[1].set_ylabel('Gradient Evals')
+
+        axs[2].plot(x, num_episodes, marker='o')
+        axs[2].set_ylabel('Episodes')
+
+        axs[3].plot(x, num_success, marker='o')
+        axs[3].set_ylabel('Successes')
+        axs[3].set_ylim(bottom=0)
+
+        axs[4].plot(x, env_evals, marker='o')
+        axs[4].set_ylabel('Env Evals')
+
+        axs[5].plot(x, explores, marker='o')
+        axs[5].set_ylabel('Explore steps')
+        axs[5].set_ylim(bottom=0)
+
+        axs[6].plot(x, exploits, marker='o')
+        axs[6].set_ylabel('Exploit steps')
+        axs[6].set_xlabel('Step Index')
+
+        fig.suptitle('Metrics Over Steps')
+        fig.tight_layout(rect=[0, 0, 1, 0.96])
+        fig.savefig("stephistory.png")
