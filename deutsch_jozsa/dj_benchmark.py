@@ -10,37 +10,9 @@ import os, sys
 import time
 import numpy as np
 
-############### Configure API
-# 
-# Configure the QED-C Benchmark package for use with the given API
-def qedc_benchmarks_init(api: str = "qiskit"):
-
-    if api == None: api = "qiskit"
-
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
-    sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
-
-    up_dir = os.path.abspath(os.path.join(current_dir, ".."))
-    common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
-    sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-    
-    api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
-    sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
-
-    import qcb_mpi as mpi
-    globals()["mpi"] = mpi
-    mpi.init()
-
-    import execute as ex
-    globals()["ex"] = ex
-
-    import metrics as metrics
-    globals()["metrics"] = metrics
-
-    from dj_kernel import DeutschJozsa, kernel_draw
-    
-    return DeutschJozsa, kernel_draw
+from _common import qcb_mpi as mpi
+from _common import metrics
+from _common.qedc_init import qedc_benchmarks_init
 
 # Benchmark Name
 benchmark_name = "Deutsch-Jozsa"
@@ -83,7 +55,10 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
 
     print(f"{benchmark_name} Benchmark Program - Qiskit")
 
-    DeutschJozsa, kernel_draw = qedc_benchmarks_init(api)
+    # configure the QED-C Benchmark package for use with the given API
+    qedc_benchmarks_init(api, "deutsch_jozsa", ["dj_kernel"])
+    import dj_kernel as kernel
+    import execute as ex
 
     # validate parameters (smallest circuit is 3 qubits)
     max_qubits = max(3, max_qubits)
@@ -140,7 +115,7 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
             
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-            qc = DeutschJozsa(num_qubits, type)
+            qc = kernel.DeutschJozsa(num_qubits, type)
             metrics.store_metric(num_qubits, type, 'create_time', time.time()-ts)
 
             # collapse the sub-circuit levels used in this benchmark (for qiskit)
@@ -170,7 +145,7 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
     
     if mpi.leader():
         # draw a sample circuit
-        kernel_draw()
+        kernel.kernel_draw()
 
         # Plot metrics for all circuit sizes
         metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
@@ -202,7 +177,8 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    DeutschJozsa, kernel_draw = qedc_benchmarks_init(args.api)
+    qedc_benchmarks_init(args.api, "deutsch_jozsa", ["dj_kernel"])
+    import execute as ex
     
     # special argument handling
     ex.verbose = args.verbose
