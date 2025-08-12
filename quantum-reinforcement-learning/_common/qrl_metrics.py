@@ -3,6 +3,7 @@ Quantum Fourier Transform Benchmark Program - Metrics for QRL
 (C) Quantum Economic Development Consortium (QED-C) 2025.
 '''
 import matplotlib.pyplot as plt
+import numpy as np
 
 class qrl_metrics:
     """
@@ -74,45 +75,55 @@ class qrl_metrics:
         self.step_history.append([self.circuit_evaluations, self.gradient_evaluations, self.num_episodes, self.num_success, self.env_evals, self.explore_steps, self.exploit_steps])
 
     def plot_metrics(self):
-        circuit_evals = [row[0] for row in self.step_history]
-        gradient_evals = [row[1] for row in self.step_history]
-        num_episodes = [row[2] for row in self.step_history]
-        num_success = [row[3] for row in self.step_history]
-        env_evals = [row[4] for row in self.step_history]
-        explores = [row[5] for row in self.step_history]
-        exploits = [row[6] for row in self.step_history]
+        """
+        step_history: list of lists like
+        [circuit_evals, gradient_evals, num_episodes, num_success, env_evals]
+        appended once per step.
+        """
+        A = np.asarray(self.step_history, dtype=float)
+        if A.ndim != 2 or A.shape[1] < 1:
+            raise ValueError("step_history must be a list of lists with at least 1 column.")
 
-        # Create x-axis as step index
-        x = list(range(1, len(self.step_history) + 1))
+        x = np.arange(len(A))  # steps: 0..n-1
 
-        # Plot each metric in its own subplot with shared x-axis
-        fig, axs = plt.subplots(7, 1, figsize=(8, 12), sharex=True)
+        # Extract columns
+        circuit_cum = A[:, 0]     # cumulative circuit evaluations
+        grad_cum    = A[:, 1]     # cumulative gradient evaluations
+        env_evals   = A[:, 4]     # environment evaluations
+        explore_raw = A[:, 5]     # explore steps
+        exploit_raw = A[:, 6]     # exploit steps
 
-        axs[0].plot(x, circuit_evals, marker='o')
-        axs[0].set_ylabel('Circuit Evals')
-        axs[0].set_ylim(bottom=0)
+        # Helper: convert cumulative -> per-step
+        def per_step(series):
+            return np.diff(np.concatenate(([0.0], series)))
 
-        axs[1].plot(x, gradient_evals, marker='o')
-        axs[1].set_ylabel('Gradient Evals')
+        # Always treat circuit evals as cumulative
+        circuit_per_step = per_step(circuit_cum)
 
-        axs[2].plot(x, num_episodes, marker='o')
-        axs[2].set_ylabel('Episodes')
+        # Detect if explore/exploit are cumulative (non-decreasing)
+        explore_per_step = per_step(explore_raw) if np.all(np.diff(explore_raw) >= 0) else explore_raw
+        exploit_per_step = per_step(exploit_raw) if np.all(np.diff(exploit_raw) >= 0) else exploit_raw
 
-        axs[3].plot(x, num_success, marker='o')
-        axs[3].set_ylabel('Successes')
-        axs[3].set_ylim(bottom=0)
+        # Prepare plots
+        plots = [
+            ("Circuit evals (per step)", circuit_per_step, "Circuit evals / step"),
+            ("Explore steps (per step)", explore_per_step, "Explore / step"),
+            ("Exploit steps (per step)", exploit_per_step, "Exploit / step"),
+            #("Gradient evals (cumulative)", grad_cum, "Grad evals (cum)"),
+            ("Env evals", env_evals, "Env evals"),
+        ]
 
-        axs[4].plot(x, env_evals, marker='o')
-        axs[4].set_ylabel('Env Evals')
+        fig, axes = plt.subplots(len(plots), 1, figsize=(20, 1.5*len(plots)), sharex=True)
 
-        axs[5].plot(x, explores, marker='o')
-        axs[5].set_ylabel('Explore steps')
-        axs[5].set_ylim(bottom=0)
+        for ax, (title, y, ylabel) in zip(axes, plots):
+            ax.plot(x, y, linewidth=0.5, marker='x')
+            ax.set_ylabel(ylabel)
+            ax.set_title(title)
+            ax.grid(True, linestyle='--', alpha=0.5)
+            if ylabel == "Circuit evals / step":
+                ax.set_ylim(0, 2) 
 
-        axs[6].plot(x, exploits, marker='o')
-        axs[6].set_ylabel('Exploit steps')
-        axs[6].set_xlabel('Step Index')
-
-        fig.suptitle('Metrics Over Steps')
-        fig.tight_layout(rect=[0, 0, 1, 0.96])
-        fig.savefig("stephistory.png")
+        axes[-1].set_xlabel("Step")
+        fig.tight_layout()
+        plt.savefig("step_history.svg", dpi=600)
+        plt.show()

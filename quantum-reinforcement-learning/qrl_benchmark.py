@@ -215,7 +215,7 @@ def schedule(exploration, step):
         exploration_probability (float): Exploration probability for the given step.
     """
     exp_max = 1.0
-    exp_min = 0.01
+    exp_min = 0.05
     slope = (exp_min - exp_max) / exploration
     return max(slope * step + exp_max, exp_min)
 
@@ -560,16 +560,16 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         ex.max_jobs_active = 1
 
         result_array = []
-        learning_start = 50
-        target_update = 20
-        params_update = 20
+        learning_start = 500
+        target_update = 10
+        params_update = 10
         lr = 0.01
-        batch_size = 5
-        gamma = 0.97
-        total_steps = 100 # Keep the defaults and expose this to the 
-        exploration_fraction = 0.9 # Expose run method
+        batch_size = 32
+        gamma = 0.95
+        total_steps = 10000 # Keep the defaults and expose this to the 
+        exploration_fraction = 0.5 # Expose run method
         tau = 0.9
-        buffer_size = 200
+        buffer_size = 2000
         qrl_metrics = qrl_metrics()
         metric_print_interval = 50
 
