@@ -5,6 +5,8 @@
 This directory describes the requirements and operational conventions for using CUDA Quantum as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
 In particular, this document explains how to set up the tools needed to run the CUDA Quantum implementation of these benchmarks.
 
+IMPORTANT: The CUDA Quantum version of the QED-C benchmarks is an evolving work-in-progress. Recent updates to CUDA Quantum have required changes to the QED-C code such that some of the benchmarks currently require later versions of CUDA Quantum. As of 19 Aug 2025, most will work with version **0.10**. The **HamLib** benchmark now requires **0.12** at a minimum.  The **Phase Estimation** benchmark requires the **nightly** build of CUDA Quantum.
+
 ## IMPORTANT Note about Benchmark Directory Structure for CUDA Quantum
 
 Integrating CUDA Quantum into the QED-C benchmarking suite prompted a restructuring of all the benchmark source code in the repository to consolidate common code in a reusable fashion, shareable across API implementations. This effort is a WORK-IN-PROGRESS and has been only partially completed across the suite of benchmarks. In particular, the restructuring defines a shared module for each problem definition and its benchmark looping logic, while isolating code that is specific to each API into a unique quantum "kernel" for that problem definition.
