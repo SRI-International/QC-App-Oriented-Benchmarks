@@ -58,7 +58,8 @@ def PhaseEstimation(num_qubits, theta, use_midcircuit_measurement):
     qc.barrier()
     
     # measure counting qubits
-    qc.measure([qr[m] for m in range(num_counting_qubits)], list(range(num_counting_qubits)))
+    if not use_midcircuit_measurement:
+        qc.measure([qr[m] for m in range(num_counting_qubits)], list(range(num_counting_qubits)))
 
     # save smaller circuit example for display
     global QC_, U_, QFTI_, QFTDI_
@@ -124,8 +125,7 @@ def inv_qft_gate(input_size):
 def dyn_inv_qft_gate(input_size):
    
     global QFTDI_, num_gates, depth
-    qr = QuantumRegister(input_size, name="q_dyn_inv")
-    cr = ClassicalRegister(input_size, name = "c0")
+    qr = QuantumRegister(input_size, name="q_dyn_inv"); cr = ClassicalRegister(input_size, name="c0")
     qc = QuantumCircuit(qr, cr, name="dyn_inv_qft")
 
     # mirror the static inv-QFT loop order, but with mid-circuit feed-forward
@@ -134,18 +134,18 @@ def dyn_inv_qft_gate(input_size):
 
         # H on the “hidx” wire
         qc.h(qr[hidx])
-        qc.barrier()
 
         # measure for feed-forward
         qc.measure(qr[hidx], cr[hidx])
-        qc.barrier()
 
         # if measured == 1, apply RZ(-θ) on each target
         if hidx < input_size - 1:
             for j in reversed(range(i_qubit)):
                 θ = math.pi / (2 ** (i_qubit - j))
                 with qc.if_test((cr[hidx], 1)):
+
                     qc.rz(-θ, qr[input_size - 1 - j])
+
         qc.barrier()
 
     # cache a small-size example for printing
