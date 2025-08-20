@@ -83,7 +83,8 @@ def qft_kernel(num_qubits: int, secret_int: int, init_phases: List[float], metho
 				x(qubits[num_qubits - index - 1])	
 		
 		input_size = qubits.size()
-
+		
+		# perform quantum fourier transform on the input phases to convert to fourier basis
 		qft(qubits)
 			
 		# some compilers recognize the QFT and IQFT in series and collapse them to identity;
@@ -92,7 +93,7 @@ def qft_kernel(num_qubits: int, secret_int: int, init_phases: List[float], metho
 			ri_q = num_qubits - i_q - 1
 			divisor = 2 ** (i_q)
 			rz( 1 * M_PI / divisor , qubits[ri_q])
-		
+		"""
 		# note: Dynamic circuits are only supported for monolithic kernels, therefore, we
 		# cannot do a function call to a circuit containing dynamic circuits as of July 16, 2025.
 		if use_midcircuit_measurement:
@@ -117,7 +118,10 @@ def qft_kernel(num_qubits: int, secret_int: int, init_phases: List[float], metho
 							divisor = 2 ** (j + 1)
 							rz( -M_PI / divisor , qubits[ri_qubit - j - 1])	
 		else:
-			iqft(qubits)
+		"""
+		
+		# perform inverse quantum fourier transform to convert back to computational basis
+		iqft(qubits)
 
 		# Measure to gather sampling statistics
 		mz(qubits)
