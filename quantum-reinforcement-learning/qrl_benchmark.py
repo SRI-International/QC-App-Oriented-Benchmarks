@@ -586,9 +586,9 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         # init params
         params = generate_rotation_params(num_layers, num_qubits, 0, data_reupload=data_reupload)
         target_network_params = copy.deepcopy(params)
-        #opt = Adam(params, lr=lr)
+
         opt = SPSA(params)
-        #opt = Adam(params, lr=lr)
+        #opt = Adam(params, lr) # Uncomment to run
 
         obs = e.reset()
         qrl_metrics.env_evals += 1  
@@ -662,7 +662,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                         td_targets.append(reward + gamma * td_vals[-1] * (1 - done))
                     
                     
-                    '''for state, action in zip(batch[rb.obs_idx], batch[rb.actions_idx]):
+                    for state, action in zip(batch[rb.obs_idx], batch[rb.actions_idx]):
                         uid = "qrl_old_params_batch_" + str(state) + "_" + str(step)
                         init_state_list = int_to_bitlist(state, num_qubits)
                         qc_arr.append(generate_pqc_circuit(num_qubits, num_layers, init_state_list, params, num_actions, data_reupload=data_reupload))
@@ -674,7 +674,8 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
                         old_vals.append(process_result(saved_result, num_actions)[action])
                     
                     loss = mse_loss(td_targets, old_vals)
-                    qrl_metrics.loss_history.append(loss)'''
+                    qrl_metrics.loss_history.append(loss)
+                    
                     # Compute gradients and update parameters
                     grad_time = time.time()
                     #grad_fn = calculate_gradients(num_qubits, num_layers, batch[rb.obs_idx], params, num_actions, num_shots, td_targets, batch[rb.actions_idx], data_reupload, ex, qrl_metrics)
@@ -730,11 +731,6 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         ex.set_execution_target(backend_id, provider_backend=provider_backend,
                 hub=hub, group=group, project=project, exec_options=exec_options,
                 context=context)
-        
-        #ex.max_active_jobs = int((max_qubits + 1 - min_qubits) * (max_circuits / skip_qubits))  
-
-        # for noiseless simulation, set noise model to be None
-        # ex.set_noise_model(None)
 
         # Execute Benchmark Program N times for multiple circuit sizes
         # Accumulate metrics asynchronously as circuits complete

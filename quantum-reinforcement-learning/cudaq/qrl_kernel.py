@@ -36,7 +36,7 @@ def generate_pqc_circuit(n_qubits: int, n_layers: int, initial_state: list, w_pa
     qc = cudaq.qvector(n_qubits)
 
     # Prepare the initial state using RX rotations if initial_state[i] == 1
-    for i in range(initial_state):
+    for i in range(n_qubits):
         if initial_state[i]:
             rx(w_params[i], qc[i])
     
