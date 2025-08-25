@@ -182,7 +182,7 @@ class qrl_metrics:
             print("╟" + line + "╢")
             # Section rows
             for key, val in group:
-                print(f"║ {key:<{max_key_len}} │ {str(val):>{max_val_len}} ║")
+                print(f"║ {key:<{max_key_len}} │ {str(val):>{max_val_len}}   ║")
             print("╠" + line + "╣")
 
         print("╚" + line + "╝")

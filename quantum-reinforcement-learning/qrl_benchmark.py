@@ -314,7 +314,6 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
             uid = "qrl_grad_calc_" + str(init_state) + "_plus" 
             c_time = time.time()
             ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
-            qrl_metrics.call_history.append("quantum")
             ex.finalize_execution(None, report_end = False)
             qrl_metrics.quantum_time += (time.time() - c_time)
             res_p = process_result(saved_result, n_measurements)
@@ -325,7 +324,6 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
             uid = "qrl_grad_calc_" + str(init_state) + "_minus"
             c_time = time.time()
             ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
-            qrl_metrics.call_history.append("quantum")
             ex.finalize_execution(None, report_end = False)
             qrl_metrics.quantum_time += (time.time() - c_time)
             res_n = process_result(saved_result, n_measurements)
@@ -335,7 +333,6 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
             n_loss = mse_loss([td_target], [res_n[action]])
 
             grad += 0.5 * (p_loss - n_loss)
-            qrl_metrics.call_history.append("Classical")
             qrl_metrics.gradient_evaluations += 1
 
         return grad/len(batch_obs)           
@@ -560,13 +557,13 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         ex.max_jobs_active = 1
 
         result_array = []
-        learning_start = 500
+        learning_start = 100
         target_update = 10
         params_update = 10
         lr = 0.01
         batch_size = 32
         gamma = 0.95
-        total_steps = 100 # Keep the defaults and expose this to the 
+        total_steps = 200 # Keep the defaults and expose this to the 
         exploration_fraction = 0.5 # Expose run method
         tau = 0.9
         buffer_size = 2000
@@ -694,6 +691,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
             qrl_metrics.step_time += (time.time() - step_time)
             qrl_metrics.update_history()
         qrl_metrics.plot_metrics()
+        qrl_metrics.print_final_metrics()
 
     # This is a measurement sweep over the number of measurement. Currently WIP. Do not use.
     elif method == 3:

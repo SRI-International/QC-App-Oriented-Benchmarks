@@ -55,7 +55,7 @@ class Environment:
             obs (int): The initial observation/state after reset.
         """
         obs, _ = self.env.reset()
-        print(f"Environment reset: obs: {obs}")
+        #print(f"Environment reset: obs: {obs}")
         return obs
 
     def sample(self):
