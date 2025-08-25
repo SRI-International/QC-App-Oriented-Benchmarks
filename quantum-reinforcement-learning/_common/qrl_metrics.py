@@ -127,3 +127,62 @@ class qrl_metrics:
         fig.tight_layout()
         plt.savefig("step_history.svg", dpi=600)
         plt.show()
+    
+    def print_final_metrics(self):
+        """
+        Pretty-print QRL metrics in a neat table format, grouped by category.
+        - Totals
+        - Averages
+        - Timing
+        """
+        avg_return_run = self.calculate_average_return_per_run()
+        avg_return_episode = self.calculate_average_return_per_episode()
+        avg_step_time = (self.step_time / self.steps) if self.steps > 0 else 0.0
+
+        # Grouped metrics
+        totals = [
+            ("Circuit Evaluations", self.circuit_evaluations),
+            ("Gradient Evaluations", self.gradient_evaluations),
+            ("Environment Evaluations", self.env_evals),
+            ("Number of Successes", self.num_success),
+            ("Number of Episodes", self.num_episodes),
+            ("Total Steps", self.steps),
+            ("Explore Steps", self.explore_steps),
+            ("Exploit Steps", self.exploit_steps),
+        ]
+
+        averages = [
+            ("Average Return per Run", f"{avg_return_run:.4f}"),
+            ("Average Return per Episode", f"{avg_return_episode:.4f}"),
+            ("Average Step Time (s)", f"{avg_step_time:.4f}"),
+        ]
+
+        timings = [
+            ("Total Time (s)", f"{self.total_time:.4f}"),
+            ("Quantum Time (s)", f"{self.quantum_time:.4f}"),
+            ("Environment Time (s)", f"{self.environment_time:.4f}"),
+            ("Gradient Time (s)", f"{self.gradient_time:.4f}"),
+        ]
+
+        all_metrics = [("TOTALS", totals), ("AVERAGES", averages), ("TIMINGS", timings)]
+
+        # Determine column widths
+        max_key_len = max(len(k) for _, group in all_metrics for k, _ in group)
+        max_val_len = max(len(str(v)) for _, group in all_metrics for _, v in group)
+        line = "═" * (max_key_len + max_val_len + 7)
+
+        # Print table
+        print("╔" + line + "╗")
+        print("║{:^{width}}║".format(" QRL Benchmark Metrics ", width=max_key_len + max_val_len + 7))
+        print("╠" + line + "╣")
+
+        for section, group in all_metrics:
+            # Section header
+            print("║ {:^{width}} ║".format(section, width=max_key_len + max_val_len + 5))
+            print("╟" + line + "╢")
+            # Section rows
+            for key, val in group:
+                print(f"║ {key:<{max_key_len}} │ {str(val):>{max_val_len}} ║")
+            print("╠" + line + "╣")
+
+        print("╚" + line + "╝")
