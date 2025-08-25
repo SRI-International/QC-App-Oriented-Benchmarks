@@ -113,7 +113,7 @@ class qrl_metrics:
             ("Env evals", env_evals, "Env evals"),
         ]
 
-        fig, axes = plt.subplots(len(plots), 1, figsize=(20, 1.5*len(plots)), sharex=True)
+        fig, axes = plt.subplots(len(plots), 1, figsize=(10, 2*len(plots)), sharex=True)
 
         for ax, (title, y, ylabel) in zip(axes, plots):
             ax.plot(x, y, linewidth=0.5, marker='x')

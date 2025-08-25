@@ -566,7 +566,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         lr = 0.01
         batch_size = 32
         gamma = 0.95
-        total_steps = 10000 # Keep the defaults and expose this to the 
+        total_steps = 100 # Keep the defaults and expose this to the 
         exploration_fraction = 0.5 # Expose run method
         tau = 0.9
         buffer_size = 2000
@@ -695,7 +695,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
             qrl_metrics.update_history()
         qrl_metrics.plot_metrics()
 
-
+    # This is a measurement sweep over the number of measurement. Currently WIP. Do not use.
     elif method == 3:
         # Method 3: Measuements pass
         max_measurements = n_measurements
