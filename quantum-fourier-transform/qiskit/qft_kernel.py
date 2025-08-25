@@ -38,8 +38,7 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
         qc.barrier()
 
         # perform QFT on the input
-        static_qft_gate = qft_gate(input_size)
-        qc.compose(static_qft_gate, qubits=qr, inplace=True)
+        qc.append(qft_gate(input_size).to_instruction(), qr)
 
 
         # End with Hadamard on all qubits (to measure the z rotations)
@@ -122,9 +121,12 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
     global QC_    
     if QC_ == None or num_qubits <= 5:
         if num_qubits < 9: QC_ = qc
-        
+    
+    # collapse the sub-circuit levels used in this benchmark (for qiskit)
+    qc2 = qc.decompose()
+            
     # return a handle on the circuit
-    return qc
+    return qc2
 
 ############### QFT Circuit
 
@@ -192,7 +194,6 @@ def inv_qft_gate(input_size):
     
     if QFTI_ == None or input_size <= 5:
         if input_size < 9: QFTI_= qc
-        print(QFTI_)
         
     return qc
 

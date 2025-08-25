@@ -50,7 +50,7 @@ def hamsim_kernel(
         init_phases: List[float],
         K: int = 5,
         t: float = 1.0,
-        coefficients: List[complex] = None,
+        coefficients: List[float] = None,
         words: List[cudaq.pauli_word] = None,
         append_measurements: bool = False,
         append_pauli_term: bool = False,
@@ -76,7 +76,7 @@ def hamsim_kernel_measured(
         init_phases: List[float],
         K: int = 5,
         t: float = 1.0,
-        coefficients: List[complex] = None,
+        coefficients: List[float] = None,
         words: List[cudaq.pauli_word] = None,
         append_measurements: bool = True,
         append_pauli_term: bool = False,
@@ -117,12 +117,12 @@ def hamsim_kernel_measured(
 def append_trotter_step(
             qubits: cudaq.qview,
             dt: float, 
-            coefficients: List[complex],
+            coefficients: List[float],
             words: List[cudaq.pauli_word]
         ):
    
     for i in range(len(coefficients)):
-        exp_pauli(coefficients[i].real * dt, qubits, words[i])   # this crashes jupyter kernel on draw
+        exp_pauli(coefficients[i] * dt, qubits, words[i])   # this crashes jupyter kernel on draw
  
 #DEVNOTE: use this as a barrier when drawing circuit; comment out otherwise
 @cudaq.kernel
@@ -147,7 +147,7 @@ def convert_to_spin_op (num_qubits: int,
     # Parameters
     n_spins = num_qubits  # Number of spins in the chain
     
-    spin_op = cudaq.SpinOperator(num_qubits=n_spins)
+    spin_op = cudaq.SpinOperator(n_spins)
         
     for term in (ham_op):
         #print(f"... term = {term}")
@@ -178,6 +178,13 @@ def convert_to_spin_op (num_qubits: int,
                 elif pauli == 'I':
                     spins *= spin.i(qidx)
         
+            # Create a set of qubits that have explicit operations
+            explicit_qubits = set(qops.keys())
+            # Then, add identity operations for all qubits not explicitly specified
+            for qidx in range(num_qubits):
+                if qidx not in explicit_qubits:
+                    spins *= spin.i(qidx)
+
         # we do not do this check any more, since we are creating a term for empty paulis
         #if len(qops) > 0:       
             #spin_op += (spins * coeff)
@@ -192,9 +199,9 @@ def convert_to_spin_op (num_qubits: int,
 """
 Extract the coefficients and Pauli words from the provided Hamiltonian for use in the Trotter step.
 """
-def extractCoefficients(hamiltonian: cudaq.SpinOperator) -> List[complex]:
+def extractCoefficients(hamiltonian: cudaq.SpinOperator) -> List[float]:
     result = []
-    hamiltonian.for_each_term(lambda term: result.append(term.get_coefficient()))
+    hamiltonian.for_each_term(lambda term: result.append(term.get_coefficient().real))
     return result
 
 def extractWords(hamiltonian: cudaq.SpinOperator) -> List[str]:
@@ -227,7 +234,7 @@ def convert_sparse_to_dense(sparse_pauli_terms, num_qubits):
 
         # Convert list to string and append to results
         full_pauli_strings.append("".join(full_term))
-        coefficients.append(coefficient)
+        coefficients.append(coefficient.real)  # Store the real part of the coefficient
 
     return full_pauli_strings, coefficients
 

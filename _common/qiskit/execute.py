@@ -790,6 +790,58 @@ def execute_circuit(circuit):
 
     # return, so caller can do other things while waiting for jobs to complete    
 
+# compute circuit properties (depth, etc) and store to active circuit object
+def compute_and_store_circuit_info(
+        qc: QuantumCircuit,
+        group_id: str,
+        circuit_id: str,
+        do_transpile_metrics: bool = True,
+        use_normalized_depth: bool = True
+    ):
+        
+    if qc == None:
+        return;
+    
+    # do the decompose before obtaining circuit metrics so we expand subcircuits to 2 levels
+    # Comment this out here; ideally we'd generalize it here, but it is intended only to 
+    # 'flatten out' circuits with subcircuits; we do it in the benchmark code for now so
+    # it only affects circuits with subcircuits (e.g. QFT, AE ...)
+    # qc = qc.decompose()
+    # qc = qc.decompose()
+    
+    # obtain initial circuit metrics
+    qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = get_circuit_metrics(qc)
+
+    # default the normalized transpiled metrics to the same, in case exec fails
+    qc_tr_depth = qc_depth
+    qc_tr_size = qc_size
+    qc_tr_count_ops = qc_count_ops
+    qc_tr_xi = qc_xi 
+    qc_tr_n2q = qc_n2q
+    #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
+    
+    # store circuit dimensional metrics
+    metrics.store_metric(group_id, circuit_id, 'depth', qc_depth)
+    metrics.store_metric(group_id, circuit_id, 'size', qc_size)
+    metrics.store_metric(group_id, circuit_id, 'xi', qc_xi)
+    metrics.store_metric(group_id, circuit_id, 'n2q', qc_n2q)
+    
+    try:    
+        # transpile the circuit to obtain size metrics using normalized basis
+        if do_transpile_metrics and use_normalized_depth:
+            qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q = transpile_for_metrics(qc)
+
+    except Exception as e:
+        print(f'ERROR: Failed to transpile circuit {circuit["group"]} {circuit["circuit"]}')
+        print(f"... exception = {e}")
+        if verbose: print(traceback.format_exc())
+        
+    metrics.store_metric(group_id, circuit_id, 'tr_depth', qc_tr_depth)
+    metrics.store_metric(group_id, circuit_id, 'tr_size', qc_tr_size)
+    metrics.store_metric(group_id, circuit_id, 'tr_xi', qc_tr_xi)
+    metrics.store_metric(group_id, circuit_id, 'tr_n2q', qc_tr_n2q)
+        
+
 # Utility function to obtain name of backend
 # This is needed because some backends support backend.name and others backend.name()
 def get_backend_name(backend):

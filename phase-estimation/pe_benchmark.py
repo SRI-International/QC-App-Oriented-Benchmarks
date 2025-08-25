@@ -116,7 +116,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 		init_phase=None,
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
-		context=None, api=None, get_circuits=False):
+		context=None, api=None, get_circuits=False, method=None):
 
 	# configure the QED-C Benchmark package for use with the given API
 	PhaseEstimation, kernel_draw = qedc_benchmarks_init(api)
