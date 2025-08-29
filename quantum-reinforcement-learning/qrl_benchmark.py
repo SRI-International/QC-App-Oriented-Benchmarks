@@ -437,6 +437,10 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     # configure the QED-C Benchmark package for use with the given API
     generate_pqc_circuit, ideal_simulation, kernel_draw = qedc_benchmarks_init(api)
     globals()['ideal_simulation'] = ideal_simulation
+    globals().update(
+    generate_pqc_circuit=generate_pqc_circuit,
+    ideal_simulation=ideal_simulation,
+    kernel_draw=kernel_draw)
     
     print(f"{benchmark_name} ({method}) Benchmark Program")
 
