@@ -72,6 +72,40 @@ pip install gymnasium
 ---
 ## Inputs
 
+The relevant parameters for methods 1 and method 2 of the QRL Benchmark are as follows.
+
+#### Method 1 (Ansatz Benchmarking)
+
+| Argument | Description |
+|----------|-------------|
+| `--min_qubits` | Minimum number of qubits to benchmark. |
+| `--max_qubits` | Maximum number of qubits to benchmark. |
+| `--skip_qubits` | Step size for sweeping qubit counts. |
+| `--max_circuits` | Number of circuit repetitions per qubit size. |
+| `--num_layers` | Number of ansatz layers in the PQC. |
+| `--init_state` | Initial state to encode as input. |
+| `--n_measurements` | Number of measurement operations in the circuit. |
+| `--num_shots` | Number of shots per circuit execution. |
+| `--data_reupload` | Enable/disable data re-uploading in the PQC. |
+| `--nonoise` | Run with a noiseless simulator (ignore backend noise). |
+
+#### Method 2 (QRL Loop)
+
+| Argument | Description |
+|----------|-------------|
+| `--num_layers` | Number of ansatz layers in the PQC. |
+| `--n_measurements` | Number of measurement operations (size of action space). |
+| `--num_shots` | Number of shots per circuit execution. |
+| `--data_reupload` | Enable/disable data re-uploading in the PQC. |
+| `--total_steps` | Maximum number of training steps in the benchmark. |
+| `--learning_start` | Step index after which gradient updates begin. |
+| `--params_update` | Steps between parameter updates. |
+| `--target_update` | Steps between target network updates. |
+| `--batch_size` | Replay buffer batch size. |
+| `--exploration_fraction` | Fraction of training steps dedicated to exploration. |
+| `--tau` | Discount factor used for soft target updates. |
+| `--nonoise` | Run with a noiseless simulator (ignore backend noise). |
+
 ---
 
 ## References
@@ -80,4 +114,5 @@ pip install gymnasium
 [2] Towers, Mark, et al. "Gymnasium: A standard interface for reinforcement learning environments." arXiv preprint arXiv:2407.17032 (2024).
 
 [3] Kruse, Georg, et al. "Benchmarking quantum reinforcement learning." arXiv preprint arXiv:2502.04909 (2025).
+
 
