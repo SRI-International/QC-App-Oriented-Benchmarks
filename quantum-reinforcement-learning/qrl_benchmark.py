@@ -123,6 +123,7 @@ def generate_rotation_params(num_layers: int, num_qubits: int, num_op_scaling: i
         num_qubits (int): Number of qubits.
         num_op_scaling (int): Number of scaling parameters to generate (default: 0).
         seed (int): Random seed for reproducibility (default: 0).
+        data_reupload (bool): Whether to enable data reuploading (default: False).
 
     Returns:
         params (list of float): List of random parameters for the PQC.
@@ -196,6 +197,13 @@ def get_args():
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--init_state", "-state", default=1, help="Initial State to be encoded", type=int)
     parser.add_argument("--n_measurements", "-nmeas", default=0, help="Number of measurement operations", type=int)
+    parser.add_argument("--total_steps", "-stp", default=200, help="Number of Steps for QRL Benchmark (M 2 only)", type=int)
+    parser.add_argument("--batch_size", "-bsize", default=32, help="Batch size of replay buffer", type=int)
+    parser.add_argument("--learning_start", "-lstart", default=100, help="Step number to start gradient updates", type=int)
+    parser.add_argument("--target_update", "-tupdt", default=10, help="Steps in between target network updates", type=int)
+    parser.add_argument("--parameter_update", "-pupdt", default=10, help="Steps in between parameter updates", type=int)
+    parser.add_argument("--exploration_fraction", "-exp", default=0.5, help="Exploration fraction", type=float)
+    parser.add_argument("--tau", "-tau", default=0.95, help="Discount factor tau", type=float)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--data_reupload", "-r", action="store_true", help="Enable data reupload")
@@ -260,6 +268,7 @@ def process_result(results, num_actions, op_scaling = []):
     Args:
         results: Result object from circuit execution.
         num_actions (int): Number of actions (qubits).
+        op_scaling (list, optional): List of scaling factors for each action (default: []).
 
     Returns:
         qvals (list of float): List of Q-values, one per action.
@@ -298,7 +307,9 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
         num_shots (int): Number of shots per circuit.
         td_targets (list): Target values for each sample in the batch.
         actions (list): Actions taken for each sample in the batch.
+        data_reupload (bool): Whether to enable data reuploading.
         ex: Execution module.
+        qrl_metrics: Metrics object for tracking circuit and gradient evaluations.
 
     Returns:
         parameter_shift (function): Function that computes the gradient for a given parameter index.
@@ -353,6 +364,7 @@ def calculate_loss(num_qubits: int, num_layers: int, batch_obs: list, n_measurem
         num_shots (int): Number of shots per circuit execution.
         td_targets (list): Target values for each sample in the batch.
         actions (list): Actions taken for each sample in the batch.
+        data_reupload (bool): Whether to enable data reuploading.
         ex: Execution module for submitting and running circuits.
         qrl_metrics: Metrics object for tracking circuit and gradient evaluations.
 
@@ -400,9 +412,10 @@ def calculate_loss(num_qubits: int, num_layers: int, batch_obs: list, n_measurem
 ################ Benchmark Loop
 
 def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100,
-        method=1, num_layers=2, init_state=1, n_measurements=0, num_qubits=3, backend_id=None, provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False, data_reupload = False):
+        method=1, num_layers=2, init_state=1, n_measurements=0, num_qubits=3, backend_id=None, provider_backend=None, hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None, api=None, get_circuits=False, data_reupload = False, tau = 0.95, 
+        target_update = 10, params_update = 10, total_steps = 200, learning_start = 100, 
+        batch_size = 32, exploration_fraction = 0.5):
     """
     Main benchmark loop for Quantum Reinforcement Learning.
     Executes the benchmark for a range of qubit sizes and collects metrics.
@@ -417,6 +430,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         num_layers (int): Number of layers in the PQC.
         init_state (int): Initial state to encode.
         n_measurements (int): Number of measurement operations.
+        num_qubits (int): Number of qubits.
         backend_id (str): Backend identifier.
         provider_backend: Provider backend object.
         hub (str): IBMQ hub.
@@ -426,6 +440,14 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         context (str): Context identifier.
         api (str): Quantum programming API.
         get_circuits (bool): If True, only generate and return circuits.
+        data_reupload (bool): Whether to enable data reuploading.
+        tau (float): Discount factor tau.
+        target_update (int): Steps in between target network updates.
+        params_update (int): Steps in between parameter updates.
+        total_steps (int): Number of steps for QRL Benchmark (method 2 only).
+        learning_start (int): Step number to start gradient updates.
+        batch_size (int): Batch size of replay buffer.
+        exploration_fraction (float): Exploration fraction.
 
     Returns:
         If get_circuits is True:
@@ -561,15 +583,8 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         ex.max_jobs_active = 1
 
         result_array = []
-        learning_start = 100
-        target_update = 10
-        params_update = 10
         lr = 0.01
-        batch_size = 32
         gamma = 0.95
-        total_steps = 200 # Keep the defaults and expose this to the 
-        exploration_fraction = 0.5 # Expose run method
-        tau = 0.9
         buffer_size = 2000
         qrl_metrics = qrl_metrics()
         metric_print_interval = 50
@@ -814,5 +829,12 @@ if __name__ == '__main__':
         exec_options={"noise_model": None} if args.nonoise else {},
         api=args.api,
         data_reupload=args.data_reupload,
-        num_qubits=args.num_qubits
+        num_qubits=args.num_qubits,
+        learning_start = args.learning_start,
+        target_update = args.target_update,
+        params_update = args.params_update,
+        batch_size = args.batch_size,
+        total_steps = args.total_steps,
+        exploration_fraction = args.exploration_fraction,
+        tau = args.tau
         )
