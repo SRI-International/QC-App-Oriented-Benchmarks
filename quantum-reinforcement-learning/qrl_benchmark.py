@@ -201,7 +201,7 @@ def get_args():
     parser.add_argument("--batch_size", "-bsize", default=32, help="Batch size of replay buffer", type=int)
     parser.add_argument("--learning_start", "-lstart", default=100, help="Step number to start gradient updates", type=int)
     parser.add_argument("--target_update", "-tupdt", default=10, help="Steps in between target network updates", type=int)
-    parser.add_argument("--parameter_update", "-pupdt", default=10, help="Steps in between parameter updates", type=int)
+    parser.add_argument("--params_update", "-pupdt", default=10, help="Steps in between parameter updates", type=int)
     parser.add_argument("--exploration_fraction", "-exp", default=0.5, help="Exploration fraction", type=float)
     parser.add_argument("--tau", "-tau", default=0.95, help="Discount factor tau", type=float)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
