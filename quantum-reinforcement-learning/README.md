@@ -30,9 +30,26 @@ The agent begins at the upper-left tile and must reach the goal (green square) w
 - **Safe tiles (purple):** Reward **0**, agent continues.  
 
 The challenge lies in balancing exploration and exploitation to maximize the probability of reaching the goal.
+
 ### Parameterized Quantum Circuit Kernel
 
+We employ a **Quantum Deep Q-Network (Q-DQN)** to perform Quantum Reinforcement Learning (QRL).  
+Instead of a classical deep neural network, Q-DQN uses a **parameterized quantum circuit (PQC) ansatz** as defined in Skolik et al. [[1]](#references).  
 
+- **Qubit width**: determined by the larger of the environment’s observation space or action space.  
+- **Measured qubits**: equal to the size of the action space.  
+
+<p align="center">
+<img width="754" height="259" alt="QRL ansatz" src="https://github.com/user-attachments/assets/86a46caa-4859-40ec-84a1-67a7463c3e68" />
+</p>
+
+*Fig. 2: Parameterized quantum circuit (ansatz) used in QRL.*  
+
+The ansatz consists of layers of parameterized $R_y$ and $R_z$ rotations, while $R_x$ gates act as input encoders (applied only if the corresponding observation bit is 1).  
+
+The benchmark also allows users to:  
+- Enable or disable **data re-upload layers**  
+- Specify the **number of ansatz layers**
 
 
 ---
@@ -63,3 +80,4 @@ pip install gymnasium
 [2] Towers, Mark, et al. "Gymnasium: A standard interface for reinforcement learning environments." arXiv preprint arXiv:2407.17032 (2024).
 
 [3] Kruse, Georg, et al. "Benchmarking quantum reinforcement learning." arXiv preprint arXiv:2502.04909 (2025).
+
