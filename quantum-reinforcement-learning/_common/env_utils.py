@@ -1,3 +1,7 @@
+'''
+Quantum Fourier Transform Benchmark Program - Environment Files
+(C) Quantum Economic Development Consortium (QED-C) 2025.
+'''
 import gymnasium as gym
 from gymnasium.wrappers import TimeLimit
 import random
@@ -51,7 +55,7 @@ class Environment:
             obs (int): The initial observation/state after reset.
         """
         obs, _ = self.env.reset()
-        print(f"Environment reset: obs: {obs}")
+        #print(f"Environment reset: obs: {obs}")
         return obs
 
     def sample(self):
@@ -72,11 +76,11 @@ class Environment:
 
         Returns:
             tuple: (next_obs, reward, terminated, truncated, info)
-                next_obs (int): Next observation/state.
-                reward (float): Reward received after taking the action.
-                terminated (bool): Whether the episode has ended (success/failure).
-                truncated (bool): Whether the episode was truncated (e.g., time limit).
-                info (dict): Additional information.
+            next_obs (int): Next observation/state.
+            reward (float): Reward received after taking the action.
+            terminated (bool): Whether the episode has ended (success/failure).
+            truncated (bool): Whether the episode was truncated (e.g., time limit).
+            info (dict): Additional information.
         """
         return self.env.step(action)
     
@@ -115,6 +119,11 @@ class ReplayBuffer:
         self.capacity = capacity  # Maximum number of items in the buffer
         self.buffer = []          # List to store experience tuples
         self.pointer = 0          # Pointer for circular buffer replacement
+        self.obs_idx = 0
+        self.next_obs_idx = 1
+        self.actions_idx = 2
+        self.rewards_idx = 3
+        self.dones_idx = 4
     
     def add_buffer_item(self, obs, next_obs, action, reward, done):
         """
