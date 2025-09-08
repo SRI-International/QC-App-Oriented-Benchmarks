@@ -270,8 +270,9 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
         # draw a sample circuit
         kernel_draw()
 
-        # Plot metrics for all circuit sizes                         
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
+        # Plot metrics for all circuit sizes
+        options = {"method":method, "shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit", options=options)
 
 #######################
 # MAIN
