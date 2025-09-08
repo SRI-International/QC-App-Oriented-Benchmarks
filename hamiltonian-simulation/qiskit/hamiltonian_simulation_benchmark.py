@@ -23,7 +23,9 @@ sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
 
 import execute as ex
 import metrics as metrics
-from hamiltonian_simulation_kernel import HamiltonianKernel, HeisenbergHamiltonianKernel, TfimHamiltonianKernel
+
+from hamiltonian_simulation_kernel import HamiltonianSimulation, kernel_draw
+
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
@@ -150,7 +152,10 @@ def print_top_measurements(label, counts, top_n):
 
 ############### Benchmark Loop
 
-def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
+# we only generate simulation data for up to 14 qubits
+MAX_QUBITS_CLASSICAL = 14
+
+def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         skip_qubits: int = 1, num_shots: int = 100,
         hamiltonian: str = "heisenberg", method: int = 1,
         use_XX_YY_ZZ_gates: bool = False, random_pauli_flag: bool = False, init_state: str = None,
@@ -167,16 +172,17 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         max_circuits (int): Maximum number of circuits to execute per group.
         skip_qubits (int): Increment of number of qubits.
         num_shots (int): Number of shots for each circuit execution.
+        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
+        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical, 3 for mirror circuit.)
         use_XX_YY_ZZ_gates (bool): Flag to use unoptimized XX, YY, ZZ gates.
+        random_pauli_flag (bool): Flag to use a random set of paulis, in addition to a quasi-hamiltonian. 
+        init_state (str): The desired initial state. Choices are "checkerboard" or "ghz". 
         backend_id (str): Backend identifier for execution.
         provider_backend: Provider backend instance.
         hub (str): IBM Quantum hub.
         group (str): IBM Quantum group.
         project (str): IBM Quantum project.
         exec_options: Execution options.
-
-        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
-        method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
         context: Execution context.
 
     Returns:
@@ -200,15 +206,18 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     
     # set the initial method if no initial state argument is given by user.
     if init_state == None:
-            if hamiltonian == "tfim": 
-                init_state = "ghz"
-            else:
-                init_state = "checkerboard"
- 
+        if hamiltonian == "tfim": 
+            init_state = "ghz"
+        else:
+            init_state = "checkerboard"
+                
     # Set the flag to use an XX YY ZZ shim if given
     if use_XX_YY_ZZ_gates:
         print("... using unoptimized XX YY ZZ gates")
         
+    print(f"... using init_state = {init_state}")
+    print(f"... using random_pauli_flag = {random_pauli_flag}")
+    
     # Parameters of simulation (note used yet, since we use hardcoded data for comparison)
     """
     if K is None:
@@ -236,16 +245,14 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
-    qc_object = None
-    
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):   
           
         # since method 1 and 2 use pre-calculated data, cannot go above 12 qubits
         if method == 1 or method == 2:
-            if num_qubits > 12:
-                print("ERROR: cannot execute method 1 or 2 above 12 qubits")
+            if num_qubits > MAX_QUBITS_CLASSICAL:
+                print(f"ERROR: cannot execute method 1 or 2 above {MAX_QUBITS_CLASSICAL} qubits")
                 break;
 
         # Reset random seed
@@ -268,6 +275,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
         # Precalculated random numbers between [-1, 1]
         hx = precalculated_data['hx'][:num_qubits]
         hz = precalculated_data['hz'][:num_qubits]
+        
         #######################################################################
 
         # Loop over only 1 circuit
@@ -275,21 +283,11 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
             ts = time.time()
 
             # Create HeisenbergKernel or TFIM kernel
-            if hamiltonian == "heisenberg" :
-                qc_object = HeisenbergHamiltonianKernel(num_qubits, K=k, t=t,
-                        hamiltonian=hamiltonian,
-                        w=w, hx = hx, hz = hz, 
-                        use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
-                        method = method, random_pauli_flag = random_pauli_flag, init_state = init_state)
-            
-            if hamiltonian == "tfim" :
-                qc_object = TfimHamiltonianKernel(num_qubits, K=k, t=t,
-                        hamiltonian=hamiltonian,
-                        w=w, hx = hx, hz = hz, 
-                        use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
-                        method = method, random_pauli_flag = random_pauli_flag, init_state = init_state)
-            
-            qc = qc_object.overall_circuit()
+            qc = HamiltonianSimulation(num_qubits, K=k, t=t,
+                    hamiltonian=hamiltonian,
+                    w=w, hx = hx, hz = hz, 
+                    use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
+                    method = method, random_pauli_flag = random_pauli_flag)
                     
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
@@ -303,9 +301,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 1,
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
+    
     # draw a sample circuit
-    if qc_object is not None:
-        qc_object.kernel_draw()
+    kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
        
     # Plot metrics for all circuit sizes
     options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
@@ -327,7 +325,7 @@ def get_args():
     parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
     parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
-    parser.add_argument("--max_circuits", "-c", default=1, help="Maximum circuit repetitions", type=int)     
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)     
     parser.add_argument("--hamiltonian", "-ham", default="heisenberg", help="Name of Hamiltonian", type=str)
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--use_XX_YY_ZZ_gates", action="store_true", help="Use explicit XX, YY, ZZ gates")
@@ -347,7 +345,7 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    #PhaseEstimation, kernel_draw = qedc_benchmarks_init(args.api)
+    #HamiltonianSimulation, kernel_draw = qedc_benchmarks_init(args.api)
     
     # special argument handling
     ex.verbose = args.verbose
