@@ -11,6 +11,9 @@ QFT_ = None # Quantum Fourier Transformation Circuit
 QFTI_ = None # Quantum Inverse Fourier Transformation Circuit
 QFTDI_ = None # Quantum Dynamic Inverse Fourier Transformation Circuit
 
+num_gates = 0
+depth = 0
+
 ############### Circuit Definition
 
 def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, use_midcircuit_measurement=False):
