@@ -223,8 +223,9 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	kernel_draw()
 
 	# Plot metrics for all circuit sizes
-	metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
-						 transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
+	options = {"method":method, "shots": num_shots, "reps": max_circuits}
+	metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}", options=options, transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
+
 
 #######################
 # MAIN
