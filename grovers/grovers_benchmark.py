@@ -12,34 +12,34 @@ import numpy as np
 # Configure the QED-C Benchmark package for use with the given API
 def qedc_benchmarks_init(api: str = "qiskit"):
 
-	if api == None: api = "qiskit"
+    if api == None: api = "qiskit"
 
-	current_dir = os.path.dirname(os.path.abspath(__file__))
-	down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
-	sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
+    sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
 
-	up_dir = os.path.abspath(os.path.join(current_dir, ".."))
-	common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
-	sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-	
-	api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
-	sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
+    up_dir = os.path.abspath(os.path.join(current_dir, ".."))
+    common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
+    sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
+    
+    api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
+    sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
 
-	import qcb_mpi as mpi
-	globals()["mpi"] = mpi
-	mpi.init()
+    import qcb_mpi as mpi
+    globals()["mpi"] = mpi
+    mpi.init()
 
-	import execute as ex
-	globals()["ex"] = ex
+    import execute as ex
+    globals()["ex"] = ex
 
-	import metrics as metrics
-	globals()["metrics"] = metrics
+    import metrics as metrics
+    globals()["metrics"] = metrics
 
-	from grovers_kernel import GroversSearch, kernel_draw
-	
-	return GroversSearch, kernel_draw
-	
-	
+    from grovers_kernel import GroversSearch, kernel_draw
+    
+    return GroversSearch, kernel_draw
+    
+    
 # Benchmark Name
 benchmark_name = "Grovers Search"
 
@@ -179,7 +179,7 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
             # Store each circuit if we want to return them
             if get_circuits:
                 all_qcs[str(num_qubits)][str(s_int)] = qc
-				# Continue to skip sumbitting the circuit for execution. 
+                # Continue to skip sumbitting the circuit for execution. 
                 continue
             
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
@@ -202,7 +202,8 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     kernel_draw()
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
+    options = {"shots": num_shots, "reps": max_circuits}
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 
 #######################

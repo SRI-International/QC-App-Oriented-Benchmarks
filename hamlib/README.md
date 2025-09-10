@@ -250,7 +250,7 @@ There is also the option to use a random initial state, which replaces the curre
 
 [2] Proctor, T., Rudinger, K., Young, K. et al. Measuring the capabilities of quantum computers. Nat. Phys. 18, 75–79 (2022). https://doi.org/10.1038/s41567-021-01409-7 
 
-[3] Sawaya, N. P., Marti-Dafcik, D., Ho, Y., Tabor, D. P., Neira, D. E. B., Magann, A. B., ... & Camps, D. (2023, September). 
+[3] Sawaya, N. P., Marti-Dafcik, D., Ho, Y., Tabor, D. P., Bernal Neira, D. E., Magann, A. B., ... & Camps, D. (2023, September). 
     HamLib: A library of Hamiltonians for benchmarking quantum algorithms and hardware. 
     In 2023 IEEE International Conference on Quantum Computing and Engineering (QCE) (Vol. 2, pp. 389-390). IEEE.
 

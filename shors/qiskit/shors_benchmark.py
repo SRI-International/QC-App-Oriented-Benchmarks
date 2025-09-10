@@ -14,8 +14,8 @@ sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common",
 import execute as ex
 import metrics as metrics
 from shors_utils import getAngles, getAngle, modinv, generate_base
-from qft_benchmark import inv_qft_gate
-from qft_benchmark import qft_gate
+from qft_kernel import inv_qft_gate
+from qft_kernel import qft_gate
 
 # Benchmark Name
 benchmark_name = "Shor's Order Finding"
@@ -342,7 +342,7 @@ def analyze_and_print_result(qc, result, num_qubits, order, num_shots, method):
 def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
         verbose=verbose, backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None):
+        context=None, api=None, get_circuits=False):
 
     print(f"{benchmark_name} ({method}) Benchmark - Qiskit")
 
@@ -450,7 +450,8 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
+    options = {"shots": num_shots, "reps": max_circuits}
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
     
 # if main, execute method
