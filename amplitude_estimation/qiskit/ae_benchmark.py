@@ -10,7 +10,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 from _common.qiskit import execute as ex
 from _common import metrics as metrics
-from quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate
+from quantum_fourier_transform.qiskit.qft_kernel import inv_qft_gate
 
 # Benchmark Name
 benchmark_name = "Amplitude Estimation"
@@ -227,7 +227,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         num_state_qubits=1, # default, not exposed to users
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None):
+        context=None, api=None, get_circuits=False):
 
     print(f"{benchmark_name} Benchmark Program - Qiskit")
 
@@ -324,7 +324,8 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
     print("\nInverse QFT Circuit ="); print(QFTI_ if QC_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
+    options = {"shots": num_shots, "reps": max_circuits}
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 
 #######################

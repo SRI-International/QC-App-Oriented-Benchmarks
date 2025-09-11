@@ -11,7 +11,7 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from _common.qiskit import execute as ex
 from _common import metrics as metrics
 from shors._common.shors_utils import getAngles, getAngle, modinv, generate_base
-from quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate, qft_gate
+from quantum_fourier_transform.qiskit.qft_kernel import inv_qft_gate, qft_gate
 
 # Benchmark Name
 benchmark_name = "Shor's Order Finding"
@@ -338,7 +338,7 @@ def analyze_and_print_result(qc, result, num_qubits, order, num_shots, method):
 def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
         verbose=verbose, backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None):
+        context=None, api=None, get_circuits=False):
 
     print(f"{benchmark_name} ({method}) Benchmark - Qiskit")
 
@@ -446,7 +446,8 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
+    options = {"shots": num_shots, "reps": max_circuits}
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
     
 # if main, execute method
