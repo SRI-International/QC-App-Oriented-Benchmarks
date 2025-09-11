@@ -14,37 +14,11 @@ HamiltonianSimulationExact runs a classical calculation that perfectly simulates
 
 import json
 import os
-import sys
 import time
 import numpy as np
 
-############### Configure API
-# 
-# Configure the QED-C Benchmark package for use with the given API
-def qedc_benchmarks_init(api: str = "qiskit"):
-
-    if api == None: api = "qiskit"
-
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
-    sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
-
-    up_dir = os.path.abspath(os.path.join(current_dir, ".."))
-    common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
-    sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-    
-    api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
-    sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
-
-    import execute as ex
-    globals()["ex"] = ex
-
-    import metrics as metrics
-    globals()["metrics"] = metrics
-
-    from hamiltonian_simulation_kernel import HamiltonianSimulation, kernel_draw
-    
-    return HamiltonianSimulation, kernel_draw
+from _common import metrics
+from _common.qedc_init import qedc_benchmarks_init
     
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
@@ -209,7 +183,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         None
     """
     # configure the QED-C Benchmark package for use with the given API
-    HamiltonianSimulation, kernel_draw = qedc_benchmarks_init(api)
+    qedc_benchmarks_init(api, "hamiltonian_simulation", ["hamiltonian_simulation_kernel"])
+    import hamiltonian_simulation_kernel as kernel
+    import execute as ex
     
     print(f"{benchmark_name} Benchmark Program - Qiskit")
     
@@ -315,7 +291,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
             ts = time.time()
 
             # Create HeisenbergKernel or TFIM kernel
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t,
+            qc = kernel.HamiltonianSimulation(num_qubits, K=k, t=t,
                     hamiltonian=hamiltonian,
                     w=w, hx = hx, hz = hz, 
                     use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
@@ -346,7 +322,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     ##########
     
     # draw a sample circuit
-    kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
+    kernel.kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
        
     # Plot metrics for all circuit sizes
     options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
@@ -388,7 +364,8 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    HamiltonianSimulation, kernel_draw = qedc_benchmarks_init(args.api)
+    qedc_benchmarks_init(args.api, "hamiltonian_simulation", ["hamiltonian_simulation_kernel"])
+    import execute as ex
     
     # special argument handling
     ex.verbose = args.verbose
