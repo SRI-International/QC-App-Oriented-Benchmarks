@@ -318,7 +318,7 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
         max_circuits=3, num_shots=4092, method=1,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None):
+        context=None, api=None, get_circuits=False):
 
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit") 
 
@@ -449,7 +449,8 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
     print("\nCluster Operator Example 'Cluster Op' ="); print(CO_ if CO_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
+    options = {"shots": num_shots, "reps": max_circuits}
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 #######################
 # MAIN

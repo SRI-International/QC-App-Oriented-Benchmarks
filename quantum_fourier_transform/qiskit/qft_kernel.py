@@ -11,6 +11,9 @@ QFT_ = None # Quantum Fourier Transformation Circuit
 QFTI_ = None # Quantum Inverse Fourier Transformation Circuit
 QFTDI_ = None # Quantum Dynamic Inverse Fourier Transformation Circuit
 
+num_gates = 0
+depth = 0
+
 ############### Circuit Definition
 
 def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, use_midcircuit_measurement=False):
@@ -39,7 +42,8 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
 
         # perform QFT on the input
         qc.append(qft_gate(input_size).to_instruction(), qr)
-
+        
+        qc.barrier()
 
         # End with Hadamard on all qubits (to measure the z rotations)
         ''' don't do this unless NOT doing the inverse afterwards
@@ -49,8 +53,6 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
         qc.barrier()
         '''
 
-        qc.barrier()
-        
         # some compilers recognize the QFT and IQFT in series and collapse them to identity;
         # perform a set of rotations to add one to the secret_int to avoid this collapse
         for i_q in range(0, num_qubits):
@@ -69,18 +71,21 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
         else:
             qc.append(inv_qft_gate(input_size).to_instruction(), qr)
         
-        qc.barrier()
 
     elif method == 2:
 
         for i_q in range(0, num_qubits):
             qc.h(qr[i_q])
             num_gates += 1
+        
+        qc.barrier()
 
         for i_q in range(0, num_qubits):
             divisor = 2 ** (i_q)
             qc.rz(secret_int * math.pi / divisor, qr[i_q])
             num_gates += 1
+        
+        qc.barrier()
 
         depth += 1
 
@@ -112,8 +117,10 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
     else:
         exit("Invalid QFT method")
 
-    # measure all qubits
-    qc.measure(qr, cr)
+    # measure all qubits in the end if there is no mid-circuit measurements.
+    if not use_midcircuit_measurement:
+        qc.measure(qr, cr)
+
     num_gates += num_qubits
     depth += 1
 
@@ -197,7 +204,6 @@ def inv_qft_gate(input_size):
         
     return qc
 
-
 def dyn_inv_qft_gate(input_size):
    
     global QFTDI_, num_gates, depth
@@ -212,21 +218,20 @@ def dyn_inv_qft_gate(input_size):
         qc.h(qr[hidx])
         num_gates += 1
         depth += 1
-        qc.barrier()
 
         # measure for feed-forward
         qc.measure(qr[hidx], cr[hidx])
-        depth += 1
-        qc.barrier()
 
         # if measured == 1, apply RZ(-θ) on each target
         if hidx < input_size - 1:
             for j in reversed(range(i_qubit)):
                 θ = math.pi / (2 ** (i_qubit - j))
                 with qc.if_test((cr[hidx], 1)):
+
                     qc.rz(-θ, qr[input_size - 1 - j])
                     num_gates += 1
                     depth += 1
+
         qc.barrier()
 
     # cache a small-size example for printing
