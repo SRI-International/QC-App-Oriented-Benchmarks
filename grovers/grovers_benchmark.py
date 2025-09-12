@@ -152,7 +152,7 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
             # Store each circuit if we want to return them
             if get_circuits:
                 all_qcs[str(num_qubits)][str(s_int)] = qc
-				# Continue to skip sumbitting the circuit for execution. 
+                # Continue to skip sumbitting the circuit for execution. 
                 continue
             
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
@@ -175,7 +175,8 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     kernel.kernel_draw()
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit")
+    options = {"shots": num_shots, "reps": max_circuits}
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 
 #######################

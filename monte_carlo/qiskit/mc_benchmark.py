@@ -15,7 +15,7 @@ from qiskit.circuit.library.standard_gates.ry import RYGate
 from _common.qiskit import execute as ex
 from monte_carlo._common import mc_utils as mc_utils
 from _common import metrics as metrics
-from quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate
+from quantum_fourier_transform.qiskit.qft_kernel import inv_qft_gate
 
 # Benchmark Name
 benchmark_name = "Monte Carlo Sampling"
@@ -361,7 +361,7 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
         epsilon=0.05, degree=2, num_state_qubits=MIN_STATE_QUBITS, method = 2, # default, not exposed to users
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None):
+        context=None, api=None, get_circuits=False):
 
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
@@ -483,7 +483,8 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
     print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit")
+    options = {"method":method, "shots": num_shots, "reps": max_circuits}
+    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}", options=options)
        
         
 #######################
