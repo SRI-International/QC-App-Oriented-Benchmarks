@@ -20,7 +20,7 @@ import numpy as np
 from typing import Dict, Optional   # for backwards compat <= py 3.10
 from typing import Union, List, Tuple
 
-sys.path[1:1] = ["_common"]
+sys.path[1:1] = ["_common", "hamlib/_common"]
 
 import evolution_exact
 import metric_plots
