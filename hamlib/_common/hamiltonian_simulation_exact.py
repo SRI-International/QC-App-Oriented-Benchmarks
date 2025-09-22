@@ -3,30 +3,9 @@ import os
 
 from qiskit import QuantumCircuit 
 from qiskit.quantum_info import SparsePauliOp
-from qiskit_algorithms import TimeEvolutionProblem, SciPyRealEvolver
 from qiskit_aer import Aer
 from qiskit import transpile
 import numpy as np
-
-
-def HamiltonianSimulationExact(qc_initial, n_spins: int, hamiltonian_op = None, time: float = 1.0):
-    """
-    Perform exact Hamiltonian simulation using classical matrix evolution.
-
-    Args:
-        n_spins (int): Number of spins (qubits).
-        hamiltonian_op (Object): A hamiltonian operator.
-        time (float): Duration of simulation, default = 1.0
-        init_state (str): The chosen initial state. By default applies the checkerboard state, but can also be set to "ghz", the GHZ state.
-
-    Returns:
-        dict: The distribution of the evolved state.
-    """
-    time_problem = TimeEvolutionProblem(hamiltonian_op, time, initial_state=qc_initial)
-    result = SciPyRealEvolver(num_timesteps=1).evolve(time_problem)
-    
-    return result.evolved_state.probabilities_dict(), result.evolved_state.expectation_value(hamiltonian_op)
-
 
 def HamiltonianSimulation_Noiseless(qc, num_qubits, circuit_id: str="0", num_shots=100):
     """
