@@ -7,9 +7,7 @@ Hamiltonian Simulation Benchmark Program - Qiskit
 This program benchmarks Hamiltonian simulation using Qiskit. 
 The central function is the `run()` method, which orchestrates the entire benchmarking process.
 
-HamiltonianSimulation forms the trotterized circuit used in the benchmark.
-
-HamiltonianSimulationExact runs a classical calculation that perfectly simulates hamiltonian evolution, although it does not scale well. 
+HamiltonianSimulation forms the trotterized circuit used in the benchmark. 
 '''
 
 import json
