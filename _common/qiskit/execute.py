@@ -1260,19 +1260,31 @@ def job_complete(job):
             
             # allow processing to continue, but use the requested shot count
             actual_shots = active_circuit["shots"]
+        
+        try:        
+            # obtain timing info from the results object
+            # the data has been seen to come from both places below
+            if "time_taken" in result_obj:
+                exec_time = result_obj["time_taken"]
             
-        # obtain timing info from the results object
-        # the data has been seen to come from both places below
-        if "time_taken" in result_obj:
-            exec_time = result_obj["time_taken"]
-        
-        elif "time_taken" in results_obj:
-            exec_time = results_obj["time_taken"]
-        
-        elif 'execution' in result_obj:
-            # read execution time for the first circuit
-            exec_time = result_obj['execution']['execution_spans'][0].duration
-
+            elif "time_taken" in results_obj:
+                exec_time = results_obj["time_taken"]
+            
+            elif 'execution' in result_obj:        
+                #exec_time = result_obj['execution']['execution_spans'][0].duration
+                
+                # Get to the actual span object (python 3.11 does not find the duration attribute above
+                spans = result_obj['execution']['execution_spans']['__value__']['spans']
+                span = spans[0]  # The DoubleSliceSpan object
+                exec_time = span.duration
+                
+        except Exception as e:
+            exec_time = 0.0
+            print(f'ERROR: failed to get exec time for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+            print(f"... exception = {e}")
+            if verbose:
+                print(traceback.format_exc()) 
+            
         # override the initial value with exec_time returned from successful execution
         metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
         
