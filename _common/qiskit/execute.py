@@ -406,6 +406,7 @@ def set_execution_target(backend_id='qasm_simulator',
                 Session,
             )
 
+
             # set use_ibm_quantum_platform if provided by user - NOTE: this will modify the global setting
             use_ibm_quantum_platform = exec_options.get("use_ibm_quantum_platform", use_ibm_quantum_platform)
 
@@ -423,6 +424,15 @@ def set_execution_target(backend_id='qasm_simulator',
             try:
                 service = QiskitRuntimeService(channel=channel, instance=instance)
                 backend = service.backend(backend_name)
+
+                # DEVNOTE : If dynamic circuit is enabled in the exec_options, then If Else Operation
+                # is imported so that the Hardware device supports the feature.
+                ######@@@@@@@@@@@@###########
+                if exec_options.get("dynamic_circuit"):
+                    from qiskit.circuit import IfElseOp
+                    backend.target.add_instruction(IfElseOp, name="if_else")
+                ######@@@@@@@@@@@@###########
+
             except Exception as ex:
                 print(authentication_error_msg.format(backend_id))
                 raise ex
@@ -453,7 +463,18 @@ def set_execution_target(backend_id='qasm_simulator',
             options_dict = exec_options.get("sampler_options", None)
             options = SamplerOptions(**options_dict if options_dict else {})
             print(f"... execute using Sampler on {backend_name=} with {options=}")
-            sampler = SamplerV2(session if session else backend, options=options)
+
+            sampler = SamplerV2(session if session else backend, options=options)  
+            
+            # DEVNOTE : If dynamic circuit is enabled in the exec_options, then it has to enable the
+            # sampler option with the execution_path to gen3-experimental. This feature was updated in
+            # the IBM Qiskit hardware update around the month July 2025 with the depreciation of the 
+            # dynamic circits feature on IBM Sherbrooke. 
+            ######@@@@@@@@@@@@###########
+            if exec_options.get("dynamic_circuit"):
+                sampler = SamplerV2(backend)
+                sampler.options.experimental = {"execution_path" : "gen3-experimental"}
+            ######@@@@@@@@@@@@###########
 
     # create an informative device name for plots
     device_name = backend_id
@@ -745,6 +766,7 @@ def execute_circuit(circuit):
 
                     # turn input into pub-like
                     job = sampler.run([trans_qc], shots=shots)
+
                 else:
                     job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
 
@@ -985,9 +1007,33 @@ def transpile_and_bind_circuit(circuit, params, backend, basis_gates=None,
         
     if do_transpile_for_execute:
         logger.info('transpiling for execute')
-        trans_qc = transpile(circuit, backend, basis_gates=basis_gates,
-                optimization_level=optimization_level, layout_method=layout_method, routing_method=routing_method,
-                seed_transpiler=seed_transpiler)
+        
+
+        # DEVNOTE CAUTION: There are two ways you can transpile circuits. If exec_options has the dynamical_decoupling
+        # enabled, then the passmanager is imported to transpile the circuit. This mechanism allows the dynamical decoupling effect 
+        # to be manually added with the choice of your own dynamical decoupling sequence and duration. If dynamical decoupling is not
+        # enabled then just the regular transpile function is used.
+        if not backend_exec_options.get("dynamical_decoupling"):
+            trans_qc = transpile(circuit, backend, basis_gates=basis_gates,
+                    optimization_level=optimization_level, layout_method=layout_method, routing_method=routing_method,
+                    seed_transpiler=seed_transpiler)
+        else:
+        ######@@@@@@@@@@@@###########
+            from qiskit.transpiler import generate_preset_pass_manager
+            from qiskit.transpiler.passmanager import PassManager
+            from qiskit.circuit import IfElseOp
+            from qiskit.circuit.library import XGate
+            from qiskit_ibm_runtime.transpiler.passes.scheduling import PadDynamicalDecoupling
+            from qiskit_ibm_runtime.transpiler.passes.scheduling import DynamicCircuitInstructionDurations
+            from qiskit_ibm_runtime.transpiler.passes.scheduling import ALAPScheduleAnalysis
+            from qiskit_ibm_runtime.transpiler.passes.scheduling import PadDelay
+
+            dd_sequence = [XGate(), XGate()]
+            durations = DynamicCircuitInstructionDurations.from_backend(backend)
+            pm = generate_preset_pass_manager(optimization_level=1, target=backend.target) 
+            pm.scheduling = PassManager([ALAPScheduleAnalysis(durations),PadDynamicalDecoupling(durations, dd_sequence),])
+            trans_qc = pm.run(circuit)
+        ######@@@@@@@@@@@@###########
         
         # cache this transpiled circuit
         cached_circuits["last_circuit"] = trans_qc
@@ -1214,19 +1260,31 @@ def job_complete(job):
             
             # allow processing to continue, but use the requested shot count
             actual_shots = active_circuit["shots"]
+        
+        try:        
+            # obtain timing info from the results object
+            # the data has been seen to come from both places below
+            if "time_taken" in result_obj:
+                exec_time = result_obj["time_taken"]
             
-        # obtain timing info from the results object
-        # the data has been seen to come from both places below
-        if "time_taken" in result_obj:
-            exec_time = result_obj["time_taken"]
-        
-        elif "time_taken" in results_obj:
-            exec_time = results_obj["time_taken"]
-        
-        elif 'execution' in result_obj:
-            # read execution time for the first circuit
-            exec_time = result_obj['execution']['execution_spans'][0].duration
-
+            elif "time_taken" in results_obj:
+                exec_time = results_obj["time_taken"]
+            
+            elif 'execution' in result_obj:        
+                #exec_time = result_obj['execution']['execution_spans'][0].duration
+                
+                # Get to the actual span object (python 3.11 does not find the duration attribute above
+                spans = result_obj['execution']['execution_spans']['__value__']['spans']
+                span = spans[0]  # The DoubleSliceSpan object
+                exec_time = span.duration
+                
+        except Exception as e:
+            exec_time = 0.0
+            print(f'ERROR: failed to get exec time for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+            print(f"... exception = {e}")
+            if verbose:
+                print(traceback.format_exc()) 
+            
         # override the initial value with exec_time returned from successful execution
         metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
         
