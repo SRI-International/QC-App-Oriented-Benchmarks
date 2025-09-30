@@ -27,6 +27,7 @@ import os, sys
 import time
 import copy
 import qcb_mpi as mpi
+import json
 
 # import metrics module relative to top level of package
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -141,12 +142,20 @@ def set_execution_target(backend_id=None, provider_backend=None,
         backend = provider_backend
     
     # now set the execution target to the given backend_id
+    backend_options = {"option" : "fp32"}
     if mpi.enabled():
-        option_string="mgpu,fp32"
-    else:
-        option_string="fp32"
-    cudaq.set_target(backend_id, option=option_string)
-    
+        backend_options = {"option" : "mgpu,fp32"}
+    elif exec_options is not None and isinstance(exec_options, str):
+        try:
+            backend_options = json.loads(exec_options)
+            for key, value in backend_options.items():
+                if not isinstance(key, str):
+                    raise ValueError("`exec_options` keys must be strings")
+                if not isinstance(value, (str, int, float, bool)):
+                    raise ValueError("`exec_options` values must be str, int, float, or bool")
+        except:
+            print(f"    ... Invalid `exec_options`; using default options.")
+    cudaq.set_target(backend_id, **backend_options)
     # create an informative device name used by the metrics module
     device_name = backend_id
     metrics.set_plot_subtitle(f"Device = {device_name}")
