@@ -246,6 +246,7 @@ def get_args():
 	parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+	parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
 	return parser.parse_args()
 	
 # if main, execute method
@@ -269,7 +270,7 @@ if __name__ == '__main__':
 		method=args.method,
 		input_value=args.input_value,
 		backend_id=args.backend_id,
-		exec_options = {"noise_model" : None} if args.nonoise else {},
+		exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
 		api=args.api
 		)
    
