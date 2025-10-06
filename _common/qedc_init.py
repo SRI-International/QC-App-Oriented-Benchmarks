@@ -205,7 +205,7 @@ def isolated_import_context(benchmark_name: str, api: str):
         sys.path = original_sys_path
 
 
-def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str]) -> None:
+def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] = None) -> None:
     """
     Dynamically load API-specific benchmark modules and inject them into sys.modules.
     
@@ -242,6 +242,9 @@ def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str])
     # Default to qiskit if no API specified
     if api is None:
         api = "qiskit"
+        
+    if module_names is None:
+        module_names = []
     
     # Use context manager to temporarily modify sys.path during imports
     # This prevents local qiskit/ and _common/ folders from shadowing real packages
@@ -256,7 +259,7 @@ def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str])
                 module_path = f"{benchmark_name}.{api}.{module_name}"
                 
                 # Load the module
-                print(f"... import_module({module_path})")
+                #print(f"... import_module({module_path})")
                 module = import_module(module_path)
                 
                 # Inject into sys.modules with bare name for convenient importing
@@ -269,7 +272,7 @@ def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str])
             # Example: "_common.qiskit.execute"
             path_to_execute = f"_common.{api}.execute"
             
-            print(f"... import_module({path_to_execute})")
+            #print(f"... import_module({path_to_execute})")
             module = import_module(path_to_execute)
             
             # Inject with bare name "execute"
