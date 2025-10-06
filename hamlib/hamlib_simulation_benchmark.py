@@ -377,9 +377,9 @@ def run(min_qubits: int = 2,
     
     # special argument handling
     print(f"... verbose = {verbose}")
-    ex.verbose = args.verbose
-    hamlib_simulation_kernel.verbose = args.verbose
-    hamlib_utils.verbose = args.verbose
+    ex.verbose = verbose
+    hamlib_simulation_kernel.verbose = verbose
+    hamlib_utils.verbose = verbose
     
     ##########
     
