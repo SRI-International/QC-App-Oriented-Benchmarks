@@ -19,22 +19,13 @@ import numpy as np
 from typing import Dict, Optional   # for backwards compat <= py 3.10
 from typing import Union, List, Tuple
 
-from hamlib._common import evolution_exact
-from hamlib._common import metric_plots
-from hamlib._common import hamlib_utils
-from hamlib._common import observables
-from _common import qcb_mpi as mpi
-from _common import metrics
+# Add benchmark home dir to path, so the benchmark can be run from anywhere
+import sys; from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
+
+# The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
 
-
-############### Configure API
-#
-## DEVNOTE: This functiion may be more complicated than is needed; simplify if possible
-## It is basically used to perform imports relative to the existing path and using subdirectories
-## based on the "api" on which the benchmark executes.
-
-# Configure the QED-C Benchmark package for use with the given API
 
 api_ = "qiskit" 
 
@@ -133,6 +124,8 @@ def analyze_and_print_result(
     Returns:
         tuple: Counts and fidelity.
     """
+    
+    from _common import metrics
     
     counts = result.get_counts(qc)
 
@@ -352,10 +345,24 @@ def run(min_qubits: int = 2,
         None
     """
     
-    # configure the QED-C Benchmark package for use with the given API
+    """
+    Configure the QED-C Benchmark package for use with the given API
+	Initialize API-specific modules. Called after argument parsing.
+	Imports are here (not at module level) to support dynamic loading
+	of API-specific implementations (qiskit/cirq/cudaq/etc).
+	"""
     qedc_benchmarks_init(api, "hamlib", ["hamlib_simulation_kernel"])
     import hamlib_simulation_kernel
     import execute as ex 
+ 
+    from hamlib._common import evolution_exact
+    from hamlib._common import metric_plots
+    from hamlib._common import hamlib_utils
+    from hamlib._common import observables
+    from _common import qcb_mpi as mpi
+    from _common import metrics
+
+    ##########
     
     print(f"{benchmark_name} Benchmark Program - {api}")
     
@@ -367,6 +374,14 @@ def run(min_qubits: int = 2,
     min_qubits = min(max(2, min_qubits), max_qubits)
     #if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even (DEVNOTE: is this True? - NO!)
     skip_qubits = max(1, skip_qubits)
+    
+    # special argument handling
+    print(f"... verbose = {verbose}")
+    ex.verbose = args.verbose
+    hamlib_simulation_kernel.verbose = args.verbose
+    hamlib_utils.verbose = args.verbose
+    
+    ##########
     
     hamiltonian_name = hamiltonian
     
@@ -1350,20 +1365,11 @@ if __name__ == '__main__':
     if args.parameters is not None:
         hamiltonian_params = parse_name_value_pairs(args.parameters)
     
-    # configure the QED-C Benchmark package for use with the given API
-    # (done here so we can set verbose for now)
-    qedc_benchmarks_init(api, "hamlib", ["hamlib_simulation_kernel"])
-    import hamlib_simulation_kernel
-    import execute as ex 
-    
     # special argument handling
-    ex.verbose = args.verbose
     verbose = args.verbose
-    hamlib_simulation_kernel.verbose = args.verbose
-    hamlib_utils.verbose = args.verbose
     
-    if args.data_suffix is not None:
-        metrics.data_suffix = args.data_suffix
+    #if args.data_suffix is not None:
+    #    metrics.data_suffix = args.data_suffix
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
