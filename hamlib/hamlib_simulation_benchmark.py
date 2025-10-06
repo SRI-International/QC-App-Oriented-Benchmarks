@@ -1235,6 +1235,8 @@ def plot_results_from_data(
     
 def plot_from_data(suptitle: str, metrics_array: list, backend_id: str, options):
 
+    from hamlib._common import metric_plots
+    
     # extract data arrays metrics_array for plotting 
     groups = [m["group"] for m in metrics_array]
     exp_values_computed = [m["exp_value_computed"] for m in metrics_array]
