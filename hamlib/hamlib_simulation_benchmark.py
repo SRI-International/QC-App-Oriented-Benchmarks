@@ -1309,6 +1309,7 @@ def get_args():
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Suffix appended to data file name", type=str)
     parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile") 
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str) 
     return parser.parse_args()
     
 def parse_name_value_pairs(input_string: str) -> Dict[str, str]:
@@ -1354,7 +1355,7 @@ def do_run(args):
         plot_results=not args.noplot,
         draw_circuits=not args.nodraw,
         backend_id=args.backend_id,
-        exec_options = {"noise_model" : None} if args.nonoise else {},
+        exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
         api=args.api
         )
 
