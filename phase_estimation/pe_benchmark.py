@@ -6,8 +6,11 @@ Phase Estimation Benchmark Program
 import time
 import numpy as np
 
-from _common import qcb_mpi as mpi
-from _common import metrics
+# Add benchmark home dir to path, so the benchmark can be run from anywhere
+import sys; from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
+
+# The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init	
 	
 # Benchmark Name
@@ -24,6 +27,8 @@ verbose = False
 # Expected result is always theta, so fidelity calc is simple
 def analyze_and_print_result(qc, result, num_counting_qubits, theta, num_shots):
 
+	from _common import metrics
+	
 	# get results as measured counts
 	counts = result.get_counts(qc)
 
@@ -87,16 +92,31 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
 		context=None, api=None, get_circuits=False, method=None):
-
-	# configure the QED-C Benchmark package for use with the given API
+		
+	"""
+	Configure the QED-C Benchmark package for use with the given API
+	Initialize API-specific modules. Called after argument parsing.
+	Imports are here (not at module level) to support dynamic loading
+	of API-specific implementations (qiskit/cirq/cudaq/etc).
+	"""
 	qedc_benchmarks_init(api, "phase_estimation", ["pe_kernel"])
 	import pe_kernel as kernel
 	import execute as ex
+	from _common import qcb_mpi as mpi
+	from _common import metrics
 	
 	mpi.init()
 	
+	##########
+	
 	print(f"{benchmark_name} Benchmark Program - Qiskit")
 
+	# create context identifier
+	if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+	
+	# special argument handling
+	ex.verbose = verbose
+	
 	num_state_qubits = 1 # default, not exposed to users, cannot be changed in current implementation
 
 	# validate parameters (smallest circuit is 3 qubits)
@@ -107,9 +127,6 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 	min_qubits = max(max(3, min_qubits), num_state_qubits + 2)
 	skip_qubits = max(1, skip_qubits)
 	#print(f"min, max, state = {min_qubits} {max_qubits} {num_state_qubits}")
-
-	# create context identifier
-	if context is None: context = f"{benchmark_name} Benchmark"
 	
 	##########
 	
@@ -238,13 +255,7 @@ def get_args():
 if __name__ == '__main__': 
 	args = get_args()
 	
-	# configure the QED-C Benchmark package for use with the given API
-	# (done here so we can set verbose for now)
-	qedc_benchmarks_init(args.api, "phase_estimation", ["pe_kernel"])
-	import execute as ex
-	
 	# special argument handling
-	ex.verbose = args.verbose
 	verbose = args.verbose
 	
 	if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
@@ -261,4 +272,3 @@ if __name__ == '__main__':
 		api=args.api
 		)
    
-

@@ -9,7 +9,11 @@ Bernstein-Vazirani Benchmark Program
 import time
 import numpy as np
 
-from _common import metrics
+# Add benchmark home dir to path, so the benchmark can be run from anywhere
+import sys; from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
+
+# The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
 
 # Benchmark Name
@@ -49,6 +53,8 @@ def str_to_ivec(input_size: int, s_int: int):
 # Expected result is always the secret_int, so fidelity calc is simple
 def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 	
+	from _common import metrics
+	
 	# size of input is one less than available qubits
 	input_size = num_qubits - 1
 	
@@ -76,23 +82,33 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
 		context=None, api=None, get_circuits=False):
-
-	# configure the QED-C Benchmark package for use with the given API
+	"""
+	Configure the QED-C Benchmark package for use with the given API
+	Initialize API-specific modules. Called after argument parsing.
+	Imports are here (not at module level) to support dynamic loading
+	of API-specific implementations (qiskit/cirq/cudaq/etc).
+	"""
 	qedc_benchmarks_init(api, "bernstein_vazirani", ["bv_kernel"])
 	import bv_kernel as kernel
 	import execute as ex 
+	from _common import metrics
 	
-	print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
+	##########
+	
+	print(f"{benchmark_name} Benchmark Program - Qiskit")
 
+	# create context identifier
+	if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+	
+	# special argument handling
+	ex.verbose = verbose
+	
 	# validate parameters (smallest circuit is 3 qubits)
 	max_qubits = max(3, max_qubits)
 	min_qubits = min(max(3, min_qubits), max_qubits)
 	skip_qubits = max(1, skip_qubits)
 	#print(f"min, max qubits = {min_qubits} {max_qubits}")
 
-	# create context identifier
-	if context is None: context = f"{benchmark_name} ({method}) Benchmark"
-	
 	##########
 	
 	# Variable for new qubit group ordering if using mid_circuit measurements
@@ -229,13 +245,7 @@ def get_args():
 if __name__ == '__main__': 
 	args = get_args()
 	
-	# configure the QED-C Benchmark package for use with the given API
-	# (done here so we can set verbose for now)
-	qedc_benchmarks_init(args.api, "bernstein_vazirani", ["bv_kernel"])
-	import execute as ex
-	
 	# special argument handling
-	ex.verbose = args.verbose
 	verbose = args.verbose
 	
 	if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits

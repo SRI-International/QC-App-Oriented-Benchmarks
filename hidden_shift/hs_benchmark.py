@@ -77,25 +77,28 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
 		context=None, api=None, get_circuits=False):
+	
 	"""
-    Configure the QED-C Benchmark package for use with the given API
+	Configure the QED-C Benchmark package for use with the given API
 	Initialize API-specific modules. Called after argument parsing.
 	Imports are here (not at module level) to support dynamic loading
 	of API-specific implementations (qiskit/cirq/cudaq/etc).
 	"""
-	from _common.qedc_init import qedc_benchmarks_init
 	qedc_benchmarks_init(api, "hidden_shift", ["hs_kernel"]) 
 	import hs_kernel as kernel
 	import execute as ex
 	from _common import metrics
 	
 	##########
-    
+	
 	print(f"{benchmark_name} Benchmark Program - Qiskit")
 
-    # create context identifier
+	# create context identifier
 	if context is None: context = f"{benchmark_name} Benchmark"
-    
+	
+	# special argument handling
+	ex.verbose = verbose
+	
 	# validate parameters (smallest circuit is 2 qubits)
 	max_qubits = max(2, max_qubits)
 	min_qubits = min(max(2, min_qubits), max_qubits)
@@ -103,9 +106,6 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 	skip_qubits = max(2, skip_qubits)
 	#print(f"min, max qubits = {min_qubits} {max_qubits}")
 	
-    # special argument handling
-	ex.verbose = verbose
-    
 	##########
 
 	# Variable to store all created circuits to return
