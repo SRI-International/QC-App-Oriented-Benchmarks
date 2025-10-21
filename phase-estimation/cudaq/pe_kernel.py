@@ -105,7 +105,11 @@ def PhaseEstimation (num_qubits: int, theta: float, use_midcircuit_measurement: 
 def kernel_draw():
     print("Sample Circuit:");
     if QC_ != None:
-        print(cudaq.draw(QC_[0], *QC_[1]))
+        try:
+            print(cudaq.draw(QC_[0], *QC_[1]))
+        except Exception as ex:
+            print(f"ERROR attempting to draw the kernel")
+            print(ex)
     else:
         print("  ... too large!")
     
