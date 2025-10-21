@@ -19,7 +19,7 @@ def iqft(register: cudaq.qview):
     input_size = register.size()
      
     # use this as a barrier when drawing circuit; comment out otherwise
-    for i in range(input_size / 2):
+    for i in range(int(input_size // 2)):
         swap(register[i], register[input_size - i - 1])
         swap(register[i], register[input_size - i - 1])
             
