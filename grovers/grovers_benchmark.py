@@ -6,9 +6,13 @@ Grovers Search Benchmark Program
 import time
 import numpy as np
 
-from _common import qcb_mpi as mpi
-from _common import metrics
+# Add benchmark home dir to path, so the benchmark can be run from anywhere
+import sys; from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
+
+# The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
+
 	
 # Benchmark Name
 benchmark_name = "Grovers Search"
@@ -23,6 +27,8 @@ verbose = False
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
 def analyze_and_print_result(qc, result, num_qubits, marked_item, num_shots):
+    
+    from _common import metrics
     
     counts = result.get_counts(qc)
     if verbose: print(f"For type {marked_item} measured: {counts}")
@@ -67,13 +73,30 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, get_circuits=False):
 
-    # configure the QED-C Benchmark package for use with the given API
+    """
+    Configure the QED-C Benchmark package for use with the given API
+    Initialize API-specific modules. Called after argument parsing.
+    Imports are here (not at module level) to support dynamic loading
+    of API-specific implementations (qiskit/cirq/cudaq/etc).
+    """
     qedc_benchmarks_init(api, "grovers", ["grovers_kernel"])
     import grovers_kernel as kernel
     import execute as ex
+    from _common import qcb_mpi as mpi
+    from _common import metrics
 
+    mpi.init()
+    
+    ##########
+    
     print(f"{benchmark_name} Benchmark Program - Qiskit")
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
+    # special argument handling
+    ex.verbose = verbose
+    
     # Clamp the maximum number of qubits
     if max_qubits > MAX_QUBITS:
         print(f"INFO: {benchmark_name} benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
@@ -84,9 +107,6 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     min_qubits = min(max(2, min_qubits), max_qubits)
     skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
-    
-    # create context identifier
-    if context is None: context = f"{benchmark_name} Benchmark"
     
     # set the flag to use an mcx shim if given
     if use_mcx_shim:
@@ -142,6 +162,7 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         # loop over limited # of secret strings for this
         for s_int in s_range:
             # create the circuit for given qubit size and secret string, store time metric
+            mpi.barrier()
             ts = time.time()
 
             n_iterations = int(np.pi * np.sqrt(2 ** num_qubits) / 4)
@@ -171,12 +192,13 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     
     ##########
     
-    # draw a sample circuit
-    kernel.kernel_draw()
+    if mpi.leader():
+        # draw a sample circuit
+        kernel.kernel_draw()
 
-    # Plot metrics for all circuit sizes
-    options = {"shots": num_shots, "reps": max_circuits}
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+        # Plot metrics for all circuit sizes
+        options = {"shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 
 #######################
@@ -199,19 +221,14 @@ def get_args():
     parser.add_argument("--use_mcx_shim", action="store_true", help="Use MCX Shim")
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
     return parser.parse_args()
     
 # if main, execute method
 if __name__ == '__main__': 
     args = get_args()
     
-    # configure the QED-C Benchmark package for use with the given API
-    # (done here so we can set verbose for now)
-    qedc_benchmarks_init(args.api, "grovers", ["grovers_kernel"])
-    import execute as ex
-    
     # special argument handling
-    ex.verbose = args.verbose
     verbose = args.verbose
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits

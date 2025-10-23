@@ -118,7 +118,11 @@ def BersteinVazirani (num_qubits: int, secret_int: int, hidden_bits: List[int], 
 def kernel_draw():
     print("Sample Circuit:");
     if QC_ != None:
-        print(cudaq.draw(QC_[0], *QC_[1]))
+        try:
+            print(cudaq.draw(QC_[0], *QC_[1]))
+        except Exception as ex:
+            print(f"ERROR attempting to draw the kernel")
+            print(ex)
     else:
         print("  ... too large!")
     

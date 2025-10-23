@@ -19,7 +19,7 @@ def iqft(register: cudaq.qview):
     input_size = register.size()
      
     # use this as a barrier when drawing circuit; comment out otherwise
-    for i in range(input_size / 2):
+    for i in range(int(input_size // 2)):
         swap(register[i], register[input_size - i - 1])
         swap(register[i], register[input_size - i - 1])
             
@@ -105,7 +105,11 @@ def PhaseEstimation (num_qubits: int, theta: float, use_midcircuit_measurement: 
 def kernel_draw():
     print("Sample Circuit:");
     if QC_ != None:
-        print(cudaq.draw(QC_[0], *QC_[1]))
+        try:
+            print(cudaq.draw(QC_[0], *QC_[1]))
+        except Exception as ex:
+            print(f"ERROR attempting to draw the kernel")
+            print(ex)
     else:
         print("  ... too large!")
     

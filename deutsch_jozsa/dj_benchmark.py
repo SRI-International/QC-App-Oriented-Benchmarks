@@ -10,12 +10,16 @@ import os, sys
 import time
 import numpy as np
 
-from _common import qcb_mpi as mpi
-from _common import metrics
+# Add benchmark home dir to path, so the benchmark can be run from anywhere
+import sys; from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
+
+# The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
 
 # Benchmark Name
 benchmark_name = "Deutsch-Jozsa"
+
 np.random.seed(0)
 
 verbose = False
@@ -25,6 +29,8 @@ verbose = False
 # Analyze and print measured results
 # Expected result is always the type, so fidelity calc is simple
 def analyze_and_print_result (qc, result, num_qubits, type, num_shots):
+    
+    from _common import metrics
     
     # Size of input is one less than available qubits
     input_size = num_qubits - 1
@@ -53,30 +59,44 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, get_circuits=False):
 
-    print(f"{benchmark_name} Benchmark Program - Qiskit")
-
-    # configure the QED-C Benchmark package for use with the given API
+    """
+    Configure the QED-C Benchmark package for use with the given API
+    Initialize API-specific modules. Called after argument parsing.
+    Imports are here (not at module level) to support dynamic loading
+    of API-specific implementations (qiskit/cirq/cudaq/etc).
+    """
     qedc_benchmarks_init(api, "deutsch_jozsa", ["dj_kernel"])
     import dj_kernel as kernel
     import execute as ex
+    from _common import qcb_mpi as mpi
+    from _common import metrics
+    
+    mpi.init()
+    
+    ##########
+        
+    print(f"{benchmark_name} Benchmark Program - Qiskit")
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} Benchmark"
+    
+    # special argument handling
+    ex.verbose = verbose
+    
     # validate parameters (smallest circuit is 3 qubits)
     max_qubits = max(3, max_qubits)
     min_qubits = min(max(3, min_qubits), max_qubits)
     skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
-    
-    # create context identifier
-    if context is None: context = f"{benchmark_name} Benchmark"
-    
+     
     ##########
-    
-    # Initialize metrics module
-    metrics.init_metrics()
 
     # Variable to store all created circuits to return
     if get_circuits:
         all_qcs = {}
+        
+    # Initialize metrics module
+    metrics.init_metrics()
 
     # Define custom result handler
     def execution_handler (qc, result, num_qubits, type, num_shots):  
@@ -115,6 +135,7 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
             
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
+            mpi.barrier()
             qc = kernel.DeutschJozsa(num_qubits, type)
             metrics.store_metric(num_qubits, type, 'create_time', time.time()-ts)
 
@@ -124,7 +145,7 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
             # Store each circuit if we want to return them
             if get_circuits:
                 all_qcs[str(num_qubits)][str(type)] = qc2
-				# Continue to skip sumbitting the circuit for execution. 
+                # Continue to skip sumbitting the circuit for execution. 
                 continue
 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
@@ -170,19 +191,14 @@ def get_args():
     #parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
     return parser.parse_args()
     
 # if main, execute method
 if __name__ == '__main__': 
     args = get_args()
     
-    # configure the QED-C Benchmark package for use with the given API
-    # (done here so we can set verbose for now)
-    qedc_benchmarks_init(args.api, "deutsch_jozsa", ["dj_kernel"])
-    import execute as ex
-    
     # special argument handling
-    ex.verbose = args.verbose
     verbose = args.verbose
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits

@@ -11,7 +11,8 @@ import copy
 import time
 from typing import Union, List, Tuple, Dict
 
-from hamlib.qiskit import hamlib_simulation_kernel as kernel
+#from hamlib.qiskit import hamlib_simulation_kernel as kernel
+import hamlib_simulation_kernel as kernel
 
 verbose = False
 verbose_circuits = False
