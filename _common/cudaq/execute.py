@@ -28,7 +28,6 @@ import time
 import copy
 import qcb_mpi as mpi
 import json
-import math
 
 # import metrics module relative to top level of package
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -156,9 +155,7 @@ def set_execution_target(backend_id=None, provider_backend=None,
                     raise ValueError("`exec_options` values must be str, int, float, or bool")
         except:
             print(f"    ... Invalid `exec_options`; using default options.")
-            
     cudaq.set_target(backend_id, **backend_options)
-    
     # create an informative device name used by the metrics module
     device_name = backend_id
     metrics.set_plot_subtitle(f"Device = {device_name}")
@@ -246,8 +243,6 @@ def execute_circuit (batched_circuit):
     # Initiate execution 
     circuit = batched_circuit["qc"]
     
-    ############
-    
     # create a pseudo-job to perform metrics processing upon return
     job = Job()
     
@@ -292,15 +287,18 @@ def execute_circuit (batched_circuit):
     
     # ***********************************
     
-    # number of qubits is stored in the "group" field
+    # store circuit dimensional metrics
+    # DEVNOTE: this is not accurate; it is provided so the volumetric plots show something
+    
+    # compute depth and gate counts based on number of qubits
     qc_size = int(active_circuit["group"])
-    
-    # obtain initial circuit metrics
-    qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = get_circuit_metrics(circuit, qc_size)
-    
+    qc_depth = 4 * pow(qc_size, 2)
+
+    qc_xi = 0.5
+
+    qc_n2q = int(qc_depth * 0.75)
     qc_tr_depth = qc_depth
     qc_tr_size = qc_size
-    qc_tr_count_ops = qc_count_ops
     qc_tr_xi = qc_xi
     qc_tr_n2q = qc_n2q
     
@@ -318,57 +316,6 @@ def execute_circuit (batched_circuit):
     ##############
     # Here we complete the job immediately 
     job_complete(job)
- 
-
-# Get circuit metrics fom the circuit passed in
-def get_circuit_metrics(qc, qc_size):
-    
-    # get resource info from cudaq
-    resources = cudaq.estimate_resources(qc[0], *qc[1])
-    resources_str = str(resources)
-    
-    import re
-
-    # Get total gates (not needed as we use the .count() function)
-    #total_match = re.search(r'Total # of gates:\s*(\d+)', resources_str)
-    #total_gates = int(total_match.group(1)) if total_match else 0
-    
-    total_gates = resources.count()
-
-    # the resources object returned is not a dict; need to parse the string to get 2q gates
-    # Get all gate counts that start with 'c' (controlled/2-qubit gates)
-    two_qubit_gates = 0
-    for line in resources_str.split('\n'):
-        match = re.match(r'\s*(c\w+)\s*:\s*(\d+)', line)
-        if match:
-            two_qubit_gates += int(match.group(2))
-
-    # print(f"Total: {total_gates}, 2-qubit: {two_qubit_gates}")
-
-    qc_depth = estimate_depth(qc_size, total_gates, two_qubit_gates)
-    #print(qc_depth)
-    
-    qc_xi = two_qubit_gates / max(total_gates, 1)
-    qc_n2q = two_qubit_gates
-    
-    qc_count_ops = total_gates
-
-    return qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q
-
-# Make estimate of circuit depth using heuristic approach
-def estimate_depth(num_qubits, total_gates, two_qubit_gates):
-    N = num_qubits
-    K = two_qubit_gates
-    S = total_gates - K
-    
-    # Theoretical minimum (perfect packing - 2Qs and 1Qs and MZ)
-    depth_min = math.ceil(2*K / N) + math.ceil(S / N) + 1
-    
-    # Realistic estimate (assume 40% packing efficiency)
-    depth_estimate = depth_min * 2.5
-    
-    return depth_estimate
-
 
 # klunky way to know the last group executed 
 last_group = None 
