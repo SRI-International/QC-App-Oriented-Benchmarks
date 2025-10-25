@@ -143,11 +143,11 @@ so they work reliably regardless of path manipulation.
 from importlib import import_module
 import sys
 from pathlib import Path
+from importlib import invalidate_caches
 from contextlib import contextmanager
 
 # Store project root for use in path calculations
 _project_root = Path(__file__).parent.parent.resolve()
-
 
 @contextmanager
 def isolated_import_context(benchmark_name: str, api: str):
@@ -204,6 +204,35 @@ def isolated_import_context(benchmark_name: str, api: str):
         # This ensures we don't leave the import system in a broken state
         sys.path = original_sys_path
 
+"""
+Alternate version of above, that should avoid the need for invalidate on cudaq, but doesn't.
+DEVNOTE: to be investigated.
+
+@contextmanager
+def isolated_import_context(benchmark_name: str, api: str):
+    original_sys_path = sys.path.copy()
+
+    project_root = str(_project_root)                     # e.g. .../QC-App-Oriented-Benchmarks-develop
+    benchmark_dir = str(_project_root / benchmark_name)   # e.g. .../bernstein_vazirani
+    api_dir       = str(_project_root / benchmark_name / api)
+
+    try:
+        # Start from current sys.path but drop only the pieces that cause shadowing
+        cleaned = [p for p in sys.path if p not in {'', '.', api_dir}]
+        # (Optional) also drop the benchmark dir if you want to be extra safe:
+        # cleaned = [p for p in cleaned if p != benchmark_dir]
+
+        # Critically: ensure the repo root is present and first,
+        # so 'import bernstein_vazirani' always resolves like `python -m`.
+        if project_root in cleaned:
+            cleaned.remove(project_root)
+        cleaned.insert(0, project_root)
+
+        sys.path = cleaned
+        yield
+    finally:
+        sys.path = original_sys_path
+"""
 
 def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] = None) -> None:
     """
@@ -246,10 +275,16 @@ def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] 
     if module_names is None:
         module_names = []
     
+    #from importlib.util import find_spec
+    #assert find_spec("bernstein_vazirani") is not None, "anchor package not importable"
+    
     # Use context manager to temporarily modify sys.path during imports
     # This prevents local qiskit/ and _common/ folders from shadowing real packages
     with isolated_import_context(benchmark_name, api):
-        
+
+        if api == "cudaq":
+            reset_module_caches(api, benchmark_name, module_names)
+
         # Dynamically load each requested kernel module
         for module_name in module_names:
             # Check if already loaded to avoid redundant imports
@@ -280,3 +315,33 @@ def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] 
     
     # Context manager automatically restores sys.path here
     # Subsequent imports in the benchmark program work normally
+ 
+ 
+def reset_module_caches (api: str, benchmark_name: str, module_names: list[str] = None) -> None:
+    """
+    Reset the module caches to normalize execution.
+    
+    This unfortunate block of code seems to be required only for cudaq.
+    If benchmark launched as benchmark_name/<bn>_benchmark.py, if fails to find the module.
+    If launched using -m <benahmark_name>.<bn>_benchmark it would succeed.
+    This code normalizes the sys.path stack so both work the same.
+    """
+    #assert find_spec("bernstein_vazirani") is not None, "anchor package not importable"
+
+    # 1) Normalize sys.path so top-level package import works like `-m`
+    repo_root = str(Path(__file__).resolve().parents[1])      # repo root
+    pkg_dir   = str(Path(repo_root) / benchmark_name)         # e.g. .../bernstein_vazirani
+    sys.path = [repo_root] + [p for p in sys.path if p not in (repo_root, pkg_dir)]
+
+    # 2) Remove poisoned/partial module entries (this fixes __spec__ is None)
+    to_clear = {benchmark_name,
+                f"{benchmark_name}.{api}"} | {
+                f"{benchmark_name}.{api}.{m}" for m in module_names}
+    for name in to_clear:
+        sys.modules.pop(name, None)
+
+    # 3) Refresh import caches
+    invalidate_caches()
+     
+    #assert find_spec("bernstein_vazirani") is not None, "anchor package not importable"
+    
