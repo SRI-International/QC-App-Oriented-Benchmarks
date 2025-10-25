@@ -126,6 +126,8 @@ def analyze_and_print_result(
     """
     
     from _common import metrics
+    from hamlib._common import evolution_exact
+    from hamlib._common import observables
     
     counts = result.get_counts(qc)
 
