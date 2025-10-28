@@ -75,7 +75,12 @@ def pe_kernel (num_qubits: int, theta: float, use_midcircuit_measurement: bool):
         
         # optimize by collapsing all phase gates at one level to single gate
         if do_uopt:
-            exp_phase = init_phase * (2 ** i_qubit) 
+            # r1 parameter should formally be: 2 * M_PI * theta * 2**i_qubit
+            # However, for large number of qubits, this may get out fp32 range.
+            # To fix this issue, we cast it to the range [0,2*M_PI[.
+            # This works because the parameter is a rotation angle.
+            rotations = (theta * (2 ** i_qubit))
+            exp_phase = 2 * M_PI * (rotations-int(rotations))
             r1.ctrl(exp_phase, counting_qubits[i_qubit], state_register);
         else:
             for j in range(2 ** i_qubit):
