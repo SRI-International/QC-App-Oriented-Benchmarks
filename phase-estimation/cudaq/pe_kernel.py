@@ -56,11 +56,13 @@ def pe_kernel (num_qubits: int, theta: float, use_midcircuit_measurement: bool):
     # size of input is one less than available qubits
     input_size = num_qubits - 1
         
-    # Allocate on less than the specified number of qubits for phase register
-    counting_qubits = cudaq.qvector(input_size)
+    qubits = cudaq.qvector(num_qubits)
+
+    # Use less than the specified number of qubits for phase register
+    counting_qubits = qubits[0:input_size]
     
-    # Allocate an extra qubit for the state register (can expand this later)
-    state_register = cudaq.qubit()
+    # Use last qubit for the state register
+    state_register = qubits[input_size]
 
     # Prepare the auxillary qubit.
     x(state_register)
