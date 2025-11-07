@@ -15,9 +15,14 @@ import os
 import time
 import numpy as np
 
-from _common import metrics
+# Add benchmark home dir to path, so the benchmark can be run from anywhere
+import sys; from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
+
+# The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
-    
+  
+  
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
 
@@ -76,6 +81,9 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     Returns:
         tuple: Counts and fidelity.
     """
+    
+    from _common import metrics
+    
     counts = result.get_counts(qc)
     if verbose:
         #print(f"For type {type} measured: {counts}")
@@ -180,19 +188,30 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     Returns:
         None
     """
-    # configure the QED-C Benchmark package for use with the given API
+    
+    """
+    Configure the QED-C Benchmark package for use with the given API
+    Initialize API-specific modules. Called after argument parsing.
+    Imports are here (not at module level) to support dynamic loading
+    of API-specific implementations (qiskit/cirq/cudaq/etc).
+    """
     qedc_benchmarks_init(api, "hamiltonian_simulation", ["hamiltonian_simulation_kernel"])
     import hamiltonian_simulation_kernel as kernel
     import execute as ex
+    from _common import qcb_mpi as mpi
+    from _common import metrics
+    
+    mpi.init()
+    
+    ##########
     
     print(f"{benchmark_name} Benchmark Program - Qiskit")
     
     # Create context identifier
     if context is None: context = f"{benchmark_name} Benchmark"
     
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
-        all_qcs = {}
+    # special argument handling
+    ex.verbose = verbose
         
     # Validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
@@ -219,6 +238,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     print(f"... using init_state = {init_state}")
     print(f"... using random_pauli_flag = {random_pauli_flag}")
     
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+        
     # Parameters of simulation (note used yet, since we use hardcoded data for comparison)
     """
     if K is None:
@@ -286,9 +309,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
         # Loop over only 1 circuit
         for circuit_id in range(num_circuits):
+            mpi.barrier()
             ts = time.time()
 
-            # Create HeisenbergKernel or TFIM kernel
+            # Create Heisenberg kernel or TFIM kernel
             qc = kernel.HamiltonianSimulation(num_qubits, K=k, t=t,
                     hamiltonian=hamiltonian,
                     w=w, hx = hx, hz = hz, 
@@ -319,13 +343,14 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
     ##########
     
-    # draw a sample circuit
-    kernel.kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
-       
-    # Plot metrics for all circuit sizes
-    options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
-    if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
+    if mpi.leader():
+        # draw a sample circuit
+        kernel.kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
+           
+        # Plot metrics for all circuit sizes
+        options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
+        if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
 #######################
@@ -353,6 +378,7 @@ def get_args():
     parser.add_argument("--init_state", "-init", default=None, help="initial state")
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
 
     return parser.parse_args()
  
@@ -360,15 +386,8 @@ def get_args():
 if __name__ == '__main__':   
     args = get_args()
     
-    # configure the QED-C Benchmark package for use with the given API
-    # (done here so we can set verbose for now)
-    qedc_benchmarks_init(args.api, "hamiltonian_simulation", ["hamiltonian_simulation_kernel"])
-    import execute as ex
-    
     # special argument handling
-    ex.verbose = args.verbose
     verbose = args.verbose
-    #hamiltonian_simulation_kernel.verbose = args.verbose     # not currently defined
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
