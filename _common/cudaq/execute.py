@@ -307,39 +307,70 @@ def execute_circuit (batched_circuit):
 # Get circuit metrics fom the circuit passed in
 def get_circuit_metrics(qc, qc_size):
     
-    # get resource info from cudaq
-    resources = cudaq.estimate_resources(qc[0], *qc[1])
-    resources_str = str(resources)
+    # the new code is implemented in CUDA-Q ver 0.13+, if it fails fall back to old code
+    try:
     
-    import re
+        # get resource info from cudaq
+        resources = cudaq.estimate_resources(qc[0], *qc[1])
+        #resources_str = str(resources)
+        
+        #print(resources)
+        
+        # Get total gates (not needed as we use the .count() function)
+        # import re
+        # total_match = re.search(r'Total # of gates:\s*(\d+)', resources_str)
+        # total_gates = int(total_match.group(1)) if total_match else 0
+        
+        total_gates = resources.count()
+        
+        two_qubit_gates = 0
+        two_qubit_gates += resources.count_controls('x', 1)
+        two_qubit_gates += resources.count_controls('y', 1)
+        two_qubit_gates += resources.count_controls('z', 1)
+        two_qubit_gates += resources.count_controls('r1', 1)
+        two_qubit_gates += resources.count_controls('rx', 1)
+        two_qubit_gates += resources.count_controls('ry', 1)
+        two_qubit_gates += resources.count_controls('rz', 1)
+        
+        #print(f"... depth = {resources.count_depth()}") # doesn't exist yet
+        #print(f"Total: {total_gates}, 2-qubit: {two_qubit_gates}")
 
-    # Get total gates (not needed as we use the .count() function)
-    #total_match = re.search(r'Total # of gates:\s*(\d+)', resources_str)
-    #total_gates = int(total_match.group(1)) if total_match else 0
-    
-    total_gates = resources.count()
+        # obtain an estimate of circuit depth
+        qc_depth = estimate_depth(qc_size, total_gates, two_qubit_gates)
+        #print(qc_depth)
+        
+        # this exact computation is not used, currently, as it is slow
+        #qc_depth = compute_circuit_depth(qc[0](*qc[1]))
+        #print(qc_depth)
+        
+        qc_xi = two_qubit_gates / max(total_gates, 1)
+        qc_n2q = two_qubit_gates
+        
+        # not currently used
+        qc_count_ops = total_gates
+        
+    # this is used for CUDA-Q versions 0.12 or earlier   
+    except:    
+        
+        # compute depth and gate counts based on number of qubits
+        qc_depth = 4 * pow(qc_size, 2)
 
-    # the resources object returned is not a dict; need to parse the string to get 2q gates
-    # Get all gate counts that start with 'c' (controlled/2-qubit gates)
-    two_qubit_gates = 0
-    for line in resources_str.split('\n'):
-        match = re.match(r'\s*(c\w+)\s*:\s*(\d+)', line)
-        if match:
-            two_qubit_gates += int(match.group(2))
+        qc_xi = 0.5
 
-    # print(f"Total: {total_gates}, 2-qubit: {two_qubit_gates}")
-
-    qc_depth = estimate_depth(qc_size, total_gates, two_qubit_gates)
-    #print(qc_depth)
-    
-    qc_xi = two_qubit_gates / max(total_gates, 1)
-    qc_n2q = two_qubit_gates
-    
-    qc_count_ops = total_gates
-
+        qc_n2q = int(qc_depth * 0.75)
+        qc_tr_depth = qc_depth
+        qc_tr_size = qc_size
+        qc_tr_xi = qc_xi
+        qc_tr_n2q = qc_n2q
+        
+        # not currently used
+        qc_count_ops = qc_depth
+         
     return qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q
 
-# Make estimate of circuit depth using heuristic approach
+
+# Make estimate of circuit depth using heuristic approach; depth not provided by cudaq
+# This is somewhat simplistic, but we have not found better solution
 def estimate_depth(num_qubits, total_gates, two_qubit_gates):
     N = num_qubits
     K = two_qubit_gates
@@ -348,11 +379,23 @@ def estimate_depth(num_qubits, total_gates, two_qubit_gates):
     # Theoretical minimum (perfect packing - 2Qs and 1Qs and MZ)
     depth_min = math.ceil(2*K / N) + math.ceil(S / N) + 1
     
-    # Realistic estimate (assume 40% packing efficiency)
-    depth_estimate = depth_min * 2.5
+    # Theoretical maximum, sparse distribution
+    depth_max = K + S + 1
+    
+    # use xi factor as proxy for level of sparseness in layout (larger = sparser)
+    qc_xi = two_qubit_gates / max(total_gates, 1)
+    depth_range = depth_max - depth_min
+    depth_estimate = math.ceil(depth_min + depth_range * qc_xi)
+    
+    #print(f"  ... min = {depth_min}, max = {depth_max}, depth = {depth_estimate}")
+    
+    # Realistic estimate (assume 40% packing efficiency)  (used with min only)
+    # depth_estimate = depth_min * 2.5
     
     return depth_estimate
+           
 
+#########################################################################  
 
 # klunky way to know the last group executed 
 last_group = None 
@@ -530,73 +573,82 @@ def execute_circuit_immed (circuit: list, num_shots: int):
     if verbose:
         print(f'... execute_circuit_immed({circuit}, {num_shots})')
 
-    #active_circuit = copy.copy(batched_circuit)
-    #active_circuit["launch_time"] = time.time()
-    
-    #num_shots = batched_circuit["shots"]
-    
-    # Initiate execution 
-    #circuit = batched_circuit["qc"]
-    
-    # create a pseudo-job to perform metrics processing upon return
-    job = Job()
-    
-    # draw the circuit, but only for debugging
-    # print(cudaq.draw(circuit[0], *circuit[1]))
-    
-    ts = time.time()
-    
-    # call sample() on circuit with its list of arguments
-    if verbose: print(f"... during exec, noise model is: {noise}")
-    if noise is None:
-        if verbose: print("... executing without noise")
-        result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
-    else:
-        if verbose: print("... executing WITH noise")
-        result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
-    
-    # control results print at benchmark level
-    #if verbose: print(result)
+    try:
+        #active_circuit = copy.copy(batched_circuit)
+        #active_circuit["launch_time"] = time.time()
         
-    exec_time = time.time() - ts
-    
-    # store the result object on the job for processing in job_complete
-    job.executor_result = result 
-    job.exec_time = exec_time
-    
-    if verbose:
-        print(f"... result = {len(result)} {result}")
-        ''' for debugging, a better way to see the counts, as the type of result is something Quake
-        for key, val in result.items():
-            print(f"... {key}:{val}")
-        '''
-        print(f"... register names = {result.register_names}")
-        print(result.dump())
-        #print(f"... register dump = {result.get_register_counts('__global__').dump()}")
-        #result.get_register_counts("b1").dump()
-        #print(result.get_sequential_data())
+        #num_shots = batched_circuit["shots"]
+        
+        # Initiate execution 
+        #circuit = batched_circuit["qc"]
+        
+        # create a pseudo-job to perform metrics processing upon return
+        job = Job()
+        
+        # draw the circuit, but only for debugging
+        # print(cudaq.draw(circuit[0], *circuit[1]))
+        
+        ts = time.time()
+        
+        # call sample() on circuit with its list of arguments
+        if verbose: print(f"... during exec, noise model is: {noise}")
+        if noise is None:
+            if verbose: print("... executing without noise")
+            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
+        else:
+            if verbose: print("... executing WITH noise")
+            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+        
+        # control results print at benchmark level
+        #if verbose: print(result)
+            
+        exec_time = time.time() - ts
+        
+        # store the result object on the job for processing in job_complete
+        job.executor_result = result 
+        job.exec_time = exec_time  
+        
+        if verbose:
+            print(f"... result = {len(result)} {result}")
+            ''' for debugging, a better way to see the counts, as the type of result is something Quake
+            for key, val in result.items():
+                print(f"... {key}:{val}")
+            '''
+            print(f"... register names = {result.register_names}")
+            print(result.dump())
+            #print(f"... register dump = {result.get_register_counts('__global__').dump()}")
+            #result.get_register_counts("b1").dump()
+            #print(result.get_sequential_data())
+            
+    except Exception as ex:
+        print(f"ERROR attempting to compute cicuit metrics")
+        print(ex)
         
     # put job into the active circuits with circuit info
     #active_circuits[job] = active_circuit
     #print("... active_circuit = ", str(active_circuit))
     
     # ***********************************
+    qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = 0, 0, 0, 0, 0
+    try:
+        # number of qubits is stored in the "group" field
+        #qc_size = int(circuit["group"])
+        qc_size = circuit[1][0]   # the first item after the kernel is alway num_qubits
+        
+        # obtain initial circuit metrics
+        qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = get_circuit_metrics(circuit, qc_size)
+
+    except Exception as ex:
+        print(f"ERROR attempting to compute cicuit metrics")
+        print(ex)
     
-    # store circuit dimensional metrics
-    # DEVNOTE: this is not accurate; it is provided so the volumetric plots show something
-    """
-    # compute depth and gate counts based on number of qubits
-    qc_size = int(active_circuit["group"])
-    qc_depth = 4 * pow(qc_size, 2)
-
-    qc_xi = 0.5
-
-    qc_n2q = int(qc_depth * 0.75)
     qc_tr_depth = qc_depth
     qc_tr_size = qc_size
+    qc_tr_count_ops = qc_count_ops
     qc_tr_xi = qc_xi
     qc_tr_n2q = qc_n2q
     
+    """
     # store circuit dimensional metrics
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'depth', qc_depth)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'size', qc_size)
@@ -607,11 +659,8 @@ def execute_circuit_immed (circuit: list, num_shots: int):
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_size', qc_tr_size)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_xi', qc_tr_xi)
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_n2q', qc_tr_n2q)
-    
-    ##############
-    # Here we complete the job immediately 
-    job_complete(job)
     """
+ 
     """
     # klunky way to know the last group executed 
     #last_group = None 
