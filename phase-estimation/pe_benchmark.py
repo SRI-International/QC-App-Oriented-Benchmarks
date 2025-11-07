@@ -116,7 +116,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 		init_phase=None,
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
-		context=None, api=None, get_circuits=False, method=None):
+		context=None, api=None, warmup=False, get_circuits=False, method=None):
 
 	# configure the QED-C Benchmark package for use with the given API
 	PhaseEstimation, kernel_draw = qedc_benchmarks_init(api)
@@ -140,7 +140,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 	##########
 	
 	# Initialize metrics module
-	metrics.init_metrics()
+	metrics.init_metrics(warmup)
 
 	# Variable to store all created circuits to return
 	if get_circuits:
@@ -256,6 +256,7 @@ def get_args():
 	parser.add_argument("--init_phase", "-p", default=0.0, help="Input Phase Value", type=float)
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+	parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
 	parser.add_argument("--use_midcircuit_measurement", "-mid", action="store_true", help="Use dynamic circuit")
 	parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
 	return parser.parse_args()
@@ -283,7 +284,7 @@ if __name__ == '__main__':
 		init_phase=args.init_phase,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
-		api=args.api
+		api=args.api, warmup=args.warmup
 		)
    
 

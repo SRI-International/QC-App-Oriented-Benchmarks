@@ -56,11 +56,13 @@ def pe_kernel (num_qubits: int, theta: float, use_midcircuit_measurement: bool):
     # size of input is one less than available qubits
     input_size = num_qubits - 1
         
-    # Allocate on less than the specified number of qubits for phase register
-    counting_qubits = cudaq.qvector(input_size)
+    qubits = cudaq.qvector(num_qubits)
+
+    # Use less than the specified number of qubits for phase register
+    counting_qubits = qubits[0:input_size]
     
-    # Allocate an extra qubit for the state register (can expand this later)
-    state_register = cudaq.qubit()
+    # Use last qubit for the state register
+    state_register = qubits[input_size]
 
     # Prepare the auxillary qubit.
     x(state_register)
@@ -75,7 +77,12 @@ def pe_kernel (num_qubits: int, theta: float, use_midcircuit_measurement: bool):
         
         # optimize by collapsing all phase gates at one level to single gate
         if do_uopt:
-            exp_phase = init_phase * (2 ** i_qubit) 
+            # r1 parameter should formally be: 2 * M_PI * theta * 2**i_qubit
+            # However, for large number of qubits, this may get out fp32 range.
+            # To fix this issue, we cast it to the range [0,2*M_PI[.
+            # This works because the parameter is a rotation angle.
+            rotations = (theta * (2 ** i_qubit))
+            exp_phase = 2 * M_PI * (rotations-int(rotations))
             r1.ctrl(exp_phase, counting_qubits[i_qubit], state_register);
         else:
             for j in range(2 ** i_qubit):
