@@ -323,55 +323,65 @@ def execute_circuit (batched_circuit):
 # Get circuit metrics fom the circuit passed in
 def get_circuit_metrics(qc, qc_size):
     
-    # get resource info from cudaq
-    resources = cudaq.estimate_resources(qc[0], *qc[1])
-    #resources_str = str(resources)
+    # the new code is implemented in CUDA-Q ver 0.13+, if it fails fall back to old code
+    try:
     
-    #print(resources)
-    
-    # Get total gates (not needed as we use the .count() function)
-    # import re
-    # total_match = re.search(r'Total # of gates:\s*(\d+)', resources_str)
-    # total_gates = int(total_match.group(1)) if total_match else 0
-    
-    total_gates = resources.count()
-    
-    two_qubit_gates = 0
-    two_qubit_gates += resources.count_controls('x', 1)
-    two_qubit_gates += resources.count_controls('y', 1)
-    two_qubit_gates += resources.count_controls('z', 1)
-    two_qubit_gates += resources.count_controls('r1', 1)
-    two_qubit_gates += resources.count_controls('rx', 1)
-    two_qubit_gates += resources.count_controls('ry', 1)
-    two_qubit_gates += resources.count_controls('rz', 1)
-    
-    #print(f"... depth = {resources.count_depth()}")
-    
-    # the resources object returned is not a dict; need to parse the string to get 2q gates
-    # Get all gate counts that start with 'c' (controlled/2-qubit gates)
-    # Retain this code, even tho we use count_controls, as it is more general; may use later
-    """
-    two_qubit_gates = 0
-    for line in resources_str.split('\n'):
-        match = re.match(r'\s*(c\w+)\s*:\s*(\d+)', line)
-        if match:
-            two_qubit_gates += int(match.group(2))
-    """
-    #print(f"Total: {total_gates}, 2-qubit: {two_qubit_gates}")
+        # get resource info from cudaq
+        resources = cudaq.estimate_resources(qc[0], *qc[1])
+        #resources_str = str(resources)
+        
+        #print(resources)
+        
+        # Get total gates (not needed as we use the .count() function)
+        # import re
+        # total_match = re.search(r'Total # of gates:\s*(\d+)', resources_str)
+        # total_gates = int(total_match.group(1)) if total_match else 0
+        
+        total_gates = resources.count()
+        
+        two_qubit_gates = 0
+        two_qubit_gates += resources.count_controls('x', 1)
+        two_qubit_gates += resources.count_controls('y', 1)
+        two_qubit_gates += resources.count_controls('z', 1)
+        two_qubit_gates += resources.count_controls('r1', 1)
+        two_qubit_gates += resources.count_controls('rx', 1)
+        two_qubit_gates += resources.count_controls('ry', 1)
+        two_qubit_gates += resources.count_controls('rz', 1)
+        
+        #print(f"... depth = {resources.count_depth()}") # doesn't exist yet
+        #print(f"Total: {total_gates}, 2-qubit: {two_qubit_gates}")
 
-    # obtain an estimate of circuit depth
-    qc_depth = estimate_depth(qc_size, total_gates, two_qubit_gates)
-    #print(qc_depth)
-    
-    # this exact computation is not used, currently, as it is slow
-    #qc_depth = compute_circuit_depth(qc[0](*qc[1]))
-    #print(qc_depth)
-    
-    qc_xi = two_qubit_gates / max(total_gates, 1)
-    qc_n2q = two_qubit_gates
-    
-    qc_count_ops = total_gates
+        # obtain an estimate of circuit depth
+        qc_depth = estimate_depth(qc_size, total_gates, two_qubit_gates)
+        #print(qc_depth)
+        
+        # this exact computation is not used, currently, as it is slow
+        #qc_depth = compute_circuit_depth(qc[0](*qc[1]))
+        #print(qc_depth)
+        
+        qc_xi = two_qubit_gates / max(total_gates, 1)
+        qc_n2q = two_qubit_gates
+        
+        # not currently used
+        qc_count_ops = total_gates
+        
+    # this is used for CUDA-Q versions 0.12 or earlier   
+    except:    
+        
+        # compute depth and gate counts based on number of qubits
+        qc_depth = 4 * pow(qc_size, 2)
 
+        qc_xi = 0.5
+
+        qc_n2q = int(qc_depth * 0.75)
+        qc_tr_depth = qc_depth
+        qc_tr_size = qc_size
+        qc_tr_xi = qc_xi
+        qc_tr_n2q = qc_n2q
+        
+        # not currently used
+        qc_count_ops = qc_depth
+         
     return qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q
 
 
@@ -750,101 +760,3 @@ class ExecResult(object):
 
     def get_counts(self, qc=0):
         return self.counts       
-
-
-###############################################################
-# UNUSED, EXPERIMENTAL CODE
-
-"""
-# Estimate depth heuristically, since cudaq does not give us this
-# This approach is somewhat better than the simplistic solution but still off
-def estimate_depth(num_qubits, total_gates, two_qubit_gates):
-    # Handle edge case
-    if total_gates == 0:
-        return 1  # Just measurement layer
-    
-    N = num_qubits
-    K = two_qubit_gates
-    xi = K / total_gates  # Safe now since we checked total_gates > 0
-    
-    # Base parallelism factor: smoothly decreases with more qubits
-    base_parallelism = 0.6 * math.exp(-0.05 * N) + 0.2
-    
-    # Adjust for 2Q gate ratio
-    two_q_penalty = 1 + 0.8 * xi
-    
-    # Calculate average gates per layer
-    avg_gates_per_layer = N * base_parallelism / two_q_penalty
-    
-    # Estimate depth for quantum gates
-    depth_estimate = math.ceil(total_gates / avg_gates_per_layer)
-    
-    # Sanity check: depth must be at least the 2Q gate count
-    depth_min = math.ceil(2 * K / N) if N > 0 else K
-    
-    quantum_depth = max(depth_estimate, depth_min)
-    
-    # Add 1 for final measurement layer
-    total_depth = quantum_depth + 1
-    
-    return int(total_depth)
-"""
-
-"""
-# Another approach that converts to QASM to count gate cycles.
-# Likely to be slow, not used yet.
-import re
-from collections import defaultdict
-
-# Compute circuit depth from CUDA-Q kernel by parsing QASM.
-def compute_circuit_depth(kernel): 
-    
-    # Get QASM representation
-    qasm_str = cudaq.to_qasm(kernel)
-    
-    # Track when each qubit is last used (cycle number)
-    qubit_last_used = defaultdict(int)
-    
-    # Parse QASM line by line
-    lines = qasm_str.split('\n')
-    
-    for line in lines:
-        line = line.strip()
-        
-        # Skip comments, declarations, and empty lines
-        if not line or line.startswith('//') or line.startswith('OPENQASM') or \
-           line.startswith('include') or line.startswith('qreg') or \
-           line.startswith('creg') or line.startswith('barrier'):
-            continue
-        
-        # Extract gate and qubits
-        # Matches patterns like: cx q[0],q[1]; or h q[2]; or measure q[0] -> c[0];
-        match = re.match(r'(\w+)\s+([^;]+);', line)
-        if not match:
-            continue
-            
-        gate_name = match.group(1)
-        qubit_args = match.group(2)
-        
-        # Extract qubit indices (handles both q[0] and q[0],q[1] patterns)
-        qubit_indices = []
-        for qubit_ref in re.findall(r'q\[(\d+)\]', qubit_args):
-            qubit_indices.append(int(qubit_ref))
-        
-        if not qubit_indices:
-            continue
-        
-        # Find the earliest cycle this gate can execute
-        # (must wait for all involved qubits to be free)
-        earliest_cycle = max(qubit_last_used[q] for q in qubit_indices) + 1
-        
-        # Update all involved qubits to this cycle
-        for q in qubit_indices:
-            qubit_last_used[q] = earliest_cycle
-    
-    # Depth is the maximum cycle number used
-    if qubit_last_used:
-        return max(qubit_last_used.values())
-    else:
-        return 0
-""" 
