@@ -380,7 +380,6 @@ def get_circuit_metrics(qc, qc_size):
     except:    
         
         # compute depth and gate counts based on number of qubits
-        qc_size = int(active_circuit["group"])
         qc_depth = 4 * pow(qc_size, 2)
 
         qc_xi = 0.5
