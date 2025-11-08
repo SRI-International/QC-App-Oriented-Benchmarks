@@ -28,6 +28,10 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 	api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
 	sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
 
+	import qcb_mpi as mpi
+	globals()["mpi"] = mpi
+	mpi.init()
+
 	import execute as ex
 	globals()["ex"] = ex
 
@@ -95,7 +99,7 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 		method=1, input_value=None,
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
-		context=None, api=None, get_circuits=False):
+		context=None, api=None, warmup=False, get_circuits=False):
 
 	# configure the QED-C Benchmark package for use with the given API
 	HiddenShift, kernel_draw = qedc_benchmarks_init(api)
@@ -119,7 +123,7 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 		all_qcs = {}
 	
 	# Initialize metrics module
-	metrics.init_metrics()
+	metrics.init_metrics(warmup)
 
 	# Define custom result handler
 	def execution_handler (qc, result, num_qubits, s_int, num_shots):  
@@ -173,6 +177,7 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 			if verbose: print(f"... s_int={s_int} bitset={bitset}")
 			
 			# create the circuit for given qubit size and secret string, store time metric
+			mpi.barrier()
 			ts = time.time()
 			qc = HiddenShift(num_qubits, s_int, bitset, method)
 			metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
@@ -199,12 +204,13 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 
 	##########
 	
-	# draw a sample circuit
-	kernel_draw()
+	if mpi.leader():
+		# draw a sample circuit
+		kernel_draw()
 	
-	# Plot metrics for all circuit sizes
-	options = {"shots": num_shots, "reps": max_circuits}
-	metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+		# Plot metrics for all circuit sizes
+		options = {"shots": num_shots, "reps": max_circuits}
+		metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 
 #######################
@@ -226,6 +232,7 @@ def get_args():
 	parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+	parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
 	parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
 	return parser.parse_args()
 	
@@ -251,7 +258,7 @@ if __name__ == '__main__':
 		input_value=args.input_value,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
-		api=args.api
+		api=args.api, warmup=args.warmup
 		)
    
 
