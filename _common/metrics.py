@@ -76,7 +76,7 @@ merge_group_metrics = False
 use_warmup_run = False
 
 # Suffix to append to filename of DATA- files
-data_suffix = ""
+data_suffix = os.getenv("QEDCBMS_DATA_SUFFIX", "")
 
 # Option to save plot images (all of them)
 save_plot_images = True
