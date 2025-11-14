@@ -210,34 +210,25 @@ def analyze_and_print_result(
         
         ts = time.time()
         
-        ################ Using the previous evolution_exact code:
-        # the plan is to remove this code and use the new once it is validated.
-        """
-        # create quantum circuit with initial state
-        qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
-        
-        # apply the Hamiltonian operator to initial state to get expectation/distribution
-        correct_exp, correct_dist = evolution_exact.compute_expectation_exact_spo_scipy(
-                init_state, 
-                qc_initial,
-                num_qubits,
-                hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                t        # time (hardocded to match default benchmark)
-                )
-        """
-        ################ Test of the newer evolution_exact code:
-        
-        correct_exp, correct_dist = evolution_exact.compute_expectation_exact(
-                init_state,
-                observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
-                t        # time
-                )
+        # exact computation is costly; limit the number of qubits for which we do this
+        if num_qubits <= max_qubits_exact:
+            correct_exp, correct_dist = evolution_exact.compute_expectation_exact(
+                    init_state,
+                    observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
+                    t        # time
+                    )
+                    
+        # make fake distribution if too many qubits; use GHZ since this will give 0 fidelity mostly
+        else:
+            correct_dist = {
+                '0' * num_qubits: num_shots/2,
+                '1' * num_qubits: num_shots/2
+            }
         
         # report details if verbose mode
         if verbose:
             print("")
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
-            print(f"Correct expectation = {correct_exp}")
             #print_top_measurements(f"Correct dist = ", correct_dist, 100)
             print("")
             
