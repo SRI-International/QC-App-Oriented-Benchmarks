@@ -39,7 +39,7 @@ save_dataset_file = False
 max_qubits_exact = 16
 
 # Data suffix appended to backend_id when saving data files
-data_suffix = ""
+data_suffix = os.getenv("QEDCBMS_DATA_SUFFIX", "")
 
 np.random.seed(0)
 
@@ -371,7 +371,9 @@ def run(min_qubits: int = 2,
     
     # special argument handling
     # print(f"... verbose = {verbose}")
+    # print(f"... data_suffix = {data_suffix}")
     ex.verbose = verbose
+    metrics.data_suffix = data_suffix
     hamlib_simulation_kernel.verbose = verbose
     hamlib_utils.verbose = verbose
     
@@ -1366,8 +1368,8 @@ if __name__ == '__main__':
     # special argument handling
     verbose = args.verbose
     
-    #if args.data_suffix is not None:
-    #    metrics.data_suffix = args.data_suffix
+    if args.data_suffix is not None:
+        data_suffix = args.data_suffix
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     
