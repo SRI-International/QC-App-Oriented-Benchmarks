@@ -26,7 +26,7 @@ The group released a fourth paper (Sep 2024) and a fifth (Apr 2025) with a deep 
 
 &nbsp;&nbsp;&nbsp;&nbsp;[A Practical Framework for Assessing the Performance of Observable Estimation in Quantum Simulation](https://arxiv.org/abs/2504.09813)
 
-Recently, a sizth paper was produced by the 2025 summer intern group with a focus on integration with other benchmarking frameworks.
+Recently, a sixth paper was produced by the 2025 summer intern group with a focus on integration with other benchmarking frameworks.
 
 &nbsp;&nbsp;&nbsp;&nbsp;[Platform-Agnostic Modular Architecture for Quantum Benchmarking](https://arxiv.org/abs/2510.08469)
 
