@@ -20,11 +20,15 @@ The group added another paper (Feb 2024) with additional benchmark programs and 
 
 &nbsp;&nbsp;&nbsp;&nbsp;[Quantum Algorithm Exploration using Application-Oriented Performance Benchmarks](https://arxiv.org/abs/2402.08985)
 
-Recently, the group released a fourth paper (Sep 2024) and a fifth (Apr 2025) with a deep focus on measuring performance of Quantum Hamiltonians Simulations at
+The group released a fourth paper (Sep 2024) and a fifth (Apr 2025) with a deep focus on measuring performance of Quantum Hamiltonians Simulations at
 
 &nbsp;&nbsp;&nbsp;&nbsp;[A Comprehensive Cross-Model Framework for Benchmarking the Performance of Quantum Hamiltonian Simulations](https://arxiv.org/abs/2409.06919)
 
 &nbsp;&nbsp;&nbsp;&nbsp;[A Practical Framework for Assessing the Performance of Observable Estimation in Quantum Simulation](https://arxiv.org/abs/2504.09813)
+
+Recently, a sizth paper was produced by the 2025 summer intern group with a focus on integration with other benchmarking frameworks.
+
+&nbsp;&nbsp;&nbsp;&nbsp;[Platform-Agnostic Modular Architecture for Quantum Benchmarking](https://arxiv.org/abs/2510.08469)
 
 See the [Implementation Status](#implementation-status) section below for the latest report on benchmarks implemented to date.
 
