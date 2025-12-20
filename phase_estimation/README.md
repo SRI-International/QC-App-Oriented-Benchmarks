@@ -2,7 +2,7 @@
 
 Phase estimation [[1]](#references) is one of the most important quantum subroutines, fundamental to most quantum 
 algorithms such as [Shor's Order Finding](../shors/) and the HHL algorithm for solving linear systems of equations. 
-The algorithm utilizes the [Quantum Fourier Transform](../quantum-fourier-transform/)
+The algorithm utilizes the [Quantum Fourier Transform](../quantum_fourier_transform/)
 as a key procedure, which is described and implemented as a benchmark in this repository. 
 
 ## Problem outline
@@ -51,7 +51,7 @@ The following circuit is the general quantum circuit for quantum phase estimatio
 state as the data register.
 
 <p align="center">
-<img align=center src="../_doc/images/phase-estimation/qpe_tex_qz.png"  width="600" />
+<img align=center src="../_doc/images/phase_estimation/qpe_tex_qz.png"  width="600" />
 </p>
 
 *Fig 1. Diagram of general quantum circuit for Phase Estimation Algorithm [[4]](#references)*
@@ -109,7 +109,7 @@ The steps for phase estimation are the following:
    
 4. The previous expression is the same derived expression for the quantum Fourier transform on 
    a <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}t">-qubit input state where <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}x"> is replaced by <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}2^t\theta">. 
-   Review the [Quantum Fourier Transform](../quantum-fourier-transform/) benchmark for the full derivation.
+   Review the [Quantum Fourier Transform](../quantum_fourier_transform/) benchmark for the full derivation.
    Thus applying the inverse QFT to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_2\rangle"> retrieves 
    <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}2^t\theta"> in the counting register:
   
@@ -137,10 +137,10 @@ In this benchmark, we chose to only have a single qubit in the data register, us
 This benchmark's gate implementation deviates slightly from way we've described the algorithm above in one important way: our C-U gates start with the most significant qubit in the counting register and work towards the least significant qubit. This can bee seen in the below image of the circuit we apply:
 
 <p align="center">
-<img align=center src="../_doc/images/phase-estimation/qpe_circuit.png"  width="600" />
+<img align=center src="../_doc/images/phase_estimation/qpe_circuit.png"  width="600" />
 </p>
 
-This is because the benchmark uses this repository's internal inverse quantum Fourier transform gate. Like we mention in the [Quantum Fourier Transform benchmark](../quantum-fourier-transform/), we have removed the cannonical swaps to improve performance. This means that our qubits are instead ordered in the reverse way by the inverse QFT gate, which is why our applications of C-U work the other way around.
+This is because the benchmark uses this repository's internal inverse quantum Fourier transform gate. Like we mention in the [Quantum Fourier Transform benchmark](../quantum_fourier_transform/), we have removed the cannonical swaps to improve performance. This means that our qubits are instead ordered in the reverse way by the inverse QFT gate, which is why our applications of C-U work the other way around.
 
 ## References
 

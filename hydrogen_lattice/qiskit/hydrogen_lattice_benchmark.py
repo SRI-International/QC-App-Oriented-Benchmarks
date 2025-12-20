@@ -23,8 +23,8 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
 
 # QED-C benchmark-specific imports
-sys.path[1:1] = ["_common", "_common/qiskit", "hydrogen-lattice/_common"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/"]
+sys.path[1:1] = ["_common", "_common/qiskit", "hydrogen_lattice/_common"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../hydrogen_lattice/_common/"]
 
 import common
 import execute as ex

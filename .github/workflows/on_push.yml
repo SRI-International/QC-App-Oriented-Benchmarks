@@ -19,11 +19,11 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install hydrogen lattice dependencies
-      run: pip install -r hydrogen-lattice/qiskit/requirements.txt
+      run: pip install -r hydrogen_lattice/qiskit/requirements.txt
       working-directory: ./
 
     - name: Install hamiltonian simulation dependencies
-      run: pip install -r hamiltonian-simulation/qiskit/requirements.txt
+      run: pip install -r f/qiskit/requirements.txt
       working-directory: ./
       
     - name: Check Qiskit version
@@ -33,8 +33,8 @@ jobs:
 
     - name: Run hydrogen lattice tests
       run: pytest
-      working-directory: ./hydrogen-lattice/qiskit
+      working-directory: ./hydrogen_lattice/qiskit
 
     - name: Run hamiltonian simulation tests
       run: pytest
-      working-directory: ./hamiltonian-simulation/qiskit
+      working-directory: ./hamiltonian_simulation/qiskit

@@ -18,8 +18,8 @@ import sys
 # Create a list to store the plots
 plots = []
 
-sys.path[1:1] = [ "_common", "_common/Dev", "hydrogen-lattice/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
+sys.path[1:1] = [ "_common", "_common/Dev", "hydrogen_lattice/_common" ]
+sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen_lattice/_common/" ]
 
 import common
 # Create an instance of the Simulator class for noiseless simulations

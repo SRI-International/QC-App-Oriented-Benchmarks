@@ -9,8 +9,8 @@ The script simulates hydrogen chains of different lengths (num_qubits), construc
 
 import sys
 
-sys.path[1:1] = [ "_common", "_common/Dev", "hydrogen-lattice/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen-lattice/_common/" ]
+sys.path[1:1] = [ "_common", "_common/Dev", "hydrogen_lattice/_common" ]
+sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen_lattice/_common/" ]
 
 import numpy as np
 from ansatz import PUCCD

@@ -115,7 +115,7 @@ Therefore, we apply the first-order Trotter approximation [[9]](#references),
 </p>
 
 This is a only an approximation since in general <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}P_i,P_j"/>
-do not commute. In the [Hamiltonian Simulation benchmark](../hamiltonian-simulation/), we used the Trotter approximation to 3rd order by default. By applying the first-order Trotter approximation, the resulting ansatz is called the 
+do not commute. In the [Hamiltonian Simulation benchmark](../hamiltonian_simulation/), we used the Trotter approximation to 3rd order by default. By applying the first-order Trotter approximation, the resulting ansatz is called the 
 disentangled unitary-CCSD ansatz. 
 
 For a single excitation in the cluster operator, the JWT converts it to

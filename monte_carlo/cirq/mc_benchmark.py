@@ -13,8 +13,8 @@ import numpy as np
 from numpy.polynomial.polynomial import Polynomial
 from numpy.polynomial.polynomial import polyfit
 
-sys.path[1:1] = ["_common", "_common/cirq", "monte-carlo/_common", "quantum-fourier-transform/cirq"]
-sys.path[1:1] = ["../../_common", "../../_common/cirq", "../../monte-carlo/_common", "../../quantum-fourier-transform/cirq"]
+sys.path[1:1] = ["_common", "_common/cirq", "monte_carlo/_common", "quantum_fourier_transform/cirq"]
+sys.path[1:1] = ["../../_common", "../../_common/cirq", "../../monte_carlo/_common", "../../quantum_fourier_transform/cirq"]
 import cirq_utils as cirq_utils
 import execute as ex
 import mc_utils as mc_utils

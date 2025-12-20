@@ -28,7 +28,7 @@ from sklearn.metrics import accuracy_score, mean_squared_error
 from noisyopt import minimizeSPSA
 
 sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", '../../image-recognition/_common/']
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", '../../image_recognition/_common/']
 
 # benchmark-specific imports
 import execute as ex

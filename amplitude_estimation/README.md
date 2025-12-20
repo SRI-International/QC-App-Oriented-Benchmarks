@@ -1,6 +1,6 @@
 # Quantum Amplitude Estimation - Prototype Benchmark Program
 
-Quantum Amplitude Estimation (QAE) [[1]](#references) is an extremely useful algorithm which provides a quadratic speedup over classical computers for wide classes of problems which would typically be solved by classical Monte Carlo simulations. This algorithm uses two ubiquitous elements of quantum algorithms: Quantum Amplitude Amplification (QAA), described in this README, and [Phase Estimation (PE)](../phase-estimation/). 
+Quantum Amplitude Estimation (QAE) [[1]](#references) is an extremely useful algorithm which provides a quadratic speedup over classical computers for wide classes of problems which would typically be solved by classical Monte Carlo simulations. This algorithm uses two ubiquitous elements of quantum algorithms: Quantum Amplitude Amplification (QAA), described in this README, and [Phase Estimation (PE)](../phase_estimation/). 
 
 ## Problem outline
 
@@ -19,7 +19,7 @@ The Amplitude Estimation algorithm is benchmarked by running `max_circuits` circ
 
 ## Classical algorithm
 
-In order to estimate <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a"> using a classical computer, we see we have a quadratic runtime penalty to get the same uncertainty in the measurement. We go more in-depth in the classical process used and the exact scaling in the [Monte Carlo benchmark](../monte-carlo/). This benchmark's README is also where we describe the scaling of the quantum algorithm.
+In order to estimate <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a"> using a classical computer, we see we have a quadratic runtime penalty to get the same uncertainty in the measurement. We go more in-depth in the classical process used and the exact scaling in the [Monte Carlo benchmark](../monte_carlo/). This benchmark's README is also where we describe the scaling of the quantum algorithm.
 
 ## Quantum algorithm
 
@@ -64,7 +64,7 @@ With some investigation, we can see the corresponence with Grover's algorithm. T
 
 ### General Quantum Circuit 
 <p align="center">
-<img src="../_doc/images/amplitude-estimation/qae_circuit.png"  width="800" />
+<img src="../_doc/images/amplitude_estimation/qae_circuit.png"  width="800" />
 </p>
 
 *Fig 1. Circuit diagram for QAE using PE as presented by Grinko et al. [[3]](#references)*
@@ -73,7 +73,7 @@ With some investigation, we can see the corresponence with Grover's algorithm. T
 
 1. Generate <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{Q}"> from the amplitude generator <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}">. 
 
-2. Use [Phase Estimation](../phase-estimation/) to find the eigenvalue(s) of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}|\psi\rangle=\mathcal{A}|0\rangle_{n+1}"> with respect to <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{Q}">. It is shown in [[1]](#references) that the two eigenstates of <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}Q"> have eigenvalue <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}{e}^{\pm2\pi\,i\,\theta_a}\">. While <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}|\psi\rangle"> is not actually an eigenstate of <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{Q}">, PE guarentees that the returned bitstring will always correspond to one of the two eigenvalues.
+2. Use [Phase Estimation](../phase_estimation/) to find the eigenvalue(s) of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}|\psi\rangle=\mathcal{A}|0\rangle_{n+1}"> with respect to <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{Q}">. It is shown in [[1]](#references) that the two eigenstates of <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}Q"> have eigenvalue <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}{e}^{\pm2\pi\,i\,\theta_a}\">. While <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}|\psi\rangle"> is not actually an eigenstate of <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{Q}">, PE guarentees that the returned bitstring will always correspond to one of the two eigenvalues.
 
 2. Transform eigenvalue estimates into amplitude estimates. At this stage, the bitstrings corresponding to the two phases will lead to an estimator of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\tilde{\theta}=2\pi\frac{y}{2^m}\">and therefore <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\tilde{a}=\sin^2{\tilde{\theta_a}}\">. It is clear that both of the eigenvalues will lead to the same value of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a"> due to the even-ness of the squared sine function. It is proven in [[1]](#references) that this follows the variance:
     <p align="center">
@@ -88,7 +88,7 @@ To implement this algorithm, all that is necessary is explicit definitions for t
 <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A},\mathcal{A}^{-1}\"> are given to the algorithm as the oracle. <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}-S_{\chi}\"> performs a phase flip only if the objective qubit is in the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle"> state. This is equivalent to the operations <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}XZX"> on the objective qubit. Lastly, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}S_{|0\rangle_{n+1}}\">, the phase flip only when all state registers are <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle">, is equivalent to performing <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X\"> on all qubits in the register except the objective qubit, then a multi-controlled-phase gate between the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n"> state qubits and objective qubit, and another set of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X\"> gates. Equivalent to multi-controlled-phase is a <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}H\"> on the objective qubit, multi-controlled-NOT, and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}H\"> again on the objective qubit.
 
 <p align="center">
-<img src="../_doc/images/amplitude-estimation/ae_circuit.png" />
+<img src="../_doc/images/amplitude_estimation/ae_circuit.png" />
 </p>
 
 If we then copy the circuits for the oracle and diffuser from Grover's algorithm:
@@ -108,7 +108,7 @@ We can see the correspondence that <img align=center src="https://latex.codecogs
 In our default implementation of A, we set <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_0\rangle=|00\ldots\rangle"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_1\rangle=|11\ldots\rangle">. To implement arbitrary angles, we use a y-rotation and CNOTs to engtangle all of the states. As an example, with two state qubits and the single "correct-ness" qubit, if we start in the initial state of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|000\rangle">, after applying an <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\textrm{Ry}(2\theta_a)"> gate, we will be in the state <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|00\rangle(\cos(\theta_a)|0\rangle+\sin(\theta_a)|1\rangle)">. By then applying CNOT gates controlled by the last qubits, we entangle the first two qubits with the state of the last: <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\cos(\theta_a)|000\rangle+\sin(\theta_a)|111\rangle">. By remembering that <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\theta_a=\sin^{-1}{\sqrt{a}}\">, we have now generated the state we are looking for.  
 
 <p align="center">
-<img src="../_doc/images/amplitude-estimation/A.png" />
+<img src="../_doc/images/amplitude_estimation/A.png" />
 </p>
 
 ## References

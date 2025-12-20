@@ -1,6 +1,6 @@
 # Monte Carlo - Prototype Benchmark Program
 
-The Quantum Monte Carlo Sampling Algorithm presented here is an application of the [Quantum Amplitude Estimation](../amplitude-estimation) routine we implemented as benchmark. We notice that this quantum algorithm performs quadratically better than any known classical algorithm. We follow the process outlined in [[1]](#references).
+The Quantum Monte Carlo Sampling Algorithm presented here is an application of the [Quantum Amplitude Estimation](../amplitude_estimation) routine we implemented as benchmark. We notice that this quantum algorithm performs quadratically better than any known classical algorithm. We follow the process outlined in [[1]](#references).
 
 ## Problem outline
 
@@ -55,7 +55,7 @@ we can see that if there is an efficient way of estimating the amplitude on the 
 src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\begin{align*}\large\mathcal{A}|0\rangle_{n+1}=\sqrt{1-a}|\psi_0\rangle|0\rangle+\sqrt{a}|\psi_1\rangle|1\rangle\end{align*}\">
 </p>
 
-we can clearly see that using <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}=\mathcal{F}\mathcal{R}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a=E[f(X)]\">, Amplitude Estimation will allow us to find the value <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a">. For information about this subroutine, please refer to the [Amplitude Estimation benchmark](../amplitude-estimation/), as our implementation of QAE in this benchmark is identical.
+we can clearly see that using <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}=\mathcal{F}\mathcal{R}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a=E[f(X)]\">, Amplitude Estimation will allow us to find the value <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}a">. For information about this subroutine, please refer to the [Amplitude Estimation benchmark](../amplitude_estimation/), as our implementation of QAE in this benchmark is identical.
 
 ### Correct Distribution
 
@@ -71,16 +71,16 @@ with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolo
 
 ### General Quantum Circuit
 <p align=center>
-<img src="../_doc/images/monte-carlo/qae_circuit.png" width = 800>
+<img src="../_doc/images/monte_carlo/qae_circuit.png" width = 800>
 </p>
 
-*Fig 1. Diagram of general quantum circuit for [Quantum Amplitude Estimation](../amplitude-estimation/)*
+*Fig 1. Diagram of general quantum circuit for [Quantum Amplitude Estimation](../amplitude_estimation/)*
 
 ### Algorithm Steps
 
 1. Generate the amplitude generator <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}"> from the function <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}"> and distribution <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}">.
 
-2. Use [Amplitude Estimation](../amplitude-estimation/) to find the amplitudes.
+2. Use [Amplitude Estimation](../amplitude_estimation/) to find the amplitudes.
 
 3. If using method 1, shift the amplitudes according to the inverse shift outlined in the section on Implementing F (method 1).
 
@@ -90,14 +90,14 @@ with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolo
 To generate our amplitude amplification operator <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}"> used in the amplitude estimation routine, we need to have a gate implementation of our probability distribution and function. In this benchmark, we implement two methods for generating these two elements of a Monte-Carlo simulation:
 
 - **Method 1** implements circuits for <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}"> which allows arbitrary distributions and functions. This generally results in much deeper circuits. Our default choices for <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}"> are a truncated Gaussian distribution with variable mean and the function <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}f(x)=x^2">.
-- **Method 2** implements circuits for <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}"> which are extremely simple distributions and functions. This allows the algorithm to run with much less deep circuits. For <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}">, we use a uniform distribution, and for <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}">, we use a function similar to the balanced oracle used in the [Deutsch-Jozsa algorithm](../deutsch-jozsa/).
+- **Method 2** implements circuits for <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}"> which are extremely simple distributions and functions. This allows the algorithm to run with much less deep circuits. For <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}">, we use a uniform distribution, and for <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}">, we use a function similar to the balanced oracle used in the [Deutsch-Jozsa algorithm](../deutsch_jozsa/).
 
 ### Implementing R (method 1)
 
 To generate <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}"> for an arbitrary probability distribution we use methods introduced in [[3]](#references). We use the intuition that a distribution can be broken into successive bisectings of regions. This property can be visualized in the below image, where we are estimating the probability of being in a specific region of a Gaussian distribution. We have each sector labeled by the qubit state which would have this probability, with the height being the corresponding probability.
 
 <p align="center">
-<img src="../_doc/images/monte-carlo/distribution.png">
+<img src="../_doc/images/monte_carlo/distribution.png">
 </p>
 
 We start off with our first bisection (in red), where for this Gaussian distribution, we have an even chance of being in the left or right region. We then apply this halving again for both sections. We then bisect each region again (orange), calculating the probability of being in the left or right side given we are know we are in one of the sides of the distribution. For example, we multiply the probability of being in the left side of the left region to find the total probability of being in the first of the now four regions.
@@ -115,7 +115,7 @@ This will clearly split any region in half with arbitrary probabilities for the 
 Below is an example circuit which uses this bisecting method to create a uniform superposition. With the angle <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}-\pi/2">, we are evenly distributing between the two halves of the region. Then, by using controlled operations based on if the controlled qubit is 1 (0), shown by the closed (open) circle, we select which region be are bisecting. Note we do not modify the last qubit, as when applying <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\mathcal{R}">, we leave the last qubit for defining the correct states in <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\mathcal{F}">.
 
 <p align=center>
-<img src="../_doc/images/monte-carlo/R_method_1.png">
+<img src="../_doc/images/monte_carlo/R_method_1.png">
 </p>
 
 To see more in-depth explanation of how this process works, the math is explaned in a more detail in [[3]](#references).
@@ -137,13 +137,13 @@ with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolo
 Now that we have <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\zeta(x)">, we can describe how to implement this polynomial via controlled rotations. To do this, we find a way of representing the polynomial in terms of sums of products of the states on each qubit. For example, for <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\zeta(x)=ax^2+bx+c"> and 2 data qubits, we can use that <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}x=2q_1+q_0">, with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}q_i"> representing the state of qubit <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}i">. Then, utilizing <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}q_i^2=q_i"> allows us to write our polynomial as <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\zeta(x)=(4a+2b)q_1+4aq_0q_1+(a+b)q_0+c">. The mapping <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|x\rangle_n|0\rangle\rightarrow|x\rangle_n(\cos(\zeta(x))|0\rangle+\sin(\zeta(x))|1\rangle)"> is then applied by the circuit below, which can clearly be seen to apply the equation with a little thought.
 
 <p align=center>
-<img src="../_doc/images/monte-carlo/poly_exp.png">
+<img src="../_doc/images/monte_carlo/poly_exp.png">
 </p>
 
 Finally, we give an example of what this circuit looks like when <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}f(x)=x^2"> with the default parameters and 3 data qubits:
 
 <p align=center>
-<img src="../_doc/images/monte-carlo/F_method_1.png">
+<img src="../_doc/images/monte_carlo/F_method_1.png">
 </p>
 
 ---
@@ -153,7 +153,7 @@ Finally, we give an example of what this circuit looks like when <img align=cent
 For our <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}"> method 2, our distribution is just a uniform distribution on all states, which can be easily implemented with Hadamards on all qubits. Again, since we use the last qubit for distinguishing states when applying <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}">, we do not modify it when preparing <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{R}">  .
 
 <p align=center>
-<img src="../_doc/images/monte-carlo/R_method_2.png">
+<img src="../_doc/images/monte_carlo/R_method_2.png">
 </p>
 
 ---
@@ -163,7 +163,7 @@ For our <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagec
 For our <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}"> in method 2, we describe a simple circuit where in <img align= center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\begin{align*}\mathcal{F}|i\rangle_n|0\rangle=|i\rangle_n\big(\sqrt{1-f(i)}|0\rangle+\sqrt{f(i)}|1\rangle\big)\end{align*}">, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}f(i)=1"> if <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}i"> has an odd number of 1's in its binary expansion, and is 0 otherwise. This is clearly implemented by the below circuit of successive controlled NOT operations. We also note that because this function does not use the shifts described in <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{F}"> method 1, we no longer need to do any shifting or inverse shifting of the measured amplitudes.
 
 <p align=center>
-<img  src="../_doc/images/monte-carlo/F_method_2.png">
+<img  src="../_doc/images/monte_carlo/F_method_2.png">
 </p>
 
 ## References

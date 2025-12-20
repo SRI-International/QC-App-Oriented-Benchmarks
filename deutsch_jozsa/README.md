@@ -47,7 +47,7 @@ The following circuit is the general quantum circuit for the Deutsch-Jozsa algor
 and 1 ancilla qubit.
 
 <p align="center">
-<img align=center src="../_doc/images/deutsch-jozsa/deutsch_alg_circuit.png"  width="600" />
+<img align=center src="../_doc/images/deutsch_jozsa/deutsch_alg_circuit.png"  width="600" />
 </p>
 
 <p align="center">
@@ -119,7 +119,7 @@ The constant oracle will either leave the qubits unchanged or apply a single x g
 The balanced oracle applies CNOTs to the ancilla qubit controlled by all the data qubits, with some modification of which input states return 0 and which return 1 with the shifting with the X gates at the start and end of the oracle.
 
 <p align="center">
-<img align=center src="../_doc/images/deutsch-jozsa/balanced_oracle.png"  width="600" />
+<img align=center src="../_doc/images/deutsch_jozsa/balanced_oracle.png"  width="600" />
 </p>
 
 ## References
@@ -133,4 +133,4 @@ The balanced oracle applies CNOTs to the ancilla qubit controlled by all the dat
     Cambridge University Press, New York, NY, USA.
 
 [3] Abraham Asfaw, Antonio Córcoles, Luciano Bello, Yael Ben-Haim, Mehdi Bozzo-Rey, Sergey Bravyi, Nicholas Bronn, Lauren Capelluto, Almudena Carrera Vazquez, Jack Ceroni, Richard Chen, Albert Frisch, Jay Gambetta, Shelly Garion, Leron Gil, Salvador De La Puente Gonzalez, Francis Harkins, Takashi Imamichi, Hwajung Kang, Amir h. Karamlou, Robert Loredo, David McKay, Antonio Mezzacapo, Zlatko Minev, Ramis Movassagh, Giacomo Nannicini, Paul Nation, Anna Phan, Marco Pistoia, Arthur Rattew, Joachim Schaefer, Javad Shabani, John Smolin, John Stenger, Kristan Temme, Madeleine Tod, Stephen Wood, and James Wootton. (2020).
-    [`Deutsch-Jozsa Algorithm`](https://qiskit.org/textbook/ch-algorithms/deutsch-jozsa.html)
+    [`Deutsch-Jozsa Algorithm`](https://qiskit.org/textbook/ch-algorithms/deutsch_jozsa.html)

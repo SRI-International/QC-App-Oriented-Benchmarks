@@ -9,8 +9,8 @@ import time
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+sys.path[1:1] = ["_common", "_common/qiskit", "quantum_fourier_transform/qiskit"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum_fourier_transform/qiskit"]
 import execute as ex
 import metrics as metrics
 from qft_kernel import inv_qft_gate

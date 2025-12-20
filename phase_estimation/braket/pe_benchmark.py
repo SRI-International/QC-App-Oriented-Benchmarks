@@ -8,8 +8,8 @@ import sys
 from braket.circuits import Circuit     # AWS imports: Import Braket SDK modules
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/braket", "quantum-fourier-transform/braket"]
-sys.path[1:1] = ["../../_common", "../../_common/braket", "../../quantum-fourier-transform/braket"]
+sys.path[1:1] = ["_common", "_common/braket", "quantum_fourier_transform/braket"]
+sys.path[1:1] = ["../../_common", "../../_common/braket", "../../quantum_fourier_transform/braket"]
 import execute as ex
 import metrics as metrics
 from qft_benchmark import inv_qft_gate

@@ -56,7 +56,7 @@ The quantum algorithm as described only requires a single query to the shifted f
 
 ### General Quantum Circuit 
 <p align="center">
-<img align=center src="../_doc/images/hidden-shift/HS_circ.png"  width="600" />
+<img align=center src="../_doc/images/hidden_shift/HS_circ.png"  width="600" />
 </p>
 
 *Fig 1. Diagram of general efficient quantum circuit for Hidden Shift Algorithm [[2]](#references)*
@@ -115,14 +115,14 @@ The following are the subcircuits for a 6 qubit hidden shift algorithm with <img
 To implement <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}g(x)\equiv{f}(x\oplus{s})"> 
 as <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U_g|x\rangle=g(x)|x\rangle">, we first apply <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X"> gates on qubits in <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}s"> provide the bitwise transformation. Then, the <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}CZ"> on neighboring pairs implements <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}f(x)">. Finally, <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X"> gates on qubits in <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}s"> provides the same bitwise transformation back to the input string
 <p align="center">
-<img align=center src="../_doc/images/hidden-shift/HS_Ug.png" height="400"/>
+<img align=center src="../_doc/images/hidden_shift/HS_Ug.png" height="400"/>
 </p>
 
 ### Implementation of <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}U_f">
 To implement <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\tilde{f}(x)">
 as <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U_f|x\rangle=f(x)|x\rangle">, we apply <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}CZ"> on neighboring pairs.
 <p align="center">
-<img align=center src="../_doc/images/hidden-shift/HS_Uf.png" height="400"/>
+<img align=center src="../_doc/images/hidden_shift/HS_Uf.png" height="400"/>
 </p>
 
 ## References

@@ -34,7 +34,7 @@ See the [Implementation Status](#implementation-status) section below for the la
 
 ## Notes on Repository Organization
 
-The repository is organized at the highest level by specific reference application names. There is a directory for each application or algorithmic example, e.g. [`quantum-fourier-transform`](./quantum-fourier-transform/), which contains the bulk of code for that application. 
+The repository is organized at the highest level by specific reference application names. There is a directory for each application or algorithmic example, e.g. [`quantum_fourier_transform`](./quantum_fourier_transform/), which contains the bulk of code for that application. 
 
 Within each application directory, there is a second-level directory, one for each of the target programming environments that are supported. The repository is organized in this way to emphasize the application first and the target environment second, to encourage full support across platforms.
 
@@ -92,7 +92,7 @@ See the above link to the _setup folder for more information about each programm
 
 The benchmark programs may be run manually in a command shell. In a command window or shell, change the directory to the application you would like to execute. Then, simply execute a line similar to the following, to begin the execution of the main program for the application:
 ```
-    cd bernstein-vazirani
+    cd bernstein_vazirani
     python bv_benchmark.py
 ```
 This will run the program, construct and execute multiple circuits, analyze results, and produce a set of bar charts to report on the results. The program executes random circuits constructed for a specific number of qubits, in a loop that ranges from `min_qubits` to `max_qubits` (with default values that can be passed as parameters). The number of random circuits generated for each qubit size can be controlled by the `max_circuits` parameter.

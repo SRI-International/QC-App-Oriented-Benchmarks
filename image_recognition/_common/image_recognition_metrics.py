@@ -34,8 +34,8 @@ import math
 # add to the path variable the path to the metrics module
 import sys
 
-sys.path[1:1] = [ "_common", "_common/qiskit", "image-recognition/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../image-recognition/_common/" ]
+sys.path[1:1] = [ "_common", "_common/qiskit", "image_recognition/_common" ]
+sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../image_recognition/_common/" ]
 
 # import the metrics module
 import metrics as metrics

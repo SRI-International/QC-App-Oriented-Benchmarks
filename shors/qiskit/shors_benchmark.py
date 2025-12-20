@@ -9,8 +9,8 @@ import time
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = ["_common", "_common/qiskit", "shors/_common", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common", "../../quantum-fourier-transform/qiskit"]
+sys.path[1:1] = ["_common", "_common/qiskit", "shors/_common", "quantum_fourier_transform/qiskit"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common", "../../quantum_fourier_transform/qiskit"]
 import execute as ex
 import metrics as metrics
 from shors_utils import getAngles, getAngle, modinv, generate_base

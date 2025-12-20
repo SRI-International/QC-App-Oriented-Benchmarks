@@ -13,8 +13,8 @@ from numpy.polynomial.polynomial import polyfit
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit.circuit.library.standard_gates.ry import RYGate
 
-sys.path[1:1] = ["_common", "_common/qiskit", "monte-carlo/_common", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../monte-carlo/_common", "../../quantum-fourier-transform/qiskit"]
+sys.path[1:1] = ["_common", "_common/qiskit", "monte_carlo/_common", "quantum_fourier_transform/qiskit"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../monte_carlo/_common", "../../quantum_fourier_transform/qiskit"]
 import execute as ex
 import mc_utils as mc_utils
 import metrics as metrics
