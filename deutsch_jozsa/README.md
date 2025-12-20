@@ -47,7 +47,7 @@ The following circuit is the general quantum circuit for the Deutsch-Jozsa algor
 and 1 ancilla qubit.
 
 <p align="center">
-<img align=center src="../_doc/images/deutsch-jozsa/deutsch_alg_circuit.png"  width="600" />
+<img align=center src="../_doc/images/deutsch_jozsa/deutsch_alg_circuit.png"  width="600" />
 </p>
 
 <p align="center">
@@ -119,7 +119,7 @@ The constant oracle will either leave the qubits unchanged or apply a single x g
 The balanced oracle applies CNOTs to the ancilla qubit controlled by all the data qubits, with some modification of which input states return 0 and which return 1 with the shifting with the X gates at the start and end of the oracle.
 
 <p align="center">
-<img align=center src="../_doc/images/deutsch-jozsa/balanced_oracle.png"  width="600" />
+<img align=center src="../_doc/images/deutsch_jozsa/balanced_oracle.png"  width="600" />
 </p>
 
 ## References

@@ -1,6 +1,6 @@
 # Bernstein-Vazirani - Prototype Benchmark Program
 
-The Bernstein-Vazirani (BV) algorithm [[1]](#references) is an extension of the [Deustch-Jozsa algorithm](../deutsch-jozsa/), also implemented in this repository. 
+The Bernstein-Vazirani (BV) algorithm [[1]](#references) is an extension of the [Deustch-Jozsa algorithm](../deutsch_jozsa/), also implemented in this repository. 
 The BV algorithm demonstrates a linear quantum speedup over its classical counterpart for analyzing a function. 
 
 ## Problem outline
@@ -40,7 +40,7 @@ and 1 ancilla qubit. The circuit is identical to the Deutsch-Jozsa circuit with 
 being in the definition and implementation of the oracle <img src="https://latex.codecogs.com/svg.latex?\pagecolor{white}U_f">.
 
 <p align="center">
-   <img align=center src="../_doc/images/bernstein-vazirani/bv_circuit.png"  width="600" />
+   <img align=center src="../_doc/images/bernstein_vazirani/bv_circuit.png"  width="600" />
 </p>
 
 *Fig 1. Diagram of general quantum circuit for Bernstein-Vazirani Algorithm [[2]](#references)*
@@ -51,7 +51,7 @@ algorithm, but the key points will be reproduced here.
 ### Algorithmic Visualization
 
 <p align="center">
-<img align=center src="../_doc/images/bernstein-vazirani/bv_gif.gif"  width="700" />
+<img align=center src="../_doc/images/bernstein_vazirani/bv_gif.gif"  width="700" />
 </p>
 
 *Fig 2. Visualization of quantum circuit executing for Bernstein-Vazirani Algorithm. The visualization
@@ -115,7 +115,7 @@ For a given bitstring <img align="center" src="https://latex.codecogs.com/svg.la
 where <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\,\text{CNOT}_{i,a}\"> is a CNOT gate controlled on data qubit <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\small\,i"/> and targeting the ancilla qubit.
 
 <p align="center">
-<img align=center src="../_doc/images/bernstein-vazirani/u_f.png" width="200"/>
+<img align=center src="../_doc/images/bernstein_vazirani/u_f.png" width="200"/>
 </p>
 
 ## Circuit Methods
@@ -125,7 +125,7 @@ This benchmark contains two methods for generating the Bernstein-Vazirani circui
 This method benchmarks the following circuit:
 
    <p align="center">
-   <img align=center src="../_doc/images/bernstein-vazirani/bv1_qiskit_circ.png"  width="600" />
+   <img align=center src="../_doc/images/bernstein_vazirani/bv1_qiskit_circ.png"  width="600" />
    </p>
 
 - **Method 2**: Generate the Bernstein-Vazirani circuit using only two qubits and mid-circuit measurements. This method
@@ -143,7 +143,7 @@ Qiskit's implementation blog post [[4]](#references). This is currently only imp
 is an example of the circuit benchmarked for this method: 
   
    <p align="center">
-   <img align=center src="../_doc/images/bernstein-vazirani/bv2_qiskit_circ.png"  width="800" />
+   <img align=center src="../_doc/images/bernstein_vazirani/bv2_qiskit_circ.png"  width="800" />
    </p>
 
 Note for this method, the following plots (which are generated with each benchmark)
@@ -152,7 +152,7 @@ physical circuit width is two. For example, for the virtual circuit width = 4, t
 two qubit circuit used with mid circuit measurements to represent the quantum circuit with 4 qubits.
 
    <p align="center">
-   <img align=center src="../_doc/images/bernstein-vazirani/bv_fidelity_width.png"  width="500" />
+   <img align=center src="../_doc/images/bernstein_vazirani/bv_fidelity_width.png"  width="500" />
    </p>
 
 ## References

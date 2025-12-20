@@ -45,13 +45,13 @@ The benchmark programs may be run directly by running Main_opt.py for version wi
 
 To execute version which includes classical optimization
 ```
-    cd hydrogen-lattice/Dev
+    cd hydrogen_lattice/Dev
     python Main_opt.py
 ```
 
 To execute version which has fixed set of parameters
 ```
-    cd hydrogen-lattice/Dev
+    cd hydrogen_lattice/Dev
     python Main.py
 ```
 

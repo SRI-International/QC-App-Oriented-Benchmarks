@@ -13,13 +13,13 @@ Integrating CUDA Quantum into the QED-C benchmarking suite prompted a restructur
 
 With this strucutre, used by the CUDA Quantum version of the benchmarks, the main routine for each benchmark resides at the top level of the benchmark directory, while the kernels are situated one level deeper in a directory identifed by the API name.  For example, the Bernstein-Vazirani benchmark main program is contained in:
 
-    bernstein-vazirani/bv_benchmark.py
+    bernstein_vazirani/bv_benchmark.py
 
 While the CUDA Quantum implementation of the quantum kernel for this benchmark is in:
 
-    bernstein-vazirani/cudaq/bv_kernel.py
+    bernstein_vazirani/cudaq/bv_kernel.py
 
-As of now, 4 of the benchmarks have been implemented for CUDA Quantum, with kernels contained within the **cudaq** sub-directory for each: **berstein-vazirani, hidden-shift, quantum-fourier transfor, and phase-estimation**. More coming soon. Instructions for running benchmarks on CUDA Quantum are presented below.
+As of now, 4 of the benchmarks have been implemented for CUDA Quantum, with kernels contained within the **cudaq** sub-directory for each: **berstein-vazirani, hidden_shift, quantum-fourier transfor, and phase_estimation**. More coming soon. Instructions for running benchmarks on CUDA Quantum are presented below.
 
 Note that for the Qiskit version of the benchmarks, we retained a version of the benhcmark main program in the **qiskit** sub-directory, in order to provide backwards compatibility for users, during this transition period and until the change has been implemented across the entire suite. 
 
@@ -58,7 +58,7 @@ In the section below, we provide some instructions for executing the benchmarks 
 
 To execute the benchmarks in a command or shell window, you simply change directory to the desired benchmark directory and execute the benchmark program as follows:
 
-    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein-vazirani
+    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein_vazirani
   
     python bv_benchmark.py -a cudaq
     

@@ -114,13 +114,13 @@ If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolo
 ### General Quantum Circuit
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/ham_sim_circuit.png"  width="700" />
+<img align=center src="../_doc/images/hamiltonian_simulation/ham_sim_circuit.png"  width="700" />
 </p>
 
 *Fig 1. Example of circuit with 1 Trotter step. We can see that our <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^x_i"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^y_i"/> turned into Rx and Ry gates, while the two qubit interactions turned into the gates that result from exponentiating these terms in the Hamiltonian. Note that this circuit application is less efficient than applying the XX, YY, and ZZ operations all at once.*
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/ham_sim_full_circuit.png"  width="700" />
+<img align=center src="../_doc/images/hamiltonian_simulation/ham_sim_full_circuit.png"  width="700" />
 </p>
 
 *Fig 2. Circuit with 2 Trotter steps and the optimal XXYYZZ operator.*
@@ -150,7 +150,7 @@ There are two options of circuit creation for this simulation:
 - **use_XX_YY_ZZ_gates:** Simple implementation of <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX)}"/>, <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(YY)}"/>, and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(ZZ)}"/>, provided for reference purposes and validation of the optimal implementation. In essence, we initially generate <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(ZZ)}"/> using two CNOT gates and an RZ gate. We then apply the XX and YY versions of this gate by providing a basis change from Z to X and from Z to Y, using Hadamard gates for the X transformation and using S and Hadamard gates for the Y transformation respectively. These circuits are below. It is possible to use this type of gate by passing `use_XX_YY_ZZ_gates=True` to the `run()` function.
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/XXYYZZ_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/XXYYZZ_gate.png"  />
 </p>
 
 *Fig 3. Optimal gate which applies <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX+YY+ZZ)}"/>.*
@@ -158,7 +158,7 @@ There are two options of circuit creation for this simulation:
 ---
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/ZZ_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/ZZ_gate.png"  />
 </p>
 
 *Fig 4. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(ZZ)}"/> gate.*
@@ -166,7 +166,7 @@ There are two options of circuit creation for this simulation:
 ---
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/XX_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/XX_gate.png"  />
 </p>
 
 *Fig 5. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX)}"/> gate.*
@@ -174,7 +174,7 @@ There are two options of circuit creation for this simulation:
 ---
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/YY_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/YY_gate.png"  />
 </p>
 
 *Fig 6. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(YY)}"/> gate.*

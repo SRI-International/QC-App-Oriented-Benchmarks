@@ -73,11 +73,11 @@ where N is the number of electrons. This metric goes from 0 to infinity, with 0 
 The following is an example of how these metrics are displayed after running the benchmarks:
 
 <p align="center">
-<img align=center src="../_doc/images/hydrogen-lattice/metric1.png"  width="600" />
+<img align=center src="../_doc/images/hydrogen_lattice/metric1.png"  width="600" />
 </p>
 
 <p align="center">
-<img align=center src="../_doc/images/hydrogen-lattice/metric2.png"  width="600" />
+<img align=center src="../_doc/images/hydrogen_lattice/metric2.png"  width="600" />
 </p>
 
 Note the several different types of plots. The top plot shows views of all three metrics with either the iteration number or cumulative quantum execution time on the X axis, while the bottom plot shows a different type of plot showing the accuracy volume as a function of the cumulative elapsed quantum time. 
@@ -179,7 +179,7 @@ $$
 With some derivation (see [2] and related papers), this can be efficiently implemented via the following gate:
 
 <p align="center">
-<img align=center src="../_doc/images/hydrogen-lattice/goings_rotation.png"  width="600" />
+<img align=center src="../_doc/images/hydrogen_lattice/goings_rotation.png"  width="600" />
 </p>
 
 With this in mind, the pUCCD ansatz will generally consist of this quantum circuit applied over each pair excitation. See the section below for an example.
@@ -187,7 +187,7 @@ With this in mind, the pUCCD ansatz will generally consist of this quantum circu
 ### Algorithmic Visualization
 
 <p align="center">
-<img align=center src="../_doc/images/hydrogen-lattice/puccd_qiskit.png"  width="600" />
+<img align=center src="../_doc/images/hydrogen_lattice/puccd_qiskit.png"  width="600" />
 </p>
 
 The pUCCD ansatz on four physical qubits. The first section marked by the barriers is the initial Hartree Fock State, wheras the sections after represent the pair excitations operations implemented via the Givens rotations. The parameterizations with which optimizations occur are in the $R_Y$ gates. Using this circuit in combination with a a paired-electron mapping for the Hamiltonian allows for a constant number of circuit measurements (3), as well as theoretically being able to simulate eight qubit systems. 
@@ -195,7 +195,7 @@ The pUCCD ansatz on four physical qubits. The first section marked by the barrie
 ### Algorithm Steps
 
 <p align="center">
-<img align=center src="../_doc/images/hydrogen-lattice/algorithm.png"  width="600" />
+<img align=center src="../_doc/images/hydrogen_lattice/algorithm.png"  width="600" />
 </p>
 
 ## Gate Implementation

@@ -1,6 +1,6 @@
 # Grover's Algorithm - Prototype Benchmark Program
 
-Grover's algorithm [[1]](#references), also referred to as the quantum search algorithm, is one of the most well known quantum algorithms due to its large amount of applications as well as its quadratic runtime speedup from any known classical algorithm. It is a special case of the more general [Amplitude Estimation](../amplitude-estimation/) algorithm.
+Grover's algorithm [[1]](#references), also referred to as the quantum search algorithm, is one of the most well known quantum algorithms due to its large amount of applications as well as its quadratic runtime speedup from any known classical algorithm. It is a special case of the more general [Amplitude Estimation](../amplitude_estimation/) algorithm.
 
 ## Problem outline
 This algorithm solves unstructured search problems, such as where we have a large, un-ordered list of items and have some "correct" item(s) we are looking for. We can check if each item is correct through an *oracle*, where for Grover's algorithm, the oracle gives the correct state a negative phase to distinguish it from other states. The methods we will describe here work for an arbitrary number of correct items, but in this benchmark we only have a single correct item we are looking for.
