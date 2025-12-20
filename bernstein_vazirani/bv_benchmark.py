@@ -110,17 +110,24 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	# configure the QED-C Benchmark package for use with the given API
 	BersteinVazirani, kernel_draw = qedc_benchmarks_init(api)
 	
+	mpi.init()
+	
+	##########
+	
 	print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
+	# create context identifier
+	if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+	
+	# special argument handling
+	ex.verbose = verbose
+	
 	# validate parameters (smallest circuit is 3 qubits)
 	max_qubits = max(3, max_qubits)
 	min_qubits = min(max(3, min_qubits), max_qubits)
 	skip_qubits = max(1, skip_qubits)
 	#print(f"min, max qubits = {min_qubits} {max_qubits}")
 
-	# create context identifier
-	if context is None: context = f"{benchmark_name} ({method}) Benchmark"
-	
 	##########
 	
 	# Variable for new qubit group ordering if using mid_circuit measurements

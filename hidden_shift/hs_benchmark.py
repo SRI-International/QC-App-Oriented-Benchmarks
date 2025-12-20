@@ -103,18 +103,25 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 
 	# configure the QED-C Benchmark package for use with the given API
 	HiddenShift, kernel_draw = qedc_benchmarks_init(api)
+
+	mpi.init()
+	
+	##########
 	
 	print(f"{benchmark_name} Benchmark Program - Qiskit")
 
+	# create context identifier
+	if context is None: context = f"{benchmark_name} Benchmark"
+	
+	# special argument handling
+	ex.verbose = verbose
+	
 	# validate parameters (smallest circuit is 2 qubits)
 	max_qubits = max(2, max_qubits)
 	min_qubits = min(max(2, min_qubits), max_qubits)
 	if min_qubits % 2 == 1: min_qubits += 1	  # min_qubits must be even
 	skip_qubits = max(2, skip_qubits)
 	#print(f"min, max qubits = {min_qubits} {max_qubits}")
-	
-	# create context identifier
-	if context is None: context = f"{benchmark_name} Benchmark"
 	
 	##########
 

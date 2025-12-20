@@ -142,16 +142,23 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
     # configure the QED-C Benchmark package for use with the given API
     QuantumFourierTransform, kernel_draw = qedc_benchmarks_init(api)
     
+    mpi.init()
+    
+    ##########
+    
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
+    # create context identifier
+    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+    
+    # special argument handling
+    ex.verbose = verbose
+    
     # validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
     skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
-
-    # create context identifier
-    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
     
     ##########
     
