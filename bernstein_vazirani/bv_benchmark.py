@@ -81,7 +81,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 		method=1, input_value=None,
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
-		context=None, api=None, get_circuits=False):
+		context=None, api=None, warmup=False, get_circuits=False):
 	"""
 	Configure the QED-C Benchmark package for use with the given API
 	Initialize API-specific modules. Called after argument parsing.
@@ -90,12 +90,15 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	"""
 	qedc_benchmarks_init(api, "bernstein_vazirani", ["bv_kernel"])
 	import bv_kernel as kernel
-	import execute as ex 
+	import execute as ex
+	from _common import qcb_mpi as mpi
 	from _common import metrics
+	
+	mpi.init()
 	
 	##########
 	
-	print(f"{benchmark_name} Benchmark Program - Qiskit")
+	print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
 	# create context identifier
 	if context is None: context = f"{benchmark_name} ({method}) Benchmark"
@@ -122,7 +125,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	transform_qubit_group = True if method == 2 else False
 	
 	# Initialize metrics module
-	metrics.init_metrics()
+	metrics.init_metrics(warmup)
 
 	# Define custom result handler
 	def execution_handler (qc, result, num_qubits, s_int, num_shots):  
@@ -185,6 +188,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 				mid_circuit_qubit_group.append(2)
 			
 			# create the circuit for given qubit size and secret string, store time metric
+			mpi.barrier()
 			ts = time.time()
 			qc = kernel.BersteinVazirani(num_qubits, s_int, bitset, method)	   
 			metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
@@ -211,12 +215,13 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 	   
 	##########
 	
-	# draw a sample circuit
-	kernel.kernel_draw()
+	if mpi.leader():
+		# draw a sample circuit
+		kernel.kernel_draw()
 
-	# Plot metrics for all circuit sizes
-	options = {"method":method, "shots": num_shots, "reps": max_circuits}
-	metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}", options=options, transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
+		# Plot metrics for all circuit sizes
+		options = {"method":method, "shots": num_shots, "reps": max_circuits}
+		metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}", options=options, transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
 
 #######################
@@ -238,6 +243,7 @@ def get_args():
 	parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
 	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
 	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+	parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
 	parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
 	return parser.parse_args()
 	
@@ -258,6 +264,6 @@ if __name__ == '__main__':
 		input_value=args.input_value,
 		backend_id=args.backend_id,
 		exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
-		api=args.api
+		api=args.api, warmup=args.warmup
 		)
    

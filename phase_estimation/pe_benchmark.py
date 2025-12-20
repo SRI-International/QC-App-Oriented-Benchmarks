@@ -112,7 +112,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 	print(f"{benchmark_name} Benchmark Program - Qiskit")
 
 	# create context identifier
-	if context is None: context = f"{benchmark_name} ({method}) Benchmark"
+	if context is None: context = f"{benchmark_name} Benchmark"
 	
 	# special argument handling
 	ex.verbose = verbose
@@ -127,6 +127,9 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 	min_qubits = max(max(3, min_qubits), num_state_qubits + 2)
 	skip_qubits = max(1, skip_qubits)
 	#print(f"min, max, state = {min_qubits} {max_qubits} {num_state_qubits}")
+
+	# create context identifier
+	if context is None: context = f"{benchmark_name} Benchmark"
 	
 	##########
 	
