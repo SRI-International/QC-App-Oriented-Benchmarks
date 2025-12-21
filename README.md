@@ -1,5 +1,11 @@
 # Application-Oriented Performance Benchmarks for Quantum Computing
 
+### 251220 - Version 1.0 - Released before Changes for Directory Names and Package Structure
+
+On 251221, significant changes were introduced to the master branch, including directory name changes (dashes to underbars), and support for standard python package structure.  This branch serves a record of the state of the system before those changes were made.
+
+## Overview
+
 This repository contains a collection of prototypical application- or algorithm-centric benchmark programs designed for the purpose of characterizing the end-user perception of the performance of current-generation Quantum Computers.
 
 The repository is maintained by members of the Quantum Economic Development Consortium (QED-C) Technical Advisory Committee on Standards and Performance Metrics (Standards TAC).
