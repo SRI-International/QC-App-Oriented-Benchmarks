@@ -23,7 +23,7 @@ jobs:
       working-directory: ./
 
     - name: Install hamiltonian simulation dependencies
-      run: pip install -r f/qiskit/requirements.txt
+      run: pip install -r hamiltonian_simulation/qiskit/requirements.txt
       working-directory: ./
       
     - name: Check Qiskit version
