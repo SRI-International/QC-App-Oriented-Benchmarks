@@ -4,6 +4,8 @@ This repository contains a collection of prototypical application- or algorithm-
 
 The repository is maintained by members of the Quantum Economic Development Consortium (QED-C) Technical Advisory Committee on Standards and Performance Metrics (Standards TAC).
 
+**Impportant Status Update --** As of 251222, any benchmark directory with a dash in its name, e.g. **hidden-shift**, has been renamed to use underbar instead, i.e. **hidden_shift**, and all references changed accordingly. This means that existing scripts or notebooks that reference these directories will need to be modified.  To ease the transition, a complete backup branch, **master-251220-v1**, of the state of the repository prior to this change has been created for use with existing scripts and notebooks.
+
 **Important Note --** The examples maintained in this repository are not intended to be viewed as "performance standards". Rather, they are offered as simple "prototypes", designed to make it as easy as possible for users to execute simple "reference applications" across multiple quantum computing APIs and platforms. The application / algorithmic examples are structured using a uniform pattern for defining circuits, executing across different platforms, collecting results, and measuring performance and fidelity in useful ways. 
 
 A variety of "reference applications" are provided. At the current stage in the evolution of quantum computing hardware, some applications will perform better on one hardware target, while a completely different set may execute better on another target. They are designed to provide users a quantum "jump start", so to speak, eliminating the need to develop for themselves uniform code patterns that facilitate quick development, deployment, and experimentation. 
