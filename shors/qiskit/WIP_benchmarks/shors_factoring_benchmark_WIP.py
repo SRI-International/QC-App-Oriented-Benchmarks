@@ -3,8 +3,8 @@ Shor's Factoring Algorithm Benchmark - Qiskit
 """
 
 import sys
-sys.path[1:1] = ["_common", "_common/qiskit", "shors/_common", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common", "../../quantum-fourier-transform/qiskit"]
+sys.path[1:1] = ["_common", "_common/qiskit", "shors/_common", "quantum_fourier_transform/qiskit"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common", "../../quantum_fourier_transform/qiskit"]
 
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 import math

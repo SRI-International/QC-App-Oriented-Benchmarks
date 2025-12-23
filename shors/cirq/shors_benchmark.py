@@ -10,8 +10,8 @@ import time
 import cirq
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/cirq", "shors/_common", "quantum-fourier-transform/cirq"]
-sys.path[1:1] = ["../../_common", "../../_common/cirq", "../../shors/_common", "../../quantum-fourier-transform/cirq"]
+sys.path[1:1] = ["_common", "_common/cirq", "shors/_common", "quantum_fourier_transform/cirq"]
+sys.path[1:1] = ["../../_common", "../../_common/cirq", "../../shors/_common", "../../quantum_fourier_transform/cirq"]
 import cirq_utils as cirq_utils
 import execute as ex
 import metrics as metrics

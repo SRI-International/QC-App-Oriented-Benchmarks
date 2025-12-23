@@ -72,7 +72,7 @@ Important note: there may be costs associated with execution on some hardware sy
 
 For example, in an Anaconda command window, you can enter the following commands to change the directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:
 
-    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein-vazirani\qiskit
+    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein_vazirani\qiskit
   
     python bv_benchmark.py
     

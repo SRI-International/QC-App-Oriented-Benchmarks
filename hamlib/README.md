@@ -185,7 +185,7 @@ If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolo
 ### General Quantum Circuit
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/ham_sim_circuit.png"  width="700" />
+<img align=center src="../_doc/images/hamiltonian_simulation/ham_sim_circuit.png"  width="700" />
 </p>
 
 *Fig 1. Example of circuit with 1 Trotter step. We can see that our <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^x_i"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^y_i"/> turned into Rx and Ry gates, while the two qubit interactions turned into the gates that result from exponentiating these terms in the Hamiltonian. Note that this circuit application is less efficient than applying the XX, YY, and ZZ operations all at once.*
@@ -213,7 +213,7 @@ Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the
 ---
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/ZZ_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/ZZ_gate.png"  />
 </p>
 
 *Fig 4. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(ZZ)}"/> gate.*
@@ -221,7 +221,7 @@ Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the
 ---
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/XX_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/XX_gate.png"  />
 </p>
 
 *Fig 5. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX)}"/> gate.*
@@ -229,7 +229,7 @@ Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the
 ---
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/YY_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/YY_gate.png"  />
 </p>
 
 *Fig 6. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(YY)}"/> gate.*

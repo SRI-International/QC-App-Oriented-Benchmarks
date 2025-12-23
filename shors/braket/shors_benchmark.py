@@ -9,8 +9,8 @@ import time
 from braket.circuits import Circuit     # AWS imports: Import Braket SDK modules
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/braket", "shors/_common", "quantum-fourier-transform/braket"]
-sys.path[1:1] = ["../../_common", "../../_common/braket", "../../shors/_common", "../../quantum-fourier-transform/braket"]
+sys.path[1:1] = ["_common", "_common/braket", "shors/_common", "quantum_fourier_transform/braket"]
+sys.path[1:1] = ["../../_common", "../../_common/braket", "../../shors/_common", "../../quantum_fourier_transform/braket"]
 import execute as ex
 import metrics as metrics
 from shors_utils import getAngles, getAngle, modinv, generate_base

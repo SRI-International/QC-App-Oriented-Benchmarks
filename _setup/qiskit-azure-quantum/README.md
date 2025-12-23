@@ -72,7 +72,7 @@ Once you are authenticated, executing the benchmarks will not request further au
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:
 
-    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein-vazirani\qiskit
+    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein_vazirani\qiskit
   
     python bv_benchmark.py
     

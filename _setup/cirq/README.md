@@ -40,7 +40,7 @@ More to come on this later.
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Cirq Bernstein-Vazirani directory and run the benchmark program:
 
-    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein-vazirani\cirq
+    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein_vazirani\cirq
   
     python bv_benchmark.py
     

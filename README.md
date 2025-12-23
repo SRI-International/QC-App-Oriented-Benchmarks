@@ -4,6 +4,8 @@ This repository contains a collection of prototypical application- or algorithm-
 
 The repository is maintained by members of the Quantum Economic Development Consortium (QED-C) Technical Advisory Committee on Standards and Performance Metrics (Standards TAC).
 
+**Important Status Update --** As of 251222, any benchmark directory with a dash in its name, e.g. **hidden-shift**, has been renamed to use underbar instead, i.e. **hidden_shift**, and all references changed accordingly. This means that existing scripts or notebooks that reference these directories will need to be modified.  To ease the transition, a complete backup branch, **master-251220-v1**, of the state of the repository prior to this change has been created for use with existing scripts and notebooks.
+
 **Important Note --** The examples maintained in this repository are not intended to be viewed as "performance standards". Rather, they are offered as simple "prototypes", designed to make it as easy as possible for users to execute simple "reference applications" across multiple quantum computing APIs and platforms. The application / algorithmic examples are structured using a uniform pattern for defining circuits, executing across different platforms, collecting results, and measuring performance and fidelity in useful ways. 
 
 A variety of "reference applications" are provided. At the current stage in the evolution of quantum computing hardware, some applications will perform better on one hardware target, while a completely different set may execute better on another target. They are designed to provide users a quantum "jump start", so to speak, eliminating the need to develop for themselves uniform code patterns that facilitate quick development, deployment, and experimentation. 
@@ -34,7 +36,7 @@ See the [Implementation Status](#implementation-status) section below for the la
 
 ## Notes on Repository Organization
 
-The repository is organized at the highest level by specific reference application names. There is a directory for each application or algorithmic example, e.g. [`quantum-fourier-transform`](./quantum-fourier-transform/), which contains the bulk of code for that application. 
+The repository is organized at the highest level by specific reference application names. There is a directory for each application or algorithmic example, e.g. [`quantum_fourier_transform`](./quantum_fourier_transform/), which contains the bulk of code for that application. 
 
 Within each application directory, there is a second-level directory, one for each of the target programming environments that are supported. The repository is organized in this way to emphasize the application first and the target environment second, to encourage full support across platforms.
 
@@ -92,7 +94,7 @@ See the above link to the _setup folder for more information about each programm
 
 The benchmark programs may be run manually in a command shell. In a command window or shell, change the directory to the application you would like to execute. Then, simply execute a line similar to the following, to begin the execution of the main program for the application:
 ```
-    cd bernstein-vazirani
+    cd bernstein_vazirani
     python bv_benchmark.py
 ```
 This will run the program, construct and execute multiple circuits, analyze results, and produce a set of bar charts to report on the results. The program executes random circuits constructed for a specific number of qubits, in a loop that ranges from `min_qubits` to `max_qubits` (with default values that can be passed as parameters). The number of random circuits generated for each qubit size can be controlled by the `max_circuits` parameter.

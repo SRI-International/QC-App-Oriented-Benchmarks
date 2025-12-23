@@ -15,12 +15,12 @@ import sparse_Ham_sim as shs
 import uniform_controlled_rotation as ucr
 
 # include QFT in this list, so we can refer to the QFT sub-circuit definition
-#sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
-#sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+#sys.path[1:1] = ["_common", "_common/qiskit", "quantum_fourier_transform/qiskit"]
+#sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum_fourier_transform/qiskit"]
 
 # cannot use the QFT common yet, as HHL seems to use reverse bit order
-sys.path[1:1] = ["_common", "_common/qiskit", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum-fourier-transform/qiskit"]
+sys.path[1:1] = ["_common", "_common/qiskit", "quantum_fourier_transform/qiskit"]
+sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../quantum_fourier_transform/qiskit"]
 #from qft_benchmark import qft_gate, inv_qft_gate
 
 import execute as ex

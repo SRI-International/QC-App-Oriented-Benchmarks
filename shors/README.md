@@ -57,7 +57,7 @@ The general number field sieve is the most efficient classical algorithm for int
 
 ## Quantum algorithm
 The quantum algorithm for order finding is a special case of Quantum Phase Estimation where the calculated phase contains information
-about the order. Review the [Quantum Phase Estimation](../phase-estimation/README.md) benchmark for more details
+about the order. Review the [Quantum Phase Estimation](../phase_estimation/README.md) benchmark for more details
 on the mathematics of the algorithm. Since Quantum Phase Estimation has a runtime of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}O(n^2)">, the problem of order finding, and by extension integer factoring, has an
 exponential speedup on a quantum computer compared to a classical computer.
 
@@ -84,7 +84,7 @@ To understand the intuition more, check out [[5]](#references) and [[6]](#refere
 ### Algorithm Steps
 The steps for Shor's order finding are the following. Note that we use the notation that within a single register we can represent a state two ways. For example, we can write the integer 1 in <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}m"> qubits as <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle^{\otimes{m-1}}|1\rangle"/> or as <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|1\rangle"/>.
 
-Additionally, note that this process is the same as applying [Quantum Phase Estimation](../phase-estimation/README.md) to estimate the eigenvalues of the operator <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U">. Because of the periodicity of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U">, all of the eigenvalues have a phase proportional to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r">. This can be seen by looking at the eigenvectors. Our first eigenvector is:
+Additionally, note that this process is the same as applying [Quantum Phase Estimation](../phase_estimation/README.md) to estimate the eigenvalues of the operator <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U">. Because of the periodicity of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U">, all of the eigenvalues have a phase proportional to <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r">. This can be seen by looking at the eigenvectors. Our first eigenvector is:
 <p align="center">
 <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\varphi_0\rangle=\sum_{j=0}^{r-1}|a^j\mod{N}\rangle=|1\mod{N}\rangle+|a\mod{N}\rangle+\cdots+|a^{r-1}\mod{N}\rangle"/>
 </p>
