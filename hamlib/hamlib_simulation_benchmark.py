@@ -25,6 +25,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 # The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
+from _common import metrics
+from _common import qcb_mpi as mpi
 
 
 api_ = "qiskit" 
@@ -124,11 +126,9 @@ def analyze_and_print_result(
     Returns:
         tuple: Counts and fidelity.
     """
-    
-    from _common import metrics
     from hamlib._common import evolution_exact
     from hamlib._common import observables
-    
+
     counts = result.get_counts(qc)
 
     if verbose:
@@ -347,14 +347,14 @@ def run(min_qubits: int = 2,
 	"""
     qedc_benchmarks_init(api, "hamlib", ["hamlib_simulation_kernel"])
     import hamlib_simulation_kernel
-    import execute as ex 
- 
+    import execute as ex
+
     from hamlib._common import evolution_exact
     from hamlib._common import metric_plots
     from hamlib._common import hamlib_utils
     from hamlib._common import observables
-    from _common import qcb_mpi as mpi
-    from _common import metrics
+
+    mpi.init()
 
     ##########
     
@@ -1076,8 +1076,10 @@ def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     """
     Group the Pauli terms according to the given group method: "None", "simple", "N"
     """
+    from hamlib._common import observables
+
     mpi.barrier()
-    
+
     return observables.find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=k)
 
 
