@@ -15,8 +15,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 # The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
+from _common import metrics
+from _common import qcb_mpi as mpi
 
-	
+
 # Benchmark Name
 benchmark_name = "Hidden Shift"
 
@@ -51,8 +53,6 @@ def str_to_ivec(input_size: int, s_int: int):
 # Expected result is always the secret_int, so fidelity calc is simple
 def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
 
-	from _common import metrics
-	
 	# obtain counts from the result object
 	counts = result.get_counts(qc)
 	if verbose: print(f"For secret int {secret_int} measured: {counts}")   
@@ -78,18 +78,11 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 		hub="ibm-q", group="open", project="main", exec_options=None,
 		context=None, api=None, warmup=False, get_circuits=False):
 	
-	"""
-	Configure the QED-C Benchmark package for use with the given API
-	Initialize API-specific modules. Called after argument parsing.
-	Imports are here (not at module level) to support dynamic loading
-	of API-specific implementations (qiskit/cirq/cudaq/etc).
-	"""
-	qedc_benchmarks_init(api, "hidden_shift", ["hs_kernel"]) 
+	# Configure the QED-C Benchmark package for use with the given API
+	qedc_benchmarks_init(api, "hidden_shift", ["hs_kernel"])
 	import hs_kernel as kernel
 	import execute as ex
-	from _common import qcb_mpi as mpi
-	from _common import metrics
-	
+
 	mpi.init()
 	
 	##########

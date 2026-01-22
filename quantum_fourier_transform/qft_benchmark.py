@@ -15,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 # The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
+from _common import metrics
+from _common import qcb_mpi as mpi
 
 
 # Benchmark Name
@@ -64,8 +66,6 @@ def expected_dist(num_qubits, secret_int, counts):
 # Analyze and print measured results
 def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots, method):
 
-    from _common import metrics
-    
     # obtain counts from the result object
     counts = result.get_counts(qc)
     if verbose: print(f"For secret int {secret_int} measured: {counts}") 
@@ -115,18 +115,11 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, warmup=False, get_circuits=False):
 
-    """
-    Configure the QED-C Benchmark package for use with the given API
-    Initialize API-specific modules. Called after argument parsing.
-    Imports are here (not at module level) to support dynamic loading
-    of API-specific implementations (qiskit/cirq/cudaq/etc).
-    """
+    # Configure the QED-C Benchmark package for use with the given API
     qedc_benchmarks_init(api, "quantum_fourier_transform", ["qft_kernel"])
     import qft_kernel as kernel
     import execute as ex
-    from _common import qcb_mpi as mpi
-    from _common import metrics
-    
+
     mpi.init()
     
     ##########

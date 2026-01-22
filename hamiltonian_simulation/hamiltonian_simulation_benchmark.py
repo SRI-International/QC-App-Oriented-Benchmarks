@@ -21,8 +21,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 # The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
-  
-  
+from _common import metrics
+from _common import qcb_mpi as mpi
+
+
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
 
@@ -81,9 +83,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     Returns:
         tuple: Counts and fidelity.
     """
-    
-    from _common import metrics
-    
+
     counts = result.get_counts(qc)
     if verbose:
         #print(f"For type {type} measured: {counts}")
@@ -189,18 +189,11 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         None
     """
     
-    """
-    Configure the QED-C Benchmark package for use with the given API
-    Initialize API-specific modules. Called after argument parsing.
-    Imports are here (not at module level) to support dynamic loading
-    of API-specific implementations (qiskit/cirq/cudaq/etc).
-    """
+    # Configure the QED-C Benchmark package for use with the given API
     qedc_benchmarks_init(api, "hamiltonian_simulation", ["hamiltonian_simulation_kernel"])
     import hamiltonian_simulation_kernel as kernel
     import execute as ex
-    from _common import qcb_mpi as mpi
-    from _common import metrics
-    
+
     mpi.init()
     
     ##########

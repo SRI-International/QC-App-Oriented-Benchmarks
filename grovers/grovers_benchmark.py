@@ -12,8 +12,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 # The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
+from _common import metrics
+from _common import qcb_mpi as mpi
 
-	
+
 # Benchmark Name
 benchmark_name = "Grovers Search"
 
@@ -27,9 +29,7 @@ verbose = False
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
 def analyze_and_print_result(qc, result, num_qubits, marked_item, num_shots):
-    
-    from _common import metrics
-    
+
     counts = result.get_counts(qc)
     if verbose: print(f"For type {marked_item} measured: {counts}")
 
@@ -73,17 +73,10 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, get_circuits=False):
 
-    """
-    Configure the QED-C Benchmark package for use with the given API
-    Initialize API-specific modules. Called after argument parsing.
-    Imports are here (not at module level) to support dynamic loading
-    of API-specific implementations (qiskit/cirq/cudaq/etc).
-    """
+    # Configure the QED-C Benchmark package for use with the given API
     qedc_benchmarks_init(api, "grovers", ["grovers_kernel"])
     import grovers_kernel as kernel
     import execute as ex
-    from _common import qcb_mpi as mpi
-    from _common import metrics
 
     mpi.init()
     

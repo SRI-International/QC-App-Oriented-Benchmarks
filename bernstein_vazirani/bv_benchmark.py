@@ -15,6 +15,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 # The QED-C initialization module
 from _common.qedc_init import qedc_benchmarks_init
+from _common import metrics
+from _common import qcb_mpi as mpi
+
 
 # Benchmark Name
 benchmark_name = "Bernstein-Vazirani"
@@ -52,9 +55,7 @@ def str_to_ivec(input_size: int, s_int: int):
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
 def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
-	
-	from _common import metrics
-	
+
 	# size of input is one less than available qubits
 	input_size = num_qubits - 1
 	
@@ -82,18 +83,11 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
 		backend_id=None, provider_backend=None,
 		hub="ibm-q", group="open", project="main", exec_options=None,
 		context=None, api=None, warmup=False, get_circuits=False):
-	"""
-	Configure the QED-C Benchmark package for use with the given API
-	Initialize API-specific modules. Called after argument parsing.
-	Imports are here (not at module level) to support dynamic loading
-	of API-specific implementations (qiskit/cirq/cudaq/etc).
-	"""
+	# Configure the QED-C Benchmark package for use with the given API
 	qedc_benchmarks_init(api, "bernstein_vazirani", ["bv_kernel"])
 	import bv_kernel as kernel
 	import execute as ex
-	from _common import qcb_mpi as mpi
-	from _common import metrics
-	
+
 	mpi.init()
 	
 	##########
