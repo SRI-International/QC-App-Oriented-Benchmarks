@@ -42,8 +42,8 @@ log_to_file = False
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# set path for saving the thetas_array
-thetas_array_path = "../_common/instances/"
+# set path for saving the thetas_array (use absolute path based on file location)
+thetas_array_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_common", "instances") + os.sep
 
 try:
     if log_to_file:
