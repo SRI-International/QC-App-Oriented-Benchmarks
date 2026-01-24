@@ -12,8 +12,8 @@ from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.synthesis import LieTrotter
 
-from _common.qiskit import execute as ex
-from _common import metrics as metrics
+import execute as ex
+from _common import metrics
 
 # Benchmark Name
 benchmark_name = "VQE Simulation"
