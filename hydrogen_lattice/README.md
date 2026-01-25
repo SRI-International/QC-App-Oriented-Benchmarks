@@ -209,4 +209,4 @@ Described in more detail in the paper.
 ## References
 
 [1] Google Open Fermion Documentation Team. (2021). [`The Jordan-Wigner and Bravyi-Kitaev Transforms`](https://quantumai.google/openfermion/tutorials/jordan_wigner_and_bravyi_kitaev_transforms)
-[2] Zhao, L., Goings, J., Shin, K. _et al._ Orbital-optimized pair-correlated electron simulations on trapped-ion quantum computers. _npj Quantum Inf_ **9**, 60 (2023). https://doi.org/10.1038/s41534-023-00730-8kj
+[2] Zhao, L., Goings, J., Shin, K. _et al._ Orbital-optimized pair-correlated electron simulations on trapped-ion quantum computers. _npj Quantum Inf_ **9**, 60 (2023). https://doi.org/10.1038/s41534-023-00730-8
