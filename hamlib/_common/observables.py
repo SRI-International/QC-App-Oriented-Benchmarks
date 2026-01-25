@@ -812,7 +812,7 @@ try:
     from qiskit.primitives import BackendEstimator
 
 except Exception as ex:
-    print("WARNING: Qiskit-dependent compute observable value functions are not available")
+    print(f"WARNING: Qiskit-dependent compute observable value functions are not available\n {ex}")
 
 # ===========================================
 # QISKIT ESTIMATOR FUNCTIONS
