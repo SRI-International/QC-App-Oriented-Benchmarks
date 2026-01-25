@@ -93,12 +93,12 @@ The code for the each of the application benchmarks is largely self-contained, e
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Braket Bernstein-Vazirani directory and run the benchmark program:
 
-    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein_vazirani\braket
-  
+    cd [your github home directory]/QC-App-Oriented-Benchmarks/bernstein_vazirani
+
     python bv_benchmark.py
-    
+
 This will execute the benchmark program, report the benchmark metrics to the console, and invoke a set of bar charts showing the results in visual form.
-All other benchmarks follow a similar pattern and structure and are executed in the same way (using the appropriate benchmark pgrogram filename).
+All other benchmarks follow a similar pattern and structure and are executed in the same way (using the appropriate benchmark program filename).
 
 Important Note:
 ```

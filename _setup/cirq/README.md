@@ -40,13 +40,13 @@ More to come on this later.
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Cirq Bernstein-Vazirani directory and run the benchmark program:
 
-    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein_vazirani\cirq
-  
+    cd [your github home directory]/QC-App-Oriented-Benchmarks/bernstein_vazirani
+
     python bv_benchmark.py
-    
+
 This will execute the benchmark program and report the benchmark metrics to the console.
 
-The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark pgrogram filename).
+The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark program filename).
 
 ## Run the benchmark programs in a Jupyter Notebook
 

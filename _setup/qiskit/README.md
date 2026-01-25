@@ -33,7 +33,7 @@ To use a hardware backend from a computer system provider other than IBM, you wi
 To execute the benchmarks on IBM systems, go your account page, 
 [create an account](https://quantum-computing.ibm.com/docs/manage/account/) in IBM Quantum and save the account token in your local machine using instructions [here](https://quantum-computing.ibm.com/docs/manage/account/ibmq).
 
-## Configuraing IBM Runtime primitives
+## Configuring IBM Runtime primitives
 
 The `qiskit-ibm-runtime` package offers the Sampler primitive and the Estimator primitive to execute quantum circuits. The Sampler primitive performs tasks of drawing samples from the output state of the quantum circuits in the computation basis, and the Estimator primitive performs tasks of estimating expectation values of observables with respect to the output state of the quantum circuits. 
 
@@ -65,20 +65,21 @@ The first code cell of the notebook is configured by default to execute all the 
     
 Once configured, you can do a Run All command to execute all the top-level benchmarks at once.
 
-Important note: there may be costs associated with execution on some hardware systems. You may consider lowering the value of the num_shots, max_circuits, and max_quibts settings in the first code cell, during your initial testing to avoid unexpected charges.
+Important note: there may be costs associated with execution on some hardware systems. You may consider lowering the value of the num_shots, max_circuits, and max_qubits settings in the first code cell, during your initial testing to avoid unexpected charges.
 
 
 ## Run the benchmark programs in a command window.
 
 For example, in an Anaconda command window, you can enter the following commands to change the directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:
 
-    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein_vazirani\qiskit
+    cd [your github home directory]/QC-App-Oriented-Benchmarks/bernstein_vazirani
+
   
     python bv_benchmark.py
     
 This will execute the benchmark program and report the benchmark metrics to the console.
 
-The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark pgrogram filename).
+The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark program filename).
 
 
 
@@ -87,7 +88,7 @@ The other benchmarks follow a similar format and structure and are executed in t
 The repository has been validated on Linux using the following versions as minimums:
 
     Miniconda Version: 4.10.3
-    Python Versions: 3.8.5 and 3.9.7
-    Qiskit-Terra Version: 0.18.3
+    Python Version: 3.9 or later
+    Qiskit Version: 1.0 or later
 
 Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.
