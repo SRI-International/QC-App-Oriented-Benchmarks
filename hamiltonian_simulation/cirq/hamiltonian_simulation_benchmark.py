@@ -4,7 +4,6 @@ Hamiltonian-Simulation Benchmark Program - Cirq
 
 import json
 import os
-import sys
 import time
 from collections import defaultdict
 
@@ -12,11 +11,9 @@ import numpy as np
 
 import cirq
 
-sys.path[1:1] = ["_common", "_common/cirq"]
-sys.path[1:1] = ["../../_common", "../../_common/cirq"]
-import cirq_utils as cirq_utils
-import execute as ex
-import metrics as metrics
+from _common.cirq import cirq_utils as cirq_utils
+from _common.cirq import execute as ex
+from _common import metrics as metrics
 
 np.random.seed(0)
 

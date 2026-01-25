@@ -22,15 +22,11 @@ from qiskit.circuit import ParameterVector
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
 
-# QED-C benchmark-specific imports
-sys.path[1:1] = ["_common", "_common/qiskit", "hydrogen_lattice/_common"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../hydrogen_lattice/_common/"]
-
-import common
-import execute as ex
-import metrics as metrics
+from hydrogen_lattice._common import common
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
 # import h-lattice_metrics from _common folder
-import h_lattice_metrics as h_metrics
+from hydrogen_lattice._common import h_lattice_metrics as h_metrics
 
 # DEVNOTE: this logging feature should be moved to common level
 logger = logging.getLogger(__name__)

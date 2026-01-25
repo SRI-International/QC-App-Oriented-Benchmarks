@@ -27,13 +27,10 @@ from sklearn.preprocessing import MinMaxScaler, normalize
 from sklearn.metrics import accuracy_score, mean_squared_error
 from noisyopt import minimizeSPSA
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", '../../image_recognition/_common/']
-
 # benchmark-specific imports
-import execute as ex
-import metrics as metrics
-import image_recognition_metrics as img_metrics
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
+from image_recognition._common import image_recognition_metrics as img_metrics
 
 # DEVNOTE: this logging feature should be moved to common level
 logger = logging.getLogger(__name__)
@@ -45,8 +42,8 @@ log_to_file = False
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# set path for saving the thetas_array
-thetas_array_path = "../_common/instances/"
+# set path for saving the thetas_array (use absolute path based on file location)
+thetas_array_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_common", "instances") + os.sep
 
 try:
     if log_to_file:

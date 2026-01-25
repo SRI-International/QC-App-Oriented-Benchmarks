@@ -3,18 +3,15 @@ Shor's Order Finding Algorithm Benchmark - Braket (WIP)
 """
 
 import math
-import sys
 import time
 
 from braket.circuits import Circuit     # AWS imports: Import Braket SDK modules
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/braket", "shors/_common", "quantum_fourier_transform/braket"]
-sys.path[1:1] = ["../../_common", "../../_common/braket", "../../shors/_common", "../../quantum_fourier_transform/braket"]
-import execute as ex
-import metrics as metrics
-from shors_utils import getAngles, getAngle, modinv, generate_base
-from qft_benchmark import inv_qft_gate, qft_gate
+from _common.braket import execute as ex
+from _common import metrics as metrics
+from shors._common.shors_utils import getAngles, getAngle, modinv, generate_base
+from quantum_fourier_transform.braket.qft_benchmark import inv_qft_gate, qft_gate
 
 np.random.seed(0)
 

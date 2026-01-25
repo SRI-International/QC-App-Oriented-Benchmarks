@@ -8,20 +8,16 @@ from pathlib import Path
 import numpy as np
 from qiskit.opflow.primitive_ops import PauliSumOp
 import matplotlib.pyplot as plt
-from ansatz import PUCCD
-from simulator import Simulator
+from hydrogen_lattice.Dev.ansatz import PUCCD
+from hydrogen_lattice.Dev.simulator import Simulator
 import os
 
 from scipy.optimize import minimize
-import sys
 
 # Create a list to store the plots
 plots = []
 
-sys.path[1:1] = [ "_common", "_common/Dev", "hydrogen_lattice/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../hydrogen_lattice/_common/" ]
-
-import common
+from hydrogen_lattice._common import common
 # Create an instance of the Simulator class for noiseless simulations
 ideal_backend = Simulator()
 

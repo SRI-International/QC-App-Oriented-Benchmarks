@@ -3,16 +3,13 @@ Phase Estimation Benchmark Program - Braket
 """
 
 import time
-import sys
 
 from braket.circuits import Circuit     # AWS imports: Import Braket SDK modules
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/braket", "quantum_fourier_transform/braket"]
-sys.path[1:1] = ["../../_common", "../../_common/braket", "../../quantum_fourier_transform/braket"]
-import execute as ex
-import metrics as metrics
-from qft_benchmark import inv_qft_gate
+from _common.braket import execute as ex
+from _common import metrics as metrics
+from quantum_fourier_transform.braket.qft_benchmark import inv_qft_gate
 
 np.random.seed(0)
 

@@ -8,17 +8,14 @@ import logging
 import math
 import os
 import re
-import sys
 import time
 
 import numpy as np
 
-sys.path[1:1] = [ "_common", "_common/ocean", "maxcut/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/ocean", "../../maxcut/_common/" ]
-import common
-import execute as ex
-import metrics as metrics
-import HamiltonianCircuitProxy
+from maxcut._common import common
+from _common.ocean import execute as ex
+from _common import metrics as metrics
+from _common.ocean import HamiltonianCircuitProxy
 
 logger = logging.getLogger(__name__)
 fname, _, ext = os.path.basename(__file__).partition(".")

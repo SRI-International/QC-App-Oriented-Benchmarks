@@ -8,11 +8,10 @@ This module includes helper funtions for computing observables from a Hamiltonia
 from itertools import combinations
 import numpy as np
 import copy
-import sys
 import time
 from typing import Union, List, Tuple, Dict
 
-sys.path[1:1] = ["..//qiskit"]
+#from hamlib.qiskit import hamlib_simulation_kernel as kernel
 import hamlib_simulation_kernel as kernel
 
 verbose = False
@@ -327,7 +326,7 @@ def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     
     # use k-commuting algorithm
     else:
-        from generate_pauli_groups import compute_groups
+        from hamlib._common.generate_pauli_groups import compute_groups
         pauli_term_groups = compute_groups(num_qubits, sparse_pauli_terms, k)
     
     #print(f"\n... Number of groups created: {len(pauli_term_groups)}")

@@ -31,14 +31,8 @@ from matplotlib.patches import Rectangle, Patch
 import numpy as np
 import math
 
-# add to the path variable the path to the metrics module
-import sys
-
-sys.path[1:1] = [ "_common", "_common/qiskit", "image_recognition/_common" ]
-sys.path[1:1] = [ "../../_common", "../../_common/qiskit", "../../image_recognition/_common/" ]
-
 # import the metrics module
-import metrics as metrics
+from _common import metrics as metrics
 
 image_recognition_metrics = metrics.circuit_metrics_detail
 
