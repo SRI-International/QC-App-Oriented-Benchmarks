@@ -29,6 +29,12 @@ A variety of "reference applications" are provided. At the current stage in the 
    python bernstein_vazirani/bv_benchmark.py
    ```
 
+4. **Run many benchmarks** (using Jupyter Notebook):
+   ```bash
+   jupyter notebook benchmarks-qiskit.ipynb
+   ```
+   This notebook provides cells for running most of the benchmarks (excludes more complex ones like Hydrogen Lattice, MaxCut, Image Recognition, and Quantum Reinforcement Learning which have their own dedicated notebooks).
+
 For more detailed setup instructions, see the [Setup and Configuration](#setup-and-configuration) section below.
 
 ## Publications
@@ -86,9 +92,8 @@ In addition to the application directories at the highest level, there are sever
 ```
     _common                      -- collection of shared routines, used by all the application examples
     _doc                         -- detailed DESIGN_NOTES, and other reference materials
-    _containerbuildfiles         -- build files and instructions for creating Docker images (optional)
     _setup                       -- information on setting up all environments
-    
+
     benchmarks-*.ipynb           -- Jupyter Notebooks convenient for executing the benchmarks
 ```
 
@@ -135,25 +140,11 @@ There you will have access to a cell for each of the benchmarks in the repositor
 
 Some benchmarks, such as Max-Cut and Hydrogen Lattice, include a notebook for running advanced tests, specifically the iterative execution of interleaved classical/quantum code for a hybrid algorithm. See the instructions in the README for those benchmarks for procedures and options that are available. 
 
-## Executing the Application Benchmark Programs via the Qiskit Runner (Qiskit Environment only)
-
-It is possible to run the benchmarks from the top-level directory in a generalized way on the command line 
-  [`Qiskit_Runner`](./_common/qiskit/README.md)
-
 ## Enabling Compiler Optimizations
 
 There is support provided within the Jupyter Notebook for the Qiskit versions of the benchmarks to enable certain compiler optimizations. In the first cell of the notebook, there is a variable called `exec_options` where several of the built-in Qiskit compiler optimizations may be specified.
 
 The second cell of the Jupyter Notebook contains commented code with references to custom-coded Qiskit compiler optimizations as well as some third-party optimization tools. Simply uncomment the desired optimizations and rerun the notebook to enable the optimization method. The custom code for these optimizations is located in the `_common/transformers` directory. Users may define their own custom optimizations within this directory and reference them from the notebook.
-
-## Container Deployment of the Application Benchmark Programs
-
-Applications are often deployed into Container Management Frameworks such as Docker, Kubernetes, and the like. 
-
-The Application-Oriented Benchmarks repository includes support for the creation of a unique *'container image'* for each of the supported API environments. You can find the instructions and all the necessary build files in a folder at the top level named [**`_containerbuildfiles`**](./_containerbuildfiles/).
-The benchmark program image can be deployed into a container management framework and executed as any other application in that framework.
-
-Once built, deployed, and launched, the container process invokes a Jupyter Notebook from which you can run all the available benchmarks.
 
 ## Interpreting Metrics
 
