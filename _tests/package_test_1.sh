@@ -13,17 +13,26 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Args:
-# - 0 args -> defaults
-# - 2 args -> use both
-# - anything else -> error
+# - 0 args -> defaults (hidden_shift, no extra args)
+# - 2+ args -> first two are folder/bmname, rest passed to Python
+#
+# Examples:
+#   ./package_test_1.sh
+#   ./package_test_1.sh hydrogen_lattice hydrogen_lattice_benchmark
+#   ./package_test_1.sh hydrogen_lattice hydrogen_lattice_benchmark -a qiskit
+#   ./package_test_1.sh hamlib hamlib_simulation_benchmark -a cudaq --num_qubits 4
+
 if [ "$#" -eq 0 ]; then
   folder="hidden_shift"
   bmname="hs_benchmark"
-elif [ "$#" -eq 2 ]; then
+  extra_args=""
+elif [ "$#" -ge 2 ]; then
   folder="$1"
   bmname="$2"
+  shift 2
+  extra_args="$*"
 else
-  echo "Error: Both arguments required or none" >&2
+  echo "Error: Need 0 args (defaults) or 2+ args (folder bmname [python_args...])" >&2
   exit 1
 fi
 
@@ -35,11 +44,12 @@ fi
 
 echo "folder=$folder"
 echo "bmname=$bmname"
+echo "extra_args=$extra_args"
 
 # ----- run in BM directory -----
 echo "... run in BM directory ..."
 pushd "$folder" >/dev/null
-"$PYTHON" "${bmname}.py" -a cudaq
+"$PYTHON" "${bmname}.py" $extra_args
 popd >/dev/null
 
 # pause (only if interactive)
@@ -49,7 +59,7 @@ fi
 
 # ----- run at top level -----
 echo "... run at top level ..."
-"$PYTHON" "${folder}/${bmname}.py"  -a cudaq
+"$PYTHON" "${folder}/${bmname}.py" $extra_args
 
 # pause (only if interactive)
 if [ -t 0 ]; then
@@ -58,4 +68,4 @@ fi
 
 # ----- run at top level as a module -----
 echo "... run at top level as a module"
-"$PYTHON" -m "${folder}.${bmname}"  -a cudaq
+"$PYTHON" -m "${folder}.${bmname}" $extra_args
