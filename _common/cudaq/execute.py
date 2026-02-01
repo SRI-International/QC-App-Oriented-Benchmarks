@@ -23,29 +23,13 @@
 # execution, so they can be aggregated and presented to the user.
 #
 
-import os, sys
 import time
 import copy
-import qcb_mpi as mpi
 import json
 import math
 
-# import metrics module relative to top level of package
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-common_dir = os.path.abspath(os.path.join(current_dir, ".."))
-#sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-
-top_dir = os.path.abspath(os.path.join(common_dir, ".."))
-sys.path = [top_dir] + [p for p in sys.path if p != top_dir]
-
-#print(sys.path)
-
-# DEVNOTE: for some reason, this does not work - why?
-#import _common.metrics as metrics
-
-# instead, need to include the common directory in path and do this
-import metrics
+from _common import qcb_mpi as mpi
+from _common import metrics
 
 # import the CUDA-Q package
 import cudaq

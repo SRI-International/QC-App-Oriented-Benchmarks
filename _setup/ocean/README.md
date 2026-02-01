@@ -38,13 +38,13 @@ The `ocean` package allows quantum circuits to be run in a real quantum hardware
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Ocean MaxCut directory and run the benchmark program:
 
-    cd [your github home directory]\QC-App-Oriented-Benchmarks\maxcut\ocean
-  
+    cd [your github home directory]/QC-App-Oriented-Benchmarks/maxcut
+
     python maxcut_benchmark.py
-    
+
 This will execute the benchmark program and report the benchmark metrics to the console.
 
-The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark pgrogram filename).
+Note: Ocean currently only supports the MaxCut benchmark (using the appropriate benchmark program filename).
 
 ## Run the benchmark programs in a Jupyter Notebook
 

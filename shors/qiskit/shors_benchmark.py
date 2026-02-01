@@ -3,22 +3,57 @@ Shor's Order Finding Algorithm Benchmark - Qiskit
 """
 
 import math
-import sys
 import time
 
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-sys.path[1:1] = ["_common", "_common/qiskit", "shors/_common", "quantum_fourier_transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common", "../../quantum_fourier_transform/qiskit"]
 import execute as ex
-import metrics as metrics
-from shors_utils import getAngles, getAngle, modinv, generate_base
-from qft_kernel import inv_qft_gate
-from qft_kernel import qft_gate
+from _common import metrics
+from shors._common.shors_utils import getAngles, getAngle, modinv, generate_base
 
 # Benchmark Name
 benchmark_name = "Shor's Order Finding"
+
+
+############### QFT Gates (inlined from QFT kernel)
+
+def qft_gate(input_size):
+    """Build QFT circuit."""
+    qr = QuantumRegister(input_size)
+    qc = QuantumCircuit(qr, name="qft_")
+
+    for i_qubit in range(0, input_size):
+        hidx = input_size - i_qubit - 1
+
+        if hidx < input_size - 1:
+            num_crzs = i_qubit
+            for j in range(0, num_crzs):
+                divisor = 2 ** (num_crzs - j)
+                qc.crz(math.pi / divisor, qr[hidx], qr[input_size - j - 1])
+
+        qc.h(qr[hidx])
+
+    return qc
+
+
+def inv_qft_gate(input_size):
+    """Build inverse QFT circuit."""
+    qr = QuantumRegister(input_size)
+    qc = QuantumCircuit(qr, name="inv_qft")
+
+    for i_qubit in reversed(range(0, input_size)):
+        hidx = input_size - i_qubit - 1
+
+        qc.h(qr[hidx])
+
+        if hidx < input_size - 1:
+            num_crzs = i_qubit
+            for j in reversed(range(0, num_crzs)):
+                divisor = 2 ** (num_crzs - j)
+                qc.crz(-math.pi / divisor, qr[hidx], qr[input_size - j - 1])
+
+    return qc
 
 np.random.seed(0)
 

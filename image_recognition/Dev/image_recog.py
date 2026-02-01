@@ -12,7 +12,7 @@ from scipy.optimize import minimize
 from qiskit import QuantumCircuit, Aer
 from sklearn.metrics import accuracy_score,log_loss
 from qiskit.circuit import ParameterVector
-import expectation_calc
+from image_recognition.Dev import expectation_calc
 
 global expectation_calc_method
 

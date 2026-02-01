@@ -3,18 +3,15 @@ Phase Estimation Benchmark Program - Cirq
 """
 
 from collections import defaultdict
-import sys
 import time
 
 import cirq
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/cirq", "quantum_fourier_transform/cirq"]
-sys.path[1:1] = ["../../_common", "../../_common/cirq", "../../quantum_fourier_transform/cirq"]
-import cirq_utils as cirq_utils
-import execute as ex
-import metrics as metrics
-from qft_benchmark import inv_qft_gate
+from _common.cirq import cirq_utils as cirq_utils
+from _common.cirq import execute as ex
+from _common import metrics as metrics
+from quantum_fourier_transform.cirq.qft_benchmark import inv_qft_gate
 
 np.random.seed(0)
 

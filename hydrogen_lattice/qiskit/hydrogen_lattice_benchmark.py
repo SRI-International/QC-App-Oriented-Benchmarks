@@ -22,15 +22,11 @@ from qiskit.circuit import ParameterVector
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.result import sampled_expectation_value
 
-# QED-C benchmark-specific imports
-sys.path[1:1] = ["_common", "_common/qiskit", "hydrogen_lattice/_common"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../hydrogen_lattice/_common/"]
-
-import common
-import execute as ex
-import metrics as metrics
+from hydrogen_lattice._common import common
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
 # import h-lattice_metrics from _common folder
-import h_lattice_metrics as h_metrics
+from hydrogen_lattice._common import h_lattice_metrics as h_metrics
 
 # DEVNOTE: this logging feature should be moved to common level
 logger = logging.getLogger(__name__)
@@ -1567,8 +1563,8 @@ def run(
                     
                     # for Estimator, energy and variance are returned directly
                     if use_estimator:
-                        energy = result.values[0]
-                        variance = result.metadata[0]['variance']
+                        energy = float(result[0].data.evs.item())
+                        variance = float(result[0].data.stds.item() ** 2)
                     
                     # for single circuit execution, need to compute energy from results and observables
                     else:
@@ -1797,7 +1793,7 @@ def submit_to_estimator(qc=None, num_qubits=1, unique_id=-1, parameterized=False
 
     #print(f"... *** using Estimator")
     
-    from qiskit.primitives import BackendEstimator, Estimator
+    from qiskit.primitives import BackendEstimatorV2, StatevectorEstimator
     
     # start timing of estimator here
     ts_launch = time.time()
@@ -1809,15 +1805,15 @@ def submit_to_estimator(qc=None, num_qubits=1, unique_id=-1, parameterized=False
         qc_bound = qc
 
     if backend_id.lower() == "statevector_simulator":
-        estimator = Estimator()  # statevector doesn't work w/ vanilla BackendEstimator
+        estimator = StatevectorEstimator()  # statevector doesn't work w/ vanilla BackendEstimator
     else:
-        estimator = BackendEstimator(backend=Aer.get_backend(backend_id))  # FIXME: won't work for vendor QPUs
+        estimator = BackendEstimatorV2(backend=Aer.get_backend(backend_id))  # FIXME: won't work for vendor QPUs
         #estimator = BackendEstimator(backend=provider_backend)
     
     ts_start = time.time()
     
     #print(operator)
-    job = estimator.run(qc_bound, operator, shots=num_shots)
+    job = estimator.run([(qc_bound, operator)])
     #print(job)
     
     #print(job.metrics())

@@ -12,38 +12,19 @@ HamiltonianSimulation forms the trotterized circuit used in the benchmark.
 
 import json
 import os
-import sys
 import time
 import numpy as np
 
-############### Configure API
-# 
-# Configure the QED-C Benchmark package for use with the given API
-def qedc_benchmarks_init(api: str = "qiskit"):
+# Add benchmark home dir to path, so the benchmark can be run without pip installing.
+import sys; from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-    if api == None: api = "qiskit"
+# The QED-C initialization module
+from _common.qedc_init import qedc_benchmarks_init
+from _common import metrics
+from _common import qcb_mpi as mpi
 
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
-    sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
 
-    up_dir = os.path.abspath(os.path.join(current_dir, ".."))
-    common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
-    sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-    
-    api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
-    sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
-
-    import execute as ex
-    globals()["ex"] = ex
-
-    import metrics as metrics
-    globals()["metrics"] = metrics
-
-    from hamiltonian_simulation_kernel import HamiltonianSimulation, kernel_draw
-    
-    return HamiltonianSimulation, kernel_draw
-    
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
 
@@ -102,6 +83,7 @@ def analyze_and_print_result(qc, result, num_qubits: int,
     Returns:
         tuple: Counts and fidelity.
     """
+
     counts = result.get_counts(qc)
     if verbose:
         #print(f"For type {type} measured: {counts}")
@@ -206,17 +188,23 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     Returns:
         None
     """
-    # configure the QED-C Benchmark package for use with the given API
-    HamiltonianSimulation, kernel_draw = qedc_benchmarks_init(api)
+    
+    # Configure the QED-C Benchmark package for use with the given API
+    qedc_benchmarks_init(api, "hamiltonian_simulation", ["hamiltonian_simulation_kernel"])
+    import hamiltonian_simulation_kernel as kernel
+    import execute as ex
+
+    mpi.init()
+    
+    ##########
     
     print(f"{benchmark_name} Benchmark Program - Qiskit")
     
     # Create context identifier
     if context is None: context = f"{benchmark_name} Benchmark"
     
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
-        all_qcs = {}
+    # special argument handling
+    ex.verbose = verbose
         
     # Validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
@@ -243,6 +231,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     print(f"... using init_state = {init_state}")
     print(f"... using random_pauli_flag = {random_pauli_flag}")
     
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+        
     # Parameters of simulation (note used yet, since we use hardcoded data for comparison)
     """
     if K is None:
@@ -310,10 +302,11 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
         # Loop over only 1 circuit
         for circuit_id in range(num_circuits):
+            mpi.barrier()
             ts = time.time()
 
-            # Create HeisenbergKernel or TFIM kernel
-            qc = HamiltonianSimulation(num_qubits, K=k, t=t,
+            # Create Heisenberg kernel or TFIM kernel
+            qc = kernel.HamiltonianSimulation(num_qubits, K=k, t=t,
                     hamiltonian=hamiltonian,
                     w=w, hx = hx, hz = hz, 
                     use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
@@ -343,13 +336,14 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
     ##########
     
-    # draw a sample circuit
-    kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
-       
-    # Plot metrics for all circuit sizes
-    options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
-    if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
+    if mpi.leader():
+        # draw a sample circuit
+        kernel.kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
+           
+        # Plot metrics for all circuit sizes
+        options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
+        if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
 #######################
@@ -377,6 +371,7 @@ def get_args():
     parser.add_argument("--init_state", "-init", default=None, help="initial state")
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
 
     return parser.parse_args()
  
@@ -384,14 +379,8 @@ def get_args():
 if __name__ == '__main__':   
     args = get_args()
     
-    # configure the QED-C Benchmark package for use with the given API
-    # (done here so we can set verbose for now)
-    HamiltonianSimulation, kernel_draw = qedc_benchmarks_init(args.api)
-    
     # special argument handling
-    ex.verbose = args.verbose
     verbose = args.verbose
-    #hamiltonian_simulation_kernel.verbose = args.verbose     # not currently defined
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     

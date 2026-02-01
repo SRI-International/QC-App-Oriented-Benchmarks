@@ -59,7 +59,7 @@ The first code cell of the notebook is configured by default to execute all the 
 Once configured, you can do a Run All command to execute all the top-level benchmarks at once.
 
     Important note: there may be costs associated with execution on some hardware systems.
-    You may consider lowering the value of the num_shots, max_circuits, and max_quibts settings in the first code cell
+    You may consider lowering the value of the num_shots, max_circuits, and max_qubits settings in the first code cell
     during your initial testing to avoid unexpected charges.
 
 Another note: executing the benchmarks from an unauthenticated command window will result in Azure Quantum requesting authentication upon execution. To avoid this, you can download and install the Azure Quantum Command Line Tool (CLI). In a command window, execute the login command:
@@ -72,8 +72,8 @@ Once you are authenticated, executing the benchmarks will not request further au
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:
 
-    cd [your github home directory]\QC-App-Oriented-Benchmarks\bernstein_vazirani\qiskit
-  
+    cd [your github home directory]/QC-App-Oriented-Benchmarks/bernstein_vazirani
+
     python bv_benchmark.py
     
 This will execute the benchmark program and report the benchmark metrics to the console.

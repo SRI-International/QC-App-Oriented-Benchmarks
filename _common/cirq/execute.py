@@ -25,7 +25,7 @@
 
 import time
 import copy
-import metrics
+from _common import metrics
 
 import cirq
 backend = cirq.Simulator()      # Use Cirq Simulator by default

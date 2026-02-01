@@ -9,11 +9,11 @@ Hamiltonian Simulation Benchmark Program - Qiskit
 import numpy as np
 import time
 
-import hamlib_simulation_benchmark
-import evolution_exact
-import observables
+from hamlib import hamlib_simulation_benchmark
+from hamlib._common import evolution_exact
+from hamlib._common import observables
 
-import hamlib_simulation_kernel
+from hamlib.qiskit import hamlib_simulation_kernel
 
 
 metrics_object = {}
@@ -43,7 +43,7 @@ def create_measurement_circuts(qc, num_qubits, pauli_term_groups, pauli_str_list
         #print(f"... ****** using diagonalization method for measurement circuits")
         
         # generate an array of circuits, one for each pauli_string in list
-        from generate_measurement_circuits import create_circuits_for_pauli_terms_k_commute    
+        from hamlib._common.generate_measurement_circuits import create_circuits_for_pauli_terms_k_commute    
         circuits = [create_circuits_for_pauli_terms_k_commute(qc, ops, num_k) for ops in pauli_term_groups]
     
     """
@@ -97,7 +97,7 @@ def compute_energy(num_qubits, results, pauli_term_groups, group_method, num_k=N
          total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                 num_qubits, results, pauli_term_groups)
     else:
-        from generate_measurement_circuits import diagonalized_pauli_strings
+        from hamlib._common.generate_measurement_circuits import diagonalized_pauli_strings
         diag_pauli_term_groups = [diagonalized_pauli_strings(pauli_term_group, num_k, num_qubits) for pauli_term_group in pauli_term_groups]
         total_energy, term_contributions = observables.calculate_expectation_from_measurements_k_commute(
                                             num_qubits, results, diag_pauli_term_groups)

@@ -8,11 +8,7 @@
 from qiskit import transpile, Aer
 import time
 
-import sys
-sys.path.insert(1, "_common")
-sys.path.insert(1, "_common/qiskit")
-
-import execute
+from _common.qiskit import execute
 
 # Set False to disable calculation of 'normalized depth' (long time for large circuits)
 # (if False, only 'algorithmic' depth will be displayed in plots)
