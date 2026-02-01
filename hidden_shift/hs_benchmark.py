@@ -9,7 +9,7 @@ Hidden Shift Benchmark Program
 import time
 import numpy as np
 
-# Add benchmark home dir to path, so the benchmark can be run from anywhere
+# Add benchmark home dir to path, so the benchmark can be run without pip installing.
 import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
