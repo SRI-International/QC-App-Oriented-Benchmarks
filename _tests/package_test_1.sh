@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ===== pretty header =====
 echo "============================================================"
-echo "Testing package implementation (default to Hidden Shift Benchmark)"
+echo "Testing package implementation (defaults to Hidden Shift Benchmark)"
 echo
 
 cd ..

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Testing package implementation with Hamlib Benchmark"
+echo "Testing package implementation with Hamlib Benchmark (with obs test)"
 echo
 
 cd ..
