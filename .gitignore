@@ -186,3 +186,7 @@ benchmarks/*/results_cloud/
 
 __data/
 __images/
+
+# Backup files
+*- Copy*
+*.bak
