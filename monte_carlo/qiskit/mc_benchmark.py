@@ -259,7 +259,9 @@ def Ctrl_Q(num_state_qubits, A_circ):
 
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
-def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots, method, num_state_qubits):
+def analyze_and_print_result(qc, result, num_qubits, num_shots, mu=None, method=None, num_state_qubits=None):
+
+    num_counting_qubits = num_qubits - num_state_qubits - 1
 
     # generate exact value for the expectation value given our function and dist
     target_dist = p_distribution(num_state_qubits, mu)
@@ -405,11 +407,12 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
     c_star = (2*epsilon)**(1/(degree+1))
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, mu, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # determine fidelity of result set
-        num_counting_qubits = int(num_qubits) - num_state_qubits -1
-        counts, fidelity = analyze_and_print_result(qc, result, num_counting_qubits, float(mu), num_shots, method=method, num_state_qubits=num_state_qubits)
-        metrics.store_metric(num_qubits, mu, 'fidelity', fidelity)
+        num_qubits = int(num_qubits)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                mu=float(circuit_id), method=method, num_state_qubits=num_state_qubits)
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -447,22 +450,26 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
         
         # loop over limited # of mu values for this
         for mu in mu_range:
+
+            # create circuit_id for use with metrics and execution framework
+            circuit_id = mu
+
             target_dist = p_distribution(num_state_qubits, mu)
             f_to_estimate = functools.partial(f_of_X, num_state_qubits=num_state_qubits)
-            
+
             #print(mu)
-            
+
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
 
             qc = MonteCarloSampling(target_dist, f_to_estimate, num_state_qubits, num_counting_qubits, epsilon, degree, method=method)
-            metrics.store_metric(num_qubits, mu, 'create_time', time.time() - ts)
-            
+            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+
             # collapse the 4 sub-circuit levels used in this benchmark (for qiskit)
             qc2 = qc.decompose().decompose().decompose().decompose()
-                
+
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, mu, num_shots)
+            ex.submit_circuit(qc2, num_qubits, circuit_id, num_shots)
 
             # if method is 2, we only have one type of circuit, so break out of loop
             #if method == 2:

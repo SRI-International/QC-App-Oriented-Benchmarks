@@ -31,7 +31,7 @@ verbose = False
 
 # Analyze and print measured results
 # Expected result is always the type, so fidelity calc is simple
-def analyze_and_print_result (qc, result, num_qubits, type, num_shots):
+def analyze_and_print_result (qc, result, num_qubits, num_shots, type=None):
 
     # Size of input is one less than available qubits
     input_size = num_qubits - 1
@@ -93,12 +93,12 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler (qc, result, num_qubits, type, num_shots):  
-     
-        # determine fidelity of result set
+    def execution_handler (qc, result, num_qubits, circuit_id, num_shots):
+
         num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(type), num_shots)
-        metrics.store_metric(num_qubits, type, 'fidelity', fidelity)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                type=int(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -126,24 +126,27 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
         
         # loop over only 2 circuits
         for type in range( num_circuits ):
-            
+
+            # create circuit_id for use with metrics and execution framework
+            circuit_id = type
+
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
             mpi.barrier()
             qc = kernel.DeutschJozsa(num_qubits, type)
-            metrics.store_metric(num_qubits, type, 'create_time', time.time()-ts)
+            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
 
             # collapse the sub-circuit levels used in this benchmark (for qiskit)
             qc2 = qc.decompose()
 
             # Store each circuit if we want to return them
             if get_circuits:
-                all_qcs[str(num_qubits)][str(type)] = qc2
-                # Continue to skip sumbitting the circuit for execution. 
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc2
+                # Continue to skip sumbitting the circuit for execution.
                 continue
 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, type, num_shots)
+            ex.submit_circuit(qc2, num_qubits, circuit_id, num_shots)
         
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)

@@ -576,8 +576,8 @@ def postselect(outcomes, return_probs=True):
     return mar_out, rate
     
 # Analyze the quality of the result obtained from executing circuit qc 
-def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
-    
+def analyze_and_print_result (qc, result, num_qubits, num_shots, s_int=None):
+
     global saved_result
     saved_result = result
     
@@ -732,14 +732,14 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, s_int, num_shots):
-     
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
+
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        
-        #counts, fidelity = analyze_and_print_result(qc, result, num_qubits, ideal_distr)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
-        metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                s_int=int(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
     
     # Variable for new qubit group ordering if using mid_circuit measurements
     mid_circuit_qubit_group = []
@@ -803,25 +803,28 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
                 # define secret_int (include 'i' since b and off_diag_index don't need to be unique)
                 s_int = 1000 * (i+1) + (2**off_diag_index)*(3**b)
                 #s_int = (2**off_diag_index)*(3**b)
-                
+
+                # create circuit_id for use with metrics and execution framework
+                circuit_id = s_int
+
                 if verbose:
                     print(f"... create A for b = {b}, off_diag_index = {off_diag_index}, s_int = {s_int}")
-                
+
                 A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
-                                          diag_el=diag_el, off_diag_el=off_diag_el)             
-                
+                                          diag_el=diag_el, off_diag_el=off_diag_el)
+
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
                 qc = make_circuit(A, b, num_clock_qubits)
-                metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
-                
+                metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
+
                 #print(qc)
-                
+
                 # collapse the sub-circuits used in this benchmark (for qiskit)
                 qc2 = qc.decompose()
-                
+
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
+                ex.submit_circuit(qc2, num_qubits, circuit_id, shots=num_shots)
         
             # Wait for some active circuits to complete; report metrics when groups complete
             ex.throttle_execution(metrics.finalize_group)

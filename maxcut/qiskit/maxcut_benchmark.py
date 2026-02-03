@@ -296,12 +296,12 @@ def get_expectation(num_qubits, degree, num_shots):
 expected_dist = {}
 
 # Compare the measurement results obtained with the expected measurements to determine fidelity
-def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
+def analyze_and_print_result (qc, result, num_qubits, num_shots, secret_int=None):
     global expected_dist
-    
+
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    
+
     # retrieve pre-computed expectation values for the circuit that just completed
     expected_dist = get_expectation(num_qubits, secret_int, num_shots)
     
@@ -1074,14 +1074,15 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
     metrics.init_metrics()
     
     # Define custom result handler
-    def execution_handler (qc, result, num_qubits, s_int, num_shots):  
-     
+    def execution_handler (qc, result, num_qubits, circuit_id, num_shots):
+
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
-        metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                secret_int=int(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
 
-    def execution_handler2 (qc, result, num_qubits, s_int, num_shots):
+    def execution_handler2 (qc, result, num_qubits, circuit_id, num_shots):
         # Stores the results to the global saved_result variable
         global saved_result
         saved_result = result
@@ -1220,7 +1221,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                     
                     global saved_result
                     # Fidelity Calculation and Storage
-                    _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, unique_id, num_shots) 
+                    _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, num_shots, secret_int=unique_id)
                     metrics.store_metric(num_qubits, unique_id, 'fidelity', fidelity)
                     
                     #************************************************

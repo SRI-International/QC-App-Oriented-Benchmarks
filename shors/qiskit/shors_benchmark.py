@@ -339,7 +339,7 @@ def expected_shor_dist(num_bits, order, num_shots):
 # Print analyzed results
 # Analyze and print measured results
 # Expected result is always the order r, so fidelity calc is simple
-def analyze_and_print_result(qc, result, num_qubits, order, num_shots, method):
+def analyze_and_print_result(qc, result, num_qubits, num_shots, order=None, method=None):
 
     if  method == 1:
         num_bits = int((num_qubits - 2) / 4)
@@ -409,13 +409,14 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     metrics.init_metrics()
 
     # Define custom result handler # number_order contains an array of length 2 with the number and order
-    def execution_handler(qc, result, num_qubits, number_order, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # determine fidelity of result set
         num_qubits = int(num_qubits)
         #Must convert number_order from string to array
-        order = eval(number_order)[1]
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, order, num_shots, method)
-        metrics.store_metric(num_qubits, number_order, 'fidelity', fidelity)
+        order = eval(circuit_id)[1]
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                order=order, method=method)
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
     
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -455,18 +456,21 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
 
             number_order = (number, order)
 
+            # create circuit_id for use with metrics and execution framework
+            circuit_id = number_order
+
             if verbose: print(f"Generated {number=}, {base=}, {order=}")
 
             # create the circuit for given qubit size and order, store time metric
             ts = time.time()
             qc = ShorsAlgorithm(number, base, method=method, verbose=verbose)
-            metrics.store_metric(num_qubits, number_order, 'create_time', time.time()-ts)
+            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
 
             # collapse the 4 sub-circuit levels used in this benchmark (for qiskit)
             qc = qc.decompose().decompose().decompose().decompose()
 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc, num_qubits, number_order, num_shots)
+            ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
 
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)

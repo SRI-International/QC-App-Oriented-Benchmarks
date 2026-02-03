@@ -101,15 +101,15 @@ def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
 def analyze_and_print_result(
             qc,
             result,
-            num_qubits: int,
-            type: str,
-            num_shots: int,
-            hamiltonian: str,
-            method: int,
-            t: float,
-            random_pauli_flag: bool,
-            do_sqrt_fidelity: bool,
-            init_state: str
+            num_qubits,
+            num_shots,
+            type=None,
+            hamiltonian=None,
+            method=None,
+            t=None,
+            random_pauli_flag=False,
+            do_sqrt_fidelity=False,
+            init_state=None
         ) -> tuple:
     """
     Analyze and print the measured results. Compute the quality of the result based on operator expectation for each state.
@@ -118,10 +118,14 @@ def analyze_and_print_result(
         qc (QuantumCircuit): The quantum circuit.
         result: The result from the execution.
         num_qubits (int): Number of qubits.
-        type (str): Type of the simulation (circuit identifier).
         num_shots (int): Number of shots.
+        type (str): Type of the simulation (circuit identifier).
         hamiltonian (str): Which hamiltonian to run.
         method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
+        t (float): Total simulation time.
+        random_pauli_flag (bool): If True, activates random Pauli gates.
+        do_sqrt_fidelity (bool): If True, computes the square root of the fidelity.
+        init_state (str): Initial state for the quantum circuit.
 
     Returns:
         tuple: Counts and fidelity.
@@ -406,19 +410,20 @@ def run(min_qubits: int = 2,
     metrics.init_metrics(warmup)
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, type, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # Determine fidelity of result set
         num_qubits = int(num_qubits)
         counts, expectation_a = analyze_and_print_result(
-                    qc, result, num_qubits, type, num_shots,
-                    hamiltonian,
-                    method,
-                    t,
-                    random_pauli_flag,
-                    do_sqrt_fidelity,
-                    init_state
+                    qc, result, num_qubits, num_shots,
+                    type=circuit_id,
+                    hamiltonian=hamiltonian,
+                    method=method,
+                    t=t,
+                    random_pauli_flag=random_pauli_flag,
+                    do_sqrt_fidelity=do_sqrt_fidelity,
+                    init_state=init_state
                 )
-        metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', expectation_a)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)

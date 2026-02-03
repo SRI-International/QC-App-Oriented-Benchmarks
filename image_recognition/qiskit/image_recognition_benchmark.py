@@ -801,7 +801,7 @@ expected_dist = {}
 
 
 # Compare the measurement results obtained with the expected measurements to determine fidelity
-def analyze_and_print_result(qc, result, num_qubits, secret_int, num_shots):
+def analyze_and_print_result(qc, result, num_qubits, num_shots, secret_int=None):
     global expected_dist
 
     # obtain counts from the result object
@@ -1455,13 +1455,14 @@ def run(
     add_custom_metric_names()
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, s_int, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
-        metrics.store_metric(num_qubits, s_int, "solution_quality", fidelity)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                secret_int=int(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, "solution_quality", fidelity)
 
-    def execution_handler2(qc, result, num_qubits, s_int, num_shots):
+    def execution_handler2(qc, result, num_qubits, circuit_id, num_shots):
         # Stores the results to the global saved_result variable
         global saved_result
         saved_result = result

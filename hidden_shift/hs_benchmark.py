@@ -51,7 +51,9 @@ def str_to_ivec(input_size: int, s_int: int):
 
 # Analyze and print measured results
 # Expected result is always the secret_int, so fidelity calc is simple
-def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
+def analyze_and_print_result (qc, result, num_qubits, num_shots, s_int=None):
+
+	secret_int = s_int
 
 	# obtain counts from the result object
 	counts = result.get_counts(qc)
@@ -112,12 +114,13 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 	metrics.init_metrics(warmup)
 
 	# Define custom result handler
-	def execution_handler (qc, result, num_qubits, s_int, num_shots):  
-	 
+	def execution_handler (qc, result, num_qubits, circuit_id, num_shots):
+
 		# determine fidelity of result set
 		num_qubits = int(num_qubits)
-		counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
-		metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+		counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+				s_int=int(circuit_id))
+		metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
 
 	# Initialize execution module using the execution result handler above and specified backend_id
 	ex.init_execution(execution_handler)
@@ -152,30 +155,33 @@ def run (min_qubits=2, max_qubits=6, skip_qubits=2, max_circuits=3, num_shots=10
 		# loop over limited # of secret strings for this
 		for s_int in s_range:
 			s_int = int(s_int)
-		
+
 			# if user specifies input_value, use it instead
 			# DEVNOTE: if max_circuits used, this will generate separate bar for each num_circuits
 			if input_value is not None:
 				s_int = input_value
-				
+
+			# create circuit_id for use with metrics and execution framework
+			circuit_id = s_int
+
 			# convert the secret int string to array of integers, each representing one bit
 			bitset = str_to_ivec(num_qubits, s_int)
 			if verbose: print(f"... s_int={s_int} bitset={bitset}")
-			
+
 			# create the circuit for given qubit size and secret string, store time metric
 			mpi.barrier()
 			ts = time.time()
 			qc = kernel.HiddenShift(num_qubits, s_int, bitset, method)
-			metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
+			metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
 
 			# If we only want the circuits:
-			if get_circuits:	
-				all_qcs[str(num_qubits)][str(s_int)] = qc
-				# Continue to skip sumbitting the circuit for execution. 
+			if get_circuits:
+				all_qcs[str(num_qubits)][str(circuit_id)] = qc
+				# Continue to skip sumbitting the circuit for execution.
 				continue
 
 			# submit circuit for execution on target (simulator, cloud simulator, or hardware)
-			ex.submit_circuit(qc, num_qubits, s_int, shots=num_shots)
+			ex.submit_circuit(qc, num_qubits, circuit_id, shots=num_shots)
 		
 		# Wait for some active circuits to complete; report metrics when groups complete
 		ex.throttle_execution(metrics.finalize_group)

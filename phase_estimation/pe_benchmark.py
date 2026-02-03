@@ -28,7 +28,9 @@ verbose = False
 
 # Analyze and print measured results
 # Expected result is always theta, so fidelity calc is simple
-def analyze_and_print_result(qc, result, num_counting_qubits, theta, num_shots):
+def analyze_and_print_result(qc, result, num_qubits, num_shots, theta=None):
+
+	num_counting_qubits = num_qubits - 1
 
 	# get results as measured counts
 	counts = result.get_counts(qc)
@@ -135,12 +137,13 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 		all_qcs = {}
 
 	# Define custom result handler
-	def execution_handler(qc, result, num_qubits, theta, num_shots):
+	def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
 
 		# determine fidelity of result set
-		num_counting_qubits = int(num_qubits) - 1
-		counts, fidelity = analyze_and_print_result(qc, result, num_counting_qubits, float(theta), num_shots)
-		metrics.store_metric(num_qubits, theta, 'fidelity', fidelity)
+		num_qubits = int(num_qubits)
+		counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+				theta=float(circuit_id))
+		metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
 
 	# Initialize execution module using the execution result handler above and specified backend_id
 	ex.init_execution(execution_handler)
@@ -187,21 +190,24 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 			# if initial phase passed in, use it instead of random values
 			if init_phase:
 				theta = init_phase
-		
+
+			# create circuit_id for use with metrics and execution framework
+			circuit_id = theta
+
 			# create the circuit for given qubit size and theta, store time metric
 			mpi.barrier()
 			ts = time.time()
 			qc = kernel.PhaseEstimation(num_qubits, theta, use_midcircuit_measurement)
-			metrics.store_metric(num_qubits, theta, 'create_time', time.time() - ts)
+			metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
 			# Store each circuit if we want to return them
 			if get_circuits:
-				all_qcs[str(num_qubits)][str(theta)] = qc
-				# Continue to skip sumbitting the circuit for execution. 
+				all_qcs[str(num_qubits)][str(circuit_id)] = qc
+				# Continue to skip sumbitting the circuit for execution.
 				continue
-			
+
 			# submit circuit for execution on target (simulator, cloud simulator, or hardware)
-			ex.submit_circuit(qc, num_qubits, theta, num_shots)
+			ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
 
 		# Wait for some active circuits to complete; report metrics when groups complete
 		ex.throttle_execution(metrics.finalize_group)

@@ -270,7 +270,7 @@ def ReadHamiltonian(nqubit):
 
 ## Analyze and print measured results
 ## Compute the quality of the result based on measured probability distribution for each state
-def analyze_and_print_result(qc, result, num_qubits, references, num_shots):
+def analyze_and_print_result(qc, result, num_qubits, num_shots, references=None):
 
     # total circuit name (pauli string + coefficient)
     total_name = qc.name
@@ -345,7 +345,9 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, type, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
+
+        num_qubits = int(num_qubits)
 
         # load pre-computed data
         if len(qc.name.split()) == 2:
@@ -359,7 +361,8 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             with open(filename) as f:
                 references = json.load(f)
 
-        fidelity = analyze_and_print_result(qc, result, num_qubits, references, num_shots)
+        fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                references=references)
 
         if len(qc.name.split()) == 2:
             metrics.store_metric(num_qubits, qc.name.split()[0], 'fidelity', fidelity)
