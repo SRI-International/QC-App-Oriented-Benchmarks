@@ -1,5 +1,10 @@
 """
-Hydogen Lattice Benchmark Program - Qiskit
+Hydrogen Lattice Benchmark Program - Qiskit
+
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python hydrogen_lattice/hydrogen_lattice_benchmark.py
 """
 
 import datetime
@@ -1078,6 +1083,7 @@ def run(
     exec_options=None,
     context=None,
     _instances=None,
+    draw_circuits=True,
 ):
     """
     Parameters
@@ -1718,16 +1724,17 @@ def run(
     ##########
     
     # print a sample circuit
-    if print_sample_circuit:
+    if draw_circuits and print_sample_circuit:
         if method == 1:
             print("Sample Circuit:")
             print(QC_ if QC_ is not None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
-                options=dict(shots=num_shots))
-                
+        if plot_results:
+            metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
+                    options=dict(shots=num_shots))
+
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
@@ -1834,10 +1841,6 @@ def submit_to_estimator(qc=None, num_qubits=1, unique_id=-1, parameterized=False
 #################################
 # MAIN
 
-# # if main, execute method
 if __name__ == "__main__":
-    run()
-
-# # %%
-
-# run()
+    print("Please run this benchmark from the parent directory:")
+    print("  python hydrogen_lattice/hydrogen_lattice_benchmark.py")

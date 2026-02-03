@@ -47,7 +47,8 @@ def run(min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100
         exec_options=None,
         context=None,
         api=None,
-        _instances=None):
+        _instances=None,
+        draw_circuits=True):
 
     # Configure the QED-C Benchmark package for use with the given API
     # Note: hydrogen_lattice only has qiskit implementation
@@ -94,7 +95,8 @@ def run(min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100
         provider_backend=provider_backend, hub=hub, group=group, project=project,
         exec_options=exec_options,
         context=context,
-        _instances=_instances
+        _instances=_instances,
+        draw_circuits=draw_circuits
     )
 
 
@@ -115,6 +117,8 @@ def get_args():
     parser.add_argument("--method", "-m", default=2, help="Algorithm Method", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -129,5 +133,6 @@ if __name__ == "__main__":
         method=args.method,
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
     )

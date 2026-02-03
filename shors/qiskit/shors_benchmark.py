@@ -1,5 +1,10 @@
 """
 Shor's Order Finding Algorithm Benchmark - Qiskit
+
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python shors/shors_benchmark.py
 """
 
 import math
@@ -377,7 +382,8 @@ def analyze_and_print_result(qc, result, num_qubits, num_shots, order=None, meth
 def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
         verbose=verbose, backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
 
     print(f"{benchmark_name} ({method}) Benchmark - Qiskit")
 
@@ -481,17 +487,20 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     ##########
     
     # print the last circuit created
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    print("\nControlled Ua Operator 'cUa' ="); print(CUA_ if CUA_ != None else " ... too large!")
-    print("\nControlled Multiplier Operator 'cMULTamodN' ="); print(CMULTAMODN_ if CMULTAMODN_!= None else " ... too large!")
-    print("\nControlled Modular Adder Operator 'ccphiamodN' ="); print(CCPHIADDMODN_ if CCPHIADDMODN_ != None else " ... too large!")
-    print("\nPhi Adder Operator '\u03C6ADD' ="); print(PHIADD_ if PHIADD_ != None else " ... too large!")
-    print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
+    if draw_circuits:
+        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+        print("\nControlled Ua Operator 'cUa' ="); print(CUA_ if CUA_ != None else " ... too large!")
+        print("\nControlled Multiplier Operator 'cMULTamodN' ="); print(CMULTAMODN_ if CMULTAMODN_!= None else " ... too large!")
+        print("\nControlled Modular Adder Operator 'ccphiamodN' ="); print(CCPHIADDMODN_ if CCPHIADDMODN_ != None else " ... too large!")
+        print("\nPhi Adder Operator '\u03C6ADD' ="); print(PHIADD_ if PHIADD_ != None else " ... too large!")
+        print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    options = {"shots": num_shots, "reps": max_circuits}
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+    if plot_results:
+        options = {"shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
-    
-# if main, execute method
-if __name__ == '__main__': run() #max_qubits = 6, max_circuits = 5, num_shots=100)
+
+if __name__ == '__main__':
+    print("Please run this benchmark from the parent directory:")
+    print("  python shors/shors_benchmark.py")

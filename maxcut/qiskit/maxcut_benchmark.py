@@ -1,5 +1,10 @@
 """
 MaxCut Benchmark Program - Qiskit
+
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python maxcut/maxcut_benchmark.py
 """
 
 import datetime
@@ -913,7 +918,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
         backend_id=None, provider_backend=None, eta=0.5,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None,
-        _instances=None):
+        _instances=None,
+        draw_circuits=True):
     """
     Parameters
     ----------
@@ -1328,15 +1334,16 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
     ##########
     
     global print_sample_circuit
-    if print_sample_circuit:
+    if draw_circuits and print_sample_circuit:
         # print a sample circuit
         print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
-                options=dict(shots=num_shots,rounds=rounds))
+        if plot_results:
+            metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
+                    options=dict(shots=num_shots,rounds=rounds))
     elif method == 2:
         #metrics.print_all_circuit_metrics()
         if plot_results:
@@ -1387,7 +1394,6 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
     
     metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
-# if main, execute method
-if __name__ == '__main__': run()
-
-# %%
+if __name__ == '__main__':
+    print("Please run this benchmark from the parent directory:")
+    print("  python maxcut/maxcut_benchmark.py")

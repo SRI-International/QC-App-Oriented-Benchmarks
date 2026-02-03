@@ -19,7 +19,8 @@ benchmark_name = "Shor's Order Finding"
 def run(min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method=1,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
 
     # Configure the QED-C Benchmark package for use with the given API
     # Note: Shors primarily uses qiskit implementation
@@ -34,7 +35,8 @@ def run(min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method=1,
         num_shots=num_shots, method=method,
         backend_id=backend_id, provider_backend=provider_backend,
         hub=hub, group=group, project=project, exec_options=exec_options,
-        context=context, api=api, get_circuits=get_circuits
+        context=context, api=api, get_circuits=get_circuits,
+        draw_circuits=draw_circuits, plot_results=plot_results
     )
 
 
@@ -54,6 +56,8 @@ def get_args():
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -67,5 +71,6 @@ if __name__ == "__main__":
         method=args.method,
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
     )

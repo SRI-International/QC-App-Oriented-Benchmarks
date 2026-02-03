@@ -115,7 +115,8 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
         method=1, use_midcircuit_measurement = False, input_value=None,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, warmup=False, get_circuits=False):
+        context=None, api=None, warmup=False, get_circuits=False,
+        draw_circuits=True, plot_results=True):
 
     # Configure the QED-C Benchmark package for use with the given API
     qedc_benchmarks_init(api, "quantum_fourier_transform", ["qft_kernel"])
@@ -257,12 +258,14 @@ def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
     ##########
     
     if mpi.leader():
-        # draw a sample circuit
-        kernel.kernel_draw()
+        if draw_circuits:
+            # draw a sample circuit
+            kernel.kernel_draw()
 
-        # Plot metrics for all circuit sizes
-        options = {"method":method, "shots": num_shots, "reps": max_circuits}
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}", options=options)
+        if plot_results:
+            # Plot metrics for all circuit sizes
+            options = {"method":method, "shots": num_shots, "reps": max_circuits}
+            metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}", options=options)
 
 #######################
 # MAIN
@@ -278,7 +281,7 @@ def get_args():
     parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
     parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
-    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
@@ -286,17 +289,19 @@ def get_args():
     parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
     parser.add_argument("--use_midcircuit_measurement", "-mid", action="store_true", help="Use dynamic circuit")
     parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
-    
+
 # if main, execute method
-if __name__ == '__main__': 
+if __name__ == '__main__':
     args = get_args()
-    
+
     # special argument handling
     verbose = args.verbose
-    
+
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
-    
+
     # execute benchmark program
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
@@ -306,6 +311,7 @@ if __name__ == '__main__':
         input_value=args.input_value,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
-        api=args.api, warmup=args.warmup
+        api=args.api, warmup=args.warmup,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
         )
    

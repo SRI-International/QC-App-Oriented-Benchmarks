@@ -29,7 +29,8 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=2,
         context=None,
         min_annealing_time=1, max_annealing_time=200,
         api=None,
-        _instances=None):
+        _instances=None,
+        draw_circuits=True):
 
     # Determine which API to use
     selected_api = api if api else "qiskit"
@@ -58,6 +59,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=2,
         backend_id=backend_id, provider_backend=provider_backend, eta=eta,
         hub=hub, group=group, project=project, exec_options=exec_options,
         _instances=_instances,
+        draw_circuits=draw_circuits,
     )
 
     # Add API-specific parameters
@@ -110,6 +112,8 @@ def get_args():
     parser.add_argument("--degree", "-d", default=3, help="Degree of graph", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -126,5 +130,6 @@ if __name__ == "__main__":
         degree=args.degree,
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
     )

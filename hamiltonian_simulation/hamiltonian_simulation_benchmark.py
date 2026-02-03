@@ -164,7 +164,8 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         K: int = None, t: float = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
-        context = None, api = None, get_circuits=False):
+        context = None, api = None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
     """
     Execute program with default parameters.
 
@@ -341,13 +342,15 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     ##########
     
     if mpi.leader():
-        # draw a sample circuit
-        kernel.kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
-           
-        # Plot metrics for all circuit sizes
-        options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
-        if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
+        if draw_circuits:
+            # draw a sample circuit
+            kernel.kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
+
+        if plot_results:
+            # Plot metrics for all circuit sizes
+            options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
+            if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
+            metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
 #######################
@@ -376,18 +379,20 @@ def get_args():
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
     parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
 
     return parser.parse_args()
- 
+
 # if main, execute method
-if __name__ == '__main__':   
+if __name__ == '__main__':
     args = get_args()
-    
+
     # special argument handling
     verbose = args.verbose
-    
+
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
-    
+
     # execute benchmark program
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
@@ -401,5 +406,6 @@ if __name__ == '__main__':
         #t = args.time,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
         )

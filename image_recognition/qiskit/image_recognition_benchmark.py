@@ -1,5 +1,10 @@
 """
 Image Recognition Benchmark Program - Qiskit
+
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python image_recognition/image_recognition_benchmark.py
 """
 
 import datetime
@@ -1301,7 +1306,8 @@ def run(
     backend_id_train:str = 'statevector_simulator',
     test_pass_count:int = 30,
     test_size:int  = 50,
-    train_size:int = 200
+    train_size:int = 200,
+    draw_circuits=True,
 ):
     """
     Parameters
@@ -1935,20 +1941,21 @@ def run(
     ex.finalize_execution(metrics.finalize_group)
 
     # print a sample circuit
-    if print_sample_circuit:
+    if draw_circuits and print_sample_circuit:
         if method == 1:
             print("Sample Circuit:")
             print(QC_ if QC_ is not None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - Image Recognition ({method}) - Qiskit",
-                options=dict(shots=num_shots))
-                
+        if plot_results:
+            metrics.plot_metrics(f"Benchmark Results - Image Recognition ({method}) - Qiskit",
+                    options=dict(shots=num_shots))
+
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
-       
+
     elif method == 3:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
@@ -2009,10 +2016,6 @@ def run_objective_function(**kwargs):
 #################################
 # MAIN
 
-# # if main, execute method
 if __name__ == "__main__":
-    run(min_qubits=6, max_qubits=8, num_shots=1000, max_iter=3, method=2, test_pass_count=30)
-
-# # %%
-
-# run()
+    print("Please run this benchmark from the parent directory:")
+    print("  python image_recognition/image_recognition_benchmark.py")

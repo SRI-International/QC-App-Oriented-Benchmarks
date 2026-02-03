@@ -1,6 +1,10 @@
 """
 HHL Benchmark Program - Qiskit
 
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python hhl/hhl_benchmark.py
 """
 
 import time
@@ -647,7 +651,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
         method = 1, use_best_widths=True, min_register_qubits=1,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):  
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):  
 
     # we must have at least 4 qubits and min must be less than max
     max_qubits = max(4, max_qubits)
@@ -691,7 +696,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             method=method, use_best_widths=use_best_widths, min_register_qubits=min_register_qubits,
             backend_id=backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
-            context=context, api=api, get_circuits=get_circuits)
+            context=context, api=api, get_circuits=get_circuits,
+            draw_circuits=draw_circuits, plot_results=plot_results)
 
 
 # Execute program with default parameters and permitting the user to specify an
@@ -704,7 +710,8 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
         method=2, use_best_widths=False, min_register_qubits=1,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):  
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):  
     
     print(f"{benchmark_name} Benchmark Program - Qiskit")
 
@@ -835,19 +842,22 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     ##########
     
     # print a sample circuit
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
-    print("\nU Circuit ="); print(U_ if U_ != None else "  ... too large!")
-    print("\nU^-1 Circuit ="); print(UI_ if UI_ != None else "  ... too large!")
-    print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
-    print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
-    print("\nHamiltonian Phase Estimation Circuit ="); print(HP_ if HP_ != None else "  ... too large!")
-    print("\nControlled Rotation Circuit ="); print(INVROT_ if INVROT_ != None else "  ... too large!")
+    if draw_circuits:
+        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+        #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
+        print("\nU Circuit ="); print(U_ if U_ != None else "  ... too large!")
+        print("\nU^-1 Circuit ="); print(UI_ if UI_ != None else "  ... too large!")
+        print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
+        print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
+        print("\nHamiltonian Phase Estimation Circuit ="); print(HP_ if HP_ != None else "  ... too large!")
+        print("\nControlled Rotation Circuit ="); print(INVROT_ if INVROT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    options = {"method":method, "shots": num_shots, "reps": max_circuits} 
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options = options,
-                         transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
+    if plot_results:
+        options = {"method":method, "shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options = options,
+                             transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
-# if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__':
+    print("Please run this benchmark from the parent directory:")
+    print("  python hhl/hhl_benchmark.py")

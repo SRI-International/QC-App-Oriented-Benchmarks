@@ -101,7 +101,8 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         num_state_qubits=1, # default, not exposed to users
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
 
     # Configure the QED-C Benchmark package for use with the given API
     qedc_benchmarks_init(api, "amplitude_estimation", ["ae_kernel"])
@@ -203,12 +204,14 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 
     ##########
 
-    # draw a sample circuit
-    kernel.kernel_draw()
+    if draw_circuits:
+        # draw a sample circuit
+        kernel.kernel_draw()
 
-    # Plot metrics for all circuit sizes
-    options = {"shots": num_shots, "reps": max_circuits}
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+    if plot_results:
+        # Plot metrics for all circuit sizes
+        options = {"shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 
 #######################
@@ -228,6 +231,8 @@ def get_args():
     parser.add_argument("--num_state_qubits", "-nsq", default=1, help="Number of State Qubits", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
 
 # if main, execute method
@@ -246,5 +251,6 @@ if __name__ == '__main__':
         num_state_qubits=args.num_state_qubits,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
         )
