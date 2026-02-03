@@ -56,7 +56,7 @@ echo "extra_args=$extra_args"
 # ----- run in BM directory -----
 echo "... run in BM directory ..."
 pushd "$folder" >/dev/null
-"$PYTHON" "${bmname}.py" $extra_args
+"$PYTHON" "${bmname}.py" -nop -nod $extra_args
 popd >/dev/null
 
 # pause (only if interactive)
@@ -66,7 +66,7 @@ fi
 
 # ----- run at top level -----
 echo "... run at top level ..."
-"$PYTHON" "${folder}/${bmname}.py" $extra_args
+"$PYTHON" "${folder}/${bmname}.py" -nop -nod $extra_args
 
 # pause (only if interactive)
 if [ -t 0 ]; then
@@ -75,4 +75,4 @@ fi
 
 # ----- run at top level as a module -----
 echo "... run at top level as a module"
-"$PYTHON" -m "${folder}.${bmname}" $extra_args
+"$PYTHON" -m "${folder}.${bmname}" -nop -nod $extra_args
