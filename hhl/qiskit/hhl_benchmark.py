@@ -767,8 +767,12 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     diag_el = 0.5
     off_diag_el = -0.25
     
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     #for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
@@ -795,8 +799,12 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
                     print(f"... SKIPPING {num_circuits} circuits with {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
                 continue
                   
-            print(f"************\nExecuting {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
-            
+            if not get_circuits:
+                print(f"************\nExecuting {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
+            else:
+                print(f"************\nCreating {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
+                all_qcs[str(num_qubits)] = {}
+
             # loop over randomly generated problem instances
             for i in range(num_circuits):
 
@@ -825,7 +833,10 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
                 qc = make_circuit(A, b, num_clock_qubits)
                 metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
 
-                #print(qc)
+                # If we only want the circuits:
+                if get_circuits:
+                    all_qcs[str(num_qubits)][str(circuit_id)] = qc
+                    continue
 
                 # collapse the sub-circuits used in this benchmark (for qiskit)
                 qc2 = qc.decompose()
@@ -836,11 +847,16 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
             # Wait for some active circuits to complete; report metrics when groups complete
             ex.throttle_execution(metrics.finalize_group)
         
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
-    
+
     # print a sample circuit
     if draw_circuits:
         print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")

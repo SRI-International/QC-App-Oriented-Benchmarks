@@ -30,7 +30,7 @@ def run(min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method=1,
     import shors_benchmark as shors_impl
 
     # Delegate to the implementation
-    shors_impl.run(
+    return shors_impl.run(
         min_qubits=min_qubits, max_circuits=max_circuits, max_qubits=max_qubits,
         num_shots=num_shots, method=method,
         backend_id=backend_id, provider_backend=provider_backend,

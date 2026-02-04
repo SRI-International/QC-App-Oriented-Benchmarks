@@ -48,6 +48,7 @@ def run(min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100
         context=None,
         api=None,
         _instances=None,
+        get_circuits=False,
         draw_circuits=True):
 
     # Configure the QED-C Benchmark package for use with the given API
@@ -62,7 +63,7 @@ def run(min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100
         backend_id = "qasm_simulator"
 
     # Delegate to the implementation
-    hl_impl.run(
+    return hl_impl.run(
         min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,
         max_circuits=max_circuits, num_shots=num_shots,
         method=method,
@@ -96,6 +97,7 @@ def run(min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100
         exec_options=exec_options,
         context=context,
         _instances=_instances,
+        get_circuits=get_circuits,
         draw_circuits=draw_circuits
     )
 

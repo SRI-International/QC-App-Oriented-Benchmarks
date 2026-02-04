@@ -32,7 +32,7 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
     import vqe_benchmark as vqe_impl
 
     # Delegate to the implementation
-    vqe_impl.run(
+    return vqe_impl.run(
         min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,
         max_circuits=max_circuits, num_shots=num_shots, method=method,
         backend_id=backend_id, provider_backend=provider_backend,

@@ -381,8 +381,12 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for input_size in range(min_qubits, max_qubits + 1, 2):
@@ -425,7 +429,11 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             # construct all circuits
             qc_list = VQEEnergy(num_qubits, na, nb, 0, method)
 
-        print(f"************\nExecuting [{len(qc_list)}] circuits with num_qubits = {num_qubits}")
+        if not get_circuits:
+            print(f"************\nExecuting [{len(qc_list)}] circuits with num_qubits = {num_qubits}")
+        else:
+            print(f"************\nCreating [{len(qc_list)}] circuits with num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
 
         for qc in qc_list:
 
@@ -438,6 +446,11 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             # record creation time
             metrics.store_metric(input_size, circuit_id, 'create_time', time.time() - ts)
 
+            # If we only want the circuits:
+            if get_circuits:
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc
+                continue
+
             # collapse the sub-circuits used in this benchmark (for qiskit)
             qc2 = qc.decompose()
 
@@ -447,11 +460,16 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
         # Wait for some active circuits to complete; report metrics when group complete
         ex.throttle_execution(metrics.finalize_group)
 
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
-    
+
     # print a sample circuit
     if draw_circuits:
         print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")

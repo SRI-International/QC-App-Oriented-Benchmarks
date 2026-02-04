@@ -31,7 +31,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     import hhl_benchmark as hhl_impl
 
     # Delegate to the implementation
-    hhl_impl.run(
+    return hhl_impl.run(
         min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,
         max_circuits=max_circuits, num_shots=num_shots,
         method=method, use_best_widths=use_best_widths, min_register_qubits=min_register_qubits,

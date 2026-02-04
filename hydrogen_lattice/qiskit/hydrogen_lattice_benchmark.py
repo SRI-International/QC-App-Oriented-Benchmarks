@@ -1083,6 +1083,7 @@ def run(
     exec_options=None,
     context=None,
     _instances=None,
+    get_circuits=False,
     draw_circuits=True,
 ):
     """
@@ -1274,9 +1275,18 @@ def run(
     # create a data folder for the results
     create_data_folder(save_res_to_file, detailed_save_names, backend_id)
 
+    # If get_circuits requested but method doesn't support it, warn and return
+    if get_circuits and method != 1:
+        print(f"WARNING: get_circuits is not supported for method {method}")
+        return None
+
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ###########################
     # Benchmark Execution Loop
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 for paired electron circuits
@@ -1284,7 +1294,11 @@ def run(
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
         
         if method == 1:
-            print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+            if not get_circuits:
+                print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+            else:
+                print(f"************\nCreating [{max_circuits}] circuits for num_qubits = {num_qubits}")
+                all_qcs[str(num_qubits)] = {}
         else:
             print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
 
@@ -1377,6 +1391,11 @@ def run(
                 """
                 # store the creation time for these circuits
                 metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
+
+                # If we only want the circuits:
+                if get_circuits:
+                    all_qcs[str(num_qubits)][str(instance_num)] = qc
+                    continue
 
                 # classically pre-compute and cache an array of expected measurement counts
                 # for comparison against actual measured counts for fidelity calc (in analysis)
@@ -1715,6 +1734,11 @@ def run(
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(num_qubits)
 
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
 
@@ -1722,7 +1746,7 @@ def run(
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
-    
+
     # print a sample circuit
     if draw_circuits and print_sample_circuit:
         if method == 1:

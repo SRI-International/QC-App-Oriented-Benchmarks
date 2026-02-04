@@ -51,6 +51,7 @@ def run(
     test_size=50,
     train_size=200,
     api=None,
+    get_circuits=False,
     draw_circuits=True,
 ):
 
@@ -66,7 +67,7 @@ def run(
         backend_id = "qasm_simulator"
 
     # Delegate to the implementation
-    img_impl.run(
+    return img_impl.run(
         min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,
         max_circuits=max_circuits, num_shots=num_shots,
         method=method,
@@ -103,6 +104,7 @@ def run(
         test_pass_count=test_pass_count,
         test_size=test_size,
         train_size=train_size,
+        get_circuits=get_circuits,
         draw_circuits=draw_circuits
     )
 

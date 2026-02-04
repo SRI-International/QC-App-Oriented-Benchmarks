@@ -30,6 +30,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=2,
         min_annealing_time=1, max_annealing_time=200,
         api=None,
         _instances=None,
+        get_circuits=False,
         draw_circuits=True):
 
     # Determine which API to use
@@ -59,6 +60,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=2,
         backend_id=backend_id, provider_backend=provider_backend, eta=eta,
         hub=hub, group=group, project=project, exec_options=exec_options,
         _instances=_instances,
+        get_circuits=get_circuits,
         draw_circuits=draw_circuits,
     )
 
@@ -77,7 +79,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=2,
         )
 
     # Delegate to the implementation
-    maxcut_impl.run(**kwargs)
+    return maxcut_impl.run(**kwargs)
 
 
 def load_data_and_plot(folder=None, backend_id=None, api=None, **kwargs):

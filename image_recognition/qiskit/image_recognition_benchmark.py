@@ -1307,6 +1307,7 @@ def run(
     test_pass_count:int = 30,
     test_size:int  = 50,
     train_size:int = 200,
+    get_circuits=False,
     draw_circuits=True,
 ):
     """
@@ -1496,9 +1497,18 @@ def run(
     x, x_train, x_test, y, y_train, y_test = fetch_mnist_data(
             test_size=test_size, train_size=train_size, verbose=verbose)
 
+    # If get_circuits requested but method doesn't support it, warn and return
+    if get_circuits and method != 1:
+        print(f"WARNING: get_circuits is not supported for method {method}")
+        return None
+
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     # dictionary to store the thetas_array for each qubit size
     thetas_array_dict = {}
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 for efficiency
@@ -1508,7 +1518,11 @@ def run(
         np.random.seed(0)
 
         if method == 1:
-            print(f"************\nExecuting [1] circuit for num_qubits = {num_qubits}")
+            if not get_circuits:
+                print(f"************\nExecuting [1] circuit for num_qubits = {num_qubits}")
+            else:
+                print(f"************\nCreating [1] circuit for num_qubits = {num_qubits}")
+                all_qcs[str(num_qubits)] = {}
         else:
             print(f"************\nExecuting [{ansatz_type}] circuit for num_qubits = {num_qubits}")
 
@@ -1792,6 +1806,11 @@ def run(
             # store the creation time for these circuits
             metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
 
+            # If we only want the circuits:
+            if get_circuits:
+                all_qcs[str(num_qubits)][str(instance_num)] = qc
+                continue
+
             # classically pre-compute and cache an array of expected measurement counts
             # for comparison against actual measured counts for fidelity calc (in analysis)
 
@@ -1934,6 +1953,11 @@ def run(
         metrics.finalize_group(num_qubits)
       
          
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
 

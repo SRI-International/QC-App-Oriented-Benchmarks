@@ -919,6 +919,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None,
         _instances=None,
+        get_circuits=False,
         draw_circuits=True):
     """
     Parameters
@@ -1111,15 +1112,28 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
     # for noiseless simulation, set noise model to be None
     # ex.set_noise_model(None)
 
+    # If get_circuits requested but method doesn't support it, warn and return
+    if get_circuits and method != 1:
+        print(f"WARNING: get_circuits is not supported for method {method}")
+        return None
+
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 to match the collection of problems in 'instance' folder
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
-        
+
         if method == 1:
-            print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+            if not get_circuits:
+                print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+            else:
+                print(f"************\nCreating [{max_circuits}] circuits for num_qubits = {num_qubits}")
+                all_qcs[str(num_qubits)] = {}
         else:
             print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
         
@@ -1167,6 +1181,11 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                                        
                 qc, params = MaxCut(num_qubits, restart_ind, edges, rounds, thetas_array_0, parameterized)
                 metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
+
+                # If we only want the circuits:
+                if get_circuits:
+                    all_qcs[str(num_qubits)][str(restart_ind)] = qc
+                    continue
 
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
                 qc2 = qc.decompose()
@@ -1325,9 +1344,14 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
             
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
-        
+
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
