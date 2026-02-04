@@ -1,11 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo "============================================================"
-echo Testing package implementation (default to Hidden Shift Benchmark)
-echo.
-
-cd ..
+REM Navigate to the benchmark root (parent of _tests)
+pushd "%~dp0.."
 
 REM Args:
 REM - 0 args -> defaults (hidden_shift / hs_benchmark), no extra args
@@ -26,23 +23,18 @@ if "%~1"=="" goto :args_done
 
 REM Check if first arg starts with "-"
 set "first=%~1"
-if "!first:~0,1!"=="-" (
-    set extra_args=%*
-    goto :args_done
-)
+if not "!first:~0,1!"=="-" goto :parse_folder_bmname
+set extra_args=%*
+goto :args_done
 
-REM First arg is folder, second is bmname
-if "%~2"=="" (
-    echo Error: Need 0 args, flags only, or 2+ args (folder bmname [python_args...])
-    exit /b 1
-)
+:parse_folder_bmname
+if "%~2"=="" goto :arg_error
 set folder=%~1
 set bmname=%~2
 shift
 shift
-
-REM Collect remaining args
 set extra_args=
+
 :collect_args
 if "%~1"=="" goto :args_done
 set extra_args=!extra_args! %1
@@ -51,23 +43,34 @@ goto :collect_args
 
 :args_done
 
-echo folder=%folder%
-echo bmname=%bmname%
+echo ============================================================
+echo Testing: %folder% / %bmname%
+echo ============================================================
 echo extra_args=-nop -nod %extra_args%
 
 echo ... run in BM directory ...
-cd %folder%
+pushd %folder%
 call python %bmname%.py -nop -nod %extra_args%
-cd ..
+popd
 
-pause
+rem pause
 
 echo ... run at top level ...
 call python %folder%/%bmname%.py -nop -nod %extra_args%
 
-pause
+rem pause
 
 echo ... run at top level as a module
 call python -m %folder%.%bmname% -nop -nod %extra_args%
 
+rem pause
+
+popd
 endlocal
+goto :eof
+
+:arg_error
+echo Error: Need 0 args, flags only, or 2+ args (folder bmname [python_args...])
+popd
+endlocal
+exit /b 1

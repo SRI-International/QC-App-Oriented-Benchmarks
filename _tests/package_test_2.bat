@@ -1,11 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo "============================================================"
-echo Testing package implementation with Hamlib Benchmark (with obs test)
-echo.
-
-cd ..
+REM Navigate to the benchmark root (parent of _tests)
+pushd "%~dp0.."
 
 REM Args:
 REM - 0 args -> defaults (hamlib, -a qiskit)
@@ -25,28 +22,30 @@ if "%~1"=="" (
     set extra_args=%*
 )
 
-echo folder=%folder%
-echo bmname=%bmname%
+echo ============================================================
+echo Testing: %folder% / %bmname%
+echo ============================================================
 echo extra_args=-nop -nod %extra_args%
 
 echo ... run in BM directory ...
-cd %folder%
+pushd %folder%
 call python %bmname%.py -nop -nod %extra_args%
-cd ..
+popd
 
-pause
+rem pause
 
 echo ... run at top level ...
 call python %folder%/%bmname%.py -nop -nod %extra_args%
 
-pause
+rem pause
 
 echo ... run at top level as a module
 call python -m %folder%.%bmname% -nop -nod %extra_args%
 
-pause
+rem pause
 
 echo ... run at top level as a module (observable test)
 call python -m %folder%.%bmname% -nop -nod %extra_args% -obs
 
+popd
 endlocal
