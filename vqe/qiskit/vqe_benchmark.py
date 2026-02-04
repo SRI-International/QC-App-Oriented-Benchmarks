@@ -1,5 +1,10 @@
 """
 Variational Quantum Eigensolver Benchmark Program - Qiskit
+
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python vqe/vqe_benchmark.py
 """
 
 import json
@@ -270,7 +275,7 @@ def ReadHamiltonian(nqubit):
 
 ## Analyze and print measured results
 ## Compute the quality of the result based on measured probability distribution for each state
-def analyze_and_print_result(qc, result, num_qubits, references, num_shots):
+def analyze_and_print_result(qc, result, num_qubits, num_shots, references=None):
 
     # total circuit name (pauli string + coefficient)
     total_name = qc.name
@@ -318,7 +323,8 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
         max_circuits=3, num_shots=4092, method=1,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
 
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit") 
 
@@ -345,7 +351,9 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, type, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
+
+        num_qubits = int(num_qubits)
 
         # load pre-computed data
         if len(qc.name.split()) == 2:
@@ -359,7 +367,8 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             with open(filename) as f:
                 references = json.load(f)
 
-        fidelity = analyze_and_print_result(qc, result, num_qubits, references, num_shots)
+        fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                references=references)
 
         if len(qc.name.split()) == 2:
             metrics.store_metric(num_qubits, qc.name.split()[0], 'fidelity', fidelity)
@@ -372,8 +381,12 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for input_size in range(min_qubits, max_qubits + 1, 2):
@@ -416,7 +429,11 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             # construct all circuits
             qc_list = VQEEnergy(num_qubits, na, nb, 0, method)
 
-        print(f"************\nExecuting [{len(qc_list)}] circuits with num_qubits = {num_qubits}")
+        if not get_circuits:
+            print(f"************\nExecuting [{len(qc_list)}] circuits with num_qubits = {num_qubits}")
+        else:
+            print(f"************\nCreating [{len(qc_list)}] circuits with num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
 
         for qc in qc_list:
 
@@ -429,6 +446,11 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             # record creation time
             metrics.store_metric(input_size, circuit_id, 'create_time', time.time() - ts)
 
+            # If we only want the circuits:
+            if get_circuits:
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc
+                continue
+
             # collapse the sub-circuits used in this benchmark (for qiskit)
             qc2 = qc.decompose()
 
@@ -438,58 +460,31 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
         # Wait for some active circuits to complete; report metrics when group complete
         ex.throttle_execution(metrics.finalize_group)
 
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
-    
+
     # print a sample circuit
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    print("\nHartree Fock Generator 'Hf' ="); print(Hf_ if Hf_ != None else " ... too large!")
-    print("\nCluster Operator Example 'Cluster Op' ="); print(CO_ if CO_ != None else " ... too large!")
+    if draw_circuits:
+        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+        print("\nHartree Fock Generator 'Hf' ="); print(Hf_ if Hf_ != None else " ... too large!")
+        print("\nCluster Operator Example 'Cluster Op' ="); print(CO_ if CO_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
-    options = {"shots": num_shots, "reps": max_circuits}
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+    if plot_results:
+        options = {"shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 #######################
 # MAIN
 
-import argparse
-def get_args():
-    parser = argparse.ArgumentParser(description="Variational Quantum Eigensolver Benchmark")
-    #parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
-    #parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
-    parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
-    parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits (min = max = N)", type=int)
-    parser.add_argument("--min_qubits", "-min", default=4, help="Minimum number of qubits", type=int)
-    parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int) 
-    parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
-    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
-    parser.add_argument("--num_shots", "-s", default=4092, help="Number of shots", type=int)
-    parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
-    
-    return parser.parse_args()
-   
 if __name__ == "__main__":
-    import argparse
-    args = get_args()
-    
-    # special argument handling
-    ex.verbose = args.verbose
-    verbose = args.verbose
-    
-    if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
-    
-    # execute benchmark program
-    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
-        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
-        num_shots=args.num_shots,
-        method=args.method,
-        backend_id=args.backend_id,
-        exec_options = {"noise_model" : None} if args.nonoise else {},
-        #api=args.api
-        )
+    print("Please run this benchmark from the parent directory:")
+    print("  python vqe/vqe_benchmark.py")
         

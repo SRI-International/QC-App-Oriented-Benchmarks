@@ -27,7 +27,9 @@ verbose = False
 
 # Analyze and print measured results
 # Expected result is always the secret_int (which encodes alpha), so fidelity calc is simple
-def analyze_and_print_result(qc, result, num_counting_qubits, s_int, num_shots):
+def analyze_and_print_result(qc, result, num_qubits, num_shots, s_int=None, num_state_qubits=1):
+
+    num_counting_qubits = num_qubits - num_state_qubits - 1
 
     counts = result.get_counts(qc)
 
@@ -99,7 +101,8 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         num_state_qubits=1, # default, not exposed to users
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
 
     # Configure the QED-C Benchmark package for use with the given API
     qedc_benchmarks_init(api, "amplitude_estimation", ["ae_kernel"])
@@ -135,17 +138,22 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, s_int, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # determine fidelity of result set
-        num_counting_qubits = int(num_qubits) - num_state_qubits - 1
-        counts, fidelity = analyze_and_print_result(qc, result, num_counting_qubits, int(s_int), num_shots)
-        metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+        num_qubits = int(num_qubits)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                s_int=int(circuit_id), num_state_qubits=num_state_qubits)
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
+
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
 
     ##########
 
@@ -162,7 +170,11 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_counting_qubits), max_circuits)
 
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        if not get_circuits:
+            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        else:
+            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
         if verbose:
             print(f"              with num_state_qubits = {num_state_qubits}  num_counting_qubits = {num_counting_qubits}")
 
@@ -174,34 +186,50 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 
         # loop over limited # of secret strings for this
         for s_int in s_range:
+
+            # create circuit_id for use with metrics and execution framework
+            circuit_id = s_int
+
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
 
             a_ = a_from_s_int(s_int, num_counting_qubits)
 
             qc = kernel.AmplitudeEstimation(num_state_qubits, num_counting_qubits, a_)
-            metrics.store_metric(num_qubits, s_int, 'create_time', time.time() - ts)
+            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+
+            # If we only want the circuits:
+            if get_circuits:
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc
+                continue
 
             # collapse the 3 sub-circuit levels used in this benchmark (for qiskit)
             qc2 = qc.decompose().decompose().decompose()
 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, s_int, num_shots)
+            ex.submit_circuit(qc2, num_qubits, circuit_id, num_shots)
 
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
+
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
 
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
 
-    # draw a sample circuit
-    kernel.kernel_draw()
+    if draw_circuits:
+        # draw a sample circuit
+        kernel.kernel_draw()
 
-    # Plot metrics for all circuit sizes
-    options = {"shots": num_shots, "reps": max_circuits}
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+    if plot_results:
+        # Plot metrics for all circuit sizes
+        options = {"shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 
 #######################
@@ -221,6 +249,8 @@ def get_args():
     parser.add_argument("--num_state_qubits", "-nsq", default=1, help="Number of State Qubits", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
 
 # if main, execute method
@@ -239,5 +269,6 @@ if __name__ == '__main__':
         num_state_qubits=args.num_state_qubits,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
         )

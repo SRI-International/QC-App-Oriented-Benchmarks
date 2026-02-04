@@ -119,7 +119,8 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
         epsilon=0.05, degree=2, num_state_qubits=MIN_STATE_QUBITS, method=2,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
 
     # Configure the QED-C Benchmark package for use with the given API
     qedc_benchmarks_init(api, "monte_carlo", ["mc_kernel"])
@@ -181,6 +182,10 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
 
     for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
@@ -190,7 +195,11 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
         num_counting_qubits = num_qubits - num_state_qubits - 1
         num_circuits = min(2 ** (input_size), max_circuits)
 
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        if not get_circuits:
+            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        else:
+            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
 
         # determine range of circuits to loop over
         if 2**(input_size) <= max_circuits:
@@ -207,6 +216,11 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
                                            num_counting_qubits, epsilon, degree, method=method)
             metrics.store_metric(num_qubits, mu, 'create_time', time.time() - ts)
 
+            # If we only want the circuits:
+            if get_circuits:
+                all_qcs[str(num_qubits)][str(mu)] = qc
+                continue
+
             # collapse the sub-circuit levels
             qc2 = qc.decompose().decompose().decompose().decompose()
 
@@ -214,14 +228,21 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
 
         ex.throttle_execution(metrics.finalize_group)
 
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
 
-    kernel.kernel_draw()
+    if draw_circuits:
+        kernel.kernel_draw()
 
-    options = {"method": method, "shots": num_shots, "reps": max_circuits}
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}", options=options)
+    if plot_results:
+        options = {"method": method, "shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}", options=options)
 
 
 #######################
@@ -242,6 +263,8 @@ def get_args():
     parser.add_argument("--num_state_qubits", "-nsq", default=1, help="Number of State Qubits", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -258,5 +281,6 @@ if __name__ == '__main__':
         num_state_qubits=args.num_state_qubits,
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
         )

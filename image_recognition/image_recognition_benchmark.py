@@ -50,7 +50,9 @@ def run(
     test_pass_count=30,
     test_size=50,
     train_size=200,
-    api=None
+    api=None,
+    get_circuits=False,
+    draw_circuits=True,
 ):
 
     # Configure the QED-C Benchmark package for use with the given API
@@ -65,7 +67,7 @@ def run(
         backend_id = "qasm_simulator"
 
     # Delegate to the implementation
-    img_impl.run(
+    return img_impl.run(
         min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,
         max_circuits=max_circuits, num_shots=num_shots,
         method=method,
@@ -101,7 +103,9 @@ def run(
         backend_id_train=backend_id_train,
         test_pass_count=test_pass_count,
         test_size=test_size,
-        train_size=train_size
+        train_size=train_size,
+        get_circuits=get_circuits,
+        draw_circuits=draw_circuits
     )
 
 
@@ -136,6 +140,8 @@ def get_args():
     parser.add_argument("--max_iter", "-i", default=300, help="Maximum iterations", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -151,5 +157,6 @@ if __name__ == "__main__":
         max_iter=args.max_iter,
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
     )

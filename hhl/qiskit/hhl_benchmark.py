@@ -1,6 +1,10 @@
 """
 HHL Benchmark Program - Qiskit
 
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python hhl/hhl_benchmark.py
 """
 
 import time
@@ -576,8 +580,8 @@ def postselect(outcomes, return_probs=True):
     return mar_out, rate
     
 # Analyze the quality of the result obtained from executing circuit qc 
-def analyze_and_print_result (qc, result, num_qubits, s_int, num_shots):
-    
+def analyze_and_print_result (qc, result, num_qubits, num_shots, s_int=None):
+
     global saved_result
     saved_result = result
     
@@ -647,7 +651,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
         method = 1, use_best_widths=True, min_register_qubits=1,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):  
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):  
 
     # we must have at least 4 qubits and min must be less than max
     max_qubits = max(4, max_qubits)
@@ -691,7 +696,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             method=method, use_best_widths=use_best_widths, min_register_qubits=min_register_qubits,
             backend_id=backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
-            context=context, api=api, get_circuits=get_circuits)
+            context=context, api=api, get_circuits=get_circuits,
+            draw_circuits=draw_circuits, plot_results=plot_results)
 
 
 # Execute program with default parameters and permitting the user to specify an
@@ -704,7 +710,8 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
         method=2, use_best_widths=False, min_register_qubits=1,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):  
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):  
     
     print(f"{benchmark_name} Benchmark Program - Qiskit")
 
@@ -732,14 +739,14 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, s_int, num_shots):
-     
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
+
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        
-        #counts, fidelity = analyze_and_print_result(qc, result, num_qubits, ideal_distr)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
-        metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                s_int=int(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
     
     # Variable for new qubit group ordering if using mid_circuit measurements
     mid_circuit_qubit_group = []
@@ -760,8 +767,12 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     diag_el = 0.5
     off_diag_el = -0.25
     
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     #for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
@@ -788,8 +799,12 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
                     print(f"... SKIPPING {num_circuits} circuits with {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
                 continue
                   
-            print(f"************\nExecuting {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
-            
+            if not get_circuits:
+                print(f"************\nExecuting {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
+            else:
+                print(f"************\nCreating {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
+                all_qcs[str(num_qubits)] = {}
+
             # loop over randomly generated problem instances
             for i in range(num_circuits):
 
@@ -803,48 +818,62 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
                 # define secret_int (include 'i' since b and off_diag_index don't need to be unique)
                 s_int = 1000 * (i+1) + (2**off_diag_index)*(3**b)
                 #s_int = (2**off_diag_index)*(3**b)
-                
+
+                # create circuit_id for use with metrics and execution framework
+                circuit_id = s_int
+
                 if verbose:
                     print(f"... create A for b = {b}, off_diag_index = {off_diag_index}, s_int = {s_int}")
-                
+
                 A = shs.generate_sparse_H(num_input_qubits, off_diag_index,
-                                          diag_el=diag_el, off_diag_el=off_diag_el)             
-                
+                                          diag_el=diag_el, off_diag_el=off_diag_el)
+
                 # create the circuit for given qubit size and secret string, store time metric
                 ts = time.time()
                 qc = make_circuit(A, b, num_clock_qubits)
-                metrics.store_metric(num_qubits, s_int, 'create_time', time.time()-ts)
-                
-                #print(qc)
-                
+                metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
+
+                # If we only want the circuits:
+                if get_circuits:
+                    all_qcs[str(num_qubits)][str(circuit_id)] = qc
+                    continue
+
                 # collapse the sub-circuits used in this benchmark (for qiskit)
                 qc2 = qc.decompose()
-                
+
                 # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc2, num_qubits, s_int, shots=num_shots)
+                ex.submit_circuit(qc2, num_qubits, circuit_id, shots=num_shots)
         
             # Wait for some active circuits to complete; report metrics when groups complete
             ex.throttle_execution(metrics.finalize_group)
         
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
-    
+
     # print a sample circuit
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
-    print("\nU Circuit ="); print(U_ if U_ != None else "  ... too large!")
-    print("\nU^-1 Circuit ="); print(UI_ if UI_ != None else "  ... too large!")
-    print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
-    print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
-    print("\nHamiltonian Phase Estimation Circuit ="); print(HP_ if HP_ != None else "  ... too large!")
-    print("\nControlled Rotation Circuit ="); print(INVROT_ if INVROT_ != None else "  ... too large!")
+    if draw_circuits:
+        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+        #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
+        print("\nU Circuit ="); print(U_ if U_ != None else "  ... too large!")
+        print("\nU^-1 Circuit ="); print(UI_ if UI_ != None else "  ... too large!")
+        print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
+        print("\nInverse QFT Circuit ="); print(QFTI_ if QFTI_ != None else "  ... too large!")
+        print("\nHamiltonian Phase Estimation Circuit ="); print(HP_ if HP_ != None else "  ... too large!")
+        print("\nControlled Rotation Circuit ="); print(INVROT_ if INVROT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    options = {"method":method, "shots": num_shots, "reps": max_circuits} 
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options = options,
-                         transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
+    if plot_results:
+        options = {"method":method, "shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options = options,
+                             transform_qubit_group = transform_qubit_group, new_qubit_group = mid_circuit_qubit_group)
 
-# if main, execute method
-if __name__ == '__main__': run()
+if __name__ == '__main__':
+    print("Please run this benchmark from the parent directory:")
+    print("  python hhl/hhl_benchmark.py")

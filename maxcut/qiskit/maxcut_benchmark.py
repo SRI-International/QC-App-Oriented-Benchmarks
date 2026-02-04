@@ -1,5 +1,10 @@
 """
 MaxCut Benchmark Program - Qiskit
+
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python maxcut/maxcut_benchmark.py
 """
 
 import datetime
@@ -296,12 +301,12 @@ def get_expectation(num_qubits, degree, num_shots):
 expected_dist = {}
 
 # Compare the measurement results obtained with the expected measurements to determine fidelity
-def analyze_and_print_result (qc, result, num_qubits, secret_int, num_shots):
+def analyze_and_print_result (qc, result, num_qubits, num_shots, secret_int=None):
     global expected_dist
-    
+
     # obtain counts from the result object
     counts = result.get_counts(qc)
-    
+
     # retrieve pre-computed expectation values for the circuit that just completed
     expected_dist = get_expectation(num_qubits, secret_int, num_shots)
     
@@ -913,7 +918,9 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
         backend_id=None, provider_backend=None, eta=0.5,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None,
-        _instances=None):
+        _instances=None,
+        get_circuits=False,
+        draw_circuits=True):
     """
     Parameters
     ----------
@@ -1074,14 +1081,15 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
     metrics.init_metrics()
     
     # Define custom result handler
-    def execution_handler (qc, result, num_qubits, s_int, num_shots):  
-     
+    def execution_handler (qc, result, num_qubits, circuit_id, num_shots):
+
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
-        metrics.store_metric(num_qubits, s_int, 'fidelity', fidelity)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                secret_int=int(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
 
-    def execution_handler2 (qc, result, num_qubits, s_int, num_shots):
+    def execution_handler2 (qc, result, num_qubits, circuit_id, num_shots):
         # Stores the results to the global saved_result variable
         global saved_result
         saved_result = result
@@ -1104,15 +1112,28 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
     # for noiseless simulation, set noise model to be None
     # ex.set_noise_model(None)
 
+    # If get_circuits requested but method doesn't support it, warn and return
+    if get_circuits and method != 1:
+        print(f"WARNING: get_circuits is not supported for method {method}")
+        return None
+
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 to match the collection of problems in 'instance' folder
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
-        
+
         if method == 1:
-            print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+            if not get_circuits:
+                print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+            else:
+                print(f"************\nCreating [{max_circuits}] circuits for num_qubits = {num_qubits}")
+                all_qcs[str(num_qubits)] = {}
         else:
             print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
         
@@ -1160,6 +1181,11 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                                        
                 qc, params = MaxCut(num_qubits, restart_ind, edges, rounds, thetas_array_0, parameterized)
                 metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
+
+                # If we only want the circuits:
+                if get_circuits:
+                    all_qcs[str(num_qubits)][str(restart_ind)] = qc
+                    continue
 
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
                 qc2 = qc.decompose()
@@ -1220,7 +1246,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                     
                     global saved_result
                     # Fidelity Calculation and Storage
-                    _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, unique_id, num_shots) 
+                    _, fidelity = analyze_and_print_result(qc, saved_result, num_qubits, num_shots, secret_int=unique_id)
                     metrics.store_metric(num_qubits, unique_id, 'fidelity', fidelity)
                     
                     #************************************************
@@ -1318,24 +1344,30 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(str(num_qubits))
             
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
-        
+
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
     
     global print_sample_circuit
-    if print_sample_circuit:
+    if draw_circuits and print_sample_circuit:
         # print a sample circuit
         print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
     #if method == 1: print("\nQuantum Oracle 'Uf' ="); print(Uf_ if Uf_ != None else " ... too large!")
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
-                options=dict(shots=num_shots,rounds=rounds))
+        if plot_results:
+            metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
+                    options=dict(shots=num_shots,rounds=rounds))
     elif method == 2:
         #metrics.print_all_circuit_metrics()
         if plot_results:
@@ -1386,7 +1418,6 @@ def plot_results_from_data(num_shots=100, rounds=1, degree=3, max_iter=30, max_c
     
     metrics.plot_angles_polar(suptitle = suptitle, options = options, suffix = suffix)
 
-# if main, execute method
-if __name__ == '__main__': run()
-
-# %%
+if __name__ == '__main__':
+    print("Please run this benchmark from the parent directory:")
+    print("  python maxcut/maxcut_benchmark.py")

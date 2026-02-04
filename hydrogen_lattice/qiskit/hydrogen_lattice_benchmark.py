@@ -1,5 +1,10 @@
 """
-Hydogen Lattice Benchmark Program - Qiskit
+Hydrogen Lattice Benchmark Program - Qiskit
+
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python hydrogen_lattice/hydrogen_lattice_benchmark.py
 """
 
 import datetime
@@ -579,7 +584,7 @@ expected_dist = {}
 
 
 # Compare the measurement results obtained with the expected measurements to determine fidelity
-def analyze_and_print_result(qc, result, num_qubits, secret_int, num_shots):
+def analyze_and_print_result(qc, result, num_qubits, num_shots, secret_int=None):
     global expected_dist
 
     # obtain counts from the result object
@@ -1078,6 +1083,8 @@ def run(
     exec_options=None,
     context=None,
     _instances=None,
+    get_circuits=False,
+    draw_circuits=True,
 ):
     """
     Parameters
@@ -1238,13 +1245,14 @@ def run(
     add_custom_metric_names()
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, s_int, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(s_int), num_shots)
-        metrics.store_metric(num_qubits, s_int, "solution_quality", fidelity)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                secret_int=int(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, "solution_quality", fidelity)
 
-    def execution_handler2(qc, result, num_qubits, s_int, num_shots):
+    def execution_handler2(qc, result, num_qubits, circuit_id, num_shots):
         # Stores the results to the global saved_result variable
         global saved_result
         saved_result = result
@@ -1267,9 +1275,18 @@ def run(
     # create a data folder for the results
     create_data_folder(save_res_to_file, detailed_save_names, backend_id)
 
+    # If get_circuits requested but method doesn't support it, warn and return
+    if get_circuits and method != 1:
+        print(f"WARNING: get_circuits is not supported for method {method}")
+        return None
+
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ###########################
     # Benchmark Execution Loop
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     # DEVNOTE: increment by 2 for paired electron circuits
@@ -1277,7 +1294,11 @@ def run(
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
         
         if method == 1:
-            print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+            if not get_circuits:
+                print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
+            else:
+                print(f"************\nCreating [{max_circuits}] circuits for num_qubits = {num_qubits}")
+                all_qcs[str(num_qubits)] = {}
         else:
             print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
 
@@ -1370,6 +1391,11 @@ def run(
                 """
                 # store the creation time for these circuits
                 metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
+
+                # If we only want the circuits:
+                if get_circuits:
+                    all_qcs[str(num_qubits)][str(instance_num)] = qc
+                    continue
 
                 # classically pre-compute and cache an array of expected measurement counts
                 # for comparison against actual measured counts for fidelity calc (in analysis)
@@ -1708,6 +1734,11 @@ def run(
             metrics.process_circuit_metrics_2_level(num_qubits)
             metrics.finalize_group(num_qubits)
 
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for some active circuits to complete; report metrics when groups complete
     ex.throttle_execution(metrics.finalize_group)
 
@@ -1715,18 +1746,19 @@ def run(
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
-    
+
     # print a sample circuit
-    if print_sample_circuit:
+    if draw_circuits and print_sample_circuit:
         if method == 1:
             print("Sample Circuit:")
             print(QC_ if QC_ is not None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
     if method == 1:
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
-                options=dict(shots=num_shots))
-                
+        if plot_results:
+            metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - Qiskit",
+                    options=dict(shots=num_shots))
+
     elif method == 2:
         if plot_results:
             plot_results_from_data(**dict_of_inputs)
@@ -1833,10 +1865,6 @@ def submit_to_estimator(qc=None, num_qubits=1, unique_id=-1, parameterized=False
 #################################
 # MAIN
 
-# # if main, execute method
 if __name__ == "__main__":
-    run()
-
-# # %%
-
-# run()
+    print("Please run this benchmark from the parent directory:")
+    print("  python hydrogen_lattice/hydrogen_lattice_benchmark.py")

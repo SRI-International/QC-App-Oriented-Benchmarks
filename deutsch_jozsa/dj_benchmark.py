@@ -31,7 +31,7 @@ verbose = False
 
 # Analyze and print measured results
 # Expected result is always the type, so fidelity calc is simple
-def analyze_and_print_result (qc, result, num_qubits, type, num_shots):
+def analyze_and_print_result (qc, result, num_qubits, num_shots, type=None):
 
     # Size of input is one less than available qubits
     input_size = num_qubits - 1
@@ -58,7 +58,8 @@ def analyze_and_print_result (qc, result, num_qubits, type, num_shots):
 def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
 
     # Configure the QED-C Benchmark package for use with the given API
     qedc_benchmarks_init(api, "deutsch_jozsa", ["dj_kernel"])
@@ -93,12 +94,12 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler (qc, result, num_qubits, type, num_shots):  
-     
-        # determine fidelity of result set
+    def execution_handler (qc, result, num_qubits, circuit_id, num_shots):
+
         num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, int(type), num_shots)
-        metrics.store_metric(num_qubits, type, 'fidelity', fidelity)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                type=int(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -126,24 +127,27 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
         
         # loop over only 2 circuits
         for type in range( num_circuits ):
-            
+
+            # create circuit_id for use with metrics and execution framework
+            circuit_id = type
+
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
             mpi.barrier()
             qc = kernel.DeutschJozsa(num_qubits, type)
-            metrics.store_metric(num_qubits, type, 'create_time', time.time()-ts)
+            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
 
             # collapse the sub-circuit levels used in this benchmark (for qiskit)
             qc2 = qc.decompose()
 
             # Store each circuit if we want to return them
             if get_circuits:
-                all_qcs[str(num_qubits)][str(type)] = qc2
-                # Continue to skip sumbitting the circuit for execution. 
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc2
+                # Continue to skip sumbitting the circuit for execution.
                 continue
 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, type, num_shots)
+            ex.submit_circuit(qc2, num_qubits, circuit_id, num_shots)
         
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
@@ -159,12 +163,14 @@ def run (min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=10
     ##########
     
     if mpi.leader():
-        # draw a sample circuit
-        kernel.kernel_draw()
+        if draw_circuits:
+            # draw a sample circuit
+            kernel.kernel_draw()
 
-        # Plot metrics for all circuit sizes
-        options = {"shots": num_shots, "reps": max_circuits}
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+        if plot_results:
+            # Plot metrics for all circuit sizes
+            options = {"shots": num_shots, "reps": max_circuits}
+            metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
 
 #######################
@@ -181,22 +187,24 @@ def get_args():
     parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
     parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
-    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)  
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)
     #parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
-    
+
 # if main, execute method
-if __name__ == '__main__': 
+if __name__ == '__main__':
     args = get_args()
-    
+
     # special argument handling
     verbose = args.verbose
-    
+
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
-    
+
     # execute benchmark program
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
@@ -204,6 +212,7 @@ if __name__ == '__main__':
         #method=args.method,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
-        #api=args.api
+        #api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
         )
    

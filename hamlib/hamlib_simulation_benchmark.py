@@ -101,15 +101,15 @@ def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
 def analyze_and_print_result(
             qc,
             result,
-            num_qubits: int,
-            type: str,
-            num_shots: int,
-            hamiltonian: str,
-            method: int,
-            t: float,
-            random_pauli_flag: bool,
-            do_sqrt_fidelity: bool,
-            init_state: str
+            num_qubits,
+            num_shots,
+            type=None,
+            hamiltonian=None,
+            method=None,
+            t=None,
+            random_pauli_flag=False,
+            do_sqrt_fidelity=False,
+            init_state=None
         ) -> tuple:
     """
     Analyze and print the measured results. Compute the quality of the result based on operator expectation for each state.
@@ -118,10 +118,14 @@ def analyze_and_print_result(
         qc (QuantumCircuit): The quantum circuit.
         result: The result from the execution.
         num_qubits (int): Number of qubits.
-        type (str): Type of the simulation (circuit identifier).
         num_shots (int): Number of shots.
+        type (str): Type of the simulation (circuit identifier).
         hamiltonian (str): Which hamiltonian to run.
         method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
+        t (float): Total simulation time.
+        random_pauli_flag (bool): If True, activates random Pauli gates.
+        do_sqrt_fidelity (bool): If True, computes the square root of the fidelity.
+        init_state (str): Initial state for the quantum circuit.
 
     Returns:
         tuple: Counts and fidelity.
@@ -281,7 +285,8 @@ def run(min_qubits: int = 2,
         exec_options = None,
         context = None,
         api = None,
-        warmup = False):
+        warmup = False,
+        get_circuits = False):
     """
     Execute program with default parameters.
 
@@ -406,19 +411,20 @@ def run(min_qubits: int = 2,
     metrics.init_metrics(warmup)
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, type, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # Determine fidelity of result set
         num_qubits = int(num_qubits)
         counts, expectation_a = analyze_and_print_result(
-                    qc, result, num_qubits, type, num_shots,
-                    hamiltonian,
-                    method,
-                    t,
-                    random_pauli_flag,
-                    do_sqrt_fidelity,
-                    init_state
+                    qc, result, num_qubits, num_shots,
+                    type=circuit_id,
+                    hamiltonian=hamiltonian,
+                    method=method,
+                    t=t,
+                    random_pauli_flag=random_pauli_flag,
+                    do_sqrt_fidelity=do_sqrt_fidelity,
+                    init_state=init_state
                 )
-        metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', expectation_a)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -443,17 +449,26 @@ def run(min_qubits: int = 2,
     if method == 2:
         ex.max_jobs_active = 1
 
+    # If get_circuits requested but observables mode doesn't support it, warn and return
+    if get_circuits and do_observables:
+        print(f"WARNING: get_circuits is not supported with do_observables=True")
+        return None
+
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     # build list of qubit sizes within the specificed range for which a Hamiltonian is available
     valid_qubits = hamlib_utils.get_valid_qubits(min_qubits, max_qubits, skip_qubits, hamiltonian_params)
-    
+
     if len(valid_qubits) < 1:
         print(f"ERROR: No matching datasets for the requested Hamiltonian name and parameters.")
         print(f"       Terminating this benchmark.")
         return
-    
+
     # metrics storage for observables, until we update the metrics module for use here
     metrics_array = []
-    
+
     for num_qubits in valid_qubits:
         global sparse_pauli_terms
     
@@ -463,7 +478,11 @@ def run(min_qubits: int = 2,
         # Determine number of circuits to execute for this group
         num_circuits = max(1, max_circuits)
         
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        if not get_circuits:
+            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        else:
+            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
         
         # use the given Hamiltonian, if provided
         if pauli_terms is not None:
@@ -608,8 +627,13 @@ def run(min_qubits: int = 2,
             
             # execute for fidelity benchmarks
             if not do_observables:
-            
+
                 metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+
+                # If collecting circuits, store and continue to next circuit
+                if get_circuits:
+                    all_qcs[str(num_qubits)][str(circuit_id)] = qc
+                    continue
 
                 # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
                 ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
@@ -777,6 +801,11 @@ def run(min_qubits: int = 2,
         if api != "cudaq" or do_observables == False:
             ex.throttle_execution(metrics.finalize_group)
     
+    # If collecting circuits, return them without executing
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
     

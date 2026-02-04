@@ -66,8 +66,8 @@ def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
 ############### Result Data Analysis
 
 #def analyze_and_print_result(qc: QuantumCircuit, result, num_qubits: int,
-def analyze_and_print_result(qc, result, num_qubits: int,
-            type: str, num_shots: int, hamiltonian: str, method: int, random_pauli_flag: bool, init_state: str) -> tuple:
+def analyze_and_print_result(qc, result, num_qubits, num_shots,
+            type=None, hamiltonian=None, method=None, random_pauli_flag=False, init_state=None):
     """
     Analyze and print the measured results. Compute the quality of the result based on operator expectation for each state.
 
@@ -75,10 +75,12 @@ def analyze_and_print_result(qc, result, num_qubits: int,
         qc (QuantumCircuit): The quantum circuit.
         result: The result from the execution.
         num_qubits (int): Number of qubits.
-        type (str): Type of the simulation.
         num_shots (int): Number of shots.
-        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM". 
+        type (str): Type of the simulation (circuit_id).
+        hamiltonian (str): Which hamiltonian to run. "heisenberg" by default but can also choose "TFIM".
         method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
+        random_pauli_flag (bool): Flag for random Pauli operations.
+        init_state (str): Initial state type.
 
     Returns:
         tuple: Counts and fidelity.
@@ -162,7 +164,8 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         K: int = None, t: float = None,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
-        context = None, api = None, get_circuits=False):
+        context = None, api = None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
     """
     Execute program with default parameters.
 
@@ -250,11 +253,13 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     metrics.init_metrics()
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, type, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # Determine fidelity of result set
         num_qubits = int(num_qubits)
-        counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, type, num_shots, hamiltonian, method, random_pauli_flag, init_state)
-        metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
+        counts, expectation_a = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                type=circuit_id, hamiltonian=hamiltonian, method=method,
+                random_pauli_flag=random_pauli_flag, init_state=init_state)
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', expectation_a)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -337,13 +342,15 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     ##########
     
     if mpi.leader():
-        # draw a sample circuit
-        kernel.kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
-           
-        # Plot metrics for all circuit sizes
-        options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
-        if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
+        if draw_circuits:
+            # draw a sample circuit
+            kernel.kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
+
+        if plot_results:
+            # Plot metrics for all circuit sizes
+            options = {"ham": hamiltonian, "method":method, "shots": num_shots, "reps": max_circuits}
+            if use_XX_YY_ZZ_gates: options.update({ "xyz": use_XX_YY_ZZ_gates })
+            metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - Qiskit", options=options)
 
 
 #######################
@@ -372,18 +379,20 @@ def get_args():
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
     parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
 
     return parser.parse_args()
- 
+
 # if main, execute method
-if __name__ == '__main__':   
+if __name__ == '__main__':
     args = get_args()
-    
+
     # special argument handling
     verbose = args.verbose
-    
+
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
-    
+
     # execute benchmark program
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
@@ -397,5 +406,6 @@ if __name__ == '__main__':
         #t = args.time,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
-        api=args.api
+        api=args.api,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot
         )

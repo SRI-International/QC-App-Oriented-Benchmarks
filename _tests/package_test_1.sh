@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ===== pretty header =====
-echo "============================================================"
-echo "Testing package implementation (defaults to Hidden Shift Benchmark)"
-echo
-
-cd ..
-
-# Use the directory of this script as the working base (like %~dp0)
+# Navigate to the benchmark root (parent of _tests)
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+cd "$SCRIPT_DIR/.."
 
 # Args:
 # - 0 args -> defaults (hidden_shift, no extra args)
@@ -49,30 +42,27 @@ if ! command -v "$PYTHON" >/dev/null 2>&1; then
   PYTHON="python"
 fi
 
-echo "folder=$folder"
-echo "bmname=$bmname"
+echo "============================================================"
+echo "Testing: $folder / $bmname"
+echo "============================================================"
 echo "extra_args=$extra_args"
 
 # ----- run in BM directory -----
 echo "... run in BM directory ..."
 pushd "$folder" >/dev/null
-"$PYTHON" "${bmname}.py" $extra_args
+"$PYTHON" "${bmname}.py" -nop -nod $extra_args
 popd >/dev/null
 
-# pause (only if interactive)
-if [ -t 0 ]; then
-  read -r -n 1 -s -p "Press any key to continue..." _; echo
-fi
+# pause
+# read -r -n 1 -s -p "Press any key to continue..." _; echo
 
 # ----- run at top level -----
 echo "... run at top level ..."
-"$PYTHON" "${folder}/${bmname}.py" $extra_args
+"$PYTHON" "${folder}/${bmname}.py" -nop -nod $extra_args
 
-# pause (only if interactive)
-if [ -t 0 ]; then
-  read -r -n 1 -s -p "Press any key to continue..." _; echo
-fi
+# pause
+# read -r -n 1 -s -p "Press any key to continue..." _; echo
 
 # ----- run at top level as a module -----
 echo "... run at top level as a module"
-"$PYTHON" -m "${folder}.${bmname}" $extra_args
+"$PYTHON" -m "${folder}.${bmname}" -nop -nod $extra_args

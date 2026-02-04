@@ -1,5 +1,10 @@
 """
 Shor's Order Finding Algorithm Benchmark - Qiskit
+
+NOTE: The benchmark-level code in this file will be migrated to the parent directory.
+This file will eventually contain only the Qiskit-specific kernel code.
+To run this benchmark, use the script in the parent directory:
+    python shors/shors_benchmark.py
 """
 
 import math
@@ -339,7 +344,7 @@ def expected_shor_dist(num_bits, order, num_shots):
 # Print analyzed results
 # Analyze and print measured results
 # Expected result is always the order r, so fidelity calc is simple
-def analyze_and_print_result(qc, result, num_qubits, order, num_shots, method):
+def analyze_and_print_result(qc, result, num_qubits, num_shots, order=None, method=None):
 
     if  method == 1:
         num_bits = int((num_qubits - 2) / 4)
@@ -377,7 +382,8 @@ def analyze_and_print_result(qc, result, num_qubits, order, num_shots, method):
 def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
         verbose=verbose, backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False):
+        context=None, api=None, get_circuits=False,
+        draw_circuits=True, plot_results=True):
 
     print(f"{benchmark_name} ({method}) Benchmark - Qiskit")
 
@@ -409,13 +415,14 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
     metrics.init_metrics()
 
     # Define custom result handler # number_order contains an array of length 2 with the number and order
-    def execution_handler(qc, result, num_qubits, number_order, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # determine fidelity of result set
         num_qubits = int(num_qubits)
         #Must convert number_order from string to array
-        order = eval(number_order)[1]
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, order, num_shots, method)
-        metrics.store_metric(num_qubits, number_order, 'fidelity', fidelity)
+        order = eval(circuit_id)[1]
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                order=order, method=method)
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
     
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -423,8 +430,12 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
  
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
-    
+
     # Execute Benchmark Program N times for multiple circuit sizes
     # Accumulate metrics asynchronously as circuits complete
     for num_qubits in range(min_qubits, max_qubits + 1, qubit_multiple):
@@ -438,7 +449,11 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (input_size), max_circuits)
         
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        if not get_circuits:
+            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        else:
+            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
 
         for _ in range(num_circuits):
 
@@ -455,39 +470,55 @@ def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
 
             number_order = (number, order)
 
+            # create circuit_id for use with metrics and execution framework
+            circuit_id = number_order
+
             if verbose: print(f"Generated {number=}, {base=}, {order=}")
 
             # create the circuit for given qubit size and order, store time metric
             ts = time.time()
             qc = ShorsAlgorithm(number, base, method=method, verbose=verbose)
-            metrics.store_metric(num_qubits, number_order, 'create_time', time.time()-ts)
+            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
+
+            # If we only want the circuits:
+            if get_circuits:
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc
+                continue
 
             # collapse the 4 sub-circuit levels used in this benchmark (for qiskit)
             qc = qc.decompose().decompose().decompose().decompose()
 
             # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc, num_qubits, number_order, num_shots)
+            ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
 
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
+
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
 
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
 
     ##########
-    
+
     # print the last circuit created
-    print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-    print("\nControlled Ua Operator 'cUa' ="); print(CUA_ if CUA_ != None else " ... too large!")
-    print("\nControlled Multiplier Operator 'cMULTamodN' ="); print(CMULTAMODN_ if CMULTAMODN_!= None else " ... too large!")
-    print("\nControlled Modular Adder Operator 'ccphiamodN' ="); print(CCPHIADDMODN_ if CCPHIADDMODN_ != None else " ... too large!")
-    print("\nPhi Adder Operator '\u03C6ADD' ="); print(PHIADD_ if PHIADD_ != None else " ... too large!")
-    print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
+    if draw_circuits:
+        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
+        print("\nControlled Ua Operator 'cUa' ="); print(CUA_ if CUA_ != None else " ... too large!")
+        print("\nControlled Multiplier Operator 'cMULTamodN' ="); print(CMULTAMODN_ if CMULTAMODN_!= None else " ... too large!")
+        print("\nControlled Modular Adder Operator 'ccphiamodN' ="); print(CCPHIADDMODN_ if CCPHIADDMODN_ != None else " ... too large!")
+        print("\nPhi Adder Operator '\u03C6ADD' ="); print(PHIADD_ if PHIADD_ != None else " ... too large!")
+        print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
 
     # Plot metrics for all circuit sizes
-    options = {"shots": num_shots, "reps": max_circuits}
-    metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+    if plot_results:
+        options = {"shots": num_shots, "reps": max_circuits}
+        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
 
-    
-# if main, execute method
-if __name__ == '__main__': run() #max_qubits = 6, max_circuits = 5, num_shots=100)
+
+if __name__ == '__main__':
+    print("Please run this benchmark from the parent directory:")
+    print("  python shors/shors_benchmark.py")
