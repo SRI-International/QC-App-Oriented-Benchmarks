@@ -151,6 +151,10 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
 
     # Execute Benchmark Program N times for multiple circuit sizes
@@ -166,7 +170,11 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_counting_qubits), max_circuits)
 
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        if not get_circuits:
+            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        else:
+            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
         if verbose:
             print(f"              with num_state_qubits = {num_state_qubits}  num_counting_qubits = {num_counting_qubits}")
 
@@ -190,6 +198,11 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
             qc = kernel.AmplitudeEstimation(num_state_qubits, num_counting_qubits, a_)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
+            # If we only want the circuits:
+            if get_circuits:
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc
+                continue
+
             # collapse the 3 sub-circuit levels used in this benchmark (for qiskit)
             qc2 = qc.decompose().decompose().decompose()
 
@@ -198,6 +211,11 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 
         # Wait for some active circuits to complete; report metrics when groups complete
         ex.throttle_execution(metrics.finalize_group)
+
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
 
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)

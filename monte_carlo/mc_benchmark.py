@@ -182,6 +182,10 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     ##########
 
     for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
@@ -191,7 +195,11 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
         num_counting_qubits = num_qubits - num_state_qubits - 1
         num_circuits = min(2 ** (input_size), max_circuits)
 
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        if not get_circuits:
+            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        else:
+            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
 
         # determine range of circuits to loop over
         if 2**(input_size) <= max_circuits:
@@ -208,12 +216,22 @@ def run(min_qubits=MIN_QUBITS, max_qubits=10, skip_qubits=1, max_circuits=1, num
                                            num_counting_qubits, epsilon, degree, method=method)
             metrics.store_metric(num_qubits, mu, 'create_time', time.time() - ts)
 
+            # If we only want the circuits:
+            if get_circuits:
+                all_qcs[str(num_qubits)][str(mu)] = qc
+                continue
+
             # collapse the sub-circuit levels
             qc2 = qc.decompose().decompose().decompose().decompose()
 
             ex.submit_circuit(qc2, num_qubits, mu, num_shots)
 
         ex.throttle_execution(metrics.finalize_group)
+
+    # Early return if we just want the circuits
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
 
     ex.finalize_execution(metrics.finalize_group)
 
