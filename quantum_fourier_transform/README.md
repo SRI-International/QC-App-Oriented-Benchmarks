@@ -47,7 +47,7 @@ The following circuit is the general quantum circuit for an <img align=center sr
 <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}R_k=\begin{bmatrix}1&0\\0&e^{2\pi{i}/2^k}\end{bmatrix}"/>.
 
 <p align="center">
-<img align=center src="../_doc/images/quantum_fourier_transform/QFT_circ.png"  width="900" />
+<img align=center src="../_doc/images/quantum-fourier-transform/QFT_circ.png"  width="900" />
 </p>
 
 *Fig 1. Diagram of general efficient quantum circuit for Quantum Fourier Transform [[2]](#references)*
@@ -71,7 +71,7 @@ Unlike the circuit diagram above, the quantum Fourier transform implementation i
 starts the iterative process from the last qubit, the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n">th qubit, to the first qubit. Below is an example for a 5 qubit system:
 
 <p align="center">
-<img align=center src="../_doc/images/quantum_fourier_transform/QFT_circ_5.png"  width="900" />
+<img align=center src="../_doc/images/quantum-fourier-transform/QFT_circ_5.png"  width="900" />
 </p>
 
 This implementation does not require the SWAP gates at the end of the circuit. Instead the qubits can be reordered
@@ -87,14 +87,14 @@ Fourier transform and inverse quantum Fourier transform.
    This method benchmarks the following circuit:
     
    <p align="center">
-   <img align=center src="../_doc/images/quantum_fourier_transform/QFT1_circ.png"  width="800" />
+   <img align=center src="../_doc/images/quantum-fourier-transform/QFT1_circ.png"  width="800" />
    </p>
    
 - **Method 2** Initialize inputs to represent the result of a QFT on a classical value followed by the inverse QFT to retrieve
    the expected classical value. This method benchmarks the following circuit: 
    
    <p align="center">
-   <img align=center src="../_doc/images/quantum_fourier_transform/QFT2_circ.png"  width="600" />
+   <img align=center src="../_doc/images/quantum-fourier-transform/QFT2_circ.png"  width="600" />
    </p>
 
 - **Method 3** Initialize the inputs to a quantum superposition, perform an inverse QFT, and 
@@ -102,7 +102,7 @@ Fourier transform and inverse quantum Fourier transform.
    This method benchmarks the following circuit:
    
    <p align="center">
-   <img align=center src="../_doc/images/quantum_fourier_transform/QFT3_circ.png"  width="600" />
+   <img align=center src="../_doc/images/quantum-fourier-transform/QFT3_circ.png"  width="600" />
    </p>
 
 Method 1 is used as the default while the second and third are provided as alternatives. 
