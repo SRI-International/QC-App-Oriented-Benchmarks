@@ -46,17 +46,34 @@ _parallel_config = {
 
 
 ###################################################################
-# PARALLEL EXECUTION SUPPORT
+# PARALLEL EXECUTION SUPPORT (EXPERIMENTAL - NOT YET WORKING)
 #
-# These functions enable parallel execution of independent circuits
-# across multiple GPUs using either:
-# - nvidia-mqpu target with cudaq.sample_async()
-# - MPI rank distribution with gather/scatter
+# Status: The parallel execution modes (mqpu, mpi) are NOT working correctly.
+# Both approaches were tested but resulted in either:
+# - mqpu: 4X slower than sequential (unexpected)
+# - mpi: Hanging or crashing due to GPU assignment issues
+#
+# For now, parallel_mode and num_gpus parameters are accepted but
+# all modes fall back to sequential execution.
+#
+# FUTURE IMPLEMENTATION NOTES:
+# The simplest approach should be pure MPI:
+# 1. Distribute circuits to MPI ranks (each rank gets a contiguous block)
+# 2. Each rank executes its circuits on its assigned GPU
+#    (GPU assignment handled by Slurm/external setup, not cudaq)
+# 3. Gather results to rank 0
+#
+# This requires:
+# - Proper GPU binding per rank (e.g., CUDA_VISIBLE_DEVICES or Slurm --gpus-per-task)
+# - NOT using mgpu mode (which is for one circuit across all GPUs)
+# - NOT using nvidia-mqpu target (which was slower than sequential)
 ###################################################################
 
 def _distribute_circuits_contiguous(circuits: list, num_workers: int) -> list:
     """
     Distribute circuits into contiguous blocks for each worker.
+
+    Utility function for future parallel implementation.
 
     Args:
         circuits: List of circuits to distribute
@@ -91,6 +108,8 @@ def _get_block_indices(total_items: int, num_workers: int) -> list:
     """
     Get (start, end) indices for contiguous blocks.
 
+    Utility function for future parallel implementation.
+
     Returns:
         List of (start, end) tuples for each worker
     """
@@ -108,205 +127,6 @@ def _get_block_indices(total_items: int, num_workers: int) -> list:
         start += size
 
     return indices
-
-
-def _detect_available_gpus() -> int:
-    """
-    Detect the number of available GPUs for parallel execution.
-    First checks environment variable, then queries cudaq.
-
-    Returns:
-        int: Number of available GPUs, or 1 if detection fails
-    """
-    # Check environment variable first
-    ngpus_env = os.environ.get("CUDAQ_MQPU_NGPUS")
-    if ngpus_env:
-        try:
-            return int(ngpus_env)
-        except ValueError:
-            pass
-
-    # Try to query cudaq for GPU count
-    try:
-        # Note: This requires the nvidia-mqpu target to be available
-        # We'll return 1 as safe default if we can't detect
-        return 1
-    except Exception:
-        return 1
-
-
-def _execute_parallel_mqpu(circuits: list, num_shots: int, num_gpus: int = None) -> list:
-    """
-    Execute circuits in parallel using nvidia-mqpu target with sample_async.
-
-    Args:
-        circuits: List of [kernel, params] circuit tuples
-        num_shots: Number of shots per circuit
-        num_gpus: Number of GPUs to use (None = auto-detect)
-
-    Returns:
-        List of count dictionaries in original circuit order
-    """
-    # Check current target - only set if not already on nvidia-mqpu
-    # Setting target mid-execution causes expensive recompilation
-    target = cudaq.get_target()
-    current_target_name = str(target).lower()
-
-    if "mqpu" not in current_target_name:
-        print(f"... switching target to nvidia-mqpu (was: {target})")
-        print(f"... TIP: Set target at startup to avoid recompilation overhead")
-        cudaq.set_target("nvidia-mqpu")
-        target = cudaq.get_target()
-
-    # Get number of QPUs actually available from the platform
-    available_qpus = target.num_qpus()
-
-    # Use requested GPUs if specified, but cap at available QPUs
-    if num_gpus is not None:
-        if num_gpus > available_qpus:
-            print(f"... mqpu mode: requested {num_gpus} GPUs but only {available_qpus} available")
-        qpu_count = min(num_gpus, available_qpus)
-    else:
-        qpu_count = available_qpus
-
-    print(f"... mqpu mode: using {qpu_count} of {available_qpus} available GPU(s)")
-
-    if qpu_count < 2:
-        # Fall back to sequential if only one GPU
-        print(f"... falling back to sequential (need 2+ GPUs for parallel)")
-        return _execute_sequential(circuits, num_shots)
-
-    print(f"... executing {len(circuits)} circuits across {qpu_count} GPUs (mqpu parallel)")
-
-    # Submit all circuits asynchronously using round-robin distribution
-    # This ensures all GPUs start working immediately rather than queuing on GPU 0 first
-    # Track (circuit_index, future) pairs to maintain order
-    async_results = []
-
-    for idx, circuit in enumerate(circuits):
-        gpu_id = idx % qpu_count  # Round-robin assignment
-        kernel, params = circuit[0], circuit[1]
-
-        # Submit asynchronously to specific GPU
-        if noise is None:
-            future = cudaq.sample_async(kernel, *params,
-                                       shots_count=num_shots, qpu_id=gpu_id)
-        else:
-            future = cudaq.sample_async(kernel, *params,
-                                       shots_count=num_shots, qpu_id=gpu_id,
-                                       noise_model=noise)
-        async_results.append((idx, future))
-
-    # Collect results in original order
-    all_results = [None] * len(circuits)
-    for global_idx, future in async_results:
-        counts = future.get()  # Blocks until this circuit completes
-        # Convert cudaq result to dict
-        count_dict = {k: v for k, v in counts.items()}
-        all_results[global_idx] = count_dict
-
-    return all_results
-
-
-def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
-    """
-    Execute circuits in parallel using MPI rank distribution.
-
-    Each MPI rank processes a contiguous block of circuits on its assigned GPU.
-    Results are gathered to rank 0.
-
-    Args:
-        circuits: List of [kernel, params] circuit tuples
-        num_shots: Number of shots per circuit
-
-    Returns:
-        List of count dictionaries in original circuit order (complete on rank 0,
-        partial results on other ranks)
-    """
-    if not mpi.enabled():
-        return _execute_sequential(circuits, num_shots)
-
-    rank = mpi.rank
-    size = mpi.size
-
-    # Debug: print from all ranks to see who gets here
-    import sys
-    sys.stdout = sys.__stdout__  # Temporarily restore stdout for debug
-    print(f"[Rank {rank}] _execute_parallel_mpi called with {len(circuits)} circuits", flush=True)
-
-    # Each MPI rank should use its own GPU
-    # With nvidia target, set the GPU via target option
-    gpu_id = rank % size
-    try:
-        cudaq.set_target("nvidia", option=f"fp32,device={gpu_id}")
-        print(f"[Rank {rank}] Set target to GPU {gpu_id}", flush=True)
-    except Exception as e:
-        print(f"[Rank {rank}] Warning: Could not set GPU {gpu_id}: {e}", flush=True)
-
-    sys.stdout = open(os.devnull, 'w') if rank > 0 else sys.__stdout__
-
-    # Synchronize all ranks before distribution
-    mpi.barrier()
-
-    # All ranks need to know total circuit count for distribution
-    num_circuits = len(circuits)
-
-    # Calculate this rank's block
-    block_indices = _get_block_indices(num_circuits, size)
-    my_start, my_end = block_indices[rank]
-
-    # Get this rank's circuits
-    my_circuits = circuits[my_start:my_end]
-
-    if mpi.leader():
-        print(f"... executing {num_circuits} circuits across {size} MPI ranks")
-        print(f"... distribution: {[(s, e) for s, e in block_indices]}")
-
-    # Execute local circuits sequentially on this rank's GPU
-    local_results = []
-    for circuit in my_circuits:
-        kernel, params = circuit[0], circuit[1]
-        if noise is None:
-            counts = cudaq.sample(kernel, *params, shots_count=num_shots)
-        else:
-            counts = cudaq.sample(kernel, *params, shots_count=num_shots, noise_model=noise)
-        # Convert to dict
-        local_results.append({k: v for k, v in counts.items()})
-
-    # Gather results to rank 0
-    all_results = mpi.gather(local_results)
-
-    if mpi.leader():
-        # Flatten gathered results in correct order
-        flattened = []
-        for rank_results in all_results:
-            flattened.extend(rank_results)
-        return flattened
-    else:
-        # Non-leader ranks return their local results
-        return local_results
-
-
-def _execute_sequential(circuits: list, num_shots: int) -> list:
-    """
-    Execute circuits sequentially (fallback mode).
-
-    Args:
-        circuits: List of [kernel, params] circuit tuples
-        num_shots: Number of shots per circuit
-
-    Returns:
-        List of count dictionaries
-    """
-    results = []
-    for circuit in circuits:
-        kernel, params = circuit[0], circuit[1]
-        if noise is None:
-            counts = cudaq.sample(kernel, *params, shots_count=num_shots)
-        else:
-            counts = cudaq.sample(kernel, *params, shots_count=num_shots, noise_model=noise)
-        results.append({k: v for k, v in counts.items()})
-    return results
 
 #noise = 'DEFAULT'
 noise=None
@@ -989,95 +809,43 @@ def execute_circuits_immed(
         backend_id: Backend identifier (currently unused for cudaq)
         circuits: List of [kernel, params] circuit tuples
         num_shots: Number of shots per circuit
-        parallel_mode: Execution mode:
+        parallel_mode: Execution mode (currently all modes use sequential):
             - "sequential": Execute circuits one at a time (default)
-            - "mqpu": Use nvidia-mqpu target with sample_async for parallel execution
-            - "mpi": Use MPI rank distribution for parallel execution
-            - "auto": Automatically select best mode based on available resources
-        num_gpus: Number of GPUs to use for parallel execution (None = auto-detect)
+            - "mqpu": NOT IMPLEMENTED - falls back to sequential
+            - "mpi": NOT IMPLEMENTED - falls back to sequential
+            - "auto": NOT IMPLEMENTED - falls back to sequential
+        num_gpus: Number of GPUs (currently unused, reserved for future)
 
     Returns:
         ExecResult object with get_counts() method
+
+    Note:
+        Parallel execution modes (mqpu, mpi, auto) are not yet working correctly.
+        All modes currently fall back to sequential execution.
+        See comments in PARALLEL EXECUTION SUPPORT section for details.
     """
 
     if verbose:
         print(f"... execute_circuits_immed({backend_id}, {len(circuits)}, {num_shots}, mode={parallel_mode})")
 
-    # Handle empty or single circuit case
+    # Handle empty case
     if not circuits or len(circuits) == 0:
         return ExecResult([])
 
-    if len(circuits) == 1:
-        # Single circuit - no benefit from parallelization
-        result = execute_circuit_immed(circuits[0], num_shots)
-        return ExecResult([result.get_counts()])
+    # Warn if parallel mode requested but not implemented
+    if parallel_mode not in ("sequential", None):
+        print(f"... WARNING: parallel_mode='{parallel_mode}' not yet implemented, using sequential")
 
-    # Report the requested execution mode
-    if parallel_mode != "sequential":
-        print(f"... execute_circuits_immed: {len(circuits)} circuits, mode={parallel_mode}")
-
-    # Choose execution path based on mode
-    if parallel_mode == "mqpu":
-        try:
-            counts_array = _execute_parallel_mqpu(circuits, num_shots, num_gpus)
-        except Exception as ex:
-            print(f"... MQPU parallel execution failed: {ex}")
-            print("... falling back to sequential execution")
-            counts_array = _execute_sequential_with_metrics(circuits, num_shots)
-
-    elif parallel_mode == "mpi":
-        if mpi.enabled():
-            try:
-                counts_array = _execute_parallel_mpi(circuits, num_shots)
-            except Exception as ex:
-                print(f"... MPI parallel execution failed: {ex}")
-                print("... falling back to sequential execution")
-                counts_array = _execute_sequential_with_metrics(circuits, num_shots)
-        else:
-            if verbose:
-                print("... MPI not enabled, using sequential execution")
-            counts_array = _execute_sequential_with_metrics(circuits, num_shots)
-
-    elif parallel_mode == "auto":
-        # Auto-select: prefer MPI if enabled, then MQPU if multiple GPUs, else sequential
-        if mpi.enabled() and mpi.size > 1:
-            try:
-                counts_array = _execute_parallel_mpi(circuits, num_shots)
-            except Exception as ex:
-                print(f"... MPI parallel execution failed: {ex}")
-                counts_array = _execute_sequential_with_metrics(circuits, num_shots)
-        else:
-            # Try MQPU if we might have multiple GPUs
-            detected_gpus = num_gpus if num_gpus else _detect_available_gpus()
-            if detected_gpus > 1:
-                try:
-                    counts_array = _execute_parallel_mqpu(circuits, num_shots, num_gpus)
-                except Exception as ex:
-                    print(f"... MQPU parallel execution failed: {ex}")
-                    counts_array = _execute_sequential_with_metrics(circuits, num_shots)
-            else:
-                counts_array = _execute_sequential_with_metrics(circuits, num_shots)
-
-    else:
-        # Default: sequential execution (original behavior)
-        counts_array = _execute_sequential_with_metrics(circuits, num_shots)
+    # Execute all circuits sequentially (original behavior)
+    counts_array = []
+    for circuit in circuits:
+        result = execute_circuit_immed(circuit, num_shots)
+        counts_array.append(result.get_counts())
 
     # Construct a Result object with counts structure to match circuits
     results = ExecResult(counts_array)
 
     return results
-
-
-def _execute_sequential_with_metrics(circuits: list, num_shots: int) -> list:
-    """
-    Execute circuits sequentially using existing execute_circuit_immed.
-    This preserves the original behavior including any metrics collection.
-    """
-    counts_array = []
-    for circuit in circuits:
-        result = execute_circuit_immed(circuit, num_shots)
-        counts_array.append(result.get_counts())
-    return counts_array
     
         
 # class ExecResult is made for multi-circuit runs. 
