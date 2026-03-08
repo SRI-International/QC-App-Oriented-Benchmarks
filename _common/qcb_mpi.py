@@ -51,14 +51,22 @@ if "mpi4py" not in sys.modules:
     def bcast(data):
         return data
 
+    # Gather data from all ranks to root (no-op without MPI)
+    def gather(data, root=0):
+        return [data]
+
+    # Scatter data from root to all ranks (no-op without MPI)
+    def scatter(data, root=0):
+        return data[0] if isinstance(data, list) and len(data) > 0 else data
+
     # Initialize this module
     # -- stdout is redirected to null if not the leader
     def init():
         global rank, size, leader, initialized
         if initialized:
             return
-        
-        #print("Initializing MPI...No MPI Module Loaded",flush=True)        
+
+        #print("Initializing MPI...No MPI Module Loaded",flush=True)
         rank = 0
         size = 0
         initialized = True
@@ -88,6 +96,20 @@ else:
 
     def bcast(data):
         return MPI.COMM_WORLD.bcast(data, root=0)
+
+    def gather(data, root=0):
+        """Gather data from all ranks to root."""
+        global initialized
+        if initialized is False:
+            raise Exception("MPI call before init")
+        return MPI.COMM_WORLD.gather(data, root=root)
+
+    def scatter(data, root=0):
+        """Scatter data from root to all ranks."""
+        global initialized
+        if initialized is False:
+            raise Exception("MPI call before init")
+        return MPI.COMM_WORLD.scatter(data, root=root)
 
     def finalize():
         global rank, initialized

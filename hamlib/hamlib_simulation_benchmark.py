@@ -286,7 +286,9 @@ def run(min_qubits: int = 2,
         context = None,
         api = None,
         warmup = False,
-        get_circuits = False):
+        get_circuits = False,
+        parallel_mode: str = "sequential",
+        num_gpus: int = None):
     """
     Execute program with default parameters.
 
@@ -680,9 +682,11 @@ def run(min_qubits: int = 2,
                                 circuits = circuits,
                                 num_shots = num_shots,
                                 distribute_shots = distribute_shots,
-                                pauli_term_groups = pauli_term_groups
+                                pauli_term_groups = pauli_term_groups,
+                                parallel_mode = parallel_mode,
+                                num_gpus = num_gpus
                                 )
-                                    
+
                         # Compute the total energy for the Hamiltonian
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                                 num_qubits, results, pauli_term_groups)
@@ -711,7 +715,9 @@ def run(min_qubits: int = 2,
                                 circuits = circuits,
                                 num_shots = num_shots,
                                 distribute_shots = distribute_shots,
-                                pauli_term_groups = pauli_term_groups
+                                pauli_term_groups = pauli_term_groups,
+                                parallel_mode = parallel_mode,
+                                num_gpus = num_gpus
                                 )
 
                         # Compute total energy from measurements
@@ -870,15 +876,21 @@ def execute_circuits_enhanced(
         distribute_shots: bool = False,
         pauli_term_groups: list = None,
         ds_method: str = 'max_sq',
+        parallel_mode: str = "sequential",
+        num_gpus: int = None,
     ) -> list:
     """
     Execute an array of circuits with the given number of shots on the specified backend.
     With default execution, the shots are divided evenly across all circuits in the group.
     If "distribute_shots" is set to True, the pauli_term_groups are used to distribute shots
-    across the circuits based on the weights of the coefficients in the terms of the group 
+    across the circuits based on the weights of the coefficients in the terms of the group
     and according to the ds_method (default = 'max_sq').
+
+    Args:
+        parallel_mode: Execution mode for cudaq - "sequential", "mqpu", "mpi", or "auto"
+        num_gpus: Number of GPUs to use for parallel execution (None = auto-detect)
     """
-    if verbose:                 
+    if verbose:
         for circuit, group in list(zip(circuits, pauli_term_groups)):
             print(group)
             #print(circuit)
@@ -891,7 +903,9 @@ def execute_circuits_enhanced(
         results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 circuits = circuits,
-                num_shots = int(num_shots / len(circuits))
+                num_shots = int(num_shots / len(circuits)),
+                parallel_mode = parallel_mode,
+                num_gpus = num_gpus
                 )
     else:
         # execute with shots distributed by weight of coefficients
@@ -901,8 +915,10 @@ def execute_circuits_enhanced(
                 num_shots = num_shots,
                 groups = pauli_term_groups,
                 ds_method = ds_method,
+                parallel_mode = parallel_mode,
+                num_gpus = num_gpus,
                 )
-                
+
     return results, pauli_term_groups
   
  
@@ -918,6 +934,8 @@ def execute_circuits_distribute_shots(
         num_shots: int = 100,
         groups: list = None,
         ds_method: str = 'max_sq',
+        parallel_mode: str = "sequential",
+        num_gpus: int = None,
     ) -> list:
 
     if verbose or debug:
@@ -979,6 +997,8 @@ def execute_circuits_distribute_shots(
         backend_id = backend_id,
         circuits_list = circuits_list,
         num_shots_list = bucket_avg_shots,
+        parallel_mode = parallel_mode,
+        num_gpus = num_gpus,
         )
 
     # Create a flattened list of all groups
@@ -1042,23 +1062,27 @@ def execute_circuits_with_mixed_shots(
         backend_id: str = None,
         circuits_list: list = None,
         num_shots_list: List[int] = None,
+        parallel_mode: str = "sequential",
+        num_gpus: int = None,
     ):
-    
+
     # Loop over the circuit lists associated with each bucket
     counts_array = []
     for circuits, num_shots in zip(circuits_list, num_shots_list):
-    
+
         if debug:
             # print(f"  ...    cccc = {circuits}")
             print(f"... len circs = {len(circuits)}")
-        
+
         # execute this list of circuits, with same shots for each circuit in list
         import execute as ex
         results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 #circuits = [circuit],
                 circuits = circuits,
-                num_shots = num_shots
+                num_shots = num_shots,
+                parallel_mode = parallel_mode,
+                num_gpus = num_gpus
                 )
         
         # accumulate list of returned raw count dicts to parallel the group list
@@ -1336,8 +1360,10 @@ def get_args():
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Suffix appended to data file name", type=str)
-    parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile") 
-    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str) 
+    parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
+    parser.add_argument("--parallel_mode", "-pm", default="sequential", help="Parallel execution mode: sequential, mqpu, mpi, auto", type=str)
+    parser.add_argument("--num_gpus", "-ng", default=None, help="Number of GPUs for parallel execution (auto-detect if not specified)", type=int)
     return parser.parse_args()
     
 def parse_name_value_pairs(input_string: str) -> Dict[str, str]:
@@ -1384,7 +1410,9 @@ def do_run(args):
         draw_circuits=not args.nodraw,
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
-        api=args.api, warmup=args.warmup
+        api=args.api, warmup=args.warmup,
+        parallel_mode=args.parallel_mode,
+        num_gpus=args.num_gpus
         )
 
 import cProfile
