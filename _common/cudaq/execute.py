@@ -233,6 +233,16 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
     import sys
     sys.stdout = sys.__stdout__  # Temporarily restore stdout for debug
     print(f"[Rank {rank}] _execute_parallel_mpi called with {len(circuits)} circuits", flush=True)
+
+    # Each MPI rank should use its own GPU
+    # With nvidia target, set the GPU via target option
+    gpu_id = rank % size
+    try:
+        cudaq.set_target("nvidia", option=f"fp32,device={gpu_id}")
+        print(f"[Rank {rank}] Set target to GPU {gpu_id}", flush=True)
+    except Exception as e:
+        print(f"[Rank {rank}] Warning: Could not set GPU {gpu_id}: {e}", flush=True)
+
     sys.stdout = open(os.devnull, 'w') if rank > 0 else sys.__stdout__
 
     # Synchronize all ranks before distribution
