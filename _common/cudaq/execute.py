@@ -851,7 +851,7 @@ def execute_circuits_immed(
 
     counts_array = None
 
-    # Try MPI parallel execution if requested
+    # Try MPI parallel execution if requested (distributes circuits across ranks)
     if parallel_mode == "mpi":
         counts_array = _execute_parallel_mpi(circuits, num_shots)
         # Returns None if MPI not available or only 1 rank - fall through to sequential
@@ -863,11 +863,23 @@ def execute_circuits_immed(
         print(f"... WARNING: parallel_mode='auto' not implemented, using sequential")
 
     # Sequential execution (default, or fallback)
+    # In mgpu mode (MPI enabled but NOT parallel_mode="mpi"), all ranks must call
+    # cudaq.sample() together - it's a collective operation. Add barriers to keep in sync.
     if counts_array is None:
         counts_array = []
+        use_mgpu_sync = mpi.enabled() and parallel_mode != "mpi"
+
         for circuit in circuits:
+            # Synchronize ranks before each circuit in mgpu mode
+            if use_mgpu_sync:
+                mpi.barrier()
+
             result = execute_circuit_immed(circuit, num_shots)
             counts_array.append(result.get_counts())
+
+            # Synchronize after each circuit in mgpu mode
+            if use_mgpu_sync:
+                mpi.barrier()
 
     # Construct a Result object with counts structure to match circuits
     results = ExecResult(counts_array)
