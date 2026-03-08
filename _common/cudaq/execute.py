@@ -147,12 +147,18 @@ def _execute_parallel_mqpu(circuits: list, num_shots: int, num_gpus: int = None)
     Returns:
         List of count dictionaries in original circuit order
     """
-    # Set target for multi-QPU execution (nvidia-mqpu is the correct target name)
-    # Can also set CUDAQ_MQPU_NGPUS environment variable to control GPU count
-    cudaq.set_target("nvidia-mqpu")
+    # Check current target - only set if not already on nvidia-mqpu
+    # Setting target mid-execution causes expensive recompilation
+    target = cudaq.get_target()
+    current_target_name = str(target).lower()
+
+    if "mqpu" not in current_target_name:
+        print(f"... switching target to nvidia-mqpu (was: {target})")
+        print(f"... TIP: Set target at startup to avoid recompilation overhead")
+        cudaq.set_target("nvidia-mqpu")
+        target = cudaq.get_target()
 
     # Get number of QPUs actually available from the platform
-    target = cudaq.get_target()
     available_qpus = target.num_qpus()
 
     # Use requested GPUs if specified, but cap at available QPUs
