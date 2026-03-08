@@ -851,11 +851,8 @@ def execute_circuits_immed(
 
     counts_array = None
 
-    # When MPI is enabled, default to distributing circuits across ranks
-    # This applies to both explicit "-pm mpi" and when MPI is just enabled
-    use_mpi_distribution = mpi.enabled() and mpi.size > 1
-
-    if parallel_mode == "mpi" or (use_mpi_distribution and parallel_mode == "sequential"):
+    # Explicit parallel circuit distribution mode
+    if parallel_mode == "mpi":
         counts_array = _execute_parallel_mpi(circuits, num_shots)
         # Returns None if MPI not available or only 1 rank - fall through to sequential
 
@@ -865,7 +862,9 @@ def execute_circuits_immed(
     elif parallel_mode == "auto":
         print(f"... WARNING: parallel_mode='auto' not implemented, using sequential")
 
-    # Sequential execution (single rank or fallback)
+    # Sequential/mgpu execution (default)
+    # When MPI is enabled without -pm mpi, this uses mgpu mode (set in set_execution_target)
+    # for state vector distribution - all ranks participate in each circuit execution
     if counts_array is None:
         counts_array = []
         for circuit in circuits:
