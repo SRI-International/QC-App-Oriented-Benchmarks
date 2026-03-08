@@ -229,6 +229,15 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
     rank = mpi.rank
     size = mpi.size
 
+    # Debug: print from all ranks to see who gets here
+    import sys
+    sys.stdout = sys.__stdout__  # Temporarily restore stdout for debug
+    print(f"[Rank {rank}] _execute_parallel_mpi called with {len(circuits)} circuits", flush=True)
+    sys.stdout = open(os.devnull, 'w') if rank > 0 else sys.__stdout__
+
+    # Synchronize all ranks before distribution
+    mpi.barrier()
+
     # All ranks need to know total circuit count for distribution
     num_circuits = len(circuits)
 
@@ -241,6 +250,7 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
 
     if mpi.leader():
         print(f"... executing {num_circuits} circuits across {size} MPI ranks")
+        print(f"... distribution: {[(s, e) for s, e in block_indices]}")
 
     # Execute local circuits sequentially on this rank's GPU
     local_results = []
