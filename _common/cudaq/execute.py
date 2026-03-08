@@ -178,29 +178,24 @@ def _execute_parallel_mqpu(circuits: list, num_shots: int, num_gpus: int = None)
 
     print(f"... executing {len(circuits)} circuits across {qpu_count} GPUs (mqpu parallel)")
 
-    # Distribute circuits into contiguous blocks per GPU
-    blocks = _distribute_circuits_contiguous(circuits, qpu_count)
-    block_indices = _get_block_indices(len(circuits), qpu_count)
-
-    # Submit all circuits asynchronously
-    # Track (global_index, future) pairs to maintain order
+    # Submit all circuits asynchronously using round-robin distribution
+    # This ensures all GPUs start working immediately rather than queuing on GPU 0 first
+    # Track (circuit_index, future) pairs to maintain order
     async_results = []
 
-    for gpu_id, block in enumerate(blocks):
-        start_idx, _ = block_indices[gpu_id]
-        for local_idx, circuit in enumerate(block):
-            global_idx = start_idx + local_idx
-            kernel, params = circuit[0], circuit[1]
+    for idx, circuit in enumerate(circuits):
+        gpu_id = idx % qpu_count  # Round-robin assignment
+        kernel, params = circuit[0], circuit[1]
 
-            # Submit asynchronously to specific GPU
-            if noise is None:
-                future = cudaq.sample_async(kernel, *params,
-                                           shots_count=num_shots, qpu_id=gpu_id)
-            else:
-                future = cudaq.sample_async(kernel, *params,
-                                           shots_count=num_shots, qpu_id=gpu_id,
-                                           noise_model=noise)
-            async_results.append((global_idx, future))
+        # Submit asynchronously to specific GPU
+        if noise is None:
+            future = cudaq.sample_async(kernel, *params,
+                                       shots_count=num_shots, qpu_id=gpu_id)
+        else:
+            future = cudaq.sample_async(kernel, *params,
+                                       shots_count=num_shots, qpu_id=gpu_id,
+                                       noise_model=noise)
+        async_results.append((idx, future))
 
     # Collect results in original order
     all_results = [None] * len(circuits)
