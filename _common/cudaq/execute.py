@@ -877,16 +877,18 @@ def execute_circuits_immed(
     return results
     
         
-# class ExecResult is made for multi-circuit runs. 
+# class ExecResult is made for multi-circuit runs.
 class ExecResult(object):
 
     def __init__(self, counts):
         super().__init__()
-        
+
         # Store the count distributions as they will be returned
         # A single count object for one circuit, and an array of count object for array of circuits
         if isinstance(counts, list):
-            if len(counts) < 2:
+            if len(counts) == 0:
+                self.counts = {}  # Empty result
+            elif len(counts) == 1:
                 self.counts = counts[0]
             else:
                 self.counts = counts
