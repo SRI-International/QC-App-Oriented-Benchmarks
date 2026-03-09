@@ -147,8 +147,8 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
         print(f"... Gathered {len(flattened)} results from {size} ranks")
         return flattened
     else:
-        # Non-leader ranks return their local results (not used by caller)
-        return local_results
+        # Non-leader ranks return empty - caller should check mpi.leader()
+        return []
 
 #noise = 'DEFAULT'
 noise=None

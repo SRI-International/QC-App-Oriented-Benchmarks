@@ -687,6 +687,10 @@ def run(min_qubits: int = 2,
                                 num_gpus = num_gpus
                                 )
 
+                        # Skip result processing on non-leader MPI ranks (parallel execution)
+                        if not mpi.leader():
+                            continue
+
                         # Compute the total energy for the Hamiltonian
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
                                                                 num_qubits, results, pauli_term_groups)
@@ -719,6 +723,10 @@ def run(min_qubits: int = 2,
                                 parallel_mode = parallel_mode,
                                 num_gpus = num_gpus
                                 )
+
+                        # Skip result processing on non-leader MPI ranks (parallel execution)
+                        if not mpi.leader():
+                            continue
 
                         # Compute total energy from measurements
                         total_energy, term_contributions = observables.calculate_expectation_from_measurements(
