@@ -1,5 +1,5 @@
-import maxcut_benchmark
-import metrics
+from maxcut.qiskit import maxcut_benchmark
+from _common import metrics
 import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm

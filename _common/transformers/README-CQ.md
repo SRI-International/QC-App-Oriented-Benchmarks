@@ -38,7 +38,7 @@ import dj_benchmark
 
 exec_options = { "optimization_level":0, "layout_method":'sabre', "routing_method":'sabre', "transformer": tket_optimiser.quick_optimisation }
 
-sys.path.insert(1, "deutsch-jozsa/qiskit")
+sys.path.insert(1, "deutsch_jozsa/qiskit")
 dj_benchmark.run(min_qubits=min_qubits, max_qubits=max_qubits, max_circuits=max_circuits, num_shots=num_shots,
                 backend_id=backend_id, provider_backend=provider_backend,
                 hub=hub, group=group, project=project, exec_options=exec_options)

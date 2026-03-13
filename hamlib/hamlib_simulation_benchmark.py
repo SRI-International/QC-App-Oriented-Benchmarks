@@ -13,76 +13,23 @@ perfectly simulates hamiltonian evolution, although it does not scale well.
 
 import json
 import os
-import sys
 import time
 import math
 import numpy as np
 from typing import Dict, Optional   # for backwards compat <= py 3.10
 from typing import Union, List, Tuple
 
-sys.path[1:1] = ["_common"]
+# Add benchmark home dir to path, so the benchmark can be run without pip installing.
+import sys; from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-import evolution_exact
-import metric_plots
+# The QED-C initialization module
+from _common.qedc_init import qedc_benchmarks_init
+from _common import metrics
+from _common import qcb_mpi as mpi
 
-############### Configure API
-#
-## DEVNOTE: This functiion may be more complicated than is needed; simplify if possible
-## It is basically used to perform imports relative to the existing path and using subdirectories
-## based on the "api" on which the benchmark executes.
-
-# Configure the QED-C Benchmark package for use with the given API
 
 api_ = "qiskit" 
-
-def qedc_benchmarks_init(api: str = "qiskit"):
-
-    global api_
-    if api == None: api = "qiskit"
-    api_ = api
-
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    down_dir = os.path.abspath(os.path.join(current_dir, f"{api}"))
-    sys.path = [down_dir] + [p for p in sys.path if p != down_dir]
-
-    up_dir = os.path.abspath(os.path.join(current_dir, ".."))
-    common_dir = os.path.abspath(os.path.join(up_dir, "_common"))
-    sys.path = [common_dir] + [p for p in sys.path if p != common_dir]
-    
-    api_dir = os.path.abspath(os.path.join(common_dir, f"{api}"))
-    sys.path = [api_dir] + [p for p in sys.path if p != api_dir]
-
-    import qcb_mpi as mpi
-    globals()["mpi"] = mpi
-    mpi.init()
-
-    import execute as ex
-    globals()["ex"] = ex
-
-    import metrics as metrics
-    globals()["metrics"] = metrics
-
-    import hamlib_utils as hamlib_utils
-    globals()["hamlib_utils"] = hamlib_utils
-    
-    import observables as observables
-    globals()["observables"] = observables
-    
-    import hamlib_simulation_kernel as hamlib_simulation_kernel
-    globals()["hamlib_simulation_kernel"] = hamlib_simulation_kernel
-
-    # there must be a better way to do this
-    from hamlib_simulation_kernel import HamiltonianSimulation, kernel_draw
-    globals()["HamiltonianSimulation"] = HamiltonianSimulation
-    globals()["kernel_draw"] = kernel_draw
-    
-    # this is only needed while testing the old exact evolution functions; remove soon (250125)
-    if api == 'qiskit':
-        from hamlib_simulation_kernel import initial_state
-        globals()["initial_state"] = initial_state
-    
-    return HamiltonianSimulation, kernel_draw
-    
 
 # Benchmark Name
 benchmark_name = "Hamiltonian Simulation"
@@ -94,7 +41,7 @@ save_dataset_file = False
 max_qubits_exact = 16
 
 # Data suffix appended to backend_id when saving data files
-data_suffix = ""
+data_suffix = os.getenv("QEDCBMS_DATA_SUFFIX", "")
 
 np.random.seed(0)
 
@@ -154,15 +101,15 @@ def key_from_initial_state(num_qubits, num_shots, init_state, random_pauli_flag)
 def analyze_and_print_result(
             qc,
             result,
-            num_qubits: int,
-            type: str,
-            num_shots: int,
-            hamiltonian: str,
-            method: int,
-            t: float,
-            random_pauli_flag: bool,
-            do_sqrt_fidelity: bool,
-            init_state: str
+            num_qubits,
+            num_shots,
+            type=None,
+            hamiltonian=None,
+            method=None,
+            t=None,
+            random_pauli_flag=False,
+            do_sqrt_fidelity=False,
+            init_state=None
         ) -> tuple:
     """
     Analyze and print the measured results. Compute the quality of the result based on operator expectation for each state.
@@ -171,15 +118,21 @@ def analyze_and_print_result(
         qc (QuantumCircuit): The quantum circuit.
         result: The result from the execution.
         num_qubits (int): Number of qubits.
-        type (str): Type of the simulation (circuit identifier).
         num_shots (int): Number of shots.
+        type (str): Type of the simulation (circuit identifier).
         hamiltonian (str): Which hamiltonian to run.
         method (int): Method for fidelity checking (1 for noiseless trotterized quantum, 2 for exact classical), 3 for mirror circuit.
+        t (float): Total simulation time.
+        random_pauli_flag (bool): If True, activates random Pauli gates.
+        do_sqrt_fidelity (bool): If True, computes the square root of the fidelity.
+        init_state (str): Initial state for the quantum circuit.
 
     Returns:
         tuple: Counts and fidelity.
     """
-    
+    from hamlib._common import evolution_exact
+    from hamlib._common import observables
+
     counts = result.get_counts(qc)
 
     if verbose:
@@ -192,7 +145,7 @@ def analyze_and_print_result(
     # for method 1, compute expected dist using ideal quantum simulation of the circuit provided
     if method == 1:
     
-        from hamiltonian_simulation_exact import HamiltonianSimulation_Noiseless
+        from hamlib._common.hamiltonian_simulation_exact import HamiltonianSimulation_Noiseless
         
         if verbose:
             print(f"... begin noiseless simulation for expected distribution for id={type} ...")
@@ -210,34 +163,25 @@ def analyze_and_print_result(
         
         ts = time.time()
         
-        ################ Using the previous evolution_exact code:
-        # the plan is to remove this code and use the new once it is validated.
-        """
-        # create quantum circuit with initial state
-        qc_initial = initial_state(n_spins=num_qubits, init_state=init_state)
-        
-        # apply the Hamiltonian operator to initial state to get expectation/distribution
-        correct_exp, correct_dist = evolution_exact.compute_expectation_exact_spo_scipy(
-                init_state, 
-                qc_initial,
-                num_qubits,
-                hamlib_simulation_kernel.ensure_sparse_pauli_op(sparse_pauli_terms, num_qubits),
-                t        # time (hardocded to match default benchmark)
-                )
-        """
-        ################ Test of the newer evolution_exact code:
-        
-        correct_exp, correct_dist = evolution_exact.compute_expectation_exact(
-                init_state,
-                observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
-                t        # time
-                )
+        # exact computation is costly; limit the number of qubits for which we do this
+        if num_qubits <= max_qubits_exact:
+            correct_exp, correct_dist = evolution_exact.compute_expectation_exact(
+                    init_state,
+                    observables.ensure_pauli_terms(sparse_pauli_terms, num_qubits),
+                    t        # time
+                    )
+                    
+        # make fake distribution if too many qubits; use GHZ since this will give 0 fidelity mostly
+        else:
+            correct_dist = {
+                '0' * num_qubits: num_shots/2,
+                '1' * num_qubits: num_shots/2
+            }
         
         # report details if verbose mode
         if verbose:
             print("")
             print(f"... exact computation time = {round((time.time() - ts), 3)} sec")
-            print(f"Correct expectation = {correct_exp}")
             #print_top_measurements(f"Correct dist = ", correct_dist, 100)
             print("")
             
@@ -340,7 +284,9 @@ def run(min_qubits: int = 2,
         hub: str = "", group: str = "", project: str = "",
         exec_options = None,
         context = None,
-        api = None):
+        api = None,
+        warmup = False,
+        get_circuits = False):
     """
     Execute program with default parameters.
 
@@ -398,8 +344,24 @@ def run(min_qubits: int = 2,
         None
     """
     
-    # configure the QED-C Benchmark package for use with the given API
-    HamilatonianSimulation, kernel_draw = qedc_benchmarks_init(api)
+    """
+    Configure the QED-C Benchmark package for use with the given API
+	Initialize API-specific modules. Called after argument parsing.
+	Imports are here (not at module level) to support dynamic loading
+	of API-specific implementations (qiskit/cirq/cudaq/etc).
+	"""
+    qedc_benchmarks_init(api, "hamlib", ["hamlib_simulation_kernel"])
+    import hamlib_simulation_kernel
+    import execute as ex
+
+    from hamlib._common import evolution_exact
+    from hamlib._common import metric_plots
+    from hamlib._common import hamlib_utils
+    from hamlib._common import observables
+
+    mpi.init()
+
+    ##########
     
     print(f"{benchmark_name} Benchmark Program - {api}")
     
@@ -411,6 +373,16 @@ def run(min_qubits: int = 2,
     min_qubits = min(max(2, min_qubits), max_qubits)
     #if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even (DEVNOTE: is this True? - NO!)
     skip_qubits = max(1, skip_qubits)
+    
+    # special argument handling
+    # print(f"... verbose = {verbose}")
+    # print(f"... data_suffix = {data_suffix}")
+    ex.verbose = verbose
+    metrics.data_suffix = data_suffix
+    hamlib_simulation_kernel.verbose = verbose
+    hamlib_utils.verbose = verbose
+    
+    ##########
     
     hamiltonian_name = hamiltonian
     
@@ -436,22 +408,23 @@ def run(min_qubits: int = 2,
     ################################
     
     # Initialize metrics module
-    metrics.init_metrics()
+    metrics.init_metrics(warmup)
 
     # Define custom result handler
-    def execution_handler(qc, result, num_qubits, type, num_shots):
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # Determine fidelity of result set
         num_qubits = int(num_qubits)
         counts, expectation_a = analyze_and_print_result(
-                    qc, result, num_qubits, type, num_shots,
-                    hamiltonian,
-                    method,
-                    t,
-                    random_pauli_flag,
-                    do_sqrt_fidelity,
-                    init_state
+                    qc, result, num_qubits, num_shots,
+                    type=circuit_id,
+                    hamiltonian=hamiltonian,
+                    method=method,
+                    t=t,
+                    random_pauli_flag=random_pauli_flag,
+                    do_sqrt_fidelity=do_sqrt_fidelity,
+                    init_state=init_state
                 )
-        metrics.store_metric(num_qubits, type, 'fidelity', expectation_a)
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', expectation_a)
 
     # Initialize execution module using the execution result handler above and specified backend_id
     ex.init_execution(execution_handler)
@@ -476,17 +449,26 @@ def run(min_qubits: int = 2,
     if method == 2:
         ex.max_jobs_active = 1
 
+    # If get_circuits requested but observables mode doesn't support it, warn and return
+    if get_circuits and do_observables:
+        print(f"WARNING: get_circuits is not supported with do_observables=True")
+        return None
+
+    # Variable to store all created circuits to return and their creation info
+    if get_circuits:
+        all_qcs = {}
+
     # build list of qubit sizes within the specificed range for which a Hamiltonian is available
     valid_qubits = hamlib_utils.get_valid_qubits(min_qubits, max_qubits, skip_qubits, hamiltonian_params)
-    
+
     if len(valid_qubits) < 1:
         print(f"ERROR: No matching datasets for the requested Hamiltonian name and parameters.")
         print(f"       Terminating this benchmark.")
         return
-    
+
     # metrics storage for observables, until we update the metrics module for use here
     metrics_array = []
-    
+
     for num_qubits in valid_qubits:
         global sparse_pauli_terms
     
@@ -496,7 +478,11 @@ def run(min_qubits: int = 2,
         # Determine number of circuits to execute for this group
         num_circuits = max(1, max_circuits)
         
-        print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        if not get_circuits:
+            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        else:
+            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
         
         # use the given Hamiltonian, if provided
         if pauli_terms is not None:
@@ -572,7 +558,7 @@ def run(min_qubits: int = 2,
                         else:
                             this_group_method = int(group_method)
 
-                        from generate_pauli_groups import compute_groups
+                        from hamlib._common.generate_pauli_groups import compute_groups
                         pauli_term_groups = compute_groups(
                                         this_group_method, sparse_pauli_terms, 1)
                                         
@@ -617,7 +603,7 @@ def run(min_qubits: int = 2,
             global bitstring_dict
             
             # create the HamLibSimulation kernel, random pauli bitstring, from the given Hamiltonian operator
-            qc, bitstring = HamiltonianSimulation(
+            qc, bitstring = hamlib_simulation_kernel.HamiltonianSimulation(
                 num_qubits = num_qubits,
                 ham_op = sparse_pauli_terms,               
                 K = K,
@@ -641,8 +627,13 @@ def run(min_qubits: int = 2,
             
             # execute for fidelity benchmarks
             if not do_observables:
-            
+
                 metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+
+                # If collecting circuits, store and continue to next circuit
+                if get_circuits:
+                    all_qcs[str(num_qubits)][str(circuit_id)] = qc
+                    continue
 
                 # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
                 ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
@@ -810,6 +801,11 @@ def run(min_qubits: int = 2,
         if api != "cudaq" or do_observables == False:
             ex.throttle_execution(metrics.finalize_group)
     
+    # If collecting circuits, return them without executing
+    if get_circuits:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, metrics.circuit_metrics
+
     # Wait for all active circuits to complete; report metrics when groups complete
     ex.finalize_execution(metrics.finalize_group)
     
@@ -823,7 +819,7 @@ def run(min_qubits: int = 2,
     # Display Sample Circuit
     
     if draw_circuits and mpi.leader():
-        kernel_draw(hamiltonian, method)
+        hamlib_simulation_kernel.kernel_draw(hamiltonian, method)
     
     ##########################
     # Display Plots of Results
@@ -891,6 +887,7 @@ def execute_circuits_enhanced(
     if not distribute_shots:
         #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
         # execute the entire list of circuits, same shots each
+        import execute as ex
         results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 circuits = circuits,
@@ -947,7 +944,7 @@ def execute_circuits_distribute_shots(
         # print(f"  in circuits = {circuits}")
     
     # determine optimal bucketing for these circuits, based on distribution of shots needed
-    from shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
+    from hamlib._common.shot_distribution import bucket_numbers_kmeans, compute_bucket_averages
     
     # get buckets of terms with similar shots counts, and index of original position
     max_buckets = 3 if len(groups) < 50 else 4
@@ -1056,6 +1053,7 @@ def execute_circuits_with_mixed_shots(
             print(f"... len circs = {len(circuits)}")
         
         # execute this list of circuits, with same shots for each circuit in list
+        import execute as ex
         results = ex.execute_circuits_immed(
                 backend_id = backend_id,
                 #circuits = [circuit],
@@ -1107,8 +1105,10 @@ def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     """
     Group the Pauli terms according to the given group method: "None", "simple", "N"
     """
+    from hamlib._common import observables
+
     mpi.barrier()
-    
+
     return observables.find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=k)
 
 
@@ -1262,6 +1262,8 @@ def plot_results_from_data(
     
 def plot_from_data(suptitle: str, metrics_array: list, backend_id: str, options):
 
+    from hamlib._common import metric_plots
+    
     # extract data arrays metrics_array for plotting 
     groups = [m["group"] for m in metrics_array]
     exp_values_computed = [m["exp_value_computed"] for m in metrics_array]
@@ -1325,6 +1327,7 @@ def get_args():
     parser.add_argument("--group_method", "-gm", default=None, help="Method for creating commuting groups, e.g. 'simple','1','2', 'N'")   
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
     parser.add_argument("--use_inverse_flag", "-inverse", action="store_true", help="Use inverse evolution")
     parser.add_argument("--do_sqrt_fidelity", "-sqrt", action="store_true", help="Return square root of fidelities")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="Gen random paulis")
@@ -1334,6 +1337,7 @@ def get_args():
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Suffix appended to data file name", type=str)
     parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile") 
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str) 
     return parser.parse_args()
     
 def parse_name_value_pairs(input_string: str) -> Dict[str, str]:
@@ -1379,8 +1383,8 @@ def do_run(args):
         plot_results=not args.noplot,
         draw_circuits=not args.nodraw,
         backend_id=args.backend_id,
-        exec_options = {"noise_model" : None} if args.nonoise else {},
-        api=args.api
+        exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
+        api=args.api, warmup=args.warmup
         )
 
 import cProfile
@@ -1392,18 +1396,11 @@ if __name__ == '__main__':
     if args.parameters is not None:
         hamiltonian_params = parse_name_value_pairs(args.parameters)
     
-    # configure the QED-C Benchmark package for use with the given API
-    # (done here so we can set verbose for now)
-    HamiltonianSimulation, kernel_draw = qedc_benchmarks_init(args.api)
-    
     # special argument handling
-    ex.verbose = args.verbose
     verbose = args.verbose
-    hamlib_simulation_kernel.verbose = args.verbose
-    hamlib_utils.verbose = args.verbose
     
     if args.data_suffix is not None:
-        metrics.data_suffix = args.data_suffix
+        data_suffix = args.data_suffix
     
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
     

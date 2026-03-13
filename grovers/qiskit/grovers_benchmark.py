@@ -3,17 +3,14 @@ Grover's Search Benchmark Program
 (C) Quantum Economic Development Consortium (QED-C) 2024.
 '''
 
-import sys
 import time
 
 import numpy as np
 
-sys.path[1:1] = ["_common", "_common/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit"]
-import execute as ex
-import metrics as metrics
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
 
-from grovers_kernel import GroversSearch, kernel_draw, _use_mcx_shim
+from grovers.qiskit.grovers_kernel import GroversSearch, kernel_draw, _use_mcx_shim
 
 # Benchmark Name
 benchmark_name = "Grover's Search"

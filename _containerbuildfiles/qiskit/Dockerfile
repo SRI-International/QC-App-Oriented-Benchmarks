@@ -70,13 +70,13 @@ USER quser
 ENV PROJECT_DIR $HOME
 WORKDIR ${PROJECT_DIR}
 ADD ${BROOT}/_common/${PLATFORM} ${PROJECT_DIR}/_common
-ADD ${BROOT}/bernstein-vazirani ${PROJECT_DIR}/bernstein-vazirani
-ADD ${BROOT}/deutsch-jozsa ${PROJECT_DIR}/deutsch-jozsa
-ADD ${BROOT}/hidden-shift ${PROJECT_DIR}/hidden-shift
-ADD ${BROOT}/quantum-fourier-transform ${PROJECT_DIR}/quantum-fourier-transform
-ADD ${BROOT}/hamiltonian-simulation ${PROJECT_DIR}/hamiltonian-simulation
-ADD ${BROOT}/amplitude-estimation ${PROJECT_DIR}/amplitude-estimation
-ADD ${BROOT}/monte-carlo ${PROJECT_DIR}/monte-carlo
+ADD ${BROOT}/bernstein_vazirani ${PROJECT_DIR}/bernstein_vazirani
+ADD ${BROOT}/deutsch_jozsa ${PROJECT_DIR}/deutsch_jozsa
+ADD ${BROOT}/hidden_shift ${PROJECT_DIR}/hidden_shift
+ADD ${BROOT}/quantum_fourier_transform ${PROJECT_DIR}/quantum_fourier_transform
+ADD ${BROOT}/hamiltonian_simulation ${PROJECT_DIR}/hamiltonian_simulation
+ADD ${BROOT}/amplitude_estimation ${PROJECT_DIR}/amplitude_estimation
+ADD ${BROOT}/monte_carlo ${PROJECT_DIR}/monte_carlo
 ADD ${BROOT}/shors ${PROJECT_DIR}/shors
 ADD ${BROOT}/grovers ${PROJECT_DIR}/grovers
 COPY ${BROOT}/benchmarks-qiskit.ipynb.template/ ${PROJECT_DIR}/benchmarks-qiskit.ipynb

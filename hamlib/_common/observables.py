@@ -8,11 +8,10 @@ This module includes helper funtions for computing observables from a Hamiltonia
 from itertools import combinations
 import numpy as np
 import copy
-import sys
 import time
 from typing import Union, List, Tuple, Dict
 
-sys.path[1:1] = ["..//qiskit"]
+#from hamlib.qiskit import hamlib_simulation_kernel as kernel
 import hamlib_simulation_kernel as kernel
 
 verbose = False
@@ -327,7 +326,7 @@ def find_pauli_groups(num_qubits, sparse_pauli_terms, group_method, k=None):
     
     # use k-commuting algorithm
     else:
-        from generate_pauli_groups import compute_groups
+        from hamlib._common.generate_pauli_groups import compute_groups
         pauli_term_groups = compute_groups(num_qubits, sparse_pauli_terms, k)
     
     #print(f"\n... Number of groups created: {len(pauli_term_groups)}")
@@ -809,11 +808,12 @@ try:
     from qiskit import QuantumCircuit 
     from qiskit.quantum_info import SparsePauliOp
     from qiskit_aer import Aer
-    from qiskit.primitives import Estimator
-    from qiskit.primitives import BackendEstimator
+    from qiskit.primitives import StatevectorEstimator
+    from qiskit.primitives import BackendEstimatorV2
 
 except Exception as ex:
-    print("WARNING: Qiskit-dependent compute observable value functions are not available")
+    #print(f"WARNING: Qiskit-dependent compute observable value functions are not available\n {ex}")
+    print(f"WARNING: Qiskit-dependent compute observable value functions are not available.")
 
 # ===========================================
 # QISKIT ESTIMATOR FUNCTIONS
@@ -841,18 +841,20 @@ def estimate_expectation_with_estimator(backend, qc, H_terms, num_shots=10000, n
     
     # Choose an actual quantum backend (Aer simulator with shot-based execution)
     if backend is None:
-        backend = Aer.get_backend("qasm_simulator") 
+        backend = Aer.get_backend("qasm_simulator")
+    elif isinstance(backend, str):
+        backend = Aer.get_backend(backend) 
 
     # Create an Estimator bound to the backend
     #estimator = BackendEstimator(backend=backend, noise_model=noise_model) # not sure this can be done v2
-    estimator = BackendEstimator(backend=backend)
+    estimator = BackendEstimatorV2(backend=backend)
 
     # Use the estimator to compute the expectation value
-    job = estimator.run(qc, H_op)
+    job = estimator.run([(qc, H_op)])
     result = job.result()
 
     # Extract the measured energy (expectation value)
-    measured_energy = result.values[0]
+    measured_energy = float(result[0].data.evs.item())
 
     return measured_energy
 

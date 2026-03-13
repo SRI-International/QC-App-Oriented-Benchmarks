@@ -4,10 +4,10 @@
 It is possible to run the benchmarks from the top level directory in a generalized way on the command line.
 
 For instance, here is an example of running the default QFT algorithm from the
-`quantum-fourier-transform` directory:
+`quantum_fourier_transform` directory:
 
 ```
-python _common/qiskit/benchmark_runner.py --algorithm quantum-fourier-transform
+python _common/qiskit/benchmark_runner.py --algorithm quantum_fourier_transform
 ```
 
 ### Optional Arguments to All Benchmarks
@@ -22,7 +22,7 @@ For instance:
 
 ```
  python _common/qiskit/benchmark_runner.py 
-    --algorithm "quantum-fourier-transform"
+    --algorithm "quantum_fourier_transform"
     --min_qubits 2 
     --max_qubits 8 
     --max_circuits 3 
@@ -40,7 +40,7 @@ The 'hub', ' group', and 'project' arguments are optional and typically only app
 
 ```
  python _common/qiskit/benchmark_runner.py 
-    --algorithm "quantum-fourier-transform"
+    --algorithm "quantum_fourier_transform"
     --min_qubits 2 
     --max_qubits 8 
     --max_circuits 3 

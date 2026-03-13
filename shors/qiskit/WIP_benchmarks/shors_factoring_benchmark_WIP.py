@@ -2,20 +2,15 @@
 Shor's Factoring Algorithm Benchmark - Qiskit
 """
 
-import sys
-sys.path[1:1] = ["_common", "_common/qiskit", "shors/_common", "quantum-fourier-transform/qiskit"]
-sys.path[1:1] = ["../../_common", "../../_common/qiskit", "../../shors/_common", "../../quantum-fourier-transform/qiskit"]
-
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 import math
 from fractions import Fraction
 import time
 import numpy as np
 np.random.seed(0)
-import execute as ex
-import metrics as metrics
-from qft_benchmark import inv_qft_gate
-from qft_benchmark import qft_gate
+from _common.qiskit import execute as ex
+from _common import metrics as metrics
+from quantum_fourier_transform.qiskit.qft_benchmark import inv_qft_gate, qft_gate
 
 from utils import getAngles, getAngle, modinv, generate_numbers, choose_random_base, determine_factors
 

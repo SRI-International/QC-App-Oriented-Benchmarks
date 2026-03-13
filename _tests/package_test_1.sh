@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Navigate to the benchmark root (parent of _tests)
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
+# Args:
+# - 0 args -> defaults (hidden_shift, no extra args)
+# - args starting with "-" -> defaults + all args passed to Python
+# - 2+ args (first not starting with "-") -> folder/bmname + rest to Python
+#
+# Examples:
+#   ./package_test_1.sh
+#   ./package_test_1.sh -a cudaq
+#   ./package_test_1.sh hydrogen_lattice hydrogen_lattice_benchmark
+#   ./package_test_1.sh hydrogen_lattice hydrogen_lattice_benchmark -a qiskit
+#   ./package_test_1.sh hamlib hamlib_simulation_benchmark -a cudaq --num_qubits 4
+
+if [ "$#" -eq 0 ]; then
+  folder="hidden_shift"
+  bmname="hs_benchmark"
+  extra_args=""
+elif [[ "$1" == -* ]]; then
+  # First arg is a flag, use defaults and pass all args to Python
+  folder="hidden_shift"
+  bmname="hs_benchmark"
+  extra_args="$*"
+elif [ "$#" -ge 2 ]; then
+  folder="$1"
+  bmname="$2"
+  shift 2
+  extra_args="$*"
+else
+  echo "Error: Need 0 args, flags only, or 2+ args (folder bmname [python_args...])" >&2
+  exit 1
+fi
+
+# Which Python to use (fallback to python3, then python)
+PYTHON="${PYTHON:-python3}"
+if ! command -v "$PYTHON" >/dev/null 2>&1; then
+  PYTHON="python"
+fi
+
+echo "============================================================"
+echo "Testing: $folder / $bmname"
+echo "============================================================"
+echo "extra_args=$extra_args"
+
+# ----- run in BM directory -----
+echo "... run in BM directory ..."
+pushd "$folder" >/dev/null
+"$PYTHON" "${bmname}.py" -nop -nod $extra_args
+popd >/dev/null
+
+# pause
+# read -r -n 1 -s -p "Press any key to continue..." _; echo
+
+# ----- run at top level -----
+echo "... run at top level ..."
+"$PYTHON" "${folder}/${bmname}.py" -nop -nod $extra_args
+
+# pause
+# read -r -n 1 -s -p "Press any key to continue..." _; echo
+
+# ----- run at top level as a module -----
+echo "... run at top level as a module"
+"$PYTHON" -m "${folder}.${bmname}" -nop -nod $extra_args

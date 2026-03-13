@@ -185,7 +185,7 @@ If we take <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolo
 ### General Quantum Circuit
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/ham_sim_circuit.png"  width="700" />
+<img align=center src="../_doc/images/hamiltonian_simulation/ham_sim_circuit.png"  width="700" />
 </p>
 
 *Fig 1. Example of circuit with 1 Trotter step. We can see that our <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^x_i"/> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\sigma^y_i"/> turned into Rx and Ry gates, while the two qubit interactions turned into the gates that result from exponentiating these terms in the Hamiltonian. Note that this circuit application is less efficient than applying the XX, YY, and ZZ operations all at once.*
@@ -213,7 +213,7 @@ Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the
 ---
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/ZZ_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/ZZ_gate.png"  />
 </p>
 
 *Fig 4. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(ZZ)}"/> gate.*
@@ -221,7 +221,7 @@ Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the
 ---
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/XX_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/XX_gate.png"  />
 </p>
 
 *Fig 5. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(XX)}"/> gate.*
@@ -229,7 +229,7 @@ Circuit creation is handled by `qiskit_algorithms`. Simple implementation of the
 ---
 
 <p align="center">
-<img align=center src="../_doc/images/hamiltonian-simulation/YY_gate.png"  />
+<img align=center src="../_doc/images/hamiltonian_simulation/YY_gate.png"  />
 </p>
 
 *Fig 6. Naive <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{it(YY)}"/> gate.*
@@ -250,7 +250,7 @@ There is also the option to use a random initial state, which replaces the curre
 
 [2] Proctor, T., Rudinger, K., Young, K. et al. Measuring the capabilities of quantum computers. Nat. Phys. 18, 75–79 (2022). https://doi.org/10.1038/s41567-021-01409-7 
 
-[3] Sawaya, N. P., Marti-Dafcik, D., Ho, Y., Tabor, D. P., Neira, D. E. B., Magann, A. B., ... & Camps, D. (2023, September). 
+[3] Sawaya, N. P., Marti-Dafcik, D., Ho, Y., Tabor, D. P., Bernal Neira, D. E., Magann, A. B., ... & Camps, D. (2023, September). 
     HamLib: A library of Hamiltonians for benchmarking quantum algorithms and hardware. 
     In 2023 IEEE International Conference on Quantum Computing and Engineering (QCE) (Vol. 2, pp. 389-390). IEEE.
 

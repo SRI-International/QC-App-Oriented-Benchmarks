@@ -1,10 +1,6 @@
 import math
 import numpy as np
-# Configure module paths
-import sys
-sys.path.insert(1, "_common")
-sys.path.insert(1, "qiskit")
-from hamlib_utils import load_hamlib_file, get_hamlib_sparsepaulilist
+from hamlib._common.hamlib_utils import load_hamlib_file, get_hamlib_sparsepaulilist
 
 
 X = np.array([[0, 1], [1, 0]])
