@@ -1673,10 +1673,15 @@ def test_execution():
 def execute_circuits_immed(
         backend_id: str = None,
         circuits: list = None,
-        num_shots: int = 100
+        num_shots: int = 100,
+        parallel_mode: str = "sequential",
+        num_gpus: int = None
     ) -> list:
     """
     Execute a list of circuits on the given backend with the given number of shots.
+
+    Note: parallel_mode and num_gpus are accepted for API compatibility with cudaq
+    but are ignored in the qiskit implementation.
     """
     
     if verbose:

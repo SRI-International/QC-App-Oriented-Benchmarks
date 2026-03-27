@@ -27,6 +27,7 @@ import time
 import copy
 import json
 import math
+import os
 
 from _common import qcb_mpi as mpi
 from _common import metrics
@@ -35,6 +36,119 @@ from _common import metrics
 import cudaq
 
 verbose = False
+
+# Parallel execution configuration
+_parallel_config = {
+    "mode": None,
+    "num_gpus": 0,
+    "initialized": False
+}
+
+
+###################################################################
+# PARALLEL EXECUTION SUPPORT (EXPERIMENTAL)
+#
+# Simple MPI-based parallel execution of independent circuits.
+# Each MPI rank executes a subset of circuits on its assigned GPU.
+#
+# REQUIREMENTS:
+# - Launch with: mpiexec -np N python -m mpi4py script.py -pm mpi
+# - GPU binding must be set externally (Slurm --gpus-per-task=1 or CUDA_VISIBLE_DEVICES)
+# - Each rank should see exactly ONE GPU
+#
+# NOTE: This is DIFFERENT from mgpu mode (which pools GPUs for one large circuit).
+# When parallel_mode="mpi", we override mgpu and use single-GPU per rank.
+###################################################################
+
+def _get_block_indices(total_items: int, num_workers: int) -> list:
+    """
+    Get (start, end) indices for contiguous blocks.
+
+    Returns:
+        List of (start, end) tuples for each worker
+    """
+    if num_workers <= 0 or total_items == 0:
+        return [(0, total_items)]
+
+    base_size = total_items // num_workers
+    remainder = total_items % num_workers
+
+    indices = []
+    start = 0
+    for i in range(num_workers):
+        size = base_size + (1 if i < remainder else 0)
+        indices.append((start, start + size))
+        start += size
+
+    return indices
+
+
+def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
+    """
+    Execute circuits in parallel using MPI rank distribution.
+
+    Each MPI rank processes a contiguous block of circuits.
+    GPU assignment is handled externally (Slurm/CUDA_VISIBLE_DEVICES).
+    Results are gathered to rank 0.
+
+    IMPORTANT: This overrides mgpu mode and sets single-GPU target per rank.
+    """
+    if not mpi.enabled():
+        print("... MPI not enabled, using sequential")
+        return None  # Signal to fall back to sequential
+
+    rank = mpi.rank
+    size = mpi.size
+
+    if size < 2:
+        if rank == 0:
+            print("... Only 1 MPI rank, using sequential")
+        return None  # Signal to fall back to sequential
+
+    # Override mgpu mode - each rank uses single GPU
+    # This is critical: mgpu pools all GPUs for ONE circuit, we want the opposite
+    if rank == 0:
+        print(f"... MPI parallel: {size} ranks, {len(circuits)} circuits")
+        print(f"... Setting single-GPU target (overriding mgpu)")
+
+    cudaq.set_target("nvidia", option="fp32")
+
+    # Synchronize before distribution
+    mpi.barrier()
+
+    # Calculate this rank's block of circuits
+    num_circuits = len(circuits)
+    block_indices = _get_block_indices(num_circuits, size)
+    my_start, my_end = block_indices[rank]
+    my_circuits = circuits[my_start:my_end]
+
+    if rank == 0:
+        print(f"... Distribution: {[(s, e-s) for s, e in block_indices]} circuits per rank")
+
+    # Execute this rank's circuits
+    local_results = []
+    for circuit in my_circuits:
+        kernel, params = circuit[0], circuit[1]
+        if noise is None:
+            counts = cudaq.sample(kernel, *params, shots_count=num_shots)
+        else:
+            counts = cudaq.sample(kernel, *params, shots_count=num_shots, noise_model=noise)
+        # Convert cudaq result to dict
+        local_results.append({k: v for k, v in counts.items()})
+
+    # Gather all results to rank 0
+    all_results = mpi.gather(local_results)
+
+    if rank == 0:
+        # Flatten gathered results in correct order
+        flattened = []
+        for rank_results in all_results:
+            flattened.extend(rank_results)
+        print(f"... Gathered {len(flattened)} results from {size} ranks")
+        return flattened
+    else:
+        # Non-leader ranks return empty - caller should check mpi.leader()
+        return []
 
 #noise = 'DEFAULT'
 noise=None
@@ -706,36 +820,75 @@ def execute_circuit_immed (circuit: list, num_shots: int):
 def execute_circuits_immed(
         backend_id: str = None,
         circuits: list = None,
-        num_shots: int = 100
+        num_shots: int = 100,
+        parallel_mode: str = "sequential",
+        num_gpus: int = None
     ) -> list:
     """
     Execute a list of circuits on the given backend with the given number of shots.
+
+    Args:
+        backend_id: Backend identifier (currently unused for cudaq)
+        circuits: List of [kernel, params] circuit tuples
+        num_shots: Number of shots per circuit
+        parallel_mode: Execution mode:
+            - "sequential": Execute circuits one at a time (default)
+            - "mpi": Distribute circuits across MPI ranks (requires -m mpi4py launch)
+            - "mqpu": NOT IMPLEMENTED - falls back to sequential
+            - "auto": NOT IMPLEMENTED - falls back to sequential
+        num_gpus: Number of GPUs (currently unused, reserved for future)
+
+    Returns:
+        ExecResult object with get_counts() method
     """
-    
+
     if verbose:
-        print(f"... execute_cicuits_immed({backend_id}, {len(circuits)}, {num_shots})")
-        
-    counts_array = []
-    for circuit in circuits:
-        result = execute_circuit_immed(circuit, num_shots)
-        counts_array.append(result.get_counts())
-        
+        print(f"... execute_circuits_immed({backend_id}, {len(circuits)}, {num_shots}, mode={parallel_mode})")
+
+    # Handle empty case
+    if not circuits or len(circuits) == 0:
+        return ExecResult([])
+
+    counts_array = None
+
+    # Explicit parallel circuit distribution mode
+    if parallel_mode == "mpi":
+        counts_array = _execute_parallel_mpi(circuits, num_shots)
+        # Returns None if MPI not available or only 1 rank - fall through to sequential
+
+    # Warn about unimplemented modes
+    if parallel_mode == "mqpu":
+        print(f"... WARNING: parallel_mode='mqpu' not implemented, using sequential")
+    elif parallel_mode == "auto":
+        print(f"... WARNING: parallel_mode='auto' not implemented, using sequential")
+
+    # Sequential/mgpu execution (default)
+    # When MPI is enabled without -pm mpi, this uses mgpu mode (set in set_execution_target)
+    # for state vector distribution - all ranks participate in each circuit execution
+    if counts_array is None:
+        counts_array = []
+        for circuit in circuits:
+            result = execute_circuit_immed(circuit, num_shots)
+            counts_array.append(result.get_counts())
+
     # Construct a Result object with counts structure to match circuits
     results = ExecResult(counts_array)
-    
+
     return results
     
         
-# class ExecResult is made for multi-circuit runs. 
+# class ExecResult is made for multi-circuit runs.
 class ExecResult(object):
 
     def __init__(self, counts):
         super().__init__()
-        
+
         # Store the count distributions as they will be returned
         # A single count object for one circuit, and an array of count object for array of circuits
         if isinstance(counts, list):
-            if len(counts) < 2:
+            if len(counts) == 0:
+                self.counts = {}  # Empty result
+            elif len(counts) == 1:
                 self.counts = counts[0]
             else:
                 self.counts = counts
