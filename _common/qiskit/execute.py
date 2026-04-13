@@ -433,7 +433,6 @@ def set_execution_target(backend_id='qasm_simulator',
                 Session,
             )
 
-
             # set use_ibm_quantum_platform if provided by user - NOTE: this will modify the global setting
             use_ibm_quantum_platform = exec_options.get("use_ibm_quantum_platform", use_ibm_quantum_platform)
 
@@ -1225,7 +1224,7 @@ def job_complete(job):
     
     ###### normal completion
     
-    # get job result (DEVNOTE: this might be different for diff targets)
+    # get job result (DEVNOTE: structure can be different for diff targets)
     result = None
         
     if job.status() == JobStatus.DONE or job.status() == 'DONE':
@@ -1247,7 +1246,7 @@ def job_complete(job):
         # counts = result.get_counts(qc)
         # print("Total counts are:", counts)
         
-        # if we are using sessions, structure of result object is different;
+        # if we are using Sampler, structure of result object is different;
         # wrap in ExecutionResult to normalize the get_counts() interface
         if sampler:
             # extract SDK-specific info before wrapping
@@ -1326,37 +1325,18 @@ def job_complete(job):
             logger.info('result_processor(...)')
             result = result_processor(result)
     
-        # The following computes the counts by summing them up, allowing for the case where
-        # <result> contains results from multiple circuits
-        # DEVNOTE: This will need to change; currently the only case where we have multiple result counts
-        # is when using randomly_compile; later, there will be other cases
+        # The following assumes single circuit execution
+        # TODO: process multiple circuit results
         result_counts = result.get_counts()
-        if isinstance(result_counts, list):
-            total_counts = dict()
-            for count in result_counts:
-                job_id = job.job_id()
-                if job_id in m3_mitigation:
-                    mit, qubits = m3_mitigation[job_id]
-                    count = mit.apply_correction(count, qubits).nearest_probability_distribution()
-                total_counts = dict(Counter(total_counts) + Counter(count))
-                
-            # make a copy of the result object so we can return a modified version
-            result = copy.copy(result) 
-
-            # replace the results array with an array containing only the first results object
-            # then populate other required fields
-            results = copy.copy(result.results[0])
-            results.header.name = active_circuit["qc"].name     # needed to identify the original circuit
-            results.shots = actual_shots
-            results.data.counts = total_counts
-            result.results = [ results ]
-        else:
-            job_id = job.job_id()
-            if job_id in m3_mitigation:
-                mit, qubits = m3_mitigation[job_id]
-                count = mit.apply_correction(result_counts, qubits).nearest_probability_distribution()
-                result.set_counts(count)
-            
+        
+        # process M3 error mitigation if provided
+        job_id = job.job_id()
+        if job_id in m3_mitigation:
+            mit, qubits = m3_mitigation[job_id]
+            count = mit.apply_correction(result_counts, qubits).nearest_probability_distribution()
+            result.set_counts(count)
+           
+        # invoke user's result handler
         try:
             result_handler(active_circuit["qc"],
                             result,
@@ -1687,11 +1667,7 @@ def test_execution():
     pass
 
 ########################################
-# NEW CODE 
-
-# The following functions have been moved here from the hamlib benchmark.
-# This transition and merge of new code developed in the hamlib benchmark is a work-in-progress.
-# The code below will be gradually integrated into this module in stages (TL: 250519)
+# MULTIPLE CIRCUIT EXECUTION
 
 # This function performs multiple circuit execution, which the other functions in this module do not yet
 def execute_circuits_immed(
@@ -1782,118 +1758,4 @@ def execute_circuits_immed(
         results = job.result()
           
     return results
-        
-
-
-
-########################################
-# DEPRECATED METHODS
-
-# these methods are retained for reference and in case needed later
-
-# Wait for active and batched circuits to complete
-# This is used as a way to complete a group of circuits and report
-# results before continuing to create more circuits.
-# Deprecated: maintained for compatibility until all circuits are modified
-# to use throttle_execution(0 and finalize_execution()
-
-def execute_circuits():
-
-    # deprecated code ...
-    '''
-    for batched_circuit in batched_circuits:
-        execute_circuit(batched_circuit)
-    batched_circuits.clear()
-    '''
     
-    # wait for all jobs to complete
-    wait_for_completion()
-
-
-# Wait for all active and batched jobs to complete
-# deprecated version, with no completion handler
-
-def wait_for_completion():
-
-    if verbose:
-        print("... waiting for completion")
-
-    # check and sleep if not complete
-    done = False
-    pollcount = 0
-    while not done:
-    
-        # check if any jobs complete
-        check_jobs()
-
-        # return only when all jobs complete
-        if len(active_circuits) < 1:
-            break
-            
-        # delay a bit, increasing the delay periodically 
-        sleeptime = 0.25
-        if pollcount > 6: sleeptime = 0.5
-        if pollcount > 60: sleeptime = 1.0
-        time.sleep(sleeptime)
-        
-        pollcount += 1
-    
-    if verbose:
-        if pollcount > 0: print("")
-
-
-# Wait for a single job to complete, return when done
-# (replaced by wait_for_completion, which handle multiple jobs)
-
-def job_wait_for_completion(job):
-        
-    done=False
-    pollcount = 0
-    while not done:
-        status = job.status()
-        #print("Job status is ", status)
-        
-        if status == JobStatus.DONE:
-            break
-            
-        if status == JobStatus.CANCELLED:
-            break
-            
-        if status == JobStatus.ERROR:
-            break
-        
-        if status == JobStatus.QUEUED:
-            if verbose:
-                if pollcount < 44 or (pollcount % 15 == 0):
-                    print('.', end='')
-        
-        elif status == JobStatus.INITIALIZING:
-            if verbose: print('i', end='')
-            
-        elif status == JobStatus.VALIDATING:
-            if verbose: print('v', end='')
-            
-        elif status == JobStatus.RUNNING:
-            if verbose: print('r', end='')
-            
-        pollcount += 1
-        
-        # delay a bit, increasing the delay periodically 
-        sleeptime = 0.25
-        if pollcount > 8: sleeptime = 0.5
-        if pollcount > 100: sleeptime = 1.0
-        time.sleep(sleeptime)
-
-    if pollcount > 0:
-        if verbose: print("")
-
-    #if verbose: print("Job status is ", job.status() )
-    
-    if job.status() == JobStatus.CANCELLED:
-        print("\n... circuit execution cancelled.")
-            
-    if job.status() == JobStatus.ERROR:
-        print("\n... circuit execution failed.")
-
-
-
