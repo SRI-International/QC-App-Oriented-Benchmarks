@@ -167,16 +167,47 @@ device = None
 #######################
 # SUPPORTING CLASSES
 
-# class BenchmarkResult is used as a compatible return object from execution
-class BenchmarkResult(object):
+# class ExecutionResult is a normalized result wrapper for quantum circuit execution.
+# It accepts either a cudaq SampleResult (dict-like), a raw counts dict,
+# or a list of counts dicts. get_counts() always returns:
+#   - dict (or dict-like SampleResult) for a single circuit
+#   - list[dict] for multiple circuits
+# This normalization allows benchmark code to process results uniformly
+# without knowing which execution path was used.
+class ExecutionResult:
 
-    def __init__(self, cq_result):
+    def __init__(self, source):
         super().__init__()
-        self.cq_result = cq_result
+        self._counts = None
 
-    def get_counts(self, qc=0):
-        counts = self.cq_result
+        if isinstance(source, dict):
+            self._counts = source
+        elif isinstance(source, list):
+            self._counts = self._normalize(source)
+        else:
+            # cudaq SampleResult (dict-like) — pass through
+            self._counts = source
+
+    def _normalize(self, counts):
+        """Normalize counts: single-element list unwraps to dict."""
+        if isinstance(counts, list):
+            if len(counts) == 0:
+                return {}
+            elif len(counts) == 1:
+                return counts[0]
+            else:
+                return counts
         return counts
+
+    def set_counts(self, counts):
+        self._counts = counts
+
+    def get_counts(self, qc=None):
+        return self._counts
+
+# Backward compatibility aliases
+BenchmarkResult = ExecutionResult
+ExecResult = ExecutionResult
 
 # Special Job object class to hold job information for custom executors
 class Job:
@@ -521,8 +552,8 @@ def job_complete (job):
     # get job result (DEVNOTE: this might be different for diff targets)
     cq_result = job.result()
     
-    # create a compatible Result object to return to the caller
-    result = BenchmarkResult(cq_result)
+    # create a normalized result object to return to the caller
+    result = ExecutionResult(cq_result)
     
     # counts = result.get_counts(qc)
     # print("Total counts are:", counts)
@@ -787,8 +818,8 @@ def execute_circuit_immed (circuit: list, num_shots: int):
     #cq_result = job.result()
     cq_result = result
 
-    # create a compatible Result object to return to the caller
-    result = BenchmarkResult(cq_result)
+    # create a normalized result object to return to the caller
+    result = ExecutionResult(cq_result)
     
     # counts = result.get_counts(qc)
     # print("Total counts are:", counts)
@@ -839,7 +870,7 @@ def execute_circuits_immed(
         num_gpus: Number of GPUs (currently unused, reserved for future)
 
     Returns:
-        ExecResult object with get_counts() method
+        ExecutionResult object with get_counts() method
     """
 
     if verbose:
@@ -847,7 +878,7 @@ def execute_circuits_immed(
 
     # Handle empty case
     if not circuits or len(circuits) == 0:
-        return ExecResult([])
+        return ExecutionResult([])
 
     counts_array = None
 
@@ -871,29 +902,7 @@ def execute_circuits_immed(
             result = execute_circuit_immed(circuit, num_shots)
             counts_array.append(result.get_counts())
 
-    # Construct a Result object with counts structure to match circuits
-    results = ExecResult(counts_array)
+    # Construct a normalized result object with counts structure to match circuits
+    results = ExecutionResult(counts_array)
 
-    return results
-    
-        
-# class ExecResult is made for multi-circuit runs.
-class ExecResult(object):
-
-    def __init__(self, counts):
-        super().__init__()
-
-        # Store the count distributions as they will be returned
-        # A single count object for one circuit, and an array of count object for array of circuits
-        if isinstance(counts, list):
-            if len(counts) == 0:
-                self.counts = {}  # Empty result
-            elif len(counts) == 1:
-                self.counts = counts[0]
-            else:
-                self.counts = counts
-        else:
-            self.counts = counts
-
-    def get_counts(self, qc=0):
-        return self.counts       
+    return results       

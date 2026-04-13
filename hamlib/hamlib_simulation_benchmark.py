@@ -1101,29 +1101,10 @@ def execute_circuits_with_mixed_shots(
         else:
             counts_array.append(results.get_counts())
 
-    # Construct a Result object with counts structure to match circuits
-    results = ExecResult(counts_array)
-    
+    # Construct a normalized result object with counts structure to match circuits
+    results = ex.ExecutionResult(counts_array)
+
     return results
-
-# class ExecResult is made for multi-circuit runs. 
-class ExecResult(object):
-
-    def __init__(self, counts):
-        super().__init__()
-        
-        # Store the count distributions as they will be returned
-        # A single count object for one circuit, and an array of count object for array of circuits
-        if isinstance(counts, list):
-            if len(counts) < 2:
-                self.counts = counts[0]
-            else:
-                self.counts = counts
-        else:
-            self.counts = counts
-
-    def get_counts(self, qc=0):
-        return self.counts
  
                         
 ########################################
