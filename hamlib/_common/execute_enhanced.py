@@ -19,8 +19,7 @@ def execute_circuits_enhanced(
         distribute_shots: bool = False,
         pauli_term_groups: list = None,
         ds_method: str = 'max_sq',
-        parallel_mode: str = "sequential",
-        num_gpus: int = None,
+        gpus_per_circuit: int = None,
         verbose: bool = False,
     ) -> list:
     """
@@ -31,8 +30,9 @@ def execute_circuits_enhanced(
     and according to the ds_method (default = 'max_sq').
 
     Args:
-        parallel_mode: Execution mode for cudaq - "sequential", "mqpu", "mpi", or "auto"
-        num_gpus: Number of GPUs to use for parallel execution (None = auto-detect)
+        gpus_per_circuit: Number of GPUs to pool per circuit (None = use all available).
+            1 = each GPU runs independently (max parallelism).
+            M = M GPUs pool per circuit, P/M circuits in parallel.
     """
     if verbose:
         for circuit, group in list(zip(circuits, pauli_term_groups)):
@@ -48,8 +48,7 @@ def execute_circuits_enhanced(
                 backend_id = backend_id,
                 circuits = circuits,
                 num_shots = int(num_shots / len(circuits)),
-                parallel_mode = parallel_mode,
-                num_gpus = num_gpus
+                gpus_per_circuit = gpus_per_circuit
                 )
     else:
         # execute with shots distributed by weight of coefficients
@@ -59,8 +58,7 @@ def execute_circuits_enhanced(
                 num_shots = num_shots,
                 groups = pauli_term_groups,
                 ds_method = ds_method,
-                parallel_mode = parallel_mode,
-                num_gpus = num_gpus,
+                gpus_per_circuit = gpus_per_circuit,
                 verbose = verbose,
                 )
 
@@ -77,8 +75,7 @@ def execute_circuits_distribute_shots(
         num_shots: int = 100,
         groups: list = None,
         ds_method: str = 'max_sq',
-        parallel_mode: str = "sequential",
-        num_gpus: int = None,
+        gpus_per_circuit: int = None,
         verbose: bool = False,
     ) -> list:
 
@@ -141,8 +138,7 @@ def execute_circuits_distribute_shots(
         backend_id = backend_id,
         circuits_list = circuits_list,
         num_shots_list = bucket_avg_shots,
-        parallel_mode = parallel_mode,
-        num_gpus = num_gpus,
+        gpus_per_circuit = gpus_per_circuit,
         )
 
     # Create a flattened list of all groups
@@ -206,8 +202,7 @@ def execute_circuits_with_mixed_shots(
         backend_id: str = None,
         circuits_list: list = None,
         num_shots_list: List[int] = None,
-        parallel_mode: str = "sequential",
-        num_gpus: int = None,
+        gpus_per_circuit: int = None,
     ):
 
     # Loop over the circuit lists associated with each bucket
@@ -225,8 +220,7 @@ def execute_circuits_with_mixed_shots(
                 #circuits = [circuit],
                 circuits = circuits,
                 num_shots = num_shots,
-                parallel_mode = parallel_mode,
-                num_gpus = num_gpus
+                gpus_per_circuit = gpus_per_circuit
                 )
 
         # accumulate list of returned raw count dicts to parallel the group list

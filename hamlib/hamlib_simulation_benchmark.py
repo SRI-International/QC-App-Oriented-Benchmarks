@@ -287,8 +287,7 @@ def run(min_qubits: int = 2,
         api = None,
         warmup = False,
         get_circuits = False,
-        parallel_mode: str = "sequential",
-        num_gpus: int = None):
+        gpus_per_circuit: int = None):
     """
     Execute program with default parameters.
 
@@ -683,8 +682,7 @@ def run(min_qubits: int = 2,
                                 num_shots = num_shots,
                                 distribute_shots = distribute_shots,
                                 pauli_term_groups = pauli_term_groups,
-                                parallel_mode = parallel_mode,
-                                num_gpus = num_gpus,
+                                gpus_per_circuit = gpus_per_circuit,
                                 verbose = verbose
                                 )
 
@@ -721,8 +719,7 @@ def run(min_qubits: int = 2,
                                 num_shots = num_shots,
                                 distribute_shots = distribute_shots,
                                 pauli_term_groups = pauli_term_groups,
-                                parallel_mode = parallel_mode,
-                                num_gpus = num_gpus,
+                                gpus_per_circuit = gpus_per_circuit,
                                 verbose = verbose
                                 )
 
@@ -1127,8 +1124,7 @@ def get_args():
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Suffix appended to data file name", type=str)
     parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")
     parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
-    parser.add_argument("--parallel_mode", "-pm", default="sequential", help="Parallel execution mode: sequential, mqpu, mpi, auto", type=str)
-    parser.add_argument("--num_gpus", "-ng", default=None, help="Number of GPUs for parallel execution (auto-detect if not specified)", type=int)
+    parser.add_argument("--gpus_per_circuit", "-gpc", default=None, help="Number of GPUs to pool per circuit (None=all available, 1=max parallelism, M=M GPUs per circuit)", type=int)
     return parser.parse_args()
     
 def parse_name_value_pairs(input_string: str) -> Dict[str, str]:
@@ -1176,8 +1172,7 @@ def do_run(args):
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
         api=args.api, warmup=args.warmup,
-        parallel_mode=args.parallel_mode,
-        num_gpus=args.num_gpus
+        gpus_per_circuit=args.gpus_per_circuit
         )
 
 import cProfile
