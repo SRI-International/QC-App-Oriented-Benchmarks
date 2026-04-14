@@ -37,10 +37,9 @@ import cudaq
 
 verbose = False
 
-# Parallel execution configuration
+# Parallel execution configuration (reserved for future use)
 _parallel_config = {
-    "mode": None,
-    "num_gpus": 0,
+    "gpus_per_circuit": None,
     "initialized": False
 }
 
@@ -52,12 +51,12 @@ _parallel_config = {
 # Each MPI rank executes a subset of circuits on its assigned GPU.
 #
 # REQUIREMENTS:
-# - Launch with: mpiexec -np N python -m mpi4py script.py -pm mpi
+# - Launch with: mpiexec -np N python -m mpi4py script.py -gpc 1
 # - GPU binding must be set externally (Slurm --gpus-per-task=1 or CUDA_VISIBLE_DEVICES)
 # - Each rank should see exactly ONE GPU
 #
 # NOTE: This is DIFFERENT from mgpu mode (which pools GPUs for one large circuit).
-# When parallel_mode="mpi", we override mgpu and use single-GPU per rank.
+# When gpus_per_circuit=1, we override mgpu and use single-GPU per rank.
 ###################################################################
 
 def _get_block_indices(total_items: int, num_workers: int) -> list:
@@ -852,8 +851,7 @@ def execute_circuits_immed(
         backend_id: str = None,
         circuits: list = None,
         num_shots: int = 100,
-        parallel_mode: str = "sequential",
-        num_gpus: int = None
+        gpus_per_circuit: int = None
     ) -> list:
     """
     Execute a list of circuits on the given backend with the given number of shots.
@@ -862,19 +860,17 @@ def execute_circuits_immed(
         backend_id: Backend identifier (currently unused for cudaq)
         circuits: List of [kernel, params] circuit tuples
         num_shots: Number of shots per circuit
-        parallel_mode: Execution mode:
-            - "sequential": Execute circuits one at a time (default)
-            - "mpi": Distribute circuits across MPI ranks (requires -m mpi4py launch)
-            - "mqpu": NOT IMPLEMENTED - falls back to sequential
-            - "auto": NOT IMPLEMENTED - falls back to sequential
-        num_gpus: Number of GPUs (currently unused, reserved for future)
+        gpus_per_circuit: Number of GPUs to pool per circuit.
+            None = use all available GPUs together (mgpu if MPI, single GPU if not).
+            1 = each GPU runs one circuit independently (max parallelism, requires MPI).
+            M = M GPUs pool per circuit, P/M circuits in parallel (requires MPI, not yet implemented).
 
     Returns:
         ExecutionResult object with get_counts() method
     """
 
     if verbose:
-        print(f"... execute_circuits_immed({backend_id}, {len(circuits)}, {num_shots}, mode={parallel_mode})")
+        print(f"... execute_circuits_immed({backend_id}, {len(circuits)}, {num_shots}, gpus_per_circuit={gpus_per_circuit})")
 
     # Handle empty case
     if not circuits or len(circuits) == 0:
@@ -882,20 +878,23 @@ def execute_circuits_immed(
 
     counts_array = None
 
-    # Explicit parallel circuit distribution mode
-    if parallel_mode == "mpi":
-        counts_array = _execute_parallel_mpi(circuits, num_shots)
-        # Returns None if MPI not available or only 1 rank - fall through to sequential
+    # Determine execution strategy based on gpus_per_circuit
+    if gpus_per_circuit is not None and mpi.enabled() and mpi.size > 1:
+        if gpus_per_circuit == 1:
+            # Mode 3: each GPU runs one circuit independently (max parallelism)
+            counts_array = _execute_parallel_mpi(circuits, num_shots)
+            # Returns None if MPI not available or only 1 rank - fall through to sequential
+        elif gpus_per_circuit < mpi.size:
+            # Mode 4: hybrid — M GPUs pool per circuit, P/M circuits in parallel
+            # TODO: Developer adds _execute_parallel_hybrid(circuits, num_shots, gpus_per_circuit)
+            if mpi.rank == 0:
+                print(f"... WARNING: gpus_per_circuit={gpus_per_circuit} (hybrid mode) not yet implemented, using default execution")
+        # else gpus_per_circuit >= mpi.size: same as default, use all GPUs together
 
-    # Warn about unimplemented modes
-    if parallel_mode == "mqpu":
-        print(f"... WARNING: parallel_mode='mqpu' not implemented, using sequential")
-    elif parallel_mode == "auto":
-        print(f"... WARNING: parallel_mode='auto' not implemented, using sequential")
-
-    # Sequential/mgpu execution (default)
-    # When MPI is enabled without -pm mpi, this uses mgpu mode (set in set_execution_target)
-    # for state vector distribution - all ranks participate in each circuit execution
+    # Default: sequential/mgpu execution
+    # When MPI is enabled, this uses mgpu mode (set in set_execution_target)
+    # for state vector distribution - all ranks participate in each circuit execution.
+    # When MPI is not enabled, this runs on a single GPU.
     if counts_array is None:
         counts_array = []
         for circuit in circuits:
