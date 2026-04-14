@@ -141,32 +141,59 @@ basis_gates_array = [
 #######################
 # SUPPORTING CLASSES
 
-# class BenchmarkResult is made for sessions runs. This is because
-# qiskit primitive job result instances don't have a get_counts method 
-# like backend results do. As such, a get counts method is calculated
-# from the quasi distributions and shots taken.
-class BenchmarkResult:
+# class ExecutionResult is a normalized result wrapper for quantum circuit execution.
+# It accepts either a Qiskit PrimitiveResult (from sampler), a raw counts dict,
+# or a list of counts dicts. get_counts() always returns:
+#   - dict for a single circuit
+#   - list[dict] for multiple circuits
+# This normalization allows benchmark code to process results uniformly
+# without knowing which execution path was used.
+class ExecutionResult:
 
-    def __init__(self, qiskit_result):
+    def __init__(self, source):
         super().__init__()
-        self.qiskit_result = qiskit_result
-        self.metadata = qiskit_result.metadata
         self._counts = None
+        self.metadata = None
+
+        if isinstance(source, dict):
+            self._counts = source
+        elif isinstance(source, list):
+            self._counts = self._normalize(source)
+        else:
+            # Qiskit PrimitiveResult from sampler (sessions or immediate)
+            self._extract_from_qiskit(source)
+
+    def _extract_from_qiskit(self, result):
+        """Extract counts from a Qiskit PrimitiveResult object."""
+        self.metadata = result.metadata
+        count_array = []
+        for pub_result in result:
+            # join_data() merges all classical registers into one
+            bitvals = pub_result.join_data()
+            count_array.append(bitvals.get_counts())
+        self._counts = self._normalize(count_array)
+
+    def _normalize(self, counts):
+        """Normalize counts: single-element list unwraps to dict."""
+        if isinstance(counts, list):
+            if len(counts) == 0:
+                return {}
+            elif len(counts) == 1:
+                return counts[0]
+            else:
+                return counts
+        return counts
 
     def set_counts(self, counts):
         self._counts = counts
 
-    def get_counts(self, qc=0):
-        # TODO: need to refactor the caller of get_counts not to submit QuantumCircuit
-        # and use index instead to be compatible with PrimitiveResult.
-        # `qc` is intentionally ignored.
-        if self._counts:
-            return self._counts
-        qc_index = 0 # this should point to the index of the circuit in a pub
-        # merge outcomes of all classical registers
-        bitvals = self.qiskit_result[qc_index].join_data()
-        self._counts = bitvals.get_counts()
+    def get_counts(self, qc=None):
         return self._counts
+
+# Backward compatibility aliases
+BenchmarkResult = ExecutionResult
+BenchmarkResult2 = ExecutionResult
+ExecResult = ExecutionResult
 
 # Special Job object class to hold job information for custom executors
 class Job:
@@ -405,7 +432,6 @@ def set_execution_target(backend_id='qasm_simulator',
                 Batch,
                 Session,
             )
-
 
             # set use_ibm_quantum_platform if provided by user - NOTE: this will modify the global setting
             use_ibm_quantum_platform = exec_options.get("use_ibm_quantum_platform", use_ibm_quantum_platform)
@@ -1198,7 +1224,7 @@ def job_complete(job):
     
     ###### normal completion
     
-    # get job result (DEVNOTE: this might be different for diff targets)
+    # get job result (DEVNOTE: structure can be different for diff targets)
     result = None
         
     if job.status() == JobStatus.DONE or job.status() == 'DONE':
@@ -1220,21 +1246,18 @@ def job_complete(job):
         # counts = result.get_counts(qc)
         # print("Total counts are:", counts)
         
-        # if we are using sessions, structure of result object is different;
-        # use a BenchmarkResult object to hold session result and provide a get_counts()
-        # that returns counts to the benchmarks in the same form as without sessions
+        # if we are using Sampler, structure of result object is different;
+        # wrap in ExecutionResult to normalize the get_counts() interface
         if sampler:
-            result = BenchmarkResult(result)
-            #counts = result.get_counts()
-            
-            # actual_shots = result.metadata[0]['shots']
-            # get the name of the classical register
-            # TODO: need to rewrite to allow for submit multiple circuits in one job
-            # get DataBin associated with the classical register
-            bitvals = next(iter(result.qiskit_result[0].data.values()))
+            # extract SDK-specific info before wrapping
+            qiskit_result = result
+            bitvals = next(iter(qiskit_result[0].data.values()))
             actual_shots = bitvals.num_shots
-            result_obj = result.metadata # not sure how to update to be V2 compatible
-            results_obj = result.metadata
+            result_obj = qiskit_result.metadata
+            results_obj = qiskit_result.metadata
+
+            # wrap in normalized result
+            result = ExecutionResult(qiskit_result)
         else:
             result_obj = result.to_dict()
             results_obj = result.to_dict()['results'][0]
@@ -1302,37 +1325,18 @@ def job_complete(job):
             logger.info('result_processor(...)')
             result = result_processor(result)
     
-        # The following computes the counts by summing them up, allowing for the case where
-        # <result> contains results from multiple circuits
-        # DEVNOTE: This will need to change; currently the only case where we have multiple result counts
-        # is when using randomly_compile; later, there will be other cases
+        # The following assumes single circuit execution
+        # TODO: process multiple circuit results
         result_counts = result.get_counts()
-        if isinstance(result_counts, list):
-            total_counts = dict()
-            for count in result_counts:
-                job_id = job.job_id()
-                if job_id in m3_mitigation:
-                    mit, qubits = m3_mitigation[job_id]
-                    count = mit.apply_correction(count, qubits).nearest_probability_distribution()
-                total_counts = dict(Counter(total_counts) + Counter(count))
-                
-            # make a copy of the result object so we can return a modified version
-            result = copy.copy(result) 
-
-            # replace the results array with an array containing only the first results object
-            # then populate other required fields
-            results = copy.copy(result.results[0])
-            results.header.name = active_circuit["qc"].name     # needed to identify the original circuit
-            results.shots = actual_shots
-            results.data.counts = total_counts
-            result.results = [ results ]
-        else:
-            job_id = job.job_id()
-            if job_id in m3_mitigation:
-                mit, qubits = m3_mitigation[job_id]
-                count = mit.apply_correction(result_counts, qubits).nearest_probability_distribution()
-                result.set_counts(count)
-            
+        
+        # process M3 error mitigation if provided
+        job_id = job.job_id()
+        if job_id in m3_mitigation:
+            mit, qubits = m3_mitigation[job_id]
+            count = mit.apply_correction(result_counts, qubits).nearest_probability_distribution()
+            result.set_counts(count)
+           
+        # invoke user's result handler
         try:
             result_handler(active_circuit["qc"],
                             result,
@@ -1663,11 +1667,7 @@ def test_execution():
     pass
 
 ########################################
-# NEW CODE 
-
-# The following functions have been moved here from the hamlib benchmark.
-# This transition and merge of new code developed in the hamlib benchmark is a work-in-progress.
-# The code below will be gradually integrated into this module in stages (TL: 250519)
+# MULTIPLE CIRCUIT EXECUTION
 
 # This function performs multiple circuit execution, which the other functions in this module do not yet
 def execute_circuits_immed(
@@ -1736,7 +1736,7 @@ def execute_circuits_immed(
         sampler_result = job.result()
         #print("sampler_result = ", sampler_result)
         
-        results = BenchmarkResult2(sampler_result)
+        results = ExecutionResult(sampler_result)
         #print("results = ", results)
         #print("results.counts = ", results.get_counts())
      
@@ -1758,141 +1758,4 @@ def execute_circuits_immed(
         results = job.result()
           
     return results
-        
-
-# The class BenchmarkResult is designed for use with IBM Sampler runs. 
-# The qiskit primitive job result instances don't have a get_counts method 
-# like backend results do. As such, a get counts method is calculated
-# from the quasi distributions and shots taken.
-# This provides a normalized return value across all benchmarks.
-class BenchmarkResult2:
-
-    def __init__(self, qiskit_result):
-        super().__init__()
-        self.qiskit_result = qiskit_result
-        self.metadata = qiskit_result.metadata
-
-    def get_counts(self):
-        count_array = []
-        for result in self.qiskit_result:    
-            # convert the quasi distribution bit values to shots distribution
-            bitvals = next(iter(result.data.values()))
-            counts = bitvals.get_counts()
-            count_array.append(counts)
-        
-        # return raw counts object if only a single circuit executed, otherwise the array
-        # this is done for consistency with all of the QED-C benchmark framework and Qiskit simulator
-        return count_array if len(count_array) > 1 else count_array[0]
-
-
-########################################
-# DEPRECATED METHODS
-
-# these methods are retained for reference and in case needed later
-
-# Wait for active and batched circuits to complete
-# This is used as a way to complete a group of circuits and report
-# results before continuing to create more circuits.
-# Deprecated: maintained for compatibility until all circuits are modified
-# to use throttle_execution(0 and finalize_execution()
-
-def execute_circuits():
-
-    # deprecated code ...
-    '''
-    for batched_circuit in batched_circuits:
-        execute_circuit(batched_circuit)
-    batched_circuits.clear()
-    '''
     
-    # wait for all jobs to complete
-    wait_for_completion()
-
-
-# Wait for all active and batched jobs to complete
-# deprecated version, with no completion handler
-
-def wait_for_completion():
-
-    if verbose:
-        print("... waiting for completion")
-
-    # check and sleep if not complete
-    done = False
-    pollcount = 0
-    while not done:
-    
-        # check if any jobs complete
-        check_jobs()
-
-        # return only when all jobs complete
-        if len(active_circuits) < 1:
-            break
-            
-        # delay a bit, increasing the delay periodically 
-        sleeptime = 0.25
-        if pollcount > 6: sleeptime = 0.5
-        if pollcount > 60: sleeptime = 1.0
-        time.sleep(sleeptime)
-        
-        pollcount += 1
-    
-    if verbose:
-        if pollcount > 0: print("")
-
-
-# Wait for a single job to complete, return when done
-# (replaced by wait_for_completion, which handle multiple jobs)
-
-def job_wait_for_completion(job):
-        
-    done=False
-    pollcount = 0
-    while not done:
-        status = job.status()
-        #print("Job status is ", status)
-        
-        if status == JobStatus.DONE:
-            break
-            
-        if status == JobStatus.CANCELLED:
-            break
-            
-        if status == JobStatus.ERROR:
-            break
-        
-        if status == JobStatus.QUEUED:
-            if verbose:
-                if pollcount < 44 or (pollcount % 15 == 0):
-                    print('.', end='')
-        
-        elif status == JobStatus.INITIALIZING:
-            if verbose: print('i', end='')
-            
-        elif status == JobStatus.VALIDATING:
-            if verbose: print('v', end='')
-            
-        elif status == JobStatus.RUNNING:
-            if verbose: print('r', end='')
-            
-        pollcount += 1
-        
-        # delay a bit, increasing the delay periodically 
-        sleeptime = 0.25
-        if pollcount > 8: sleeptime = 0.5
-        if pollcount > 100: sleeptime = 1.0
-        time.sleep(sleeptime)
-
-    if pollcount > 0:
-        if verbose: print("")
-
-    #if verbose: print("Job status is ", job.status() )
-    
-    if job.status() == JobStatus.CANCELLED:
-        print("\n... circuit execution cancelled.")
-            
-    if job.status() == JobStatus.ERROR:
-        print("\n... circuit execution failed.")
-
-
-
