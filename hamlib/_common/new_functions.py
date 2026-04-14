@@ -70,7 +70,8 @@ def do_execute(backend_id: str, circuits: list, num_shots: int,
 
     # execute the circuits with given number of shots on specified backend
     # apply weighted shot distribution, if specified
-    results, pauli_term_groups = hamlib_simulation_benchmark.execute_circuits_enhanced(
+    from hamlib._common.execute_enhanced import execute_circuits_enhanced
+    results, pauli_term_groups = execute_circuits_enhanced(
             backend_id = backend_id,
             circuits = circuits,
             num_shots = num_shots,
