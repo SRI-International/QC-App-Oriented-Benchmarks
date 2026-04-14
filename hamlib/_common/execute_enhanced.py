@@ -9,7 +9,6 @@ based on Pauli term coefficient weights. Extracted from hamlib_simulation_benchm
 import numpy as np
 from typing import List
 
-# 250302 TL: Leaving this option in until we are sure all works well.
 debug = False
 
 
@@ -69,7 +68,8 @@ def execute_circuits_enhanced(
 
 
 #########################################
-# EXECUTE CIRCUITS WITH DISTRIBUTED SHOTS
+# Distribute shots across circuits weighted by Pauli term coefficients,
+# then bucket circuits with similar shot counts to reduce execution overhead.
 
 def execute_circuits_distribute_shots(
         backend_id: str = None,
@@ -159,15 +159,13 @@ def execute_circuits_distribute_shots(
     return results, group_list
 
 
-# From the given list of term groups, distribute the total shot count, returning num_shots by group
+# Allocate shots proportionally across Pauli term groups based on coefficient magnitudes.
+# Supports 4 weighting methods: max_sq (default), mean_sq, max, mean.
 def get_distributed_shot_counts(
         num_shots: int = 100,
         groups: list = None,
         ds_method: str = 'max_sq',
 ) -> List:
-    #     # loop over all groups, to find the largest coefficient in each group
-    # add shots to first group until the total is same as the given total shot count
-    #     one_norm_weights = [sum(abs(coeff) for pauli, coeff in group) / len(group) for group in groups]
     weights = []
     for group in groups:
         w_sqs = [abs(coeff) ** 2 for pauli, coeff in group]
@@ -201,6 +199,8 @@ def get_distributed_shot_counts(
     return shot_allocations
 
 #####################
+# Execute bucketed circuit groups, each with a different shot count.
+# Accumulates results into a single ExecutionResult as if all circuits ran individually.
 
 def execute_circuits_with_mixed_shots(
         backend_id: str = None,
