@@ -321,7 +321,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
             
             # If we only want the circuits:
             if get_circuits:    
-                all_qcs[str(num_qubits)][str(s_int)] = qc
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc
                 # Continue to skip sumbitting the circuit for execution. 
                 continue
 
