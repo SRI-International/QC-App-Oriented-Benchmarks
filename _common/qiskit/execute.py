@@ -608,27 +608,16 @@ def execute_circuit(circuit):
     # qc = qc.decompose()
     # qc = qc.decompose()
     
-    # obtain initial circuit metrics
-    qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = get_circuit_metrics(qc)
+    # compute circuit metrics (algorithmic + optionally normalized depth)
+    circuit_metrics = compute_circuit_metrics(qc, do_transpile_metrics, use_normalized_depth)
 
-    # default the normalized transpiled metrics to the same, in case exec fails
-    qc_tr_depth = qc_depth
-    qc_tr_size = qc_size
-    qc_tr_count_ops = qc_count_ops
-    qc_tr_xi = qc_xi 
-    qc_tr_n2q = qc_n2q
-    #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
-    
+    # if normalized depth was computed, exclude that time from elapsed_time
+    if do_transpile_metrics and use_normalized_depth:
+        active_circuit["launch_time"] = time.time()
+
     backend_name = get_backend_name(backend)
-    
-    try:    
-        # transpile the circuit to obtain size metrics using normalized basis
-        if do_transpile_metrics and use_normalized_depth:
-            qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q = transpile_for_metrics(qc)
-            
-            # we want to ignore elapsed time contribution of transpile for metrics (normalized depth)
-            active_circuit["launch_time"] = time.time()
-            
+
+    try:
         # use noise model from execution options if given for simulator
         this_noise = noise
         
@@ -814,16 +803,8 @@ def execute_circuit(circuit):
     active_circuits[job] = active_circuit
     # print("... active_circuit = ", str(active_circuit))
 
-    # store circuit dimensional metrics
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'depth', qc_depth)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'size', qc_size)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'xi', qc_xi)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'n2q', qc_n2q)
-
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_depth', qc_tr_depth)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_size', qc_tr_size)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_xi', qc_tr_xi)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_n2q', qc_tr_n2q)
+    # store circuit dimensional metrics (computed before execution)
+    store_circuit_metrics(active_circuit["group"], active_circuit["circuit"], circuit_metrics)
 
     # also store the job_id for future reference
     metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'job_id', job.job_id())
@@ -846,49 +827,61 @@ def compute_and_store_circuit_info(
         do_transpile_metrics: bool = True,
         use_normalized_depth: bool = True
     ):
-        
-    if qc == None:
-        return;
-    
-    # do the decompose before obtaining circuit metrics so we expand subcircuits to 2 levels
-    # Comment this out here; ideally we'd generalize it here, but it is intended only to 
-    # 'flatten out' circuits with subcircuits; we do it in the benchmark code for now so
-    # it only affects circuits with subcircuits (e.g. QFT, AE ...)
-    # qc = qc.decompose()
-    # qc = qc.decompose()
-    
-    # obtain initial circuit metrics
+
+    if qc is None:
+        return
+
+    metrics_values = compute_circuit_metrics(qc, do_transpile_metrics, use_normalized_depth)
+    store_circuit_metrics(group_id, circuit_id, metrics_values)
+
+
+# Compute circuit metrics (algorithmic + optionally normalized) and return as a tuple.
+# Does not store to metrics table — caller decides when to store.
+def compute_circuit_metrics(qc, do_transpile_metrics=True, use_normalized_depth=True):
+
+    if qc is None:
+        return (0, 0, 0, 0, 0, 0, 0, 0)
+
+    # obtain initial (algorithmic) circuit metrics
     qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = get_circuit_metrics(qc)
 
-    # default the normalized transpiled metrics to the same, in case exec fails
+    # default the normalized transpiled metrics to the same, in case transpile is skipped or fails
     qc_tr_depth = qc_depth
     qc_tr_size = qc_size
-    qc_tr_count_ops = qc_count_ops
-    qc_tr_xi = qc_xi 
+    qc_tr_xi = qc_xi
     qc_tr_n2q = qc_n2q
-    #print(f"... before tp: {qc_depth} {qc_size} {qc_count_ops}")
-    
-    # store circuit dimensional metrics
-    metrics.store_metric(group_id, circuit_id, 'depth', qc_depth)
-    metrics.store_metric(group_id, circuit_id, 'size', qc_size)
-    metrics.store_metric(group_id, circuit_id, 'xi', qc_xi)
-    metrics.store_metric(group_id, circuit_id, 'n2q', qc_n2q)
-    
-    try:    
+
+    try:
         # transpile the circuit to obtain size metrics using normalized basis
         if do_transpile_metrics and use_normalized_depth:
             qc_tr_depth, qc_tr_size, qc_tr_count_ops, qc_tr_xi, qc_tr_n2q = transpile_for_metrics(qc)
 
     except Exception as e:
-        print(f'ERROR: Failed to transpile circuit {circuit["group"]} {circuit["circuit"]}')
+        print(f'ERROR: Failed to transpile circuit for metrics')
         print(f"... exception = {e}")
         if verbose: print(traceback.format_exc())
-        
+
+    return (qc_depth, qc_size, qc_xi, qc_n2q,
+            qc_tr_depth, qc_tr_size, qc_tr_xi, qc_tr_n2q)
+
+
+# Store precomputed circuit metrics to the metrics table.
+# metrics_values is the 8-tuple returned by compute_circuit_metrics().
+def store_circuit_metrics(group_id, circuit_id, metrics_values):
+
+    (qc_depth, qc_size, qc_xi, qc_n2q,
+     qc_tr_depth, qc_tr_size, qc_tr_xi, qc_tr_n2q) = metrics_values
+
+    metrics.store_metric(group_id, circuit_id, 'depth', qc_depth)
+    metrics.store_metric(group_id, circuit_id, 'size', qc_size)
+    metrics.store_metric(group_id, circuit_id, 'xi', qc_xi)
+    metrics.store_metric(group_id, circuit_id, 'n2q', qc_n2q)
+
     metrics.store_metric(group_id, circuit_id, 'tr_depth', qc_tr_depth)
     metrics.store_metric(group_id, circuit_id, 'tr_size', qc_tr_size)
     metrics.store_metric(group_id, circuit_id, 'tr_xi', qc_tr_xi)
     metrics.store_metric(group_id, circuit_id, 'tr_n2q', qc_tr_n2q)
-        
+
 
 # Utility function to obtain name of backend
 # This is needed because some backends support backend.name and others backend.name()
