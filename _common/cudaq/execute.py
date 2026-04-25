@@ -419,30 +419,11 @@ def execute_circuit (batched_circuit):
     #print("... active_circuit = ", str(active_circuit))
     
     # ***********************************
-    
-    # number of qubits is stored in the "group" field
-    qc_size = int(active_circuit["group"])
-    
-    # obtain initial circuit metrics
-    qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = get_circuit_metrics(circuit, qc_size)
-    
-    qc_tr_depth = qc_depth
-    qc_tr_size = qc_size
-    qc_tr_count_ops = qc_count_ops
-    qc_tr_xi = qc_xi
-    qc_tr_n2q = qc_n2q
-    
-    # store circuit dimensional metrics
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'depth', qc_depth)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'size', qc_size)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'xi', qc_xi)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'n2q', qc_n2q)
 
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_depth', qc_tr_depth)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_size', qc_tr_size)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_xi', qc_tr_xi)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_n2q', qc_tr_n2q)
-    
+    # compute and store circuit dimensional metrics
+    circuit_metrics = compute_circuit_metrics(circuit)
+    store_circuit_metrics(active_circuit["group"], active_circuit["circuit"], circuit_metrics)
+
     ##############
     # Here we complete the job immediately 
     job_complete(job)
@@ -537,9 +518,57 @@ def estimate_depth(num_qubits, total_gates, two_qubit_gates):
     # depth_estimate = depth_min * 2.5
     
     return depth_estimate
-           
 
-#########################################################################  
+
+# Compute circuit metrics and return as a tuple (matching qiskit signature).
+# Does not store to metrics table — caller decides when to store.
+# For cudaq, there is no transpile-based normalization, so tr_* = algorithmic.
+def compute_circuit_metrics(qc):
+
+    qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = 0, 0, 0, 0, 0
+    try:
+        qc_size = qc[1][0]   # the first item after the kernel is always num_qubits
+        qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = get_circuit_metrics(qc, qc_size)
+    except Exception as ex:
+        print(f"ERROR attempting to compute circuit metrics")
+        print(ex)
+
+    # cudaq has no transpile-based normalization; tr_* = algorithmic
+    return (qc_depth, qc_size, qc_xi, qc_n2q,
+            qc_depth, qc_size, qc_xi, qc_n2q)
+
+
+# Store precomputed circuit metrics to the metrics table.
+# metrics_values is the 8-tuple returned by compute_circuit_metrics().
+def store_circuit_metrics(group_id, circuit_id, metrics_values):
+
+    (qc_depth, qc_size, qc_xi, qc_n2q,
+     qc_tr_depth, qc_tr_size, qc_tr_xi, qc_tr_n2q) = metrics_values
+
+    metrics.store_metric(group_id, circuit_id, 'depth', qc_depth)
+    metrics.store_metric(group_id, circuit_id, 'size', qc_size)
+    metrics.store_metric(group_id, circuit_id, 'xi', qc_xi)
+    metrics.store_metric(group_id, circuit_id, 'n2q', qc_n2q)
+
+    metrics.store_metric(group_id, circuit_id, 'tr_depth', qc_tr_depth)
+    metrics.store_metric(group_id, circuit_id, 'tr_size', qc_tr_size)
+    metrics.store_metric(group_id, circuit_id, 'tr_xi', qc_tr_xi)
+    metrics.store_metric(group_id, circuit_id, 'tr_n2q', qc_tr_n2q)
+
+
+# Compute and store circuit metrics in one call (convenience function).
+def compute_and_store_circuit_info(qc, group_id, circuit_id):
+
+    metrics_values = compute_circuit_metrics(qc)
+    store_circuit_metrics(group_id, circuit_id, metrics_values)
+
+
+# Placeholder for API parity with qiskit — cudaq has no transpile-based normalization.
+def compute_and_store_normalized_depth(qc, group_id, circuit_id):
+    pass  # tr_* already set by compute_and_store_circuit_info
+
+
+#########################################################################
 
 # klunky way to know the last group executed 
 last_group = None 
@@ -773,48 +802,10 @@ def execute_circuit_immed (circuit: list, num_shots: int):
     #print("... active_circuit = ", str(active_circuit))
     
     # ***********************************
-    qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = 0, 0, 0, 0, 0
-    try:
-        # number of qubits is stored in the "group" field
-        #qc_size = int(circuit["group"])
-        qc_size = circuit[1][0]   # the first item after the kernel is alway num_qubits
-        
-        # obtain initial circuit metrics
-        qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q = get_circuit_metrics(circuit, qc_size)
+    # compute circuit metrics (not stored here — execute_circuit_immed is a low-level function)
+    _circuit_metrics = compute_circuit_metrics(circuit)
 
-    except Exception as ex:
-        print(f"ERROR attempting to compute cicuit metrics")
-        print(ex)
-    
-    qc_tr_depth = qc_depth
-    qc_tr_size = qc_size
-    qc_tr_count_ops = qc_count_ops
-    qc_tr_xi = qc_xi
-    qc_tr_n2q = qc_n2q
-    
-    """
-    # store circuit dimensional metrics
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'depth', qc_depth)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'size', qc_size)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'xi', qc_xi)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'n2q', qc_n2q)
-
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_depth', qc_tr_depth)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_size', qc_tr_size)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_xi', qc_tr_xi)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'tr_n2q', qc_tr_n2q)
-    """
- 
-    """
-    # klunky way to know the last group executed 
-    #last_group = None 
-
-    # Process a completed job
-    def job_complete (job):
-        #active_circuit = active_circuits[job]
-    """         
-    # get job result (DEVNOTE: this might be different for diff targets)
-    #cq_result = job.result()
+    # get job result
     cq_result = result
 
     # create a normalized result object to return to the caller
