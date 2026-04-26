@@ -178,6 +178,7 @@ class ExecutionResult:
     def __init__(self, source):
         super().__init__()
         self._counts = None
+        self.native_result = source  # preserve original result for vendor-specific access
 
         if isinstance(source, dict):
             self._counts = source
@@ -352,11 +353,11 @@ def submit_circuit (qc, group_id, circuit_id, shots=100):
     #print("... submit circuit - ", str(batched_circuits[len(batched_circuits)-1]))
     
     # DEVNOTE: execute immediately for now, so that we don't accumulate elapsed time while in queue
-    execute_circuits()
+    _execute_batched_circuits()
     
     
 # Launch execution of all batched circuits
-def execute_circuits ():
+def _execute_batched_circuits ():
     for batched_circuit in batched_circuits:
         execute_circuit(batched_circuit)
     batched_circuits.clear()
@@ -628,7 +629,7 @@ def throttle_execution(completion_handler=metrics.finalize_group):
         print(f"... throttling execution, active={len(active_circuits)}, batched={len(batched_circuits)}")
     
     # DEVNOTE: execution is currently synchronous, so force execution of any batched circuits
-    execute_circuits()
+    _execute_batched_circuits()
 
     global last_group
     group = last_group
@@ -676,7 +677,7 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
         print("... finalize_execution")
         
     # DEVNOTE: execution is currently synchronous, so force execution of any batched circuits
-    execute_circuits()
+    _execute_batched_circuits()
     
     '''   DEVNOTE: this or something similar could be used later for throtttling
     # check and sleep if not complete
@@ -895,4 +896,199 @@ def execute_circuits_immed(
     # Construct a normalized result object with counts structure to match circuits
     results = ExecutionResult(counts_array)
 
-    return results       
+    return results
+
+
+###########################################################################
+# NEW ARRAY-BASED EXECUTION PATH
+#
+# These functions implement a cleaner execution model that operates on
+# arrays of circuits. They are designed to coexist with the existing
+# execute_circuit/submit_circuit/job_complete path above, which remains
+# untouched for backward compatibility.
+#
+# API Layering:
+#   Level 1 (primitives): execute_circuits, process_circuit_results,
+#       compute_circuit_metrics, store_circuit_metrics, ExecutionResult
+#   Level 2 (convenience): submit_circuits
+#   Level 3 (benchmark): calls submit_circuits or Level 1 directly
+###########################################################################
+
+
+def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
+    """
+    Execute an array of circuits. Pure execution — no metrics,
+    no result_handler, no dict knowledge.
+
+    Always takes an array. Always returns (job_id, result).
+    Cudaq circuits are [kernel, [args]] tuples.
+
+    Args:
+        circuits: list of [kernel, [args]] tuples
+        num_shots: shots per circuit
+        wait: if True (default), block until results are ready.
+              if False, return immediately with result=None (not yet supported for cudaq).
+        gpus_per_circuit: Number of GPUs to pool per circuit.
+            None = use all available GPUs together (mgpu if MPI, single GPU if not).
+            1 = each GPU runs one circuit independently (max parallelism, requires MPI).
+
+    Returns:
+        (job_id, result) tuple:
+        - job_id: identifier for the job (serializable)
+        - result: ExecutionResult with get_counts() → list of dicts,
+          or None if wait=False
+    """
+
+    if verbose:
+        print(f"... execute_circuits({len(circuits)}, {num_shots}, wait={wait}, gpus_per_circuit={gpus_per_circuit})")
+
+    # Handle empty case
+    if not circuits or len(circuits) == 0:
+        pseudo_job = Job()
+        return (pseudo_job.job_id(), ExecutionResult([]))
+
+    counts_array = None
+
+    # MPI parallel execution (gpus_per_circuit support)
+    if gpus_per_circuit is not None and mpi.enabled() and mpi.size > 1:
+        if gpus_per_circuit == 1:
+            # Mode 3: each GPU runs one circuit independently (max parallelism)
+            counts_array = _execute_parallel_mpi(circuits, num_shots)
+        elif gpus_per_circuit < mpi.size:
+            # Mode 4: hybrid — not yet implemented
+            if mpi.rank == 0:
+                print(f"... WARNING: gpus_per_circuit={gpus_per_circuit} (hybrid mode) not yet implemented, using default execution")
+
+    # Default: sequential execution (single GPU or mgpu mode)
+    if counts_array is None:
+        counts_array = []
+        for circuit in circuits:
+            try:
+                if noise is None:
+                    result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
+                else:
+                    result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+
+                # Convert cudaq SampleResult to dict for counts array
+                counts = {key: val for key, val in result.items()}
+                counts_array.append(counts)
+
+            except Exception as e:
+                print(f'ERROR: Failed to execute circuit')
+                print(f"... exception = {e}")
+                if verbose:
+                    import traceback
+                    traceback.print_exc()
+                counts_array.append({})
+
+    # Create pseudo-Job for job_id consistency
+    pseudo_job = Job()
+    job_id = pseudo_job.job_id()
+
+    # If not waiting, return job_id with no result (cudaq is always synchronous for now)
+    if not wait:
+        return (job_id, None)
+
+    # Wrap in ExecutionResult
+    results = ExecutionResult(counts_array)
+
+    if verbose:
+        print(f"... execute_circuits complete, job_id={job_id}")
+
+    return (job_id, results)
+
+
+def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=None):
+    """
+    Map batch results back to individual circuits. For each circuit:
+    wraps counts in ExecutionResult, calls result_handler, stores timing
+    and job_id.
+
+    Args:
+        circuits_info: list of dicts with keys "qc", "group", "circuit", "shots"
+        results: result object with get_counts() returning list or dict.
+        job_id: job identifier (stored per circuit in metrics)
+        elapsed_time: wall-clock seconds for the batch (stored per circuit)
+    """
+
+    if verbose:
+        print(f"... process_circuit_results({len(circuits_info)}, job_id={job_id})")
+
+    # Extract per-circuit counts from batch result
+    counts_list = results.get_counts()
+    if isinstance(counts_list, dict):
+        counts_list = [counts_list]  # single-element array was unwrapped
+
+    # For cudaq, exec_time is the elapsed_time (no separate timing from backend)
+    exec_time = elapsed_time if elapsed_time is not None else 0.0
+
+    # Process each circuit's result
+    for ci, counts in zip(circuits_info, counts_list):
+
+        # Store timing metrics
+        if elapsed_time is not None:
+            metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time)
+        metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', exec_time)
+
+        # Store job_id for tracking/retrieval
+        if job_id is not None:
+            metrics.store_metric(ci["group"], ci["circuit"], 'job_id', job_id)
+
+        # Wrap individual counts in ExecutionResult for result_handler
+        circuit_result = ExecutionResult(counts)
+
+        # Call the benchmark's result handler (computes fidelity etc.)
+        if result_handler:
+            try:
+                result_handler(ci["qc"], circuit_result,
+                              ci["group"], ci["circuit"], ci["shots"])
+            except Exception as e:
+                print(f'ERROR: failed in result_handler for circuit {ci["group"]} {ci["circuit"]}')
+                print(f"... exception = {e}")
+                if verbose:
+                    import traceback
+                    traceback.print_exc()
+
+
+def submit_circuits(circuits_info, num_shots=100, max_batch_size=None, batch_by_group=False,
+                    gpus_per_circuit=None):
+    """
+    Convenience: compute metrics + execute in batches + process results.
+
+    Args:
+        circuits_info: list of dicts with "qc", "group", "circuit", "shots"
+        num_shots: default shots
+        max_batch_size: max circuits per batch (None = no limit)
+        batch_by_group: if True, batch boundaries align with group changes.
+                        If False (default), batch by max_batch_size only.
+        gpus_per_circuit: passed through to execute_circuits for MPI support
+    """
+
+    if verbose:
+        print(f"... submit_circuits({len(circuits_info)}, max_batch={max_batch_size}, by_group={batch_by_group})")
+
+    # Compute metrics for each circuit
+    for ci in circuits_info:
+        compute_and_store_circuit_info(ci["qc"], ci["group"], ci["circuit"])
+
+    if batch_by_group:
+        # Group circuits by their "group" key, execute one group at a time
+        from itertools import groupby
+        for group_key, group_iter in groupby(circuits_info, key=lambda ci: ci["group"]):
+            batch = list(group_iter)
+            _execute_batch(batch, num_shots, max_batch_size, gpus_per_circuit)
+    else:
+        # Batch by max_batch_size regardless of group boundaries
+        _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit)
+
+
+def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=None):
+    """Internal: execute circuits_info in chunks of max_batch_size."""
+    batch_size = max_batch_size or len(circuits_info)
+    for i in range(0, len(circuits_info), batch_size):
+        batch = circuits_info[i:i + batch_size]
+        circuits = [ci["qc"] for ci in batch]
+        ts = time.time()
+        job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
+        elapsed_time = time.time() - ts
+        process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
