@@ -154,11 +154,19 @@ class ExecutionResult:
         super().__init__()
         self._counts = None
         self.metadata = None
+        self.native_result = source  # preserve original result for vendor-specific access
 
         if isinstance(source, dict):
             self._counts = source
         elif isinstance(source, list):
             self._counts = self._normalize(source)
+        elif hasattr(source, 'get_counts'):
+            # Native Qiskit Result object (from backend.run().result())
+            counts = source.get_counts()
+            if isinstance(counts, list):
+                self._counts = self._normalize(counts)
+            else:
+                self._counts = counts
         else:
             # Qiskit PrimitiveResult from sampler (sessions or immediate)
             self._extract_from_qiskit(source)
@@ -1750,4 +1758,274 @@ def execute_circuits_immed(
         results = job.result()
           
     return results
-    
+
+
+###########################################################################
+# NEW ARRAY-BASED EXECUTION PATH
+#
+# These functions implement a cleaner execution model that operates on
+# arrays of circuits. They are designed to coexist with the existing
+# execute_circuit/submit_circuit/job_complete path above, which remains
+# untouched for backward compatibility.
+#
+# API Layering:
+#   Level 1 (primitives): execute_circuits, process_circuit_results,
+#       compute_circuit_metrics, store_circuit_metrics, ExecutionResult
+#   Level 2 (convenience): submit_circuits
+#   Level 3 (benchmark): calls submit_circuits or Level 1 directly
+###########################################################################
+
+
+def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
+    """
+    Execute an array of circuits. Pure execution — no metrics,
+    no result_handler, no dict knowledge.
+
+    Always takes an array. Always returns (job_id, result).
+    Uses the backend/sampler/noise configured by set_execution_target().
+    Processes exec_options for noise_model, executor, and transpilation settings.
+
+    Args:
+        circuits: list of QuantumCircuit objects
+        num_shots: shots per circuit
+        wait: if True (default), block until results are ready.
+              if False, return immediately with result=None.
+        gpus_per_circuit: accepted for API compatibility with cudaq (ignored here)
+
+    Returns:
+        (job_id, result) tuple:
+        - job_id: identifier for the job (serializable)
+        - result: ExecutionResult with get_counts() → list of dicts,
+          or None if wait=False
+    """
+
+    if verbose:
+        print(f"... execute_circuits({len(circuits)}, {num_shots}, wait={wait})")
+
+    # Extract exec_options from the global set by set_execution_target()
+    opts = copy.copy(backend_exec_options) if backend_exec_options else {}
+
+    # Extract noise model — exec_options can override the module-level noise
+    this_noise = opts.pop("noise_model", noise)
+
+    # Extract executor callback
+    executor = opts.pop("executor", None)
+
+    # Extract transpilation options
+    optimization_level = opts.pop("optimization_level", None)
+    layout_method = opts.pop("layout_method", None)
+    routing_method = opts.pop("routing_method", None)
+
+    # Pop options that are handled elsewhere (don't pass to backend.run)
+    opts.pop("use_sessions", None)
+    opts.pop("resilience_level", None)
+    opts.pop("sampler_options", None)
+    opts.pop("use_ibm_quantum_platform", None)
+    opts.pop("dynamic_circuit", None)
+    opts.pop("transpile_attempt_count", None)
+    opts.pop("transformer", None)
+    opts.pop("postprocessor", None)
+    opts.pop("use_m3", None)
+
+    backend_name = get_backend_name(backend) if backend else "unknown"
+
+    ##########
+    # Executor path — custom execution callback, per-circuit
+    if executor:
+        pseudo_job = Job()
+        counts_array = []
+        for qc in circuits:
+            result = executor(qc, backend_name, backend, shots=num_shots, **opts)
+            if hasattr(result, 'get_counts'):
+                counts_array.append(result.get_counts())
+            else:
+                counts_array.append(result)
+        return (pseudo_job.job_id(), ExecutionResult(counts_array))
+
+    ##########
+    # Standard execution paths — always pass array
+
+    try:
+        # Transpile circuits for the target backend
+        trans_qcs = transpile(circuits, backend,
+            optimization_level=optimization_level,
+            layout_method=layout_method,
+            routing_method=routing_method)
+
+        # Statevector simulator: remove final measurements
+        if backend_name.lower() == "statevector_simulator":
+            trans_qcs = [qc.remove_final_measurements(inplace=False) for qc in trans_qcs]
+
+        # Execute on appropriate path
+        if sampler is not None:
+            # Sampler path (IBM Runtime, StatevectorSampler, AerSampler)
+            job = sampler.run(trans_qcs, shots=num_shots)
+
+        elif this_noise is not None and backend_name.endswith("qasm_simulator"):
+            # Noisy simulator path
+            job = backend.run(trans_qcs, shots=num_shots,
+                noise_model=this_noise, basis_gates=this_noise.basis_gates,
+                **opts)
+
+        else:
+            # Straight backend (hardware, cloud, or noiseless simulator)
+            job = backend.run(trans_qcs, shots=num_shots, **opts)
+
+    except Exception as e:
+        print(f'ERROR: Failed to execute circuits')
+        print(f"... exception = {e}")
+        if verbose: print(traceback.format_exc())
+        # Return empty result with pseudo job_id
+        pseudo_job = Job()
+        return (pseudo_job.job_id(), ExecutionResult([{} for _ in circuits]))
+
+    # Extract job_id before waiting
+    try:
+        job_id = job.job_id()
+    except:
+        job_id = Job.unique_job_id  # fallback if job doesn't support job_id()
+
+    # If not waiting, return job_id with no result
+    if not wait:
+        return (job_id, None)
+
+    # Wait for result
+    # Only wrap in ExecutionResult for sampler path (PrimitiveResult needs normalization).
+    # Native Qiskit Result (simulator/backend) already supports get_counts() natively.
+    try:
+        raw_result = job.result()
+        if sampler is not None:
+            result = ExecutionResult(raw_result)
+        else:
+            result = raw_result
+    except Exception as e:
+        print(f'ERROR: Failed to get result for job {job_id}')
+        print(f"... exception = {e}")
+        if verbose: print(traceback.format_exc())
+        result = ExecutionResult([{} for _ in circuits])
+
+    if verbose:
+        print(f"... execute_circuits complete, job_id={job_id}")
+
+    return (job_id, result)
+
+
+def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=None):
+    """
+    Map batch results back to individual circuits. For each circuit:
+    wraps counts in ExecutionResult, calls result_handler, stores timing
+    and job_id.
+
+    Replaces the need for CountsWrapper / BenchmarkResult2 classes
+    used in modularized notebooks.
+
+    Args:
+        circuits_info: list of dicts with keys "qc", "group", "circuit", "shots"
+        results: result object with get_counts() returning list or dict.
+                 Can be from execute_circuits() or user's own execution.
+        job_id: job identifier (stored per circuit in metrics)
+        elapsed_time: wall-clock seconds for the batch (stored per circuit)
+    """
+
+    if verbose:
+        print(f"... process_circuit_results({len(circuits_info)}, job_id={job_id})")
+
+    # Extract per-circuit counts from batch result
+    counts_list = results.get_counts()
+    if isinstance(counts_list, dict):
+        counts_list = [counts_list]  # single-element array was unwrapped by ExecutionResult
+
+    # Extract exec_time from result object (best-effort)
+    # Results may be a native Qiskit Result (has to_dict) or ExecutionResult (has native_result)
+    exec_time = 0.0
+    try:
+        # Get the native result object for timing extraction
+        native = getattr(results, 'native_result', results)
+
+        if hasattr(native, 'to_dict'):
+            # Native Qiskit Result — timing in result dict
+            result_dict = native.to_dict()
+            if "time_taken" in result_dict:
+                exec_time = result_dict["time_taken"]
+            elif "results" in result_dict and len(result_dict["results"]) > 0:
+                if "time_taken" in result_dict["results"][0]:
+                    exec_time = result_dict["results"][0]["time_taken"]
+        elif hasattr(native, 'metadata'):
+            # Sampler/PrimitiveResult — try to extract from metadata
+            pass  # exec_time stays 0, use elapsed_time as fallback
+    except Exception as e:
+        if verbose:
+            print(f"... could not extract exec_time: {e}")
+
+    # Fall back to elapsed_time if no exec_time extracted
+    if exec_time == 0.0 and elapsed_time is not None:
+        exec_time = elapsed_time
+
+    # Process each circuit's result
+    for ci, counts in zip(circuits_info, counts_list):
+
+        # Store timing metrics
+        if elapsed_time is not None:
+            metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time)
+        metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', exec_time)
+
+        # Store job_id for tracking/retrieval
+        if job_id is not None:
+            metrics.store_metric(ci["group"], ci["circuit"], 'job_id', job_id)
+
+        # Wrap individual counts in ExecutionResult for result_handler
+        circuit_result = ExecutionResult(counts)
+
+        # Call the benchmark's result handler (computes fidelity etc.)
+        if result_handler:
+            try:
+                result_handler(ci["qc"], circuit_result,
+                              ci["group"], ci["circuit"], ci["shots"])
+            except Exception as e:
+                print(f'ERROR: failed in result_handler for circuit {ci["group"]} {ci["circuit"]}')
+                print(f"... exception = {e}")
+                if verbose: print(traceback.format_exc())
+
+
+def submit_circuits(circuits_info, num_shots=100, max_batch_size=None, batch_by_group=False):
+    """
+    Convenience: compute metrics + execute in batches + process results.
+
+    Args:
+        circuits_info: list of dicts with "qc", "group", "circuit", "shots"
+        num_shots: default shots
+        max_batch_size: max circuits per batch (None = no limit)
+        batch_by_group: if True, batch boundaries align with group changes.
+                        If False (default), batch by max_batch_size only.
+    """
+
+    if verbose:
+        print(f"... submit_circuits({len(circuits_info)}, max_batch={max_batch_size}, by_group={batch_by_group})")
+
+    # Compute metrics for each circuit
+    # compute_and_store_circuit_info handles both algorithmic and normalized depth
+    # based on the do_transpile_metrics and use_normalized_depth module globals
+    for ci in circuits_info:
+        compute_and_store_circuit_info(ci["qc"], ci["group"], ci["circuit"])
+
+    if batch_by_group:
+        # Group circuits by their "group" key, execute one group at a time
+        from itertools import groupby
+        for group_key, group_iter in groupby(circuits_info, key=lambda ci: ci["group"]):
+            batch = list(group_iter)
+            _execute_batch(batch, num_shots, max_batch_size)
+    else:
+        # Batch by max_batch_size regardless of group boundaries
+        _execute_batch(circuits_info, num_shots, max_batch_size)
+
+
+def _execute_batch(circuits_info, num_shots, max_batch_size):
+    """Internal: execute circuits_info in chunks of max_batch_size."""
+    batch_size = max_batch_size or len(circuits_info)
+    for i in range(0, len(circuits_info), batch_size):
+        batch = circuits_info[i:i + batch_size]
+        circuits = [ci["qc"] for ci in batch]
+        ts = time.time()
+        job_id, results = execute_circuits(circuits, num_shots)
+        elapsed_time = time.time() - ts
+        process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
