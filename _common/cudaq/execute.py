@@ -838,37 +838,6 @@ def execute_circuit_immed (circuit: list, num_shots: int):
     # return a Qiskit-like result object 
     return result
 
-# This function performs multiple circuit execution
-def execute_circuits_immed(
-        backend_id: str = None,
-        circuits: list = None,
-        num_shots: int = 100,
-        gpus_per_circuit: int = None
-    ) -> list:
-    """
-    Execute a list of circuits on the given backend with the given number of shots.
-
-    DEPRECATED: This function now delegates to execute_circuits().
-    Kept for backward compatibility with existing callers (hamlib execute_enhanced).
-
-    Args:
-        backend_id: Backend identifier (currently unused for cudaq)
-        circuits: List of [kernel, params] circuit tuples
-        num_shots: Number of shots per circuit
-        gpus_per_circuit: Number of GPUs to pool per circuit.
-
-    Returns:
-        ExecutionResult object with get_counts() method
-    """
-
-    if verbose:
-        print(f"... execute_circuits_immed({backend_id}, {len(circuits)}, {num_shots}, gpus_per_circuit={gpus_per_circuit}) -> delegating to execute_circuits()")
-
-    job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
-
-    return results
-
-
 ###########################################################################
 # NEW ARRAY-BASED EXECUTION PATH
 #
@@ -1062,3 +1031,27 @@ def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=No
         job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
         elapsed_time = time.time() - ts
         process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
+
+
+###########################################################################
+# DEPRECATED FUNCTIONS
+# These functions are kept for backward compatibility but will be removed
+# in a future release. They delegate to the new array-based execution path.
+###########################################################################
+
+
+def execute_circuits_immed(
+        backend_id: str = None,
+        circuits: list = None,
+        num_shots: int = 100,
+        gpus_per_circuit: int = None
+    ) -> list:
+    """
+    DEPRECATED: Use execute_circuits() instead.
+    This function delegates to execute_circuits() and returns only the result.
+    """
+    print("WARNING: execute_circuits_immed() is deprecated and will be removed. Use execute_circuits() instead.")
+
+    job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
+
+    return results

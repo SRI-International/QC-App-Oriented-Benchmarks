@@ -44,8 +44,7 @@ def execute_circuits_enhanced(
         #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
         # execute the entire list of circuits, same shots each
         import execute as ex
-        results = ex.execute_circuits_immed(
-                backend_id = backend_id,
+        job_id, results = ex.execute_circuits(
                 circuits = circuits,
                 num_shots = int(num_shots / len(circuits)),
                 gpus_per_circuit = gpus_per_circuit
@@ -215,9 +214,7 @@ def execute_circuits_with_mixed_shots(
 
         # execute this list of circuits, with same shots for each circuit in list
         import execute as ex
-        results = ex.execute_circuits_immed(
-                backend_id = backend_id,
-                #circuits = [circuit],
+        job_id, results = ex.execute_circuits(
                 circuits = circuits,
                 num_shots = num_shots,
                 gpus_per_circuit = gpus_per_circuit
