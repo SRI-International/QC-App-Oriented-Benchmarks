@@ -203,6 +203,9 @@ class ExecutionResult:
         self._counts = counts
 
     def get_counts(self, qc=None):
+        # Support integer index into the counts list (matches native Qiskit Result API)
+        if isinstance(qc, int) and isinstance(self._counts, list):
+            return self._counts[qc]
         return self._counts
 
 # Backward compatibility aliases
@@ -937,18 +940,33 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     return (job_id, results)
 
 
-def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=None):
+def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=None, num_shots=None):
     """
     Map batch results back to individual circuits. For each circuit:
     wraps counts in ExecutionResult, calls result_handler, stores timing
     and job_id.
 
     Args:
-        circuits_info: list of dicts with keys "qc", "group", "circuit", "shots"
+        circuits_info: either:
+            - list of dicts with keys "qc", "group", "circuit", "shots"
+            - nested dict {group: {circuit_id: qc}} from get_circuits()
         results: result object with get_counts() returning list or dict.
         job_id: job identifier (stored per circuit in metrics)
         elapsed_time: wall-clock seconds for the batch (stored per circuit)
+        num_shots: shots per circuit (used when circuits_info is a nested dict)
     """
+
+    # If circuits_info is a nested dict {group: {circuit_id: qc}}, flatten it
+    if isinstance(circuits_info, dict):
+        flat_info = []
+        for group_id, group_circuits in circuits_info.items():
+            if isinstance(group_circuits, dict):
+                for circuit_id, qc in group_circuits.items():
+                    flat_info.append({
+                        "qc": qc, "group": str(group_id),
+                        "circuit": str(circuit_id), "shots": num_shots or 0
+                    })
+        circuits_info = flat_info
 
     if verbose:
         print(f"... process_circuit_results({len(circuits_info)}, job_id={job_id})")
