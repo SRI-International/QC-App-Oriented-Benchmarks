@@ -848,53 +848,23 @@ def execute_circuits_immed(
     """
     Execute a list of circuits on the given backend with the given number of shots.
 
+    DEPRECATED: This function now delegates to execute_circuits().
+    Kept for backward compatibility with existing callers (hamlib execute_enhanced).
+
     Args:
         backend_id: Backend identifier (currently unused for cudaq)
         circuits: List of [kernel, params] circuit tuples
         num_shots: Number of shots per circuit
         gpus_per_circuit: Number of GPUs to pool per circuit.
-            None = use all available GPUs together (mgpu if MPI, single GPU if not).
-            1 = each GPU runs one circuit independently (max parallelism, requires MPI).
-            M = M GPUs pool per circuit, P/M circuits in parallel (requires MPI, not yet implemented).
 
     Returns:
         ExecutionResult object with get_counts() method
     """
 
     if verbose:
-        print(f"... execute_circuits_immed({backend_id}, {len(circuits)}, {num_shots}, gpus_per_circuit={gpus_per_circuit})")
+        print(f"... execute_circuits_immed({backend_id}, {len(circuits)}, {num_shots}, gpus_per_circuit={gpus_per_circuit}) -> delegating to execute_circuits()")
 
-    # Handle empty case
-    if not circuits or len(circuits) == 0:
-        return ExecutionResult([])
-
-    counts_array = None
-
-    # Determine execution strategy based on gpus_per_circuit
-    if gpus_per_circuit is not None and mpi.enabled() and mpi.size > 1:
-        if gpus_per_circuit == 1:
-            # Mode 3: each GPU runs one circuit independently (max parallelism)
-            counts_array = _execute_parallel_mpi(circuits, num_shots)
-            # Returns None if MPI not available or only 1 rank - fall through to sequential
-        elif gpus_per_circuit < mpi.size:
-            # Mode 4: hybrid — M GPUs pool per circuit, P/M circuits in parallel
-            # TODO: Developer adds _execute_parallel_hybrid(circuits, num_shots, gpus_per_circuit)
-            if mpi.rank == 0:
-                print(f"... WARNING: gpus_per_circuit={gpus_per_circuit} (hybrid mode) not yet implemented, using default execution")
-        # else gpus_per_circuit >= mpi.size: same as default, use all GPUs together
-
-    # Default: sequential/mgpu execution
-    # When MPI is enabled, this uses mgpu mode (set in set_execution_target)
-    # for state vector distribution - all ranks participate in each circuit execution.
-    # When MPI is not enabled, this runs on a single GPU.
-    if counts_array is None:
-        counts_array = []
-        for circuit in circuits:
-            result = execute_circuit_immed(circuit, num_shots)
-            counts_array.append(result.get_counts())
-
-    # Construct a normalized result object with counts structure to match circuits
-    results = ExecutionResult(counts_array)
+    job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
 
     return results
 
