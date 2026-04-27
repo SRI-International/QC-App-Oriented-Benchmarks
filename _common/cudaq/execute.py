@@ -990,6 +990,11 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
                     })
         circuits_info = flat_info
 
+    # Guard against None or missing results (e.g. job timeout or cancellation)
+    if results is None:
+        print("WARNING: No results to process (execution may have failed)")
+        return
+
     if verbose:
         print(f"... process_circuit_results({len(circuits_info)}, job_id={job_id})")
 
