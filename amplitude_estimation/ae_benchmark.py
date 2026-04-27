@@ -102,6 +102,7 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, get_circuits=False,
+        max_batch_size=None,
         draw_circuits=True, plot_results=True):
 
     # Configure the QED-C Benchmark package for use with the given API
@@ -151,14 +152,10 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
-        all_qcs = {}
-
     ##########
 
-    # Execute Benchmark Program N times for multiple circuit sizes
-    # Accumulate metrics asynchronously as circuits complete
+    # Build all circuits into a dict
+    all_qcs = {}
     for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
 
         # reset random seed
@@ -170,11 +167,8 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_counting_qubits), max_circuits)
 
-        if not get_circuits:
-            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
-        else:
-            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
-            all_qcs[str(num_qubits)] = {}
+        print(f"************\n{'Creating' if get_circuits else 'Executing'} [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        all_qcs[str(num_qubits)] = {}
         if verbose:
             print(f"              with num_state_qubits = {num_state_qubits}  num_counting_qubits = {num_counting_qubits}")
 
@@ -192,33 +186,24 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 
             # create the circuit for given qubit size and secret string, store time metric
             ts = time.time()
-
             a_ = a_from_s_int(s_int, num_counting_qubits)
-
             qc = kernel.AmplitudeEstimation(num_state_qubits, num_counting_qubits, a_)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
-
-            # If we only want the circuits:
-            if get_circuits:
-                all_qcs[str(num_qubits)][str(circuit_id)] = qc
-                continue
 
             # collapse the 3 sub-circuit levels used in this benchmark (for qiskit)
             qc2 = qc.decompose().decompose().decompose()
 
-            # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, num_qubits, circuit_id, num_shots)
-
-        # Wait for some active circuits to complete; report metrics when groups complete
-        ex.throttle_execution(metrics.finalize_group)
+            all_qcs[str(num_qubits)][str(circuit_id)] = qc2
 
     # Early return if we just want the circuits
     if get_circuits:
         print(f"************\nReturning circuits and circuit information")
         return all_qcs, metrics.circuit_metrics
 
-    # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)
+    # Compute circuit metrics, execute as array, and process results
+    ex.compute_all_circuit_metrics(all_qcs)
+    ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+    metrics.finalize_all_groups()
 
     ##########
 
@@ -247,6 +232,7 @@ def get_args():
     parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)
     parser.add_argument("--num_state_qubits", "-nsq", default=1, help="Number of State Qubits", type=int)
+    parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
@@ -270,5 +256,6 @@ if __name__ == '__main__':
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
         api=args.api,
+        max_batch_size=args.max_batch_size,
         draw_circuits=not args.nodraw, plot_results=not args.noplot
         )

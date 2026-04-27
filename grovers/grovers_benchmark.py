@@ -72,6 +72,7 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, get_circuits=False,
+        max_batch_size=None,
         draw_circuits=True, plot_results=True):
 
     # Configure the QED-C Benchmark package for use with the given API
@@ -79,41 +80,35 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
     import grovers_kernel as kernel
     import execute as ex
 
-    mpi.init()
-    
     ##########
-    
+
     print(f"{benchmark_name} Benchmark Program - Qiskit")
 
     # create context identifier
     if context is None: context = f"{benchmark_name} Benchmark"
-    
+
     # special argument handling
     ex.verbose = verbose
-    
+
     # Clamp the maximum number of qubits
     if max_qubits > MAX_QUBITS:
         print(f"INFO: {benchmark_name} benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
         max_qubits = MAX_QUBITS
-        
+
     # validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
     skip_qubits = max(1, skip_qubits)
     #print(f"min, max qubits = {min_qubits} {max_qubits}")
-    
+
     # set the flag to use an mcx shim if given
     if use_mcx_shim:
         print("... using MCX shim")
-    
+
     ##########
-    
+
     # Initialize metrics module
     metrics.init_metrics()
-
-    # Variable to store all created circuits to return
-    if get_circuits:
-        all_qcs = {}
 
     # Define custom result handler
     def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
@@ -130,21 +125,17 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
             context=context)
 
     ##########
-    
-    # Execute Benchmark Program N times for multiple circuit sizes
-    # Accumulate metrics asynchronously as circuits complete
+
+    # Build all circuits into a dict
+    all_qcs = {}
     for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
-        
+
         # determine number of circuits to execute for this group
         num_circuits = min(2 ** (num_qubits), max_circuits)
 
-        if not get_circuits:
-            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
-        else:
-            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
-            # Initialize dictionary to store circuits for this qubit group. 
-            all_qcs[str(num_qubits)] = {}
-        
+        print(f"************\n{'Creating' if get_circuits else 'Executing'} [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        all_qcs[str(num_qubits)] = {}
+
         # determine range of secret strings to loop over
         if 2**(num_qubits) <= max_circuits:
             s_range = list(range(num_circuits))
@@ -152,7 +143,7 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
             # create selection larger than needed and remove duplicates (faster than random.choice())
             s_range = np.random.randint(1, 2**(num_qubits), num_circuits + 10)
             s_range = list(set(s_range))[0:max_circuits]
-        
+
         # loop over limited # of secret strings for this
         for s_int in s_range:
 
@@ -160,33 +151,22 @@ def run(min_qubits=2, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=100
             circuit_id = s_int
 
             # create the circuit for given qubit size and secret string, store time metric
-            mpi.barrier()
             ts = time.time()
-
             n_iterations = int(np.pi * np.sqrt(2 ** num_qubits) / 4)
-
             qc = kernel.GroversSearch(num_qubits, s_int, n_iterations, use_mcx_shim)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
-            # Store each circuit if we want to return them
-            if get_circuits:
-                all_qcs[str(num_qubits)][str(circuit_id)] = qc
-                # Continue to skip sumbitting the circuit for execution.
-                continue
+            all_qcs[str(num_qubits)][str(circuit_id)] = qc
 
-            # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
-        
-        # Wait for some active circuits to complete; report metrics when groups complete
-        ex.throttle_execution(metrics.finalize_group)
-    
     # Early return if we want the circuits and creation information
     if get_circuits:
         print(f"************\nReturning circuits and circuit information")
         return all_qcs, metrics.circuit_metrics
-    
-    # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)
+
+    # Compute circuit metrics, execute as array, and process results
+    ex.compute_all_circuit_metrics(all_qcs)
+    ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+    metrics.finalize_all_groups()
     
     ##########
     
@@ -219,6 +199,7 @@ def get_args():
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     #parser.add_argument("--input_value", "-i", default=None, help="Fixed Input Value", type=int)
     parser.add_argument("--use_mcx_shim", action="store_true", help="Use MCX Shim")
+    parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
@@ -244,5 +225,6 @@ if __name__ == '__main__':
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
         api=args.api,
+        max_batch_size=args.max_batch_size,
         draw_circuits=not args.nodraw, plot_results=not args.noplot
         )
