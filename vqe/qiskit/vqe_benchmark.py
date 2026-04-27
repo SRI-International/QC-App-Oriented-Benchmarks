@@ -324,6 +324,7 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, get_circuits=False,
+        max_batch_size=None,
         draw_circuits=True, plot_results=True):
 
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit") 
@@ -381,14 +382,10 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
-        all_qcs = {}
-
     ##########
 
-    # Execute Benchmark Program N times for multiple circuit sizes
-    # Accumulate metrics asynchronously as circuits complete
+    # Build all circuits into a dict
+    all_qcs = {}
     for input_size in range(min_qubits, max_qubits + 1, 2):
 
         # reset random seed
@@ -409,7 +406,7 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
         # create the circuit for given qubit size and simulation parameters, store time metric
         ts = time.time()
 
-        # circuit list 
+        # circuit list
         qc_list = []
 
         # Method 1 (default)
@@ -417,11 +414,11 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             # loop over circuits
             for circuit_id in range(num_circuits):
 
-                # construct circuit 
-                qc_single = VQEEnergy(num_qubits, na, nb, circuit_id, method)               
-                qc_single.name = qc_single.name + " " + str(circuit_id) 
+                # construct circuit
+                qc_single = VQEEnergy(num_qubits, na, nb, circuit_id, method)
+                qc_single.name = qc_single.name + " " + str(circuit_id)
 
-                # add to list 
+                # add to list
                 qc_list.append(qc_single)
         # method 2
         elif method == 2:
@@ -429,11 +426,8 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             # construct all circuits
             qc_list = VQEEnergy(num_qubits, na, nb, 0, method)
 
-        if not get_circuits:
-            print(f"************\nExecuting [{len(qc_list)}] circuits with num_qubits = {num_qubits}")
-        else:
-            print(f"************\nCreating [{len(qc_list)}] circuits with num_qubits = {num_qubits}")
-            all_qcs[str(num_qubits)] = {}
+        print(f"************\n{'Creating' if get_circuits else 'Executing'} [{len(qc_list)}] circuits with num_qubits = {num_qubits}")
+        all_qcs[str(num_qubits)] = {}
 
         for qc in qc_list:
 
@@ -446,27 +440,20 @@ def run(min_qubits=4, max_qubits=8, skip_qubits=1,
             # record creation time
             metrics.store_metric(input_size, circuit_id, 'create_time', time.time() - ts)
 
-            # If we only want the circuits:
-            if get_circuits:
-                all_qcs[str(num_qubits)][str(circuit_id)] = qc
-                continue
-
             # collapse the sub-circuits used in this benchmark (for qiskit)
             qc2 = qc.decompose()
 
-            # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc2, input_size, circuit_id, num_shots)
-
-        # Wait for some active circuits to complete; report metrics when group complete
-        ex.throttle_execution(metrics.finalize_group)
+            all_qcs[str(num_qubits)][str(circuit_id)] = qc2
 
     # Early return if we just want the circuits
     if get_circuits:
         print(f"************\nReturning circuits and circuit information")
         return all_qcs, metrics.circuit_metrics
 
-    # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)
+    # Compute circuit metrics, execute as array, and process results
+    ex.compute_all_circuit_metrics(all_qcs)
+    ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+    metrics.finalize_all_groups()
 
     ##########
 

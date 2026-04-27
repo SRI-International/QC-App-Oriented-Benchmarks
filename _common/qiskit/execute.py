@@ -1780,33 +1780,42 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     # Standard execution paths — always pass array
 
     try:
-        # Transpile circuits for the target backend
-        # Skip transpilation for simulators — they accept any gate set natively
-        if backend_name.endswith("qasm_simulator") or backend_name.endswith("aer_simulator"):
-            trans_qcs = circuits
-        else:
+        # Execute on appropriate path
+        if sampler is not None:
+            # Sampler path (IBM Runtime, StatevectorSampler, AerSampler)
             trans_qcs = transpile(circuits, backend,
                 optimization_level=optimization_level,
                 layout_method=layout_method,
                 routing_method=routing_method)
-
-        # Statevector simulator: remove final measurements
-        if backend_name.lower() == "statevector_simulator":
-            trans_qcs = [qc.remove_final_measurements(inplace=False) for qc in trans_qcs]
-
-        # Execute on appropriate path
-        if sampler is not None:
-            # Sampler path (IBM Runtime, StatevectorSampler, AerSampler)
             job = sampler.run(trans_qcs, shots=num_shots)
 
-        elif this_noise is not None and backend_name.endswith("qasm_simulator"):
-            # Noisy simulator path
+        elif this_noise is not None and not sampler and backend_name.endswith("qasm_simulator"):
+            # Noisy simulator path — transpile with noise model's basis gates
+            trans_qcs = transpile(circuits, backend,
+                basis_gates=this_noise.basis_gates)
+
+            # Copy noise model QV to metrics if available
+            if hasattr(this_noise, "QV"):
+                metrics.QV = this_noise.QV
+
+            # Remove noise_model from opts if present (passed explicitly to backend.run)
+            opts.pop("noise_model", None)
+
             job = backend.run(trans_qcs, shots=num_shots,
                 noise_model=this_noise, basis_gates=this_noise.basis_gates,
                 **opts)
 
         else:
-            # Straight backend (hardware, cloud, or noiseless simulator)
+            # All other backends and noiseless simulator
+            trans_qcs = transpile(circuits, backend,
+                optimization_level=optimization_level,
+                layout_method=layout_method,
+                routing_method=routing_method)
+
+            # Statevector simulator: remove final measurements
+            if backend_name.lower() == "statevector_simulator":
+                trans_qcs = [qc.remove_final_measurements(inplace=False) for qc in trans_qcs]
+
             job = backend.run(trans_qcs, shots=num_shots, **opts)
 
     except Exception as e:
