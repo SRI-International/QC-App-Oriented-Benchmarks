@@ -165,6 +165,7 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
         backend_id: str = None, provider_backend = None,
         hub: str = "ibm-q", group: str = "open", project: str = "main", exec_options = None,
         context = None, api = None, get_circuits=False,
+        max_batch_size=None,
         draw_circuits=True, plot_results=True):
     """
     Execute program with default parameters.
@@ -197,58 +198,43 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
     import hamiltonian_simulation_kernel as kernel
     import execute as ex
 
-    mpi.init()
-    
     ##########
-    
+
     print(f"{benchmark_name} Benchmark Program - Qiskit")
-    
+
     # Create context identifier
     if context is None: context = f"{benchmark_name} Benchmark"
-    
+
     # special argument handling
     ex.verbose = verbose
-        
+
     # Validate parameters (smallest circuit is 2 qubits)
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
     #if min_qubits % 2 == 1: min_qubits += 1  # min_qubits must be even (DEVNOTE: why? comment out for now)
     skip_qubits = max(1, skip_qubits)
-    
+
     # check for valid Hamiltonian name
     if not (hamiltonian == "heisenberg" or hamiltonian == "tfim"):
         print(f"ERROR: invalid Hamiltonian name: {hamiltonian}")
         return
-    
+
     # set the initial method if no initial state argument is given by user.
     if init_state == None:
-        if hamiltonian == "tfim": 
+        if hamiltonian == "tfim":
             init_state = "ghz"
         else:
             init_state = "checkerboard"
-                
+
     # Set the flag to use an XX YY ZZ shim if given
     if use_XX_YY_ZZ_gates:
         print("... using unoptimized XX YY ZZ gates")
-        
+
     print(f"... using init_state = {init_state}")
     print(f"... using random_pauli_flag = {random_pauli_flag}")
-    
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
-        all_qcs = {}
-        
-    # Parameters of simulation (note used yet, since we use hardcoded data for comparison)
-    """
-    if K is None:
-        K = 5
-        
-    if t is None:
-        t = 1.0
-    """
-    
+
     ################################
-    
+
     # Initialize metrics module
     metrics.init_metrics()
 
@@ -267,10 +253,10 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
-    # Execute Benchmark Program N times for multiple circuit sizes
-    # Accumulate metrics asynchronously as circuits complete
-    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):   
-          
+    # Build all circuits into a dict
+    all_qcs = {}
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+
         # since method 1 and 2 use pre-calculated data, cannot go above 12 qubits
         if method == 1 or method == 2:
             if num_qubits > MAX_QUBITS_CLASSICAL:
@@ -282,13 +268,9 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
 
         # Determine number of circuits to execute for this group
         num_circuits = max(1, max_circuits)
-        
-        if not get_circuits:
-            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
-        else:
-            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
-            # Initialize dictionary to store circuits for this qubit group. 
-            all_qcs[str(num_qubits)] = {}
+
+        print(f"************\n{'Creating' if get_circuits else 'Executing'} [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        all_qcs[str(num_qubits)] = {}
 
         # Parameters of simulation
         #### CANNOT BE MODIFIED W/O ALSO MODIFYING PRECALCULATED DATA #########
@@ -298,46 +280,37 @@ def run(min_qubits: int = 2, max_qubits: int = 8, max_circuits: int = 3,
                # But a large Trotter order also means the circuit is deeper.
                # For ideal or noise-less quantum circuits, k >> 1 gives perfect Hamiltonian simulation.
         t = precalculated_data['t']  # Time of simulation
-        
+
         # Precalculated random numbers between [-1, 1]
         hx = precalculated_data['hx'][:num_qubits]
         hz = precalculated_data['hz'][:num_qubits]
-        
+
         #######################################################################
 
-        # Loop over only 1 circuit
+        # Loop over circuits
         for circuit_id in range(num_circuits):
-            mpi.barrier()
             ts = time.time()
 
             # Create Heisenberg kernel or TFIM kernel
             qc = kernel.HamiltonianSimulation(num_qubits, K=k, t=t,
                     hamiltonian=hamiltonian,
-                    w=w, hx = hx, hz = hz, 
+                    w=w, hx = hx, hz = hz,
                     use_XX_YY_ZZ_gates = use_XX_YY_ZZ_gates,
                     method = method, random_pauli_flag = random_pauli_flag)
-                    
-            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
-            
-            # If we only want the circuits:
-            if get_circuits:    
-                all_qcs[str(num_qubits)][str(circuit_id)] = qc
-                # Continue to skip sumbitting the circuit for execution. 
-                continue
 
-            # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
-            ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
-        
-        # Wait for some active circuits to complete; report metrics when groups complete
-        ex.throttle_execution(metrics.finalize_group)
-    
+            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+
+            all_qcs[str(num_qubits)][str(circuit_id)] = qc
+
     # Early return if we just want the circuits
     if get_circuits:
         print(f"************\nReturning circuits and circuit information")
         return all_qcs, metrics.circuit_metrics
-        
-    # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)
+
+    # Compute circuit metrics, execute as array, and process results
+    ex.compute_all_circuit_metrics(all_qcs)
+    ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+    metrics.finalize_all_groups()
 
     ##########
     
@@ -372,6 +345,7 @@ def get_args():
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--use_XX_YY_ZZ_gates", action="store_true", help="Use explicit XX, YY, ZZ gates")
     #parser.add_argument("--theta", default=0.0, help="Input Theta Value", type=float)
+    parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="random pauli flag")
@@ -407,5 +381,6 @@ if __name__ == '__main__':
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else {},
         api=args.api,
+        max_batch_size=args.max_batch_size,
         draw_circuits=not args.nodraw, plot_results=not args.noplot
         )
