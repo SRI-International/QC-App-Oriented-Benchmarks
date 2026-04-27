@@ -44,6 +44,7 @@ from qiskit_aer.noise import depolarizing_error, reset_error
 
 # QED-C modules
 from _common import metrics
+from _common import qcb_mpi as mpi
 
 ##########################
 # JOB MANAGEMENT VARIABLES 
@@ -311,6 +312,9 @@ def set_execution_target(backend_id='qasm_simulator',
     global session_count
     global use_m3
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
+
+    # Initialize MPI if available (no-op if already initialized or not loaded)
+    mpi.init()
 
     # default to qasm_simulator if None passed in
     if backend_id == None:

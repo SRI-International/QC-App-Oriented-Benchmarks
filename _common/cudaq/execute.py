@@ -260,8 +260,11 @@ def set_execution_target(backend_id=None, provider_backend=None,
     set_execution_target(backend_id='aqt_qasm_simulator', 
                         provider_backende=aqt.backends.aqt_qasm_simulator)
     """
-    global backend   
-    
+    global backend
+
+    # Initialize MPI if available (no-op if already initialized or not loaded)
+    mpi.init()
+
     # in case anyone uses a name similar to that used in other APIs
     if backend_id == "cudaq_simulator":
         backend_id = None
@@ -922,6 +925,9 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         counts_array = []
         for circuit in circuits:
             try:
+                # Synchronize MPI ranks before each circuit execution
+                mpi.barrier()
+
                 if noise is None:
                     result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
                 else:
