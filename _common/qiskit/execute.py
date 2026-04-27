@@ -846,6 +846,23 @@ def compute_and_store_circuit_info(
     store_circuit_metrics(group_id, circuit_id, metrics_values)
 
 
+def compute_all_circuit_metrics(circuits, do_transpile_metrics=True, use_normalized_depth=True):
+    """Compute and store circuit metrics for all circuits in a nested dict.
+
+    Args:
+        circuits: nested dict {group: {circuit_id: qc}} from get_circuits()
+        do_transpile_metrics: if True, compute transpiled depth metrics (expensive)
+        use_normalized_depth: if True, use normalized basis for depth (requires transpile)
+    """
+    for group_id in circuits:
+        if not isinstance(circuits[group_id], dict):
+            continue
+        for circuit_id in circuits[group_id]:
+            compute_and_store_circuit_info(circuits[group_id][circuit_id],
+                                          str(group_id), str(circuit_id),
+                                          do_transpile_metrics, use_normalized_depth)
+
+
 # Compute circuit metrics (algorithmic + optionally normalized) and return as a tuple.
 # Does not store to metrics table — caller decides when to store.
 def compute_circuit_metrics(qc, do_transpile_metrics=True, use_normalized_depth=True):
