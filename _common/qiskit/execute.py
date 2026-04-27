@@ -1919,26 +1919,38 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
                 if verbose: print(traceback.format_exc())
 
 
-def submit_circuits(circuits_info, num_shots=100, max_batch_size=None, batch_by_group=False):
+def submit_circuits(circuits, metadata=None, num_shots=100, max_batch_size=None, batch_by_group=False):
     """
-    Convenience: compute metrics + execute in batches + process results.
+    Execute a dict of circuit arrays and store execution metrics.
+
+    Assumes circuit depth metrics have already been computed (via compute_and_store_circuit_info)
+    if desired. This function handles execution and timing only.
 
     Args:
-        circuits_info: list of dicts with "qc", "group", "circuit", "shots"
-        num_shots: default shots
+        circuits: nested dict {group: {circuit_id: qc}} from get_circuits()
+        metadata: nested dict for storing execution timing metrics (elapsed_time, exec_time,
+                  job_id). Typically metrics.circuit_metrics. If None, timing not stored.
+        num_shots: shots per circuit
         max_batch_size: max circuits per batch (None = no limit)
         batch_by_group: if True, batch boundaries align with group changes.
                         If False (default), batch by max_batch_size only.
     """
 
-    if verbose:
-        print(f"... submit_circuits({len(circuits_info)}, max_batch={max_batch_size}, by_group={batch_by_group})")
+    # Flatten circuits dict to ordered list for execution
+    circuits_info = []
+    for group_id in circuits:
+        if not isinstance(circuits[group_id], dict):
+            continue
+        for circuit_id in circuits[group_id]:
+            circuits_info.append({
+                "qc": circuits[group_id][circuit_id],
+                "group": str(group_id),
+                "circuit": str(circuit_id),
+                "shots": num_shots
+            })
 
-    # Compute metrics for each circuit
-    # compute_and_store_circuit_info handles both algorithmic and normalized depth
-    # based on the do_transpile_metrics and use_normalized_depth module globals
-    for ci in circuits_info:
-        compute_and_store_circuit_info(ci["qc"], ci["group"], ci["circuit"])
+    if verbose:
+        print(f"... submit_circuits({len(circuits_info)} circuits, max_batch={max_batch_size}, by_group={batch_by_group})")
 
     if batch_by_group:
         # Group circuits by their "group" key, execute one group at a time

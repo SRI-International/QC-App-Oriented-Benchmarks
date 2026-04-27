@@ -42,6 +42,15 @@ def create_circuits_info(num_circuits=3, num_qubits=2, num_shots=100):
     return circuits_info
 
 
+def create_circuits_dict(num_circuits=3, num_qubits=2):
+    """Create a nested dict {group: {circuit_id: qc}} for testing submit_circuits."""
+    circuits = {}
+    circuits[str(num_qubits)] = {}
+    for i in range(num_circuits):
+        circuits[str(num_qubits)][str(i)] = create_bell_circuit(num_qubits)
+    return circuits
+
+
 # Track result_handler calls for verification
 handler_calls = []
 
@@ -169,7 +178,7 @@ def test_process_circuit_results_timing():
 
 
 def test_submit_circuits_end_to_end():
-    """Test: submit_circuits computes metrics, executes, and processes results."""
+    """Test: submit_circuits executes and processes results with nested dict input."""
     print("\n=== test_submit_circuits_end_to_end ===")
 
     handler_calls.clear()
@@ -178,17 +187,15 @@ def test_submit_circuits_end_to_end():
     ex.init_execution(test_result_handler)
     ex.set_execution_target('qasm_simulator')
 
-    circuits_info = create_circuits_info(num_circuits=4)
-    ex.submit_circuits(circuits_info, num_shots=100)
+    circuits = create_circuits_dict(num_circuits=4)
+    ex.submit_circuits(circuits, num_shots=100)
 
     assert len(handler_calls) == 4, f"Expected 4 handler calls, got {len(handler_calls)}"
 
-    # Check that circuit metrics were computed and stored
-    for ci in circuits_info:
-        g, c = ci["group"], ci["circuit"]
-        cm = metrics.circuit_metrics.get(g, {}).get(c, {})
-        assert "depth" in cm, f"depth not stored for {g}/{c}"
-        assert "elapsed_time" in cm, f"elapsed_time not stored for {g}/{c}"
+    # Check that elapsed_time was stored
+    for cid in circuits["2"]:
+        cm = metrics.circuit_metrics.get("2", {}).get(cid, {})
+        assert "elapsed_time" in cm, f"elapsed_time not stored for 2/{cid}"
 
     print(f"  PASS: end-to-end submit_circuits, {len(handler_calls)} circuits processed")
 
@@ -203,16 +210,15 @@ def test_submit_circuits_max_batch_size():
     ex.init_execution(test_result_handler)
     ex.set_execution_target('qasm_simulator')
 
-    circuits_info = create_circuits_info(num_circuits=6)
-    ex.submit_circuits(circuits_info, num_shots=100, max_batch_size=2)
+    circuits = create_circuits_dict(num_circuits=6)
+    ex.submit_circuits(circuits, num_shots=100, max_batch_size=2)
 
     assert len(handler_calls) == 6, f"Expected 6 handler calls, got {len(handler_calls)}"
 
-    # All circuits should have metrics
-    for ci in circuits_info:
-        g, c = ci["group"], ci["circuit"]
-        cm = metrics.circuit_metrics.get(g, {}).get(c, {})
-        assert "elapsed_time" in cm, f"elapsed_time not stored for {g}/{c}"
+    # All circuits should have timing
+    for cid in circuits["2"]:
+        cm = metrics.circuit_metrics.get("2", {}).get(cid, {})
+        assert "elapsed_time" in cm, f"elapsed_time not stored for 2/{cid}"
 
     print(f"  PASS: max_batch_size=2, all 6 circuits processed in 3 batches")
 
@@ -228,16 +234,13 @@ def test_submit_circuits_batch_by_group():
     ex.set_execution_target('qasm_simulator')
 
     # Create circuits from 2 different groups (qubit widths)
-    circuits_info = []
+    circuits = {}
     for num_qubits in [2, 3]:
+        circuits[str(num_qubits)] = {}
         for i in range(3):
-            qc = create_bell_circuit(num_qubits)
-            circuits_info.append({
-                "qc": qc, "group": str(num_qubits),
-                "circuit": str(i), "shots": 100
-            })
+            circuits[str(num_qubits)][str(i)] = create_bell_circuit(num_qubits)
 
-    ex.submit_circuits(circuits_info, num_shots=100, batch_by_group=True)
+    ex.submit_circuits(circuits, num_shots=100, batch_by_group=True)
 
     assert len(handler_calls) == 6, f"Expected 6 handler calls, got {len(handler_calls)}"
 

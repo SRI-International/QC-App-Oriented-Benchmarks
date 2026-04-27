@@ -213,6 +213,14 @@ def end_metrics():
     print(f'... execution complete at {get_timestr()} in {total_run_time} secs')
     print("")
 
+def finalize_all_groups():
+    """Finalize all groups and end metrics collection."""
+    for group in list(circuit_metrics.keys()):
+        if group == "subtitle":
+            continue
+        finalize_group(group)
+    end_metrics()
+
 ##################################################
 # METRICS STORE AND GET FUNCTIONS
 
