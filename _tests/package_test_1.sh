@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Navigate to the benchmark root (parent of _tests)
+# Navigate to the benchmark root (parent of _tests), remember where we started
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+ORIG_DIR="$(pwd)"
 cd "$SCRIPT_DIR/.."
 
 # Args:
@@ -66,3 +67,6 @@ echo "... run at top level ..."
 # ----- run at top level as a module -----
 echo "... run at top level as a module"
 "$PYTHON" -m "${folder}.${bmname}" -nop -nod $extra_args
+
+# Return to where we started
+cd "$ORIG_DIR"
