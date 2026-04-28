@@ -1309,6 +1309,7 @@ def run(
     train_size:int = 200,
     get_circuits=False,
     draw_circuits=True,
+    max_batch_size=0,
 ):
     """
     Parameters
@@ -1475,9 +1476,7 @@ def run(
         saved_result = result
 
     # Initialize execution module using the execution result handler above and specified backend_id
-    # for method=2 we need to set max_jobs_active to 1, so each circuit completes before continuing
     if method == 2 or method == 3:
-        ex.max_jobs_active = 1
         ex.init_execution(execution_handler2)
     else:
         ex.init_execution(execution_handler)
@@ -1502,8 +1501,8 @@ def run(
         print(f"WARNING: get_circuits is not supported for method {method}")
         return None
 
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
+    # Variable to store all created circuits for array execution (method 1)
+    if method == 1:
         all_qcs = {}
 
     # dictionary to store the thetas_array for each qubit size
@@ -1522,7 +1521,7 @@ def run(
                 print(f"************\nExecuting [1] circuit for num_qubits = {num_qubits}")
             else:
                 print(f"************\nCreating [1] circuit for num_qubits = {num_qubits}")
-                all_qcs[str(num_qubits)] = {}
+            all_qcs[str(num_qubits)] = {}
         else:
             print(f"************\nExecuting [{ansatz_type}] circuit for num_qubits = {num_qubits}")
 
@@ -1585,26 +1584,16 @@ def run(
                     x_data=data_point
                     )
 
-                # bind parameters to circuit before execution
-                # if parameterized:
-                #     qc.assign_parameters(params)
-            
-                # submit circuit for execution on target with the current parameters
-                ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
+                # bind parameters before execution
+                if params is not None:
+                    qc = qc.assign_parameters(params)
 
-                # wait for circuit to complete by calling finalize  ...
-                # finalize execution of group (each circuit in loop accumulates metrics)
-                ex.finalize_execution(None, report_end=False)
+                # compute and store circuit metrics (depth, etc.)
+                ex.compute_and_store_circuit_info(qc, str(num_qubits), str(unique_id))
 
-                # after first execution and thereafter, no need for transpilation if parameterized
-                # DEVNOTE: this can be removed or commented, not used currently
-                if parameterized:
-                    # DEVNOTE: since we gen multipl circuits in this loop, and execute.py can only
-                    # cache 1 at a time, we cannot yet implement caching.  Transpile every time.
-                    cached_circuits = False
-                    if cached_circuits:
-                        ex.set_transpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                        logger.info("  **** First execution complete, disabling transpile")
+                # execute single circuit synchronously via submit_circuits
+                one_circuit = {str(num_qubits): {str(unique_id): qc}}
+                ex.submit_circuits(one_circuit, num_shots=num_shots)
 
                 # result array stores the multiple results we measure along different Pauli basis.
                 global saved_result
@@ -1806,28 +1795,25 @@ def run(
             # store the creation time for these circuits
             metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
 
-            # If we only want the circuits:
-            if get_circuits:
-                all_qcs[str(num_qubits)][str(instance_num)] = qc
-                continue
-
             # classically pre-compute and cache an array of expected measurement counts
             # for comparison against actual measured counts for fidelity calc (in analysis)
-
             if do_compute_expectation:
                 logger.info("Computing expectation")
 
                 # pass parameters as they are used during execution
                 compute_expectation(qc, num_qubits, instance_num, params=params)
 
-            # submit circuit for execution on target, with parameters
-            ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
-            ex.finalize_execution(None, report_end=False)
+            # bind parameters before storing (execute_circuits doesn't handle params)
+            if params is not None:
+                qc = qc.assign_parameters(params)
+
+            # store circuit for later execution
+            all_qcs[str(num_qubits)][str(instance_num)] = qc
         
 
         ###############
         elif method == 2:
-            logger.info("===============  Begin method 2 loop, enabling transpile")
+            logger.info("===============  Begin method 2 loop")
 
             # create batch from scaled data
             indices = np.random.choice(len(x_train_scaled), size=batch_size, replace=False)
@@ -1847,9 +1833,6 @@ def run(
             # Set iteration loss and accuracy to empty lists
             loss_this_iter = []
             accuracy_this_iter = []
-
-            # Always start by enabling transpile ...
-            ex.set_transpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
 
             # dictionary to store the thetas_array for each batch
             thetas_array_batch = {} 
@@ -1958,11 +1941,11 @@ def run(
         print(f"************\nReturning circuits and circuit information")
         return all_qcs, metrics.circuit_metrics
 
-    # Wait for some active circuits to complete; report metrics when groups complete
-    ex.throttle_execution(metrics.finalize_group)
-
-    # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)
+    # For method 1: compute metrics, execute as array, and finalize
+    if method == 1:
+        ex.compute_all_circuit_metrics(all_qcs)
+        ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+        metrics.finalize_all_groups()
 
     # print a sample circuit
     if draw_circuits and print_sample_circuit:
