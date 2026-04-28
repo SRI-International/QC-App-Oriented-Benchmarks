@@ -652,6 +652,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, get_circuits=False,
+        max_batch_size=None,
         draw_circuits=True, plot_results=True):  
 
     # we must have at least 4 qubits and min must be less than max
@@ -697,6 +698,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=1, max_circuits=3, num_shots=10
             backend_id=backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context, api=api, get_circuits=get_circuits,
+            max_batch_size=max_batch_size,
             draw_circuits=draw_circuits, plot_results=plot_results)
 
 
@@ -711,6 +713,7 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
         backend_id=None, provider_backend=None,
         hub="ibm-q", group="open", project="main", exec_options=None,
         context=None, api=None, get_circuits=False,
+        max_batch_size=None,
         draw_circuits=True, plot_results=True):  
     
     print(f"{benchmark_name} Benchmark Program - Qiskit")
@@ -767,57 +770,47 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
     diag_el = 0.5
     off_diag_el = -0.25
     
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
-        all_qcs = {}
-
     ##########
 
-    # Execute Benchmark Program N times for multiple circuit sizes
-    # Accumulate metrics asynchronously as circuits complete
-    #for num_input_qubits in range(min_input_qubits, max_input_qubits+1):
+    # Build all circuits into a dict
+    all_qcs = {}
     for num_input_qubits in range(min_input_qubits, max_input_qubits + 1, skip_qubits):
         N = 2**num_input_qubits # matrix size
-                    
-        for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1, skip_qubits):      
+
+        for num_clock_qubits in range(min_clock_qubits, max_clock_qubits+1, skip_qubits):
             num_qubits = 2*num_input_qubits + num_clock_qubits + 1
-        
+
             # determine number of circuits to execute for this group
             num_circuits = max_circuits
 
             # if flagged to use best input and clock for specific num_qubits, check against formula
             if use_best_widths:
                 if num_input_qubits != int((num_qubits - 1) / 3) or num_clock_qubits != (num_qubits - 1 - 2 * num_input_qubits):
-                
-                    if verbose:   
+
+                    if verbose:
                         print(f"... SKIPPING {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
                     continue
-            
+
             # skip if input or clock size smaller than minimum
             if min_register_qubits > 1 and num_input_qubits < min_register_qubits or num_clock_qubits < min_register_qubits:
                 if verbose:
                     print(f"... SKIPPING {num_circuits} circuits with {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
                 continue
-                  
-            if not get_circuits:
-                print(f"************\nExecuting {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
-            else:
-                print(f"************\nCreating {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
-                all_qcs[str(num_qubits)] = {}
+
+            print(f"************\n{'Creating' if get_circuits else 'Executing'} {num_circuits} circuits with {num_qubits} qubits, using {num_input_qubits} input qubits and {num_clock_qubits} clock qubits")
+            all_qcs[str(num_qubits)] = {}
 
             # loop over randomly generated problem instances
             for i in range(num_circuits):
 
                 # generate a non-zero value < N
-                #b = np.random.choice(range(N))           # orig code, gens 0 sometimes
                 b = np.random.choice(range(1, N))
-                
+
                 # and a non-zero index
                 off_diag_index = np.random.choice(range(1, N))
-                
+
                 # define secret_int (include 'i' since b and off_diag_index don't need to be unique)
                 s_int = 1000 * (i+1) + (2**off_diag_index)*(3**b)
-                #s_int = (2**off_diag_index)*(3**b)
 
                 # create circuit_id for use with metrics and execution framework
                 circuit_id = s_int
@@ -833,27 +826,20 @@ def run2 (min_input_qubits=1, max_input_qubits=3, skip_qubits=1,
                 qc = make_circuit(A, b, num_clock_qubits)
                 metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
 
-                # If we only want the circuits:
-                if get_circuits:
-                    all_qcs[str(num_qubits)][str(circuit_id)] = qc
-                    continue
-
                 # collapse the sub-circuits used in this benchmark (for qiskit)
                 qc2 = qc.decompose()
 
-                # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc2, num_qubits, circuit_id, shots=num_shots)
-        
-            # Wait for some active circuits to complete; report metrics when groups complete
-            ex.throttle_execution(metrics.finalize_group)
-        
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc2
+
     # Early return if we just want the circuits
     if get_circuits:
         print(f"************\nReturning circuits and circuit information")
         return all_qcs, metrics.circuit_metrics
 
-    # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)
+    # Compute circuit metrics, execute as array, and process results
+    ex.compute_all_circuit_metrics(all_qcs)
+    ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+    metrics.finalize_all_groups()
 
     ##########
 
