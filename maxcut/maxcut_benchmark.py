@@ -31,7 +31,8 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=2,
         api=None,
         _instances=None,
         get_circuits=False,
-        draw_circuits=True):
+        draw_circuits=True,
+        max_batch_size=0):
 
     # Determine which API to use
     selected_api = api if api else "qiskit"
@@ -62,6 +63,7 @@ def run(min_qubits=3, max_qubits=6, skip_qubits=2,
         _instances=_instances,
         get_circuits=get_circuits,
         draw_circuits=draw_circuits,
+        max_batch_size=max_batch_size,
     )
 
     # Add API-specific parameters
@@ -116,6 +118,7 @@ def get_args():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
+    parser.add_argument("--max_batch_size", "-mbs", default=0, help="Max batch size for circuit execution (0=no limit)", type=int)
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -133,5 +136,6 @@ if __name__ == "__main__":
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
         api=args.api,
-        draw_circuits=not args.nodraw, plot_results=not args.noplot
+        draw_circuits=not args.nodraw, plot_results=not args.noplot,
+        max_batch_size=args.max_batch_size
     )

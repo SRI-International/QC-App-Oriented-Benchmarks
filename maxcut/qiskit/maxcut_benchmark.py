@@ -920,7 +920,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
         context=None,
         _instances=None,
         get_circuits=False,
-        draw_circuits=True):
+        draw_circuits=True,
+        max_batch_size=0):
     """
     Parameters
     ----------
@@ -1095,9 +1096,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
         saved_result = result
      
     # Initialize execution module using the execution result handler above and specified backend_id
-    # for method=2 we need to set max_jobs_active to 1, so each circuit completes before continuing
     if method == 2:
-        ex.max_jobs_active = 1
         ex.init_execution(execution_handler2)
     else:
         ex.init_execution(execution_handler)
@@ -1117,8 +1116,8 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
         print(f"WARNING: get_circuits is not supported for method {method}")
         return None
 
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
+    # Variable to store all created circuits for array execution (method 1)
+    if method == 1:
         all_qcs = {}
 
     ##########
@@ -1133,7 +1132,7 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                 print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
             else:
                 print(f"************\nCreating [{max_circuits}] circuits for num_qubits = {num_qubits}")
-                all_qcs[str(num_qubits)] = {}
+            all_qcs[str(num_qubits)] = {}
         else:
             print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
         
@@ -1182,26 +1181,22 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                 qc, params = MaxCut(num_qubits, restart_ind, edges, rounds, thetas_array_0, parameterized)
                 metrics.store_metric(num_qubits, restart_ind, 'create_time', time.time()-ts)
 
-                # If we only want the circuits:
-                if get_circuits:
-                    all_qcs[str(num_qubits)][str(restart_ind)] = qc
-                    continue
-
                 # collapse the sub-circuit levels used in this benchmark (for qiskit)
                 qc2 = qc.decompose()
 
-                # submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc2, num_qubits, restart_ind, shots=num_shots, params=params)
+                # bind parameters before storing (execute_circuits doesn't handle params)
+                if params is not None:
+                    qc2 = qc2.assign_parameters(params)
+
+                # store circuit for later execution
+                all_qcs[str(num_qubits)][str(restart_ind)] = qc2
 
             if method == 2:
                 # a unique circuit index used inside the inner minimizer loop as identifier
                 minimizer_loop_index = 0 # Value of 0 corresponds to the 0th iteration of the minimizer
                 start_iters_t = time.time()
 
-                # Always start by enabling transpile ...
-                ex.set_transpilation_flags(do_transpile_metrics=True, do_transpile_for_execute=True)
-                    
-                logger.info('===============  Begin method 2 loop, enabling transpile')
+                logger.info('===============  Begin method 2 loop')
                 
                 def expectation(thetas_array):
                     
@@ -1231,17 +1226,16 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                     
                     #************************************************
                     #*** Quantum Part: Execution of Circuits ***
-                    # submit circuit for execution on target with the current parameters
-                    ex.submit_circuit(qc2, num_qubits, unique_id, shots=num_shots, params=params)
-                    
-                    # Must wait for circuit to complete
-                    #ex.throttle_execution(metrics.finalize_group)
-                    ex.finalize_execution(None, report_end=False)    # don't finalize group until all circuits done
-                    
-                    # after first execution and thereafter, no need for transpilation if parameterized
-                    if parameterized:
-                        ex.set_transpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                        logger.info('**** First execution complete, disabling transpile')
+                    # bind parameters before execution
+                    if params is not None:
+                        qc2 = qc2.assign_parameters(params)
+
+                    # compute and store circuit metrics (depth, etc.)
+                    ex.compute_and_store_circuit_info(qc2, str(num_qubits), str(unique_id))
+
+                    # execute single circuit synchronously via submit_circuits
+                    one_circuit = {str(num_qubits): {str(unique_id): qc2}}
+                    ex.submit_circuits(one_circuit, num_shots=num_shots)
                     #************************************************
                     
                     global saved_result
@@ -1301,12 +1295,6 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
                     
                     return dict_of_vals[objective_func_type]
                 
-                # after first execution and thereafter, no need for transpilation if parameterized
-                # DEVNOTE: this appears to NOT be needed, as we can turn these off after 
-                def callback(xk):
-                    if parameterized:
-                        ex.set_transpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-
                 opt_ts = time.time()
                 # perform the complete algorithm; minimizer invokes 'expectation' function iteratively
                 ##res = minimize(expectation, thetas_array, method='COBYLA', options = { 'maxiter': max_iter}, callback=callback)
@@ -1349,11 +1337,11 @@ def run (min_qubits=3, max_qubits=6, skip_qubits=2,
         print(f"************\nReturning circuits and circuit information")
         return all_qcs, metrics.circuit_metrics
 
-    # Wait for some active circuits to complete; report metrics when groups complete
-    ex.throttle_execution(metrics.finalize_group)
-
-    # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)
+    # For method 1: compute metrics, execute as array, and finalize
+    if method == 1:
+        ex.compute_all_circuit_metrics(all_qcs)
+        ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+        metrics.finalize_all_groups()
 
     ##########
     
