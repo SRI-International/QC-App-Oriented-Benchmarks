@@ -1084,6 +1084,7 @@ def run(
     context=None,
     _instances=None,
     get_circuits=False,
+    max_batch_size=None,
     draw_circuits=True,
 ):
     """
@@ -1244,7 +1245,7 @@ def run(
     # Add custom metric names to metrics module
     add_custom_metric_names()
 
-    # Define custom result handler
+    # Define custom result handler for method 1 (fidelity)
     def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # determine fidelity of result set
         num_qubits = int(num_qubits)
@@ -1252,15 +1253,13 @@ def run(
                 secret_int=int(circuit_id))
         metrics.store_metric(num_qubits, circuit_id, "solution_quality", fidelity)
 
+    # Define custom result handler for method 2 (variational) — stores result for inline processing
     def execution_handler2(qc, result, num_qubits, circuit_id, num_shots):
-        # Stores the results to the global saved_result variable
         global saved_result
         saved_result = result
 
-    # Initialize execution module using the execution result handler above and specified backend_id
-    # for method=2 we need to set max_jobs_active to 1, so each circuit completes before continuing
+    # Initialize execution module using the appropriate result handler
     if method == 2:
-        ex.max_jobs_active = 1
         ex.init_execution(execution_handler2)
     else:
         ex.init_execution(execution_handler)
@@ -1280,9 +1279,8 @@ def run(
         print(f"WARNING: get_circuits is not supported for method {method}")
         return None
 
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
-        all_qcs = {}
+    # Variable to store all created circuits
+    all_qcs = {}
 
     ###########################
     # Benchmark Execution Loop
@@ -1294,11 +1292,8 @@ def run(
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
         
         if method == 1:
-            if not get_circuits:
-                print(f"************\nExecuting [{max_circuits}] circuits for num_qubits = {num_qubits}")
-            else:
-                print(f"************\nCreating [{max_circuits}] circuits for num_qubits = {num_qubits}")
-                all_qcs[str(num_qubits)] = {}
+            print(f"************\n{'Creating' if get_circuits else 'Executing'} [{max_circuits}] circuits for num_qubits = {num_qubits}")
+            all_qcs[str(num_qubits)] = {}
         else:
             print(f"************\nExecuting [{max_circuits}] restarts for num_qubits = {num_qubits}")
 
@@ -1392,22 +1387,18 @@ def run(
                 # store the creation time for these circuits
                 metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
 
-                # If we only want the circuits:
-                if get_circuits:
-                    all_qcs[str(num_qubits)][str(instance_num)] = qc
-                    continue
-
                 # classically pre-compute and cache an array of expected measurement counts
                 # for comparison against actual measured counts for fidelity calc (in analysis)
-
                 if do_compute_expectation:
                     logger.info("Computing expectation")
-
-                    # pass parameters as they are used during execution
                     compute_expectation(qc, num_qubits, instance_num, params=params)
 
-                # submit circuit for execution on target, with parameters
-                ex.submit_circuit(qc, num_qubits, instance_num, shots=num_shots, params=params)
+                # bind parameters before storing (execute_circuits doesn't handle params)
+                if params is not None:
+                    qc = qc.assign_parameters(params)
+
+                # store circuit for later execution
+                all_qcs[str(num_qubits)][str(instance_num)] = qc
             
 
             ###############
@@ -1523,27 +1514,15 @@ def run(
                             # bind parameters to circuit before execution
                             if parameterized:
                                 qc.assign_parameters(params)
-                                
-                            # submit circuit for execution on target with the current parameters
-                            ex.submit_circuit(qc, num_qubits, unique_id, shots=num_shots, params=params)
-                            
-                            # wait for circuit to complete by calling finalize  ...
-                            # finalize execution of group (each circuit in loop accumulates metrics)
-                            ex.finalize_execution(None, report_end=False)
-     
-                            # after first execution and thereafter, no need for transpilation if parameterized
-                            if parameterized:
-                                # DEVNOTE: since Hydro uses 3 circuits inside this loop, and execute.py can only
-                                # cache 1 at a time, we cannot yet implement caching.  Transpile every time for now.
-                                cached_circuits = False
-                                if cached_circuits:
-                                    ex.set_transpilation_flags(do_transpile_metrics=False, do_transpile_for_execute=False)
-                                    logger.info("**** First execution complete, disabling transpile")
-     
-                            # result array stores the multiple results we measure along different Pauli basis.
+
+                            # execute single circuit synchronously via submit_circuits
+                            one_circuit = {str(num_qubits): {str(unique_id): qc}}
+                            ex.submit_circuits(one_circuit, num_shots=num_shots)
+
+                            # result stored by execution_handler2 via callback
                             global saved_result
                             result_array.append(saved_result)
-     
+
                             # Aggregate execution and elapsed time for running all three circuits
                             # corresponding to different measurements along the different Pauli bases
                             quantum_execution_time = (
@@ -1739,11 +1718,11 @@ def run(
         print(f"************\nReturning circuits and circuit information")
         return all_qcs, metrics.circuit_metrics
 
-    # Wait for some active circuits to complete; report metrics when groups complete
-    ex.throttle_execution(metrics.finalize_group)
-
-    # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)
+    # For method 1: compute metrics, execute as array, and finalize
+    if method == 1:
+        ex.compute_all_circuit_metrics(all_qcs)
+        ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+        metrics.finalize_all_groups()
 
     ##########
 

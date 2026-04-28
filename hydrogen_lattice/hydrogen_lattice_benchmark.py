@@ -49,6 +49,7 @@ def run(min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100
         api=None,
         _instances=None,
         get_circuits=False,
+        max_batch_size=None,
         draw_circuits=True):
 
     # Configure the QED-C Benchmark package for use with the given API
@@ -98,6 +99,7 @@ def run(min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100
         context=context,
         _instances=_instances,
         get_circuits=get_circuits,
+        max_batch_size=max_batch_size,
         draw_circuits=draw_circuits
     )
 
@@ -117,6 +119,7 @@ def get_args():
     parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)
     parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
     parser.add_argument("--method", "-m", default=2, help="Algorithm Method", type=int)
+    parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
@@ -136,5 +139,6 @@ if __name__ == "__main__":
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
         api=args.api,
+        max_batch_size=args.max_batch_size,
         draw_circuits=not args.nodraw, plot_results=not args.noplot
     )
