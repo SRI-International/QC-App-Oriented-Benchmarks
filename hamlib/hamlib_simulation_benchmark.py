@@ -287,6 +287,7 @@ def run(min_qubits: int = 2,
         api = None,
         warmup = False,
         get_circuits = False,
+        max_batch_size = None,
         gpus_per_circuit: int = None):
     """
     Execute program with default parameters.
@@ -360,10 +361,8 @@ def run(min_qubits: int = 2,
     from hamlib._common import hamlib_utils
     from hamlib._common import observables
 
-    mpi.init()
-
     ##########
-    
+
     print(f"{benchmark_name} Benchmark Program - {api}")
     
     # Create context identifier
@@ -444,20 +443,13 @@ def run(min_qubits: int = 2,
     if api == "cudaq" and backend_id == None:
         backend_id = "nvidia"
         
-    # DEVNOTE: this is necessary, since we get the Hamiltonian pauli terms when circuit execution is launched.
-    # need to wait until it completes since we need to have access to those terms.  They are currently global.
-    # Need to fix this
-    if method == 2:
-        ex.max_jobs_active = 1
-
     # If get_circuits requested but observables mode doesn't support it, warn and return
     if get_circuits and do_observables:
         print(f"WARNING: get_circuits is not supported with do_observables=True")
         return None
 
-    # Variable to store all created circuits to return and their creation info
-    if get_circuits:
-        all_qcs = {}
+    # Variable to store all created circuits
+    all_qcs = {}
 
     # build list of qubit sizes within the specificed range for which a Hamiltonian is available
     valid_qubits = hamlib_utils.get_valid_qubits(min_qubits, max_qubits, skip_qubits, hamiltonian_params)
@@ -479,11 +471,8 @@ def run(min_qubits: int = 2,
         # Determine number of circuits to execute for this group
         num_circuits = max(1, max_circuits)
         
-        if not get_circuits:
-            print(f"************\nExecuting [{num_circuits}] circuits with num_qubits = {num_qubits}")
-        else:
-            print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
-            all_qcs[str(num_qubits)] = {}
+        print(f"************\n{'Creating' if get_circuits else 'Executing'} [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        all_qcs[str(num_qubits)] = {}
         
         # use the given Hamiltonian, if provided
         if pauli_terms is not None:
@@ -515,7 +504,6 @@ def run(min_qubits: int = 2,
         # in the case of random paulis, method = 3: loop over multiple random pauli circuits
         # otherwise, loop over the same circuit, executing it num_circuits times 
         for circuit_id in range(num_circuits):
-            mpi.barrier()
             ts = time.time()
             
             ##############################
@@ -626,18 +614,13 @@ def run(min_qubits: int = 2,
             
             # NOTE: the label "group" here mean the "number of qubits" as an index into stored metrics
             
-            # execute for fidelity benchmarks
+            # collect circuits for fidelity benchmarks
             if not do_observables:
 
                 metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
-                # If collecting circuits, store and continue to next circuit
-                if get_circuits:
-                    all_qcs[str(num_qubits)][str(circuit_id)] = qc
-                    continue
-
-                # Submit circuit for execution on target (simulator, cloud simulator, or hardware)
-                ex.submit_circuit(qc, num_qubits, circuit_id, num_shots)
+                # Store circuit in dict for later execution
+                all_qcs[str(num_qubits)][str(circuit_id)] = qc
             
             
             ######################################
@@ -807,20 +790,19 @@ def run(min_qubits: int = 2,
                 ###store_app_metrics(app_name, backend_id, metrics_array)
  
  
-        ##############################
-        # Finalize current Qubit Wdith
-                
-        # Wait for some active circuits to complete; report metrics when groups complete
-        if api != "cudaq" or do_observables == False:
-            ex.throttle_execution(metrics.finalize_group)
-    
+    ##############################
+    # Finalize execution
+
     # If collecting circuits, return them without executing
     if get_circuits:
         print(f"************\nReturning circuits and circuit information")
         return all_qcs, metrics.circuit_metrics
 
-    # Wait for all active circuits to complete; report metrics when groups complete
-    ex.finalize_execution(metrics.finalize_group)
+    # For fidelity benchmarks: compute metrics, execute as array, and finalize
+    if not do_observables:
+        ex.compute_all_circuit_metrics(all_qcs)
+        ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+        metrics.finalize_all_groups()
     
     # we want to write file every time we have new data.
     # but if file is busy, we get error, do it at end for now
@@ -1111,6 +1093,7 @@ def get_args():
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
     parser.add_argument("--do_observables", "-obs", action="store_true", help="Compute observable values")
     parser.add_argument("--group_method", "-gm", default=None, help="Method for creating commuting groups, e.g. 'simple','1','2', 'N'")   
+    parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
@@ -1172,6 +1155,7 @@ def do_run(args):
         backend_id=args.backend_id,
         exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
         api=args.api, warmup=args.warmup,
+        max_batch_size=args.max_batch_size,
         gpus_per_circuit=args.gpus_per_circuit
         )
 
