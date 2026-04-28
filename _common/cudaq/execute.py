@@ -262,9 +262,6 @@ def set_execution_target(backend_id=None, provider_backend=None,
     """
     global backend
 
-    # Initialize MPI if available (no-op if already initialized or not loaded)
-    mpi.init()
-
     # in case anyone uses a name similar to that used in other APIs
     if backend_id == "cudaq_simulator":
         backend_id = None
@@ -925,9 +922,6 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         counts_array = []
         for circuit in circuits:
             try:
-                # Synchronize MPI ranks before each circuit execution
-                mpi.barrier()
-
                 if noise is None:
                     result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
                 else:
@@ -1067,6 +1061,9 @@ def submit_circuits(circuits, metadata=None, num_shots=100, max_batch_size=None,
 
     if verbose:
         print(f"... submit_circuits({len(circuits_info)} circuits, max_batch={max_batch_size}, by_group={batch_by_group})")
+
+    # Synchronize MPI ranks before execution begins
+    mpi.barrier()
 
     if batch_by_group:
         # Group circuits by their "group" key, execute one group at a time

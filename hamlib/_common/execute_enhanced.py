@@ -39,6 +39,10 @@ def execute_circuits_enhanced(
             print(group)
             #print(circuit)
 
+    # Synchronize MPI ranks before execution begins
+    from _common import qcb_mpi as mpi
+    mpi.barrier()
+
     # call api-specific function to execute circuits
     if not distribute_shots:
         #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")

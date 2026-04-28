@@ -313,9 +313,6 @@ def set_execution_target(backend_id='qasm_simulator',
     global use_m3
     authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
 
-    # Initialize MPI if available (no-op if already initialized or not loaded)
-    mpi.init()
-
     # default to qasm_simulator if None passed in
     if backend_id == None:
         backend_id="qasm_simulator"
@@ -1986,6 +1983,9 @@ def submit_circuits(circuits, metadata=None, num_shots=100, max_batch_size=None,
 
     if verbose:
         print(f"... submit_circuits({len(circuits_info)} circuits, max_batch={max_batch_size}, by_group={batch_by_group})")
+
+    # Synchronize MPI ranks before execution begins
+    mpi.barrier()
 
     if batch_by_group:
         # Group circuits by their "group" key, execute one group at a time

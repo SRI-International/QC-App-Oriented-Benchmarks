@@ -138,6 +138,10 @@ def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] 
         import hs_kernel  # Points to hidden_shift/qiskit/hs_kernel.py
         import execute    # Points to _common/qiskit/execute.py
     """
+    # Initialize MPI early (before any prints) so non-leader ranks get stdout suppressed
+    from _common import qcb_mpi as mpi
+    mpi.init()
+
     # Default to qiskit if no API specified
     if api is None:
         api = "qiskit"
