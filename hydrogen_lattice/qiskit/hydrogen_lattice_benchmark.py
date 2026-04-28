@@ -1515,6 +1515,9 @@ def run(
                             if parameterized:
                                 qc.assign_parameters(params)
 
+                            # compute and store circuit metrics (depth, etc.)
+                            ex.compute_and_store_circuit_info(qc, str(num_qubits), str(unique_id))
+
                             # execute single circuit synchronously via submit_circuits
                             one_circuit = {str(num_qubits): {str(unique_id): qc}}
                             ex.submit_circuits(one_circuit, num_shots=num_shots)
