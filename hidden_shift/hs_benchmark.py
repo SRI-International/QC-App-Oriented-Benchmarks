@@ -212,6 +212,7 @@ def run(**kwargs):
 
     # Step 1: Create the benchmark circuits
     all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
+    if not all_qcs: return
 
     # Step 2: If user just wants circuits, return them now
     if get_circuits_only:
