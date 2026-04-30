@@ -1273,127 +1273,230 @@ def plot_results_from_data(
 
 MAX_QUBITS = 16
 
-def run(
-    min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
+
+############### Common Setup
+
+def _validate_params(min_qubits, max_qubits):
+    """Validate and clamp common parameters. Returns (min_qubits, max_qubits)."""
+    max_qubits = max(2, max_qubits)
+    max_qubits = min(MAX_QUBITS, max_qubits)
+    min_qubits = min(max(2, min_qubits), max_qubits)
+    return min_qubits, max_qubits
+
+
+############### Get Circuits
+
+import inspect
+
+def get_circuits(
+    # Standard args (common across benchmarks)
+    min_qubits=2, max_qubits=4, skip_qubits=2,
+    max_circuits=3, num_shots=100, method=1,
+    # App-specific args
+    thetas_array=None, parameterized=False, parameter_mode=1,
+    do_fidelities=True,
+    ansatz_type='qcnn uniform', reps=1,
+    test_size=50, train_size=200,
+    api=None, _instances=None,
+):
+    """Create Image Recognition benchmark circuits (method 1 only).
+
+    Standard args (common to all benchmarks):
+        min_qubits: smallest circuit width (default 2)
+        max_qubits: largest circuit width (default 4)
+        skip_qubits: increment between widths (default 2)
+        max_circuits: max circuits per qubit group (default 3)
+        num_shots: measurement shots, stored in metrics (default 100)
+        method: 1=standard fidelity metrics (default 1). Method 2/3 not supported.
+        api: programming API; None = use qedc_set_api() value (default None)
+
+    App-specific args:
+        thetas_array: initial parameter values (default None)
+        parameterized: use parameterized circuits (default False)
+        parameter_mode: parameter mode (default 1)
+        do_fidelities: compute circuit fidelity (default True)
+        ansatz_type: circuit architecture type (default 'qcnn uniform')
+        reps: ansatz repetitions (default 1)
+        test_size: number of test samples (default 50)
+        train_size: number of training samples (default 200)
+        _instances: pre-loaded problem instances (default None)
+
+    Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
+    """
+
+    if method != 1:
+        print(f"WARNING: get_circuits is not supported for method {method}")
+        return {}, {}
+
+    # validate parameters
+    min_qubits, max_qubits = _validate_params(min_qubits, max_qubits)
+
+    # don't compute expectation unless fidelity is needed
+    global do_compute_expectation
+    do_compute_expectation = do_fidelities
+
+    # save the desired parameter mode globally (for now, during dev)
+    global saved_parameter_mode
+    saved_parameter_mode = parameter_mode
+
+    # Initialize metrics module with empty metrics arrays
+    metrics.init_metrics()
+
+    # Add custom metric names to metrics module
+    add_custom_metric_names()
+
+    # Fetch MNIST data
+    x, x_train, x_test, y, y_train, y_test = fetch_mnist_data(
+            test_size=test_size, train_size=train_size, verbose=verbose)
+
+    # Build circuits at each qubit width
+    all_qcs = {}
+    for num_qubits in range(min_qubits, max_qubits + 1, 2):
+
+        np.random.seed(0)
+
+        print(f"************\nCreating [1] circuit for num_qubits = {num_qubits}")
+        all_qcs[str(num_qubits)] = {}
+
+        x_scaled, x_train_scaled, x_test_scaled = preprocess_image_data(x, x_train, x_test, num_qubits)
+
+        instance_num = 1
+
+        # create the circuit for given qubit size, store time metric
+        ts = time.time()
+
+        # set x_batch to the test data for circuit creation
+        x_batch = x_test_scaled
+        y_batch = y_test
+
+        # create an initial thetas_array, given the circuit width and user input
+        thetas_array_0 = get_initial_parameters(num_qubits=num_qubits, thetas_array=thetas_array, ansatz_type=ansatz_type, reps=reps)
+
+        # create one circuit with one data point
+        data_point = x_batch[0]
+        qc, frmt_obs, params = ImageRecognition(
+            num_qubits=num_qubits,
+            thetas_array=thetas_array_0,
+            ansatz_type=ansatz_type,
+            parameterized=parameterized,
+            reps=reps,
+            x_data=data_point
+            )
+
+        # store the creation time for these circuits
+        metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
+
+        # classically pre-compute and cache an array of expected measurement counts
+        if do_compute_expectation:
+            logger.info("Computing expectation")
+            compute_expectation(qc, num_qubits, instance_num, params=params)
+
+        # bind parameters before storing (execute_circuits doesn't handle params)
+        if params is not None:
+            qc = qc.assign_parameters(params)
+
+        # store circuit for later execution
+        all_qcs[str(num_qubits)][str(instance_num)] = qc
+
+    return all_qcs, metrics.circuit_metrics
+
+
+############### Run Circuits
+
+def run_circuits(all_qcs,
+    num_shots=100, method=1, max_batch_size=None,
+    backend_id=None, provider_backend=None,
+    hub="ibm-q", group="open", project="main",
+    exec_options=None, context=None, api=None,
+):
+    """Execute benchmark circuits and collect metrics.
+
+    Args:
+        all_qcs: circuit dict from get_circuits()
+        num_shots: measurement shots per circuit (default 100)
+        method: algorithm method, for result analysis (default 1)
+        max_batch_size: max circuits per batch; None = no limit (default None)
+        backend_id: backend identifier (default None = qasm_simulator)
+        provider_backend: provider backend instance (default None)
+        hub, group, project: IBMQ credentials (defaults "ibm-q"/"open"/"main")
+        exec_options: additional execution options dict (default None)
+        context: context identifier for metrics (default None)
+        api: programming API if not already initialized (default None)
+    """
+    # Result handler: computes fidelity for each circuit
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
+        num_qubits = int(num_qubits)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                secret_int=int(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, "solution_quality", fidelity)
+
+    # Set up execution target and submit all circuits as a batch
+    ex.init_execution(execution_handler)
+    ex.set_execution_target(backend_id, provider_backend=provider_backend,
+        hub=hub, group=group, project=project,
+        exec_options=exec_options)
+
+    ex.compute_all_circuit_metrics(all_qcs)
+    ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+    metrics.finalize_all_groups()
+
+
+############### Plot Results
+
+def plot_results_fn(
+    num_shots=100, method=1,
+    api=None, draw_circuits=True, plot_results=True,
+):
+    """Draw sample circuits and plot benchmark metrics (method 1).
+
+    Args:
+        num_shots: shots, for plot subtitle (default 100)
+        method: algorithm method (default 1)
+        api: programming API name for plot title (default None)
+        draw_circuits: draw sample circuit diagrams (default True)
+        plot_results: generate metrics plots (default True)
+    """
+    global print_sample_circuit
+    if draw_circuits and print_sample_circuit:
+        print("Sample Circuit:")
+        print(QC_ if QC_ is not None else "  ... too large!")
+
+    if plot_results:
+        metrics.plot_metrics(f"Benchmark Results - Image Recognition ({method}) - Qiskit",
+                options=dict(shots=num_shots))
+
+
+############### Run Method 2 (and Method 3)
+
+def run_method2(
+    min_qubits=2, max_qubits=4, skip_qubits=2,
+    max_circuits=3, num_shots=100,
     method=2,
     radius=None, thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
     minimizer_function=None,
     minimizer_tolerance=1e-3, max_iter=300, comfort=False,
-    line_x_metrics=["iteration_count", "cumulative_exec_time", "iteration_count"],
-    line_y_metrics=["train_loss", "train_accuracy", "test_accuracy"],
-    bar_y_metrics=["average_exec_times", "train_accuracy", "test_accuracy"],
-    bar_x_metrics=["num_qubits"],
-    score_metric=["train_accuracy"],
-    x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
-    y_metric="num_qubits",
-    fixed_metrics={},
-    num_x_bins=15,
-    y_size=None,
-    x_size=None,
     show_results_summary=True,
-    plot_results=True,
-    plot_layout_style="grid",
-    show_elapsed_times=True,
-    use_logscale_for_times=False,
     save_res_to_file=True, save_final_counts=False, detailed_save_names=False,
     backend_id="qasm_simulator",
     provider_backend=None, hub="ibm-q", group="open", project="main",
     exec_options=None,
     _instances=None,
-    ansatz_type:str = 'qcnn uniform',
-    reps:int = 1,
-    batch_size:int = 50,
-    backend_id_train:str = 'statevector_simulator',
-    test_pass_count:int = 30,
-    test_size:int  = 50,
-    train_size:int = 200,
-    get_circuits=False,
-    draw_circuits=True,
-    max_batch_size=0,
+    ansatz_type='qcnn uniform',
+    reps=1,
+    batch_size=50,
+    backend_id_train='statevector_simulator',
+    test_pass_count=30,
+    test_size=50,
+    train_size=200,
 ):
-    """
-    Parameters
-    ----------
-    min_qubits : int, optional
-        The smallest circuit width for which benchmarking will be done The default is 3.
-    max_qubits : int, optional
-        The largest circuit width for which benchmarking will be done. The default is 6.
-    max_circuits : int, optional
-        Number of restarts. The default is None.
-    num_shots : int, optional
-        Number of times the circut will be measured, for each iteration. The default is 100.
-    method : int, optional
-        If 1, then do standard metrics, if 2, implement iterative algo metrics. The default is 1.
-    thetas_array : list, optional
-        list or ndarray of theta values. The default is None.
-    N : int, optional
-        For the max % counts metric, choose the highest N% counts. The default is 10.
-    alpha : float, optional
-        Value between 0 and 1. The default is 0.1.
-    parameterized : bool, optional
-        Whether to use parameter objects in circuits or not. The default is False.
-    parameter_mode : bool, optional
-        If 1, use thetas_array of length 1, otherwise (num_qubits//2)**2, to match excitation pairs
-    do_fidelities : bool, optional
-        Compute circuit fidelity. The default is True.
-    minimizer_function : function
-        custom function used for minimizer
-    minimizer_tolerance : float
-        tolerance for minimizer, default is 1e-3,
-    max_iter : int, optional
-        Number of iterations for the minimizer routine. The default is 30.
-    plot_layout_style : str, optional
-        Style of plot layout, 'grid', 'stacked', or 'individual', default = 'grid'
-    line_x_metrics : list or string, optional
-        Which metrics are to be plotted on x-axis in line metrics plots.
-    line_y_metrics : list or string, optional
-        Which metrics are to be plotted on y-axis in line metrics plots.
-    show_elapsed_times : bool, optional
-        In execution times bar chart, include elapsed times if True
-    use_logscale_for_times : bool, optional
-        In execution times bar plot, use a log scale to show data
-    score_metric : list or string, optional
-        Which metrics are to be plotted in area metrics plots. The default is 'fidelity'.
-    x_metric : list or string, optional
-        Horizontal axis for area plots. The default is 'cumulative_exec_time'.
-    y_metric : list or string, optional
-        Vertical axis for area plots. The default is 'num_qubits'.
-    fixed_metrics : TYPE, optional
-        DESCRIPTION. The default is {}.
-    num_x_bins : int, optional
-        DESCRIPTION. The default is 15.
-    y_size : TYPint, optional
-        DESCRIPTION. The default is None.
-    x_size : string, optional
-        DESCRIPTION. The default is None.
-    backend_id : string, optional
-        DESCRIPTION. The default is 'qasm_simulator'.
-    provider_backend : string, optional
-        DESCRIPTION. The default is None.
-    hub : string, optional
-        DESCRIPTION. The default is "ibm-q".
-    group : string, optional
-        DESCRIPTION. The default is "open".
-    project : string, optional
-        DESCRIPTION. The default is "main".
-    exec_options : string, optional
-        DESCRIPTION. The default is None.
-    plot_results : bool, optional
-        Plot results only if True. The default is True.
-    save_res_to_file : bool, optional
-        Save results to json files. The default is True.
-    save_final_counts : bool, optional
-        If True, also save the counts from the final iteration for each problem in the json files. The default is True.
-    detailed_save_names : bool, optional
-        If true, the data and plots will be saved with more detailed names. Default is False
-    confort : bool, optional
-        If true, print comfort dots during execution
+    """Run the QML training loop (method 2) or test pass (method 3).
+
+    This function contains the complete method 2/3 implementation: circuit creation,
+    execution, and optimization are interleaved inside the SPSA minimizer loop.
     """
 
-    # Store all the input parameters into a dictionary.
-    # This dictionary will later be stored in a json file
-    # It will also be used for sending parameters to the plotting function
-    dict_of_inputs = locals()
+    # Build dict_of_inputs for plotting and saving (matches original run() behavior)
+    dict_of_inputs = {k: v for k, v in locals().items()}
 
     thetas = []  # a default empty list of thetas
 
@@ -1406,45 +1509,21 @@ def run(
 
     global image_recognition_inputs
     image_recognition_inputs = dict_of_inputs
-    
+
     ###########################
-    # Benchmark Initializeation
+    # Benchmark Initialization
 
     global QC_
-    global circuits_done
     global minimizer_loop_index
     global opt_ts
     global unique_id
 
-    print("Image Recognition Benchmark Program - Qiskit")
-
     QC_ = None
 
     # validate parameters
-    max_qubits = max(2, max_qubits)
-    max_qubits = min(MAX_QUBITS, max_qubits)
-    min_qubits = min(max(2, min_qubits), max_qubits)
+    min_qubits, max_qubits = _validate_params(min_qubits, max_qubits)
 
-    # try:
-    #     print("Validating user inputs...")
-    #     # raise an exception if either min_qubits or max_qubits is not even
-    #     if min_qubits % 2 != 0 or max_qubits % 2 != 0:
-    #         raise ValueError(
-    #             "min_qubits and max_qubits must be even. min_qubits = {}, max_qubits = {}".format(
-    #                 min_qubits, max_qubits
-    #             )
-    #         )
-    # except ValueError as err:
-    #     # display error message and stop execution if min_qubits or max_qubits is not even
-    #     logger.error(err)
-    #     if min_qubits % 2 != 0:
-    #         min_qubits += 1
-    #     if max_qubits % 2 != 0:
-    #         max_qubits -= 1
-    #         max_qubits = min(max_qubits, MAX_QUBITS)
-    #     print(err.args[0] + "\n Running for for values min_qubits = {}, max_qubits = {}".format(min_qubits, max_qubits))
-
-    # don't compute exectation unless fidelity is is needed
+    # don't compute expectation unless fidelity is needed
     global do_compute_expectation
     do_compute_expectation = do_fidelities
 
@@ -1452,9 +1531,7 @@ def run(
     global saved_parameter_mode
     saved_parameter_mode = parameter_mode
 
-    # given that this benchmark does every other width, set y_size default to 1.5
-    if y_size is None:
-        y_size = 1.5
+    ##########
 
     # Initialize metrics module with empty metrics arrays
     metrics.init_metrics()
@@ -1462,24 +1539,12 @@ def run(
     # Add custom metric names to metrics module
     add_custom_metric_names()
 
-    # Define custom result handler
-    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
-        # determine fidelity of result set
-        num_qubits = int(num_qubits)
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
-                secret_int=int(circuit_id))
-        metrics.store_metric(num_qubits, circuit_id, "solution_quality", fidelity)
-
     def execution_handler2(qc, result, num_qubits, circuit_id, num_shots):
-        # Stores the results to the global saved_result variable
         global saved_result
         saved_result = result
 
-    # Initialize execution module using the execution result handler above and specified backend_id
-    if method == 2 or method == 3:
-        ex.init_execution(execution_handler2)
-    else:
-        ex.init_execution(execution_handler)
+    # Initialize execution module
+    ex.init_execution(execution_handler2)
 
     # initialize the execution module with target information
     ex.set_execution_target(
@@ -1496,50 +1561,26 @@ def run(
     x, x_train, x_test, y, y_train, y_test = fetch_mnist_data(
             test_size=test_size, train_size=train_size, verbose=verbose)
 
-    # If get_circuits requested but method doesn't support it, warn and return
-    if get_circuits and method != 1:
-        print(f"WARNING: get_circuits is not supported for method {method}")
-        return None
-
-    # Variable to store all created circuits for array execution (method 1)
-    if method == 1:
-        all_qcs = {}
-
     # dictionary to store the thetas_array for each qubit size
     thetas_array_dict = {}
-
-    # Execute Benchmark Program N times for multiple circuit sizes
-    # Accumulate metrics asynchronously as circuits complete
-    # DEVNOTE: increment by 2 for efficiency
 
     for num_qubits in range(min_qubits, max_qubits + 1, 2):
 
         np.random.seed(0)
 
-        if method == 1:
-            if not get_circuits:
-                print(f"************\nExecuting [1] circuit for num_qubits = {num_qubits}")
-            else:
-                print(f"************\nCreating [1] circuit for num_qubits = {num_qubits}")
-            all_qcs[str(num_qubits)] = {}
-        else:
-            print(f"************\nExecuting [{ansatz_type}] circuit for num_qubits = {num_qubits}")
+        print(f"************\nExecuting [{ansatz_type}] circuit for num_qubits = {num_qubits}")
 
-        # loop over all instance files according to max_circuits given
-        # instance_num index starts from 1
-        # for instance_num in range(1, max_circuits + 1):
-
-        x_scaled, x_train_scaled, x_test_scaled = preprocess_image_data(x, x_train, x_test, num_qubits)        
+        x_scaled, x_train_scaled, x_test_scaled = preprocess_image_data(x, x_train, x_test, num_qubits)
 
         global x_batch, y_batch
-        
+
         instance_num = 1
 
         # global variables to store execution and elapsed time
         global quantum_execution_time, quantum_elapsed_time
         quantum_execution_time = 0.0
-        quantum_elapsed_time = 0.0   
-         
+        quantum_elapsed_time = 0.0
+
         #####################
         # define the objective and the callback functions
         # NOTE: this is called twice for the SPSA optimizer
@@ -1560,21 +1601,21 @@ def run(
 
             if verbose:
                 print(f"--> begin batch: instance={instance_num}, index={minimizer_loop_index}")
-                
+
             # variables used to aggregate metrics for all terms
             result_array = []
 
             #####################
             # loop over each of the circuits that are generated from a batch and execute
             # create the ImageRecognition ansatz to generate a parameterized hamiltonian
-            
+
             if verbose and comfort: print("  ", end='')
-                
+
             ts = time.time()
             for data_point in x_batch:
-            
+
                 if verbose and comfort: print('+', end='')
-                    
+
                 qc, frmt_obs, params = ImageRecognition(
                     num_qubits=num_qubits,
                     thetas_array=thetas_array,
@@ -1621,11 +1662,11 @@ def run(
                         quantum_elapsed_time
                         + 0.0
                     )
-                    
+
             # end of loop over data points
-            
+
             # store the time it took to create the circuit
-            # DEVNOTE: not correct; instead, accumulate time wrapped around ImageRecognition() 
+            # DEVNOTE: not correct; instead, accumulate time wrapped around ImageRecognition()
             metrics.store_metric(num_qubits, unique_id, "create_time", time.time() - ts)
 
             global opt_ts
@@ -1633,15 +1674,15 @@ def run(
             # store the new exec time and elapsed time back to metrics
             metrics.store_metric(num_qubits, unique_id, "exec_time", quantum_execution_time)
             metrics.store_metric(num_qubits, unique_id, "elapsed_time", quantum_elapsed_time)
-    
+
             #####################
             # classical processing of results
-            
+
             if verbose:
                 if comfort: print('')
                 thetas_array_round = [round(th,3) for th in thetas_array]
                 print(f"  ... compute loss and accuracy for num_qubits={num_qubits}, circuit={unique_id}, parameters={params},\n  thetas_array={thetas_array_round}")
-                
+
             # increment the minimizer loop index, the index is increased by one
             # for the group of three circuits created ( three measurement basis circuits)
 
@@ -1660,18 +1701,12 @@ def run(
             loss, accuracy = loss_function(result=result_array, y_data=y_batch,
                     num_qubits= num_qubits, formatted_observables=frmt_obs)
 
-            # calculate std error from the variance -- identically zero if using statevector simulator
-            # if backend_id.lower() != "statevector_simulator":
-            #     standard_error = np.sqrt(variance/num_shots)
-            # else:
-            #     standard_error = 0.0
-
             if verbose:
                 print(f"  ... loss, accuracy = {loss}, {accuracy}")
 
             # append the most recent accuracy value to the list
             accuracy_values.append(accuracy)
-            
+
             # store the metrics for the current iteration
             if test_pass:
                 metrics.store_metric(num_qubits, unique_id, "test_accuracy", accuracy)
@@ -1679,28 +1714,17 @@ def run(
             if train_pass:
                 metrics.store_metric(num_qubits, unique_id, "train_loss", loss)
                 metrics.store_metric(num_qubits, unique_id, "train_accuracy", accuracy)
-            
+
             loss_this_iter.append(loss)
             accuracy_this_iter.append(accuracy)
-            
-            # store metrics (not needed, done above, but may need more analysis
-            # metrics.store_metric(num_qubits, unique_id, "loss", loss)
-            # metrics.store_metric(num_qubits, unique_id, "accuracy", accuracy)
-            # metrics.store_metric(num_qubits, unique_id, "standard_error", standard_error)
+
             metrics.store_metric(num_qubits, unique_id, "iteration_count", minimizer_loop_index + 1)
 
-            # store most recent metrics for export          
-            # key_metrics["energy"] = loss
-            # key_metrics["accuracy"] = accuracy
-            # key_metrics["variance"] = variance
-            # key_metrics["standard_error"] = standard_error
-            # key_metrics["iteration_count"] = minimizer_loop_index
-            
             if not return_accuracy:
                 return loss
             else:
                 return loss, accuracy
-       
+
         ##############
         def callback_thetas_array(thetas_array):
             '''
@@ -1710,10 +1734,10 @@ def run(
             global quantum_execution_time, quantum_elapsed_time
             global x_batch, y_batch
             global minimizer_loop_index
-            
+
             if verbose:
                 print(f"==> in callback_thetas_array, minimizer loop index {minimizer_loop_index}")
-                
+
             ######
             # print out execution time metrics for this iteration
             if verbose:
@@ -1723,28 +1747,28 @@ def run(
             # (done after all circuits of a batch and all calls to objective_function complete)
             quantum_execution_time = 0.0
             quantum_elapsed_time = 0.0
-            
+
             ######
             # compute mean loss and accuracy on this iteration and store it in metrics table
             loss = np.mean(loss_this_iter)
             accuracy = np.mean(accuracy_this_iter)
-            
+
             metrics.store_metric(num_qubits, unique_id, "train_loss", loss)
-            metrics.store_metric(num_qubits, unique_id, "train_accuracy", accuracy) 
+            metrics.store_metric(num_qubits, unique_id, "train_accuracy", accuracy)
 
             # print out loss and accuracy metrics
             if verbose:
                 print(f"  ... batch {minimizer_loop_index + 1} loss: {round(loss,4)} accuracy: {round(accuracy,4)}")
-                
+
             loss_this_iter.clear()
             accuracy_this_iter.clear()
 
             ######
-            # whenerver minimizer_loop_index is divisible by factor,
+            # whenever minimizer_loop_index is divisible by factor,
             # save the thetas_array at this minimizer_loop_index so we can save to file later
             factor = np.ceil(max_iter/test_pass_count)
             if minimizer_loop_index % factor == 0:
-                thetas_array_batch[minimizer_loop_index + 1] = thetas_array.tolist() 
+                thetas_array_batch[minimizer_loop_index + 1] = thetas_array.tolist()
                 if verbose:
                     print(f"  ... saved thetas_array at batch index {minimizer_loop_index + 1}")
 
@@ -1757,62 +1781,13 @@ def run(
             indices = np.random.choice(len(x_train_scaled), size=batch_size, replace=False)
             x_batch = x_train_scaled[indices]
             y_batch = y_train[indices]
-   
+
             # increment the loop index
             minimizer_loop_index += 1
-            
-   
-        ###############
-        if method == 1:
-        
-            # create the circuit(s) for given qubit size and secret string, store time metric
-            ts = time.time()
 
-            # set x_batch and y_batch to the test data
-            x_batch = x_test_scaled
-            y_batch = y_test
-          
-            # create an intial thetas_array, given the circuit width and user input
-            thetas_array_0 = get_initial_parameters(num_qubits=num_qubits, thetas_array=thetas_array, ansatz_type=ansatz_type, reps=reps)
-
-            # create one circuit with one data point
-            data_point = x_batch[0]
-            # create the circuits to be tested
-            qc, frmt_obs, params = ImageRecognition(
-                num_qubits=num_qubits,
-                thetas_array=thetas_array_0,
-                ansatz_type=ansatz_type,
-                parameterized=parameterized,
-                reps=reps,
-                x_data=data_point
-                )
-            """ TMI ...
-            # for testing and debugging ...
-            #if using parameter objects, bind before printing
-            if verbose:
-                print(qc.assign_parameters(params) if parameterized else qc)
-            """
-            # store the creation time for these circuits
-            metrics.store_metric(num_qubits, instance_num, "create_time", time.time() - ts)
-
-            # classically pre-compute and cache an array of expected measurement counts
-            # for comparison against actual measured counts for fidelity calc (in analysis)
-            if do_compute_expectation:
-                logger.info("Computing expectation")
-
-                # pass parameters as they are used during execution
-                compute_expectation(qc, num_qubits, instance_num, params=params)
-
-            # bind parameters before storing (execute_circuits doesn't handle params)
-            if params is not None:
-                qc = qc.assign_parameters(params)
-
-            # store circuit for later execution
-            all_qcs[str(num_qubits)][str(instance_num)] = qc
-        
 
         ###############
-        elif method == 2:
+        if method == 2:
             logger.info("===============  Begin method 2 loop")
 
             # create batch from scaled data
@@ -1823,7 +1798,7 @@ def run(
             # Array of accuracy values collected during iterations of image_recognition
             accuracy_values = []
 
-            # create an intial thetas_array, given the circuit width and user input
+            # create an initial thetas_array, given the circuit width and user input
             thetas_array_0 = get_initial_parameters(num_qubits=num_qubits, thetas_array=thetas_array, ansatz_type=ansatz_type, reps=reps)
 
             # a unique circuit index used inside the inner minimizer loop as identifier
@@ -1835,16 +1810,14 @@ def run(
             accuracy_this_iter = []
 
             # dictionary to store the thetas_array for each batch
-            thetas_array_batch = {} 
-            
+            thetas_array_batch = {}
+
             if verbose:
                 print(f"==> Launch optimizer, batch_size={batch_size}, max_iter={max_iter}")
 
             # minimize loss returned from objective function to find best theta values
 
             # execute SPSA optimizer to minimize the objective function
-            # objective function is called repeatedly with varying parameters
-            # until the max_iter are run
             if minimizer_function is None:
                 ret = minimizeSPSA(objective_function, x0=thetas_array_0, a=0.3, c=0.3, niter=max_iter, callback=callback_thetas_array, paired=False)
 
@@ -1852,13 +1825,13 @@ def run(
             else:
                 ret = minimizer_function(
                     objective_function=objective_function,
-                    initial_parameters=thetas_array_0.ravel(),  # note: revel not really needed for this ansatz
+                    initial_parameters=thetas_array_0.ravel(),
                     callback=callback_thetas_array,
                 )
 
             if comfort:
-                print("!") 
-                
+                print("!")
+
             # remove the last element of metrics arrays, since it is always zero
             metrics.pop_metric(group=num_qubits, circuit = unique_id)
 
@@ -1866,9 +1839,8 @@ def run(
             thetas_array_dict[num_qubits] = thetas_array_batch
 
             # write the thetas_array_dict to a json file
-            # NOTE: the size of this file grows each time we increment num_qubits
             write_dict_to_json(thetas_array_dict, thetas_array_path + "precomputed_thetas.json")
-          
+
             # save the data for this qubit width, and instance number
             store_final_iter_to_metrics_json(
                 backend_id=backend_id_train,
@@ -1878,7 +1850,6 @@ def run(
                 num_shots=num_shots,
                 converged_thetas_list=ret.x.tolist(),
                 accuracy=accuracy_values[-1],
-                # iter_size_dist=iter_size_dist, iter_dist=iter_dist,
                 detailed_save_names=detailed_save_names,
                 dict_of_inputs=dict_of_inputs,
                 save_final_counts=save_final_counts,
@@ -1891,11 +1862,10 @@ def run(
 
         ##############
         # for method 3, need to aggregate the detail metrics appropriately for each group
-        # Note that this assumes that all iterations of the circuit have completed by this point
 
         elif method == 3:
 
-            # set exectution target
+            # set execution target
             ex.set_execution_target(
                 backend_id, provider_backend=provider_backend, hub=hub, group=group, project=project, exec_options=exec_options
                 )
@@ -1921,7 +1891,6 @@ def run(
             accuracy_this_iter = []
 
             # iterate over the iteration_list and calculate the loss and accuracy for test data
-            # use the objective function to compute loss and accuracy
             for iteration_count in iteration_list:
                 minimizer_loop_index = int(iteration_count) - 1
                 thetas_array = np.array(thetas_array_batch[iteration_count])
@@ -1929,45 +1898,55 @@ def run(
 
             if comfort and not verbose:
                 print("!")
-                
+
         if method == 2 or method == 3:
             metrics.process_circuit_metrics_2_level(num_qubits)
-        
+
         metrics.finalize_group(num_qubits)
-      
-         
-    # Early return if we just want the circuits
-    if get_circuits:
-        print(f"************\nReturning circuits and circuit information")
-        return all_qcs, metrics.circuit_metrics
 
-    # For method 1: compute metrics, execute as array, and finalize
+    # Store dict_of_inputs for use by plot_results
+    return dict_of_inputs
+
+
+############### Run (convenience)
+
+def run(**kwargs):
+    """Create circuits, execute, and plot. Accepts any arg from
+    get_circuits(), run_circuits(), plot_results_fn(), or run_method2()."""
+
+    def _for(func):
+        return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
+
+    method = kwargs.get('method', 2)
+    get_circuits_only = kwargs.pop('get_circuits', False)
+
+    print("Image Recognition Benchmark Program - Qiskit")
+
     if method == 1:
-        ex.compute_all_circuit_metrics(all_qcs)
-        ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
-        metrics.finalize_all_groups()
+        all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
+        if not all_qcs:
+            return
+        if get_circuits_only:
+            return all_qcs, circuit_metrics
+        run_circuits(all_qcs, **_for(run_circuits))
+        plot_results_fn(**_for(plot_results_fn))
 
-    # print a sample circuit
-    if draw_circuits and print_sample_circuit:
-        if method == 1:
-            print("Sample Circuit:")
-            print(QC_ if QC_ is not None else "  ... too large!")
+    elif method in (2, 3):
+        if get_circuits_only:
+            print(f"WARNING: get_circuits is not supported for method {method}")
+            return None
 
-    # Plot metrics for all circuit sizes
-    if method == 1:
-        if plot_results:
-            metrics.plot_metrics(f"Benchmark Results - Image Recognition ({method}) - Qiskit",
-                    options=dict(shots=num_shots))
+        dict_of_inputs = run_method2(**_for(run_method2))
+        if dict_of_inputs is None:
+            return
 
-    elif method == 2:
-        if plot_results:
+        # Plot method 2/3 results
+        if kwargs.get('plot_results', True):
             plot_results_from_data(**dict_of_inputs)
 
-    elif method == 3:
-        if plot_results:
-            plot_results_from_data(**dict_of_inputs)
 
-    
+# ******************************
+
 def get_final_results():
     """
     Return the energy and dict of key metrics of the last run().

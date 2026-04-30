@@ -16,99 +16,23 @@ from _common.qedc_init import qedc_benchmarks_init
 benchmark_name = "Image Recognition"
 
 
-def run(
-    min_qubits=2, max_qubits=4, skip_qubits=2, max_circuits=3, num_shots=100,
-    method=2,
-    radius=None, thetas_array=None, parameterized=False, parameter_mode=1, do_fidelities=True,
-    minimizer_function=None,
-    minimizer_tolerance=1e-3, max_iter=300, comfort=False,
-    line_x_metrics=["iteration_count", "cumulative_exec_time", "iteration_count"],
-    line_y_metrics=["train_loss", "train_accuracy", "test_accuracy"],
-    bar_y_metrics=["average_exec_times", "train_accuracy", "test_accuracy"],
-    bar_x_metrics=["num_qubits"],
-    score_metric=["train_accuracy"],
-    x_metric=["cumulative_exec_time", "cumulative_elapsed_time"],
-    y_metric="num_qubits",
-    fixed_metrics={},
-    num_x_bins=15,
-    y_size=None,
-    x_size=None,
-    show_results_summary=True,
-    plot_results=True,
-    plot_layout_style="grid",
-    show_elapsed_times=True,
-    use_logscale_for_times=False,
-    save_res_to_file=True, save_final_counts=False, detailed_save_names=False,
-    backend_id=None,
-    provider_backend=None, hub="ibm-q", group="open", project="main",
-    exec_options=None,
-    _instances=None,
-    ansatz_type='qcnn uniform',
-    reps=1,
-    batch_size=50,
-    backend_id_train='statevector_simulator',
-    test_pass_count=30,
-    test_size=50,
-    train_size=200,
-    api=None,
-    get_circuits=False,
-    draw_circuits=True,
-    max_batch_size=0,
-):
+def run(**kwargs):
+    """Create circuits, execute, and plot. Delegates to qiskit implementation.
+    See image_recognition/qiskit/image_recognition_benchmark.py for detailed parameter documentation."""
 
     # Configure the QED-C Benchmark package for use with the given API
     # Note: image_recognition only has qiskit implementation
-    qedc_benchmarks_init(api if api else "qiskit", "image_recognition", ["image_recognition_benchmark"])
+    qedc_benchmarks_init(kwargs.pop('api', None) or "qiskit", "image_recognition", ["image_recognition_benchmark"])
 
     # Import the actual benchmark module (now available after qedc_init)
     import image_recognition_benchmark as img_impl
 
     # Use default backend_id if None passed
-    if backend_id is None:
-        backend_id = "qasm_simulator"
+    if kwargs.get('backend_id') is None:
+        kwargs['backend_id'] = "qasm_simulator"
 
     # Delegate to the implementation
-    return img_impl.run(
-        min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,
-        max_circuits=max_circuits, num_shots=num_shots,
-        method=method,
-        radius=radius, thetas_array=thetas_array, parameterized=parameterized,
-        parameter_mode=parameter_mode, do_fidelities=do_fidelities,
-        minimizer_function=minimizer_function,
-        minimizer_tolerance=minimizer_tolerance, max_iter=max_iter, comfort=comfort,
-        line_x_metrics=line_x_metrics,
-        line_y_metrics=line_y_metrics,
-        bar_y_metrics=bar_y_metrics,
-        bar_x_metrics=bar_x_metrics,
-        score_metric=score_metric,
-        x_metric=x_metric,
-        y_metric=y_metric,
-        fixed_metrics=fixed_metrics,
-        num_x_bins=num_x_bins,
-        y_size=y_size,
-        x_size=x_size,
-        show_results_summary=show_results_summary,
-        plot_results=plot_results,
-        plot_layout_style=plot_layout_style,
-        show_elapsed_times=show_elapsed_times,
-        use_logscale_for_times=use_logscale_for_times,
-        save_res_to_file=save_res_to_file, save_final_counts=save_final_counts,
-        detailed_save_names=detailed_save_names,
-        backend_id=backend_id,
-        provider_backend=provider_backend, hub=hub, group=group, project=project,
-        exec_options=exec_options,
-        _instances=_instances,
-        ansatz_type=ansatz_type,
-        reps=reps,
-        batch_size=batch_size,
-        backend_id_train=backend_id_train,
-        test_pass_count=test_pass_count,
-        test_size=test_size,
-        train_size=train_size,
-        get_circuits=get_circuits,
-        draw_circuits=draw_circuits,
-        max_batch_size=max_batch_size,
-    )
+    return img_impl.run(**kwargs)
 
 
 def load_data_and_plot(folder=None, backend_id=None, **kwargs):
