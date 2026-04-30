@@ -95,12 +95,80 @@ not work from within those directories. Use absolute imports instead.
 """
 
 from importlib import import_module
+import inspect
 import sys
 from pathlib import Path
 from importlib import invalidate_caches
 
 # Store project root for use in path calculations
 _project_root = Path(__file__).parent.parent.resolve()
+
+# Default API, set via qedc_set_api()
+_current_api = None
+
+
+def qedc_set_api(api):
+    """
+    Set the default quantum computing API for all subsequent benchmark operations.
+
+    Call this once at startup (e.g., in the first notebook cell) to avoid passing
+    api= to every function call.
+
+    Args:
+        api: The API name ("qiskit", "cudaq", "cirq", "braket", etc.)
+
+    Example:
+        qedc_set_api("qiskit")
+    """
+    global _current_api
+    _current_api = api
+
+
+def qedc_get_api():
+    """
+    Get the current default API. Returns "qiskit" if not explicitly set.
+    """
+    return _current_api or "qiskit"
+
+
+def qedc_get_kernel(kernel_name, api=None, benchmark_name=None):
+    """
+    Initialize and return a kernel module in one call.
+
+    Auto-detects the benchmark directory from the calling file's location unless
+    benchmark_name is provided explicitly.
+
+    Args:
+        kernel_name: Name of the kernel module to load (e.g., "qft_kernel").
+        api: API to use. If None, uses the value set by qedc_set_api() (default "qiskit").
+        benchmark_name: Benchmark directory name. If None, auto-detected from caller's directory.
+
+    Returns:
+        The loaded kernel module, ready to use.
+
+    Example:
+        kernel = qedc_get_kernel("qft_kernel")
+        qc = kernel.QuantumFourierTransform(4, 3, [1,1,0,0], method=1)
+    """
+    if api is None:
+        api = qedc_get_api()
+    if benchmark_name is None:
+        caller_file = inspect.stack()[1].filename
+        benchmark_name = Path(caller_file).parent.name
+
+    qedc_benchmarks_init(api, benchmark_name, [kernel_name])
+    return sys.modules[kernel_name]
+
+
+def qedc_is_leader():
+    """
+    Return True if this process is the MPI leader (rank 0) or MPI is not active.
+
+    Use this to guard output that should only appear once in multi-GPU runs
+    (e.g., drawing circuits, plotting results).
+    """
+    from _common import qcb_mpi as mpi
+    return mpi.leader()
 
 
 def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] = None) -> None:

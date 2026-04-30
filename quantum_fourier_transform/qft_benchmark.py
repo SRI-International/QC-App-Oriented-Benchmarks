@@ -1,59 +1,146 @@
 '''
-Quantum Fourier Transform Benchmark Program
+Quantum Fourier Transform Benchmark Program - v2 Architecture Prototype
 (C) Quantum Economic Development Consortium (QED-C) 2024.
+
+Three key functions, each independently callable:
+  - get_circuits(): Create benchmark circuits (std + app args)
+  - run_circuits(): Execute circuits and collect metrics (exec args)
+  - plot_results(): Draw circuits and plot metrics (plot args)
+  - run(): Convenience that calls all three
 '''
 
-# This benchmark program runs at the top level of the named benchmark directory.
-# It uses the "api" parameter to select the API to be used for kernel construction and execution.
-
+import inspect
 import time
 import numpy as np
 
-# Add benchmark home dir to path, so the benchmark can be run without pip installing.
 import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-# The QED-C initialization module
-from _common.qedc_init import qedc_benchmarks_init
+from _common.qedc_init import qedc_get_kernel, qedc_is_leader
 from _common import metrics
-from _common import qcb_mpi as mpi
 
-
-# Benchmark Name
 benchmark_name = "Quantum Fourier Transform"
 
 np.random.seed(0)
-
 verbose = False
-
-# Variable for number of resets to perform after mid circuit measurements
 num_resets = 1
-    
-# Routine to convert the secret integer into an array of integers, each representing one bit
-# DEVNOTE: do we need to convert to string, or can we just keep shifting?
-def str_to_ivec(input_size: int, s_int: int):
 
-    # convert the secret integer into a string so we can scan the characters
-    s = ('{0:0' + str(input_size) + 'b}').format(s_int)
-    
-    # create an array to hold one integer per bit
-    bitset = []
-    
-    # assign bits in reverse order of characters in string
-    for i in range(input_size):
 
-        if s[input_size - 1 - i] == '1':
-            bitset.append(1)
+############### Get Circuits
+
+def get_circuits(
+    # Standard args (common across benchmarks)
+    min_qubits=2, max_qubits=8, skip_qubits=1,
+    max_circuits=3, num_shots=100, method=1,
+    # App-specific args
+    use_midcircuit_measurement=False, input_value=None,
+    api=None,
+):
+    """Create QFT benchmark circuits.
+
+    Standard args (common to all benchmarks):
+        min_qubits: smallest circuit width (default 2)
+        max_qubits: largest circuit width (default 8)
+        skip_qubits: increment between widths (default 1)
+        max_circuits: max circuits per qubit group (default 3)
+        num_shots: measurement shots, stored in metrics (default 100)
+        method: algorithm method (default 1)
+
+    App-specific args:
+        use_midcircuit_measurement: use dynamic circuits for inverse QFT (default False)
+        input_value: fixed input for all circuits; None = random (default None)
+        api: programming API; None = use qedc_set_api() value (default None)
+
+    Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
+    """
+
+    # Load the API-specific circuit kernel for this benchmark (e.g. qiskit or cudaq)
+    kernel = qedc_get_kernel("qft_kernel", api=api)
+
+    max_qubits = max(2, max_qubits)
+    min_qubits = min(max(2, min_qubits), max_qubits)
+    skip_qubits = max(1, skip_qubits)
+
+    metrics.init_metrics()
+
+    # Build circuits at each qubit width, with max_circuits random inputs per width
+    all_qcs = {}
+    for input_size in range(min_qubits, max_qubits + 1, skip_qubits):
+
+        np.random.seed(0)
+        num_qubits = input_size
+
+        # Compute how many circuits to create and select random input values
+        if method == 1 or method == 2:
+            num_circuits = min(2 ** (input_size), max_circuits)
+            if 2**(input_size) <= max_circuits:
+                s_range = list(range(num_circuits))
+            else:
+                s_range = np.random.randint(0, 2**(input_size), num_circuits + 2)
+                s_range = list(set(s_range))[0:num_circuits]
+        elif method == 3:
+            num_circuits = min(input_size, max_circuits)
+            if input_size <= max_circuits:
+                s_range = list(range(num_circuits))
+            else:
+                s_range = np.random.randint(0, 2**(input_size), num_circuits + 2)
+                s_range = list(set(s_range))[0:num_circuits]
         else:
-            bitset.append(0)
-    
-    return bitset
-    
-    
-############### Result Data Analysis
+            sys.exit("Invalid QFT method")
 
-# Define expected distribution calculated from applying the iqft to the prepared secret_int state
+        print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        all_qcs[str(num_qubits)] = {}
+
+        # Select unique random secret integers as circuit inputs
+        if 2**(input_size) <= max_circuits:
+            s_range = list(range(num_circuits))
+        else:
+            s_range = np.random.randint(1, 2**(input_size), num_circuits + 2)
+            s_range = list(set(s_range))[0:max_circuits]
+
+        # Create each circuit with a different input value and store in the dict
+        for s_int in s_range:
+            s_int = int(s_int)
+            if input_value is not None:
+                s_int = input_value
+
+            circuit_id = s_int
+            bitset = str_to_ivec(input_size, s_int)
+            if verbose: print(f"... s_int={s_int} bitset={bitset}")
+
+            ts = time.time()
+            qc = kernel.QuantumFourierTransform(num_qubits, s_int, bitset, method, use_midcircuit_measurement)
+            metrics.store_metric(input_size, circuit_id, 'create_time', time.time()-ts)
+
+            all_qcs[str(num_qubits)][str(circuit_id)] = qc
+
+    return all_qcs, metrics.circuit_metrics
+
+
+############### Result Analysis (used by run_circuits)
+
+def analyze_and_print_result(qc, result, num_qubits, num_shots, s_int=None, method=None):
+    """Compare measured results against expected distribution and compute fidelity."""
+    secret_int = s_int
+    counts = result.get_counts(qc)
+    if verbose: print(f"For secret int {secret_int} measured: {counts}")
+
+    if method == 1:
+        secret_int_plus_one = (secret_int + 1) % (2 ** num_qubits)
+        key = format(secret_int_plus_one, f"0{num_qubits}b")
+        correct_dist = {key: 1.0}
+    elif method == 2:
+        key = format(secret_int, f"0{num_qubits}b")
+        correct_dist = {key: 1.0}
+    elif method == 3:
+        correct_dist = expected_dist(num_qubits, secret_int, counts)
+
+    fidelity = metrics.polarization_fidelity(counts, correct_dist)
+    if verbose: print(f"... fidelity: {fidelity}")
+    return counts, fidelity
+
 def expected_dist(num_qubits, secret_int, counts):
+    """Compute the expected measurement distribution for method 3 (partial superposition)."""
     dist = {}
     s = num_qubits - secret_int
     for key in counts.keys():
@@ -61,200 +148,125 @@ def expected_dist(num_qubits, secret_int, counts):
             dist[key] = 1/(2**s)
     return dist
 
-############### Result Data Analysis
-
-# Analyze and print measured results
-def analyze_and_print_result (qc, result, num_qubits, num_shots, s_int=None, method=None):
-
-    secret_int = s_int
-
-    # obtain counts from the result object
-    counts = result.get_counts(qc)
-    if verbose: print(f"For secret int {secret_int} measured: {counts}") 
-
-    # For method 1, expected result is always the secret_int
-    if method==1:
-        
-        # add one to the secret_int to compensate for the extra rotations done between QFT and IQFT
-        secret_int_plus_one = (secret_int + 1) % (2 ** num_qubits)
-
-        # create the key that is expected to have all the measurements (for this circuit)
-        key = format(secret_int_plus_one, f"0{num_qubits}b")
-
-        # correct distribution is measuring the key 100% of the time
-        correct_dist = {key: 1.0}
-        if verbose: print(f"... correct_dist: {correct_dist}")
-        
-    # For method 2, expected result is always the secret_int
-    elif method==2:
-
-        # create the key that is expected to have all the measurements (for this circuit)
-        key = format(secret_int, f"0{num_qubits}b")
-
-        # correct distribution is measuring the key 100% of the time
-        correct_dist = {key: 1.0}
-    
-    # For method 3, correct_dist is a distribution with more than one value
-    elif method==3:
-
-        # correct_dist is from the expected dist
-        correct_dist = expected_dist(num_qubits, secret_int, counts)
-            
-    # use our polarization fidelity rescaling
-    fidelity = metrics.polarization_fidelity(counts, correct_dist)
-
-    if verbose: print(f"... fidelity: {fidelity}")
-
-    return counts, fidelity
+def str_to_ivec(input_size: int, s_int: int):
+    """Convert an integer to a list of bits (LSB first)."""
+    s = ('{0:0' + str(input_size) + 'b}').format(s_int)
+    bitset = []
+    for i in range(input_size):
+        if s[input_size - 1 - i] == '1':
+            bitset.append(1)
+        else:
+            bitset.append(0)
+    return bitset
 
 
-################ Benchmark Loop
+############### Run Circuits
 
-# Execute program with default parameters
-def run (min_qubits=2, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100,
-        method=1, use_midcircuit_measurement = False, input_value=None,
-        backend_id=None, provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, warmup=False, get_circuits=False,
-        max_batch_size=None,
-        draw_circuits=True, plot_results=True):
+def run_circuits(all_qcs,
+    num_shots=100, method=1, max_batch_size=None,
+    backend_id=None, provider_backend=None,
+    hub="ibm-q", group="open", project="main",
+    exec_options=None, context=None, api=None,
+):
+    """Execute benchmark circuits and collect metrics.
 
-    # Configure the QED-C Benchmark package for use with the given API
-    qedc_benchmarks_init(api, "quantum_fourier_transform", ["qft_kernel"])
-    import qft_kernel as kernel
+    Args:
+        all_qcs: circuit dict from get_circuits()
+        num_shots: measurement shots per circuit (default 100)
+        method: algorithm method, for result analysis (default 1)
+        max_batch_size: max circuits per batch; None = no limit (default None)
+        backend_id: backend identifier (default None = qasm_simulator)
+        provider_backend: provider backend instance (default None)
+        hub, group, project: IBMQ credentials (defaults "ibm-q"/"open"/"main")
+        exec_options: additional execution options dict (default None)
+        context: context identifier for metrics (default None)
+        api: programming API if not already initialized (default None)
+    """
+    qedc_get_kernel("qft_kernel", api=api)
     import execute as ex
 
-    ##########
+    if context is None:
+        context = f"{benchmark_name} ({method}) Benchmark"
 
-    print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
-
-    # create context identifier
-    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
-
-    # special argument handling
-    ex.verbose = verbose
-
-    # validate parameters (smallest circuit is 2 qubits)
-    max_qubits = max(2, max_qubits)
-    min_qubits = min(max(2, min_qubits), max_qubits)
-    skip_qubits = max(1, skip_qubits)
-    #print(f"min, max qubits = {min_qubits} {max_qubits}")
-
-    ##########
-
-    # Initialize metrics module
-    metrics.init_metrics(warmup)
-
-    # Define custom result handler
-    def execution_handler (qc, result, input_size, circuit_id, num_shots):
-
+    # Result handler: called for each circuit after execution completes
+    def execution_handler(qc, result, input_size, circuit_id, num_shots):
         num_qubits = int(input_size)
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
                 s_int=int(circuit_id), method=method)
         metrics.store_metric(input_size, circuit_id, 'fidelity', fidelity)
 
-    # Initialize execution module using the execution result handler above and specified backend_id
+    # Set up execution target and submit all circuits as a batch
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
 
-    ##########
-
-    # Build all circuits into a dict
-    all_qcs = {}
-    for input_size in range(min_qubits, max_qubits + 1, skip_qubits):
-
-        # reset random seed
-        np.random.seed(0)
-
-        num_qubits = input_size
-
-        # determine number of circuits to execute for this group
-        # and determine range of secret strings to loop over
-        if method == 1 or method == 2:
-            num_circuits = min(2 ** (input_size), max_circuits)
-
-            if 2**(input_size) <= max_circuits:
-                s_range = list(range(num_circuits))
-            else:
-                s_range = np.random.randint(0, 2**(input_size), num_circuits + 2)
-                s_range = list(set(s_range))[0:num_circuits]
-
-        elif method == 3:
-            num_circuits = min(input_size, max_circuits)
-
-            if input_size <= max_circuits:
-                s_range = list(range(num_circuits))
-            else:
-                s_range = np.random.randint(0, 2**(input_size), num_circuits + 2)
-                s_range = list(set(s_range))[0:num_circuits]
-
-        else:
-            sys.exit("Invalid QFT method")
-
-        print(f"************\n{'Creating' if get_circuits else 'Executing'} [{num_circuits}] circuits with num_qubits = {num_qubits}")
-        all_qcs[str(num_qubits)] = {}
-
-        # determine range of secret strings to loop over
-        if 2**(input_size) <= max_circuits:
-            s_range = list(range(num_circuits))
-        else:
-            # create selection larger than needed and remove duplicates
-            s_range = np.random.randint(1, 2**(input_size), num_circuits + 2)
-            s_range = list(set(s_range))[0:max_circuits]
-
-        # loop over limited # of secret strings for this
-        for s_int in s_range:
-            s_int = int(s_int)
-
-            # if user specifies input_value, use it instead
-            # DEVNOTE: if max_circuits used, this will generate separate bar for each num_circuits
-            if input_value is not None:
-                s_int = input_value
-
-            # create circuit_id for use with metrics and execution framework
-            circuit_id = s_int
-
-            # convert the secret int string to array of integers, each representing one bit
-            bitset = str_to_ivec(input_size, s_int)
-            if verbose: print(f"... s_int={s_int} bitset={bitset}")
-
-            # create the circuit for given qubit size and secret string, store time metric
-            ts = time.time()
-            qc = kernel.QuantumFourierTransform(num_qubits, s_int, bitset, method, use_midcircuit_measurement)
-            metrics.store_metric(input_size, circuit_id, 'create_time', time.time()-ts)
-
-            all_qcs[str(num_qubits)][str(circuit_id)] = qc
-
-    # Early return if we just want the circuits
-    if get_circuits:
-        print(f"************\nReturning circuits and circuit information")
-        return all_qcs, metrics.circuit_metrics
-
-    # Compute circuit metrics, execute as array, and process results
     ex.compute_all_circuit_metrics(all_qcs)
     ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
     metrics.finalize_all_groups()
-       
-    ##########
-    
-    if mpi.leader():
+
+
+############### Plot Results
+
+def plot_results(
+    method=1, num_shots=100, max_circuits=3,
+    api=None, draw_circuits=True, plot_results=True,
+):
+    """Draw sample circuit and plot benchmark metrics.
+
+    Args:
+        method: algorithm method, for plot title (default 1)
+        num_shots: shots, for plot subtitle (default 100)
+        max_circuits: circuit reps, for plot subtitle (default 3)
+        api: programming API name for plot title (default None)
+        draw_circuits: draw a sample circuit diagram (default True)
+        plot_results: generate metrics plots (default True)
+    """
+    kernel = qedc_get_kernel("qft_kernel", api=api)
+
+    if qedc_is_leader():
         if draw_circuits:
-            # draw a sample circuit
             kernel.kernel_draw()
 
         if plot_results:
-            # Plot metrics for all circuit sizes
-            options = {"method":method, "shots": num_shots, "reps": max_circuits}
-            metrics.plot_metrics(f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}", options=options)
+            options = {"method": method, "shots": num_shots, "reps": max_circuits}
+            metrics.plot_metrics(
+                f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}",
+                options=options)
+
+
+############### Run (convenience)
+
+def run(**kwargs):
+    """Create circuits, execute, and plot. Accepts any arg from
+    get_circuits(), run_circuits(), or plot_results()."""
+
+    def _for(func):
+        return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
+
+    get_circuits_only = kwargs.pop('get_circuits', False)
+
+    # Step 1: Create the benchmark circuits
+    all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
+
+    # Step 2: If user just wants circuits, return them now
+    if get_circuits_only:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, circuit_metrics
+
+    # Step 3: Execute circuits on the target backend
+    run_circuits(all_qcs, **_for(run_circuits))
+
+    # Step 4: Draw sample circuit and plot metrics
+    plot_results(**_for(plot_results))
+
 
 #######################
 # MAIN
 
 import argparse
 def get_args():
-    parser = argparse.ArgumentParser(description="Quantum Fourier Transform Benchmark")
+    parser = argparse.ArgumentParser(description="Quantum Fourier Transform Benchmark (v2)")
     parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
     parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
     parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
@@ -269,33 +281,21 @@ def get_args():
     parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
-    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
     parser.add_argument("--use_midcircuit_measurement", "-mid", action="store_true", help="Use dynamic circuit")
-    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
 
-# if main, execute method
 if __name__ == '__main__':
     args = get_args()
-
-    # special argument handling
     verbose = args.verbose
-
     if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
 
-    # execute benchmark program
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
-        num_shots=args.num_shots,
-        method=args.method,
+        num_shots=args.num_shots, method=args.method,
         use_midcircuit_measurement=args.use_midcircuit_measurement,
-        input_value=args.input_value,
-        backend_id=args.backend_id,
-        exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
-        api=args.api, warmup=args.warmup,
-        max_batch_size=args.max_batch_size,
-        draw_circuits=not args.nodraw, plot_results=not args.noplot
-        )
-   
+        input_value=args.input_value, backend_id=args.backend_id,
+        exec_options={"noise_model": None} if args.nonoise else None,
+        api=args.api, max_batch_size=args.max_batch_size,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot)
