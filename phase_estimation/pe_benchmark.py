@@ -1,216 +1,248 @@
 '''
 Phase Estimation Benchmark Program
 (C) Quantum Economic Development Consortium (QED-C) 2024.
+
+Three key functions, each independently callable:
+  - get_circuits(): Create benchmark circuits (std + app args)
+  - run_circuits(): Execute circuits and collect metrics (exec args)
+  - plot_results(): Draw circuits and plot metrics (plot args)
+  - run(): Convenience that calls all three
 '''
 
+import inspect
 import time
 import numpy as np
 
-# Add benchmark home dir to path, so the benchmark can be run without pip installing.
 import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-# The QED-C initialization module
-from _common.qedc_init import qedc_benchmarks_init
+from _common.qedc_init import qedc_get_kernel, qedc_is_leader
 from _common import metrics
-from _common import qcb_mpi as mpi
 
-
-# Benchmark Name
 benchmark_name = "Phase Estimation"
 
 np.random.seed(0)
-
 verbose = False
 
 
-############### Analyze Result
+############### Get Circuits
 
-# Analyze and print measured results
-# Expected result is always theta, so fidelity calc is simple
+def get_circuits(
+    # Standard args (common across benchmarks)
+    min_qubits=3, max_qubits=8, skip_qubits=1,
+    max_circuits=3, num_shots=100,
+    # App-specific args
+    use_midcircuit_measurement=False, init_phase=None,
+    api=None,
+):
+    """Create Phase Estimation benchmark circuits.
+
+    Standard args (common to all benchmarks):
+        min_qubits: smallest circuit width (default 3)
+        max_qubits: largest circuit width (default 8)
+        skip_qubits: increment between widths (default 1)
+        max_circuits: max circuits per qubit group (default 3)
+        num_shots: measurement shots, stored in metrics (default 100)
+
+    App-specific args:
+        use_midcircuit_measurement: use dynamic circuits for inverse QFT (default False)
+        init_phase: fixed phase value for all circuits; None = random (default None)
+        api: programming API; None = use qedc_set_api() value (default None)
+
+    Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
+    """
+
+    # Load the API-specific circuit kernel for this benchmark (e.g. qiskit or cudaq)
+    kernel = qedc_get_kernel("pe_kernel", api=api)
+
+    num_state_qubits = 1  # fixed, not exposed to users
+
+    # validate parameters
+    if max_qubits < num_state_qubits + 2:
+        print(f"ERROR: PE Benchmark needs at least {num_state_qubits + 2} qubits to run")
+        return {}, {}
+    min_qubits = max(max(3, min_qubits), num_state_qubits + 2)
+    skip_qubits = max(1, skip_qubits)
+
+    metrics.init_metrics()
+
+    # Build circuits at each qubit width, with max_circuits random phase values per width
+    all_qcs = {}
+    for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+
+        np.random.seed(0)
+
+        # as circuit width grows, the number of counting qubits increases
+        num_counting_qubits = num_qubits - num_state_qubits
+        num_circuits = min(2 ** (num_counting_qubits), max_circuits)
+
+        print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        all_qcs[str(num_qubits)] = {}
+
+        # Select random theta values scaled to [0, 1)
+        if 2**(num_counting_qubits) <= max_circuits:
+            theta_choices = list(range(num_circuits))
+        else:
+            theta_choices = np.random.randint(1, 2**(num_counting_qubits), num_circuits + 10)
+            theta_choices = list(set(theta_choices))[0:num_circuits]
+
+        theta_range = [i/(2**(num_counting_qubits)) for i in theta_choices]
+
+        # Create each circuit with a different phase value and store in the dict
+        for theta in theta_range:
+            theta = float(theta)
+            if init_phase:
+                theta = init_phase
+
+            circuit_id = theta
+
+            ts = time.time()
+            qc = kernel.PhaseEstimation(num_qubits, theta, use_midcircuit_measurement)
+            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
+
+            all_qcs[str(num_qubits)][str(circuit_id)] = qc
+
+    return all_qcs, metrics.circuit_metrics
+
+
+############### Result Analysis (used by run_circuits)
+
 def analyze_and_print_result(qc, result, num_qubits, num_shots, theta=None):
+    """Compare measured results against expected phase distribution and compute fidelity."""
+    num_counting_qubits = num_qubits - 1
+    counts = result.get_counts(qc)
 
-	num_counting_qubits = num_qubits - 1
+    correct_dist = theta_to_bitstring(theta, num_counting_qubits)
 
-	# get results as measured counts
-	counts = result.get_counts(qc)
+    if num_counting_qubits < 15:
+        thermal_dist = metrics.uniform_dist(num_counting_qubits)
+    else:
+        thermal_dist = None
 
-	# calculate expected output histogram
-	correct_dist = theta_to_bitstring(theta, num_counting_qubits)
-	
-	# generate thermal_dist and ap form of thermal_dist to be comparable to correct_dist
-	if num_counting_qubits < 15:
-		thermal_dist = metrics.uniform_dist(num_counting_qubits)
-		app_thermal_dist = bitstring_to_theta(thermal_dist, num_counting_qubits)
-	else :
-		thermal_dist = None
-		app_thermal_dist = None
-		
-	# convert counts expectation to app form for visibility
-	# app form of correct distribution is measuring theta correctly 100% of the time
-	app_counts = bitstring_to_theta(counts, num_counting_qubits)
-	app_correct_dist = {theta: 1.0} 
-	
-	if verbose:
-		print(f"For theta {theta}, expected: {correct_dist} measured: {counts}")
-		#print(f"	... For theta {theta} thermal_dist: {thermal_dist}")
-		print(f"For theta {theta}, app expected: {app_correct_dist} measured: {app_counts}")
-		#print(f"	... For theta {theta} app_thermal_dist: {app_thermal_dist}")
-		
-	# use polarization fidelity with rescaling
-	fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
-	
-	# use polarization fidelity with rescaling
-	fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
-	#fidelity = metrics.polarization_fidelity(app_counts, app_correct_dist, app_thermal_dist)
-	
-	hf_fidelity = metrics.hellinger_fidelity_with_expected(counts, correct_dist)
-	
-	if verbose: print(f"  ... fidelity: {fidelity}	hf_fidelity: {hf_fidelity}")
-		
-	return counts, fidelity
+    if verbose:
+        app_counts = bitstring_to_theta(counts, num_counting_qubits)
+        app_correct_dist = {theta: 1.0}
+        print(f"For theta {theta}, expected: {correct_dist} measured: {counts}")
+        print(f"For theta {theta}, app expected: {app_correct_dist} measured: {app_counts}")
 
-# Convert theta to a bitstring distribution
+    fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
+    if verbose: print(f"  ... fidelity: {fidelity}")
+    return counts, fidelity
+
 def theta_to_bitstring(theta, num_counting_qubits):
-	counts = {format( int(theta * (2**num_counting_qubits)), "0"+str(num_counting_qubits)+"b"): 1.0}
-	return counts
+    """Convert theta to expected bitstring distribution."""
+    return {format(int(theta * (2**num_counting_qubits)), "0"+str(num_counting_qubits)+"b"): 1.0}
 
-# Convert bitstring to theta representation, useful for debugging
 def bitstring_to_theta(counts, num_counting_qubits):
-	theta_counts = {}
-	for item in counts.items():
-		key, r = item
-		theta = int(key,2) / (2**num_counting_qubits)
-		if theta not in theta_counts.keys():
-			theta_counts[theta] = 0
-		theta_counts[theta] += r
-	return theta_counts
+    """Convert bitstring counts to theta representation (for debugging)."""
+    theta_counts = {}
+    for key, r in counts.items():
+        theta = int(key, 2) / (2**num_counting_qubits)
+        if theta not in theta_counts:
+            theta_counts[theta] = 0
+        theta_counts[theta] += r
+    return theta_counts
 
 
-################ Benchmark Loop
+############### Run Circuits
 
-# Execute program with default parameters
-def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100, use_midcircuit_measurement=False,
-		init_phase=None,
-		backend_id=None, provider_backend=None,
-		hub="ibm-q", group="open", project="main", exec_options=None,
-		context=None, api=None, warmup=False, get_circuits=False, method=None,
-		max_batch_size=None,
-		draw_circuits=True, plot_results=True):
-		
-	# Configure the QED-C Benchmark package for use with the given API
-	qedc_benchmarks_init(api, "phase_estimation", ["pe_kernel"])
-	import pe_kernel as kernel
-	import execute as ex
+def run_circuits(all_qcs,
+    num_shots=100, method=None, max_batch_size=None,
+    backend_id=None, provider_backend=None,
+    hub="ibm-q", group="open", project="main",
+    exec_options=None, context=None, api=None,
+):
+    """Execute benchmark circuits and collect metrics.
 
-	##########
+    Args:
+        all_qcs: circuit dict from get_circuits()
+        num_shots: measurement shots per circuit (default 100)
+        method: algorithm method, for plot options (default None)
+        max_batch_size: max circuits per batch; None = no limit (default None)
+        backend_id: backend identifier (default None = qasm_simulator)
+        provider_backend: provider backend instance (default None)
+        hub, group, project: IBMQ credentials (defaults "ibm-q"/"open"/"main")
+        exec_options: additional execution options dict (default None)
+        context: context identifier for metrics (default None)
+        api: programming API if not already initialized (default None)
+    """
+    qedc_get_kernel("pe_kernel", api=api)
+    import execute as ex
 
-	print(f"{benchmark_name} Benchmark Program - Qiskit")
+    if context is None:
+        context = f"{benchmark_name} Benchmark"
 
-	# create context identifier
-	if context is None: context = f"{benchmark_name} Benchmark"
+    # Result handler: called for each circuit after execution completes
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
+        num_qubits = int(num_qubits)
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                theta=float(circuit_id))
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
 
-	# special argument handling
-	ex.verbose = verbose
+    # Set up execution target and submit all circuits as a batch
+    ex.init_execution(execution_handler)
+    ex.set_execution_target(backend_id, provider_backend=provider_backend,
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
 
-	num_state_qubits = 1 # default, not exposed to users, cannot be changed in current implementation
+    ex.compute_all_circuit_metrics(all_qcs)
+    ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
+    metrics.finalize_all_groups()
 
-	# validate parameters (smallest circuit is 3 qubits)
-	num_state_qubits = max(1, num_state_qubits)
-	if max_qubits < num_state_qubits + 2:
-		print(f"ERROR: PE Benchmark needs at least {num_state_qubits + 2} qubits to run")
-		return
-	min_qubits = max(max(3, min_qubits), num_state_qubits + 2)
-	skip_qubits = max(1, skip_qubits)
-	#print(f"min, max, state = {min_qubits} {max_qubits} {num_state_qubits}")
 
-	##########
+############### Plot Results
 
-	# Initialize metrics module
-	metrics.init_metrics(warmup)
+def plot_results(
+    method=None, num_shots=100, max_circuits=3,
+    api=None, draw_circuits=True, plot_results=True,
+):
+    """Draw sample circuit and plot benchmark metrics.
 
-	# Define custom result handler
-	def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
+    Args:
+        method: algorithm method, for plot options (default None)
+        num_shots: shots, for plot subtitle (default 100)
+        max_circuits: circuit reps, for plot subtitle (default 3)
+        api: programming API name for plot title (default None)
+        draw_circuits: draw a sample circuit diagram (default True)
+        plot_results: generate metrics plots (default True)
+    """
+    kernel = qedc_get_kernel("pe_kernel", api=api)
 
-		# determine fidelity of result set
-		num_qubits = int(num_qubits)
-		counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
-				theta=float(circuit_id))
-		metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
+    if qedc_is_leader():
+        if draw_circuits:
+            kernel.kernel_draw()
 
-	# Initialize execution module using the execution result handler above and specified backend_id
-	ex.init_execution(execution_handler)
-	ex.set_execution_target(backend_id, provider_backend=provider_backend,
-			hub=hub, group=group, project=project, exec_options=exec_options,
-			context=context)
+        if plot_results:
+            options = {"method": method, "shots": num_shots, "reps": max_circuits}
+            metrics.plot_metrics(
+                f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}",
+                options=options)
 
-	##########
 
-	# Build all circuits into a dict
-	all_qcs = {}
-	for num_qubits in range(min_qubits, max_qubits + 1, skip_qubits):
+############### Run (convenience)
 
-		# reset random seed
-		np.random.seed(0)
+def run(**kwargs):
+    """Create circuits, execute, and plot. Accepts any arg from
+    get_circuits(), run_circuits(), or plot_results()."""
 
-		# as circuit width grows, the number of counting qubits is increased
-		num_counting_qubits = num_qubits - num_state_qubits
+    def _for(func):
+        return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
 
-		# determine number of circuits to execute for this group
-		num_circuits = min(2 ** (num_counting_qubits), max_circuits)
+    get_circuits_only = kwargs.pop('get_circuits', False)
 
-		print(f"************\n{'Creating' if get_circuits else 'Executing'} [{num_circuits}] circuits with num_qubits = {num_qubits}")
-		all_qcs[str(num_qubits)] = {}
+    # Step 1: Create the benchmark circuits
+    all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
 
-		# determine range of secret strings to loop over
-		if 2**(num_counting_qubits) <= max_circuits:
-			theta_choices = list(range(num_circuits))
-		else:
-			theta_choices = np.random.randint(1, 2**(num_counting_qubits), num_circuits + 10)
-			theta_choices = list(set(theta_choices))[0:num_circuits]
+    # Step 2: If user just wants circuits, return them now
+    if get_circuits_only:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, circuit_metrics
 
-		# scale choices to 1.0
-		theta_range = [i/(2**(num_counting_qubits)) for i in theta_choices]
+    # Step 3: Execute circuits on the target backend
+    run_circuits(all_qcs, **_for(run_circuits))
 
-		# loop over limited # of random theta choices
-		for theta in theta_range:
-			theta = float(theta)
-
-			# if initial phase passed in, use it instead of random values
-			if init_phase:
-				theta = init_phase
-
-			# create circuit_id for use with metrics and execution framework
-			circuit_id = theta
-
-			# create the circuit for given qubit size and theta, store time metric
-			ts = time.time()
-			qc = kernel.PhaseEstimation(num_qubits, theta, use_midcircuit_measurement)
-			metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
-
-			all_qcs[str(num_qubits)][str(circuit_id)] = qc
-
-	# Early return if we want the circuits and creation information
-	if get_circuits:
-		print(f"************\nReturning circuits and circuit information")
-		return all_qcs, metrics.circuit_metrics
-
-	# Compute circuit metrics, execute as array, and process results
-	ex.compute_all_circuit_metrics(all_qcs)
-	ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
-	metrics.finalize_all_groups()
-
-	##########
-
-	if mpi.leader():
-		if draw_circuits:
-			# draw a sample circuit
-			kernel.kernel_draw()
-
-		if plot_results:
-			# Plot metrics for all circuit sizes
-			options = {"method":method, "shots": num_shots, "reps": max_circuits}
-			metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+    # Step 4: Draw sample circuit and plot metrics
+    plot_results(**_for(plot_results))
 
 
 #######################
@@ -218,48 +250,36 @@ def run(min_qubits=3, max_qubits=8, skip_qubits=1, max_circuits=3, num_shots=100
 
 import argparse
 def get_args():
-	parser = argparse.ArgumentParser(description="Bernstei-Vazirani Benchmark")
-	parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
-	parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
-	parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
-	parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
-	parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits", type=int)
-	parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
-	parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
-	parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
-	parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)
-	parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
-	parser.add_argument("--init_phase", "-p", default=0.0, help="Input Phase Value", type=float)
-	parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
-	parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
-	parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
-	parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
-	parser.add_argument("--use_midcircuit_measurement", "-mid", action="store_true", help="Use dynamic circuit")
-	parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
-	parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
-	parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
-	return parser.parse_args()
+    parser = argparse.ArgumentParser(description="Phase Estimation Benchmark")
+    parser.add_argument("--api", "-a", default=None, help="Programming API", type=str)
+    parser.add_argument("--target", "-t", default=None, help="Target Backend", type=str)
+    parser.add_argument("--backend_id", "-b", default=None, help="Backend Identifier", type=str)
+    parser.add_argument("--num_shots", "-s", default=100, help="Number of shots", type=int)
+    parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits", type=int)
+    parser.add_argument("--min_qubits", "-min", default=3, help="Minimum number of qubits", type=int)
+    parser.add_argument("--max_qubits", "-max", default=8, help="Maximum number of qubits", type=int)
+    parser.add_argument("--skip_qubits", "-k", default=1, help="Number of qubits to skip", type=int)
+    parser.add_argument("--max_circuits", "-c", default=3, help="Maximum circuit repetitions", type=int)
+    parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
+    parser.add_argument("--init_phase", "-p", default=0.0, help="Input Phase Value", type=float)
+    parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--use_midcircuit_measurement", "-mid", action="store_true", help="Use dynamic circuit")
+    parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
+    return parser.parse_args()
 
-# if main, execute method
 if __name__ == '__main__':
-	args = get_args()
+    args = get_args()
+    verbose = args.verbose
+    if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
 
-	# special argument handling
-	verbose = args.verbose
-
-	if args.num_qubits > 0: args.min_qubits = args.max_qubits = args.num_qubits
-
-	# execute benchmark program
-	run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
-		skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
-		num_shots=args.num_shots,
-		#method=args.method,
-		use_midcircuit_measurement=args.use_midcircuit_measurement,
-		init_phase=args.init_phase,
-		backend_id=args.backend_id,
-		exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
-		api=args.api, warmup=args.warmup,
-		max_batch_size=args.max_batch_size,
-		draw_circuits=not args.nodraw, plot_results=not args.noplot
-		)
-   
+    run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
+        skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
+        num_shots=args.num_shots, method=args.method,
+        use_midcircuit_measurement=args.use_midcircuit_measurement,
+        init_phase=args.init_phase, backend_id=args.backend_id,
+        exec_options={"noise_model": None} if args.nonoise else None,
+        api=args.api, max_batch_size=args.max_batch_size,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot)
