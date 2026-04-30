@@ -411,7 +411,7 @@ def report_metrics_for_group (group):
             if len(group_metrics["avg_depths"]) > 0:
                 avg_depth = group_metrics["avg_depths"][group_index]
                 if avg_depth > 0:
-                    print(f"Average Circuit Algorithmic Depth, \u03BE (xi) for the {group} qubit group = {int(avg_depth)}, {avg_xi}")
+                    print(f"Average Circuit Algorithmic Depth, xi for the {group} qubit group = {int(avg_depth)}, {avg_xi}")
             
             avg_tr_xi = 0
             if len(group_metrics["avg_tr_xis"]) > 0:
@@ -424,7 +424,7 @@ def report_metrics_for_group (group):
             if len(group_metrics["avg_tr_depths"]) > 0:
                 avg_tr_depth = group_metrics["avg_tr_depths"][group_index]
                 if avg_tr_depth > 0:
-                    print(f"Average Normalized Transpiled Depth, \u03BE (xi), 2q gates for the {group} qubit group = {int(avg_tr_depth)}, {avg_tr_xi}, {avg_tr_n2q}")
+                    print(f"Average Normalized Transpiled Depth, xi, 2q gates for the {group} qubit group = {int(avg_tr_depth)}, {avg_tr_xi}, {avg_tr_n2q}")
                     
             avg_create_time = group_metrics["avg_create_times"][group_index]
             avg_elapsed_time = group_metrics["avg_elapsed_times"][group_index]
