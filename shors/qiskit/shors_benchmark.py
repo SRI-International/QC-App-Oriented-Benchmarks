@@ -376,134 +376,192 @@ def analyze_and_print_result(qc, result, num_qubits, num_shots, order=None, meth
     return counts, fidelity
 
         
-#################### Benchmark Loop        
+############### Get Circuits
 
-# Execute program with default parameters
-def run (min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method = 1,
-        verbose=verbose, backend_id=None, provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False,
-        max_batch_size=None,
-        draw_circuits=True, plot_results=True):
+import inspect
 
-    print(f"{benchmark_name} ({method}) Benchmark - Qiskit")
+def get_circuits(
+    # Standard args (common across benchmarks)
+    min_qubits=3, max_qubits=18, max_circuits=1,
+    num_shots=100, method=1,
+    api=None,
+):
+    """Create Shor's Order Finding benchmark circuits.
 
-    # Each method has a different minimum amount of qubits to run and a certain multiple of qubits that can be run
-    qubit_multiple = 2                  #Standard for Method 2 and 3
+    Standard args (common to all benchmarks):
+        min_qubits: smallest circuit width (default 3, adjusted per method)
+        max_qubits: largest circuit width (default 18)
+        max_circuits: max circuits per qubit group (default 1)
+        num_shots: measurement shots, stored in metrics (default 100)
+        method: 1=Beauregard, 2=standard QPE, 3=iterative QPE (default 1)
+        api: programming API; None = use qedc_set_api() value (default None)
 
-    max_qubits = max(max_qubits, min_qubits)        # max must be >= min
+    Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
+    """
+
+    # Each method has different minimum qubits and qubit step size
+    qubit_multiple = 2
+    max_qubits = max(max_qubits, min_qubits)
 
     if method == 1:
-        min_qubits = max(min_qubits, 10)            # need min of 10
+        min_qubits = max(min_qubits, 10)
         qubit_multiple = 4
-    elif method ==2:
-        min_qubits = max(min_qubits, 7)             # need min of 7
+    elif method == 2:
+        min_qubits = max(min_qubits, 7)
     elif method == 3:
-        min_qubits = max(min_qubits,6)              # need min of 6
+        min_qubits = max(min_qubits, 6)
 
-    #skip_qubits = max(1, skip_qubits)
-    
     if max_qubits < min_qubits:
         print(f"Max number of qubits {max_qubits} is too low to run method {method} of {benchmark_name}")
-        return
+        return {}, {}
 
-    # create context identifier
-    if context is None: context = f"{benchmark_name} ({method}) Benchmark"
-    
-    ##########
-    
-    # Initialize metrics module
     metrics.init_metrics()
 
-    # Define custom result handler # number_order contains an array of length 2 with the number and order
-    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
-        # determine fidelity of result set
-        num_qubits = int(num_qubits)
-        #Must convert number_order from string to array
-        order = eval(circuit_id)[1]
-        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
-                order=order, method=method)
-        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
-    
-    # Initialize execution module using the execution result handler above and specified backend_id
-    ex.init_execution(execution_handler)
-    ex.set_execution_target(backend_id, provider_backend=provider_backend,
-            hub=hub, group=group, project=project, exec_options=exec_options,
-            context=context)
- 
-    ##########
-
-    # Build all circuits into a dict
+    # Build circuits at each qubit width
     all_qcs = {}
     for num_qubits in range(min_qubits, max_qubits + 1, qubit_multiple):
 
         input_size = num_qubits - 1
 
-        if method == 1: num_bits = int((num_qubits -2)/4)
-        elif method == 2: num_bits = int((num_qubits -3)/2)
-        elif method == 3: num_bits = int((num_qubits -2)/2)
+        if method == 1: num_bits = int((num_qubits - 2) / 4)
+        elif method == 2: num_bits = int((num_qubits - 3) / 2)
+        elif method == 3: num_bits = int((num_qubits - 2) / 2)
 
-        # determine number of circuits to execute for this group
         num_circuits = min(2 ** (input_size), max_circuits)
 
-        print(f"************\n{'Creating' if get_circuits else 'Executing'} [{num_circuits}] circuits with num_qubits = {num_qubits}")
+        print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
         all_qcs[str(num_qubits)] = {}
 
+        # Create circuits with randomly generated number/order pairs
         for _ in range(num_circuits):
 
             base = 1
             while base == 1:
-                # Ensure N is a number using the greatest bit
                 number = np.random.randint(2 ** (num_bits - 1) + 1, 2 ** num_bits)
                 order = np.random.randint(2, number)
                 base = generate_base(number, order)
 
-            # Checking if generated order can be reduced. Can also run through prime list in shors utils
+            # reduce order to smallest prime factor
             if order % 2 == 0: order = 2
             if order % 3 == 0: order = 3
 
             number_order = (number, order)
-
-            # create circuit_id for use with metrics and execution framework
             circuit_id = number_order
 
             if verbose: print(f"Generated {number=}, {base=}, {order=}")
 
-            # create the circuit for given qubit size and order, store time metric
             ts = time.time()
             qc = ShorsAlgorithm(number, base, method=method, verbose=verbose)
-            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time()-ts)
+            metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
             # collapse the 4 sub-circuit levels used in this benchmark (for qiskit)
             qc = qc.decompose().decompose().decompose().decompose()
 
             all_qcs[str(num_qubits)][str(circuit_id)] = qc
 
-    # Early return if we just want the circuits
-    if get_circuits:
-        print(f"************\nReturning circuits and circuit information")
-        return all_qcs, metrics.circuit_metrics
+    return all_qcs, metrics.circuit_metrics
 
-    # Compute circuit metrics, execute as array, and process results
+
+############### Run Circuits
+
+def run_circuits(all_qcs,
+    num_shots=100, method=1, max_batch_size=None,
+    backend_id=None, provider_backend=None,
+    hub="ibm-q", group="open", project="main",
+    exec_options=None, context=None, api=None,
+):
+    """Execute benchmark circuits and collect metrics.
+
+    Args:
+        all_qcs: circuit dict from get_circuits()
+        num_shots: measurement shots per circuit (default 100)
+        method: algorithm method, for result analysis (default 1)
+        max_batch_size: max circuits per batch; None = no limit (default None)
+        backend_id: backend identifier (default None = qasm_simulator)
+        provider_backend: provider backend instance (default None)
+        hub, group, project: IBMQ credentials (defaults "ibm-q"/"open"/"main")
+        exec_options: additional execution options dict (default None)
+        context: context identifier for metrics (default None)
+        api: programming API if not already initialized (default None)
+    """
+    if context is None:
+        context = f"{benchmark_name} ({method}) Benchmark"
+
+    # Result handler: extracts order from circuit_id tuple and computes fidelity
+    def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
+        num_qubits = int(num_qubits)
+        order = eval(circuit_id)[1]
+        counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
+                order=order, method=method)
+        metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
+
+    # Set up execution target and submit all circuits as a batch
+    ex.init_execution(execution_handler)
+    ex.set_execution_target(backend_id, provider_backend=provider_backend,
+            hub=hub, group=group, project=project, exec_options=exec_options,
+            context=context)
+
     ex.compute_all_circuit_metrics(all_qcs)
     ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
     metrics.finalize_all_groups()
 
-    ##########
 
-    # print the last circuit created
+############### Plot Results
+
+def plot_results(
+    num_shots=100, max_circuits=1,
+    api=None, draw_circuits=True, plot_results=True,
+):
+    """Draw sample circuits and plot benchmark metrics.
+
+    Args:
+        num_shots: shots, for plot subtitle (default 100)
+        max_circuits: circuit reps, for plot subtitle (default 1)
+        api: programming API name for plot title (default None)
+        draw_circuits: draw sample circuit diagrams (default True)
+        plot_results: generate metrics plots (default True)
+    """
     if draw_circuits:
-        print("Sample Circuit:"); print(QC_ if QC_ != None else "  ... too large!")
-        print("\nControlled Ua Operator 'cUa' ="); print(CUA_ if CUA_ != None else " ... too large!")
-        print("\nControlled Multiplier Operator 'cMULTamodN' ="); print(CMULTAMODN_ if CMULTAMODN_!= None else " ... too large!")
-        print("\nControlled Modular Adder Operator 'ccphiamodN' ="); print(CCPHIADDMODN_ if CCPHIADDMODN_ != None else " ... too large!")
-        print("\nPhi Adder Operator '\u03C6ADD' ="); print(PHIADD_ if PHIADD_ != None else " ... too large!")
-        print("\nQFT Circuit ="); print(QFT_ if QFT_ != None else "  ... too large!")
+        print("Sample Circuit:"); print(QC_ if QC_ is not None else "  ... too large!")
+        print("\nControlled Ua Operator 'cUa' ="); print(CUA_ if CUA_ is not None else " ... too large!")
+        print("\nControlled Multiplier Operator 'cMULTamodN' ="); print(CMULTAMODN_ if CMULTAMODN_ is not None else " ... too large!")
+        print("\nControlled Modular Adder Operator 'ccphiamodN' ="); print(CCPHIADDMODN_ if CCPHIADDMODN_ is not None else " ... too large!")
+        print("\nPhi Adder Operator '\u03C6ADD' ="); print(PHIADD_ if PHIADD_ is not None else " ... too large!")
+        print("\nQFT Circuit ="); print(QFT_ if QFT_ is not None else "  ... too large!")
 
-    # Plot metrics for all circuit sizes
     if plot_results:
         options = {"shots": num_shots, "reps": max_circuits}
-        metrics.plot_metrics(f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}", options=options)
+        metrics.plot_metrics(
+            f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}",
+            options=options)
+
+
+############### Run (convenience)
+
+def run(**kwargs):
+    """Create circuits, execute, and plot. Accepts any arg from
+    get_circuits(), run_circuits(), or plot_results()."""
+
+    def _for(func):
+        return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
+
+    get_circuits_only = kwargs.pop('get_circuits', False)
+
+    print(f"{benchmark_name} ({kwargs.get('method', 1)}) Benchmark - Qiskit")
+
+    # Step 1: Create the benchmark circuits
+    all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
+
+    # Step 2: If user just wants circuits, return them now
+    if get_circuits_only:
+        print(f"************\nReturning circuits and circuit information")
+        return all_qcs, circuit_metrics
+
+    # Step 3: Execute circuits on the target backend
+    run_circuits(all_qcs, **_for(run_circuits))
+
+    # Step 4: Draw sample circuit and plot metrics
+    plot_results(**_for(plot_results))
 
 
 if __name__ == '__main__':

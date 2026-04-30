@@ -3,45 +3,25 @@ Variational Quantum Eigensolver Benchmark Program
 (C) Quantum Economic Development Consortium (QED-C) 2024.
 
 This is a thin wrapper that delegates to the qiskit implementation.
-VQE benchmark requires data files that are located in the qiskit subdirectory.
 '''
 
-# Add benchmark home dir to path, so the benchmark can be run without pip installing.
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 from _common.qedc_init import qedc_benchmarks_init
 
-# Benchmark Name
 benchmark_name = "VQE Simulation"
 
 
-def run(min_qubits=4, max_qubits=8, skip_qubits=1,
-        max_circuits=3, num_shots=4092, method=1,
-        backend_id=None, provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False,
-        max_batch_size=None,
-        draw_circuits=True, plot_results=True):
+def run(**kwargs):
+    """Create circuits, execute, and plot. Delegates to qiskit implementation.
+    See vqe/qiskit/vqe_benchmark.py for detailed parameter documentation."""
 
-    # Configure the QED-C Benchmark package for use with the given API
-    # Note: VQE only has qiskit implementation, so we always use qiskit
-    qedc_benchmarks_init(api if api else "qiskit", "vqe", ["vqe_benchmark"])
-
-    # Import the actual benchmark module (now available after qedc_init)
+    qedc_benchmarks_init(kwargs.get('api', None) or "qiskit", "vqe", ["vqe_benchmark"])
     import vqe_benchmark as vqe_impl
 
-    # Delegate to the implementation
-    return vqe_impl.run(
-        min_qubits=min_qubits, max_qubits=max_qubits, skip_qubits=skip_qubits,
-        max_circuits=max_circuits, num_shots=num_shots, method=method,
-        backend_id=backend_id, provider_backend=provider_backend,
-        hub=hub, group=group, project=project, exec_options=exec_options,
-        context=context, api=api, get_circuits=get_circuits,
-        max_batch_size=max_batch_size,
-        draw_circuits=draw_circuits, plot_results=plot_results
-    )
+    return vqe_impl.run(**kwargs)
 
 
 #######################
@@ -68,17 +48,13 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-
     if args.num_qubits > 0:
         args.min_qubits = args.max_qubits = args.num_qubits
 
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
-        num_shots=args.num_shots,
-        method=args.method,
+        num_shots=args.num_shots, method=args.method,
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
-        api=args.api,
-        max_batch_size=args.max_batch_size,
-        draw_circuits=not args.nodraw, plot_results=not args.noplot
-    )
+        api=args.api, max_batch_size=args.max_batch_size,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot)

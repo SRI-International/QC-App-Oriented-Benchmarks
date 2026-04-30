@@ -5,41 +5,23 @@ Shor's Order Finding Algorithm Benchmark Program
 This is a thin wrapper that delegates to the qiskit implementation.
 '''
 
-# Add benchmark home dir to path, so the benchmark can be run without pip installing.
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 from _common.qedc_init import qedc_benchmarks_init
 
-# Benchmark Name
 benchmark_name = "Shor's Order Finding"
 
 
-def run(min_qubits=3, max_circuits=1, max_qubits=18, num_shots=100, method=1,
-        backend_id=None, provider_backend=None,
-        hub="ibm-q", group="open", project="main", exec_options=None,
-        context=None, api=None, get_circuits=False,
-        max_batch_size=None,
-        draw_circuits=True, plot_results=True):
+def run(**kwargs):
+    """Create circuits, execute, and plot. Delegates to qiskit implementation.
+    See shors/qiskit/shors_benchmark.py for detailed parameter documentation."""
 
-    # Configure the QED-C Benchmark package for use with the given API
-    # Note: Shors primarily uses qiskit implementation
-    qedc_benchmarks_init(api if api else "qiskit", "shors", ["shors_benchmark"])
-
-    # Import the actual benchmark module (now available after qedc_init)
+    qedc_benchmarks_init(kwargs.get('api', None) or "qiskit", "shors", ["shors_benchmark"])
     import shors_benchmark as shors_impl
 
-    # Delegate to the implementation
-    return shors_impl.run(
-        min_qubits=min_qubits, max_circuits=max_circuits, max_qubits=max_qubits,
-        num_shots=num_shots, method=method,
-        backend_id=backend_id, provider_backend=provider_backend,
-        hub=hub, group=group, project=project, exec_options=exec_options,
-        context=context, api=api, get_circuits=get_circuits,
-        max_batch_size=max_batch_size,
-        draw_circuits=draw_circuits, plot_results=plot_results
-    )
+    return shors_impl.run(**kwargs)
 
 
 #######################
@@ -65,16 +47,12 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-
     if args.num_qubits > 0:
         args.min_qubits = args.max_qubits = args.num_qubits
 
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         max_circuits=args.max_circuits, num_shots=args.num_shots,
-        method=args.method,
-        backend_id=args.backend_id,
+        method=args.method, backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
-        api=args.api,
-        max_batch_size=args.max_batch_size,
-        draw_circuits=not args.nodraw, plot_results=not args.noplot
-    )
+        api=args.api, max_batch_size=args.max_batch_size,
+        draw_circuits=not args.nodraw, plot_results=not args.noplot)
