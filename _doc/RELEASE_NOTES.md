@@ -3,6 +3,22 @@
 The **QED-C Application-Oriented Benchmarks** suite is continually evolving, with issues fixed and enhancements made to add features.
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.
 
+---
+
+## Version 2.0 Release Notes 
+
+This version constitutes a major refactor of the entire benchmark repository.  For backwards compatibility with externally developed work that uses the repo, use version 1.2.1, the last satable release of the earlier benchmark repository structure.
+
+### Release 2.0.0 - 15 May 2026
+
+TBD ...
+
+---
+
+## Version 1.2 Release Notes 
+
+This is the last stable version of the earlier benchmark repository structure. For convenience in running externally developed work with no changes, a branch names master-260414 contains source code for this version.
+
 ### Release 1.2.1 - 14 April 2026
 
 - **Parallel Execution Logic modifed to use GPU Cluster Size** The pair of options that was implemented earlier to support parallel execution of circuits in hamlib has been modifed. The options **--parallel_mode** and **--num_gpus** have been removed and replaced with the **--gpus_per_cluster (-gpc)** option, which indicates the number of GPUs that cluster together to execute a single circuit. E.g., if you have 16 GPUs and set -gpc to 1, then you could execute 16 circuits in parallel. with 1 GPU used for each execution. The default is to use ALL GPUs in a cluster if MPI is enabled. This is the option which provides more qubits by distributing the state vector across all of the GPUs. The "hybrid" mode in which you might set -gpc to a number other than 1 is not yet implemented.
