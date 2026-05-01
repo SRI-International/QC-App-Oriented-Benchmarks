@@ -906,6 +906,7 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         return (pseudo_job.job_id(), ExecutionResult([]))
 
     counts_array = None
+    per_circuit_times = []
 
     # MPI parallel execution (gpus_per_circuit support)
     if gpus_per_circuit is not None and mpi.enabled() and mpi.size > 1:
@@ -920,12 +921,15 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     # Default: sequential execution (single GPU or mgpu mode)
     if counts_array is None:
         counts_array = []
+        per_circuit_times = []
         for circuit in circuits:
             try:
+                ts_circ = time.time()
                 if noise is None:
                     result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
                 else:
                     result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+                per_circuit_times.append(time.time() - ts_circ)
 
                 # Convert cudaq SampleResult to dict for counts array
                 counts = {key: val for key, val in result.items()}
@@ -938,6 +942,7 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
                     import traceback
                     traceback.print_exc()
                 counts_array.append({})
+                per_circuit_times.append(0.0)
 
     # Create pseudo-Job for job_id consistency
     pseudo_job = Job()
@@ -949,6 +954,10 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
 
     # Wrap in ExecutionResult
     results = ExecutionResult(counts_array)
+
+    # Attach per-circuit timing if available (sequential execution only)
+    if per_circuit_times:
+        results._per_circuit_times = per_circuit_times
 
     if verbose:
         print(f"... execute_circuits complete, job_id={job_id}")
@@ -997,16 +1006,22 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
     if isinstance(counts_list, dict):
         counts_list = [counts_list]  # single-element array was unwrapped
 
-    # For cudaq, exec_time is the elapsed_time (no separate timing from backend)
-    exec_time = elapsed_time if elapsed_time is not None else 0.0
+    # Use per-circuit times if available (from sequential execution), otherwise batch time
+    per_circuit_times = getattr(results, '_per_circuit_times', None)
 
     # Process each circuit's result
-    for ci, counts in zip(circuits_info, counts_list):
+    for idx, (ci, counts) in enumerate(zip(circuits_info, counts_list)):
 
-        # Store timing metrics
-        if elapsed_time is not None:
-            metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time)
-        metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', exec_time)
+        # Store timing metrics: per-circuit if available, otherwise batch elapsed_time
+        if per_circuit_times and idx < len(per_circuit_times):
+            circ_time = per_circuit_times[idx]
+            metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', circ_time)
+            metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', circ_time)
+        else:
+            if elapsed_time is not None:
+                metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time)
+            metrics.store_metric(ci["group"], ci["circuit"], 'exec_time',
+                                 elapsed_time if elapsed_time is not None else 0.0)
 
         # Store job_id for tracking/retrieval
         if job_id is not None:
