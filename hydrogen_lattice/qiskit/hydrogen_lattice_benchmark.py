@@ -1779,12 +1779,21 @@ def run_objective_function(**kwargs):
     These arguments are preset to single execution: method=2, max_circuits=1, max_iter=1
     """
 
+    # Use a single-evaluation minimizer that calls the objective once at x0 and returns.
+    # This avoids COBYLA's minimum function evaluation requirement (num_vars + 2) in newer scipy,
+    # which would move the parameters away from the requested initial point.
+    def single_eval(objective_function, initial_parameters, callback):
+        from scipy.optimize import OptimizeResult
+        energy = objective_function(initial_parameters)
+        return OptimizeResult(x=initial_parameters, fun=energy, success=True, nfev=1)
+
     # Fix arguments required to execute of single instance
     hl_single_args = dict(
 
         method=2,                   # method 2 defines the objective function
         max_circuits=1,             # only one repetition
         max_iter=1,                 # maximum minimizer iterations to perform, set to 1
+        minimizer_function=single_eval,  # single evaluation, no optimization
 
         # disable display options for line plots
         line_y_metrics=None,

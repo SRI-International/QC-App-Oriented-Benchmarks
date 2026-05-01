@@ -1,6 +1,15 @@
-from hydrogen_lattice.qiskit import hydrogen_lattice_benchmark
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.resolve()))
+
+from _common.qedc_init import qedc_benchmarks_init
+qedc_benchmarks_init("qiskit", "hydrogen_lattice", ["hydrogen_lattice_benchmark"])
+import hydrogen_lattice_benchmark
+
 import numpy as np
 from scipy.optimize import minimize
+
+import pytest
 
 
 def test_hydrogen_lattice_hartree_fock():
@@ -29,6 +38,8 @@ def test_h2_converges_to_exact():
             "radius": radius,
             "parameter_mode": 2,
             "backend_id": "statevector_simulator",
+            "plot_results": False,
+            "show_results_summary": False,
         }
 
         # Variable to hold key_metrics
@@ -40,8 +51,10 @@ def test_h2_converges_to_exact():
             key_metrics_output.update(key_metrics)
             return energy
 
-        # Run the optimization
-        result = minimize(objective_func, initial_guess, method="L-BFGS-B")
+        # Run the optimization (use larger epsilon for finite differences since
+        # the energy landscape is smooth and the default eps=1e-8 is too small)
+        result = minimize(objective_func, initial_guess, method="L-BFGS-B",
+                          options={"eps": 1e-3})
 
         # Extract optimized thetas_array and minimum energy
         optimized_thetas_array = result.x
@@ -192,15 +205,8 @@ def test_h6_full_opt():
         parameter_mode=2,  # 1 - use single theta parameter, 2 - map multiple thetas to pairs
         max_circuits=1,  # just run once
         minimizer_function=L_BFGS_B,
-        # disable display options for line plots
-        line_y_metrics=None,
-        line_x_metrics=None,
-        # disable display options for bar plots
-        bar_y_metrics=None,
-        bar_x_metrics=None,
-        # disable display options for area plots
-        score_metric=None,
-        x_metric=None,
+        plot_results=False,
+        show_results_summary=False,
     )
 
     # Run the benchmark in method 2
