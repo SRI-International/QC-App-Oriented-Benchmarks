@@ -3,9 +3,11 @@
 The **QED-C Application-Oriented Benchmarks** suite is continually evolving, with issues fixed and enhancements made to add features.
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.
 
----
+## Version 2.0 Release Notes 
 
-### Version 2.0 - May 2026
+This version constitutes a major refactor of the entire benchmark repository.  For backwards compatibility with externally developed work that uses the repo, use version 1.2.1, the last satable release of the earlier benchmark repository structure.
+
+### Release 2.0.0 - 15 May 2026
 
 #### Three-Function Benchmark API
 
@@ -78,6 +80,10 @@ Fixed `UnicodeEncodeError` on Windows terminals (cp1252) by replacing the Greek 
 - Removed duplicate benchmark files (`grovers/qiskit/grovers_benchmark.py`, `amplitude_estimation/qiskit/ae_benchmark.py`)
 
 ---
+
+## Version 1.2 Release Notes 
+
+This is the last stable version of the earlier benchmark repository structure. For convenience in running externally developed work with no changes, a branch names master-260414 contains source code for this version.
 
 ### Release 1.2.1 - 14 April 2026
 
