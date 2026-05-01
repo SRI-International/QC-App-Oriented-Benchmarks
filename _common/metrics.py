@@ -863,7 +863,8 @@ def get_backend_title(backend_id=None):
 # Extract short app name from the title passed in by user
 def get_appname_from_title(suptitle):
     appname = suptitle[len('Benchmark Results - '):len(suptitle)]
-    appname = appname[:appname.index(' - ')]
+    if ' - ' in appname:
+        appname = appname[:appname.index(' - ')]
     
     # for creating plot image filenames replace spaces
     appname = appname.replace(' ', '-') 
