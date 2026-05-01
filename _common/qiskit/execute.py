@@ -1737,7 +1737,10 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     opts = copy.copy(backend_exec_options) if backend_exec_options else {}
 
     # Extract noise model — exec_options can override the module-level noise
+    # Values: None = no noise, "default" = built-in default model, or a NoiseModel object
     this_noise = opts.pop("noise_model", noise)
+    if this_noise == "default":
+        this_noise = default_noise_model()
 
     # Extract executor callback
     executor = opts.pop("executor", None)

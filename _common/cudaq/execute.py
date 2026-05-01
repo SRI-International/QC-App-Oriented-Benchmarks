@@ -290,11 +290,24 @@ def set_execution_target(backend_id=None, provider_backend=None,
             print(f"    ... Invalid `exec_options`; using default options.")
             
     cudaq.set_target(backend_id, **backend_options)
-    
+
+    # Handle noise_model in exec_options (same pattern as qiskit)
+    # Values: None = no noise, "default" = built-in depolarization model, or a cudaq.NoiseModel object
+    global noise
+    if exec_options is not None and isinstance(exec_options, dict):
+        if "noise_model" in exec_options:
+            nm = exec_options["noise_model"]
+            if nm == "default":
+                set_default_noise_model()
+            else:
+                noise = nm
+            if verbose:
+                print(f"  ... noise model set from exec_options: {noise}")
+
     # create an informative device name used by the metrics module
     device_name = backend_id
     metrics.set_plot_subtitle(f"Device = {device_name}")
-    
+
     print(f"... configure execution for target backend_id = {backend_id}")
 
 # CUDA-Q supports several different models of noise. In this default
