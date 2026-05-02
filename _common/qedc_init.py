@@ -171,13 +171,17 @@ def qedc_is_leader():
     return mpi.leader()
 
 
-def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] = None) -> None:
+def qedc_benchmarks_init(api: str, benchmark_name: str = None, module_names: list[str] = None) -> None:
     """
     Dynamically load API-specific benchmark modules and inject them into sys.modules.
 
     This function sets up sys.path to find kernel implementations and the execute module
     for the specified API, then loads them and makes them available for import throughout
     the benchmark program.
+
+    Can be called with just an API name to initialize the execute module without loading
+    any benchmark-specific kernels. This is useful when you need to access execute settings
+    (e.g., execute.verbose) before running any benchmarks.
 
     IMPORTANT: This function must be called AFTER argument parsing (to get the API name)
     but BEFORE importing any benchmark modules that depend on the dynamically loaded code.
@@ -187,6 +191,7 @@ def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] 
              or None (defaults to "qiskit").
         benchmark_name: The name of the benchmark directory (e.g., "hidden_shift", "hamlib").
                        Must match the actual directory name in the repository.
+                       If None, only the common execute module is loaded (no kernels).
         module_names: List of module names to dynamically load from benchmark_name/api/.
                      Example: ["hs_kernel"] will load hidden_shift/qiskit/hs_kernel.py
 
@@ -199,6 +204,11 @@ def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] 
         - Adds "execute" to sys.modules, pointing to _common/{api}/execute.py
 
     Example:
+        # Initialize just the execute module (e.g., to set verbose before running benchmarks)
+        qedc_benchmarks_init("qiskit")
+        import execute
+        execute.verbose = True
+
         # In hidden_shift/hs_benchmark.py
         qedc_benchmarks_init("qiskit", "hidden_shift", ["hs_kernel"])
 
@@ -217,31 +227,36 @@ def qedc_benchmarks_init(api: str, benchmark_name: str, module_names: list[str] 
     if module_names is None:
         module_names = []
 
-    # Calculate directories
-    benchmark_dir = _project_root / benchmark_name
-    api_dir = benchmark_dir / api
+    # Calculate common directories (always needed)
     common_dir = _project_root / "_common"
     common_api_dir = common_dir / api
 
-    # Add API-specific directories to sys.path (like master does)
-    # This allows direct imports of kernel modules and execute
-    for path in [str(api_dir), str(common_dir), str(common_api_dir)]:
+    # Add common directories to sys.path
+    for path in [str(common_dir), str(common_api_dir)]:
         if path not in sys.path:
             sys.path.insert(0, path)
 
-    # For cudaq, may need to reset caches
-    if api == "cudaq":
-        reset_module_caches(api, benchmark_name, module_names)
+    # If a benchmark was specified, set up benchmark-specific paths and load kernels
+    if benchmark_name is not None:
+        benchmark_dir = _project_root / benchmark_name
+        api_dir = benchmark_dir / api
 
-    # Dynamically load each requested kernel module
-    for module_name in module_names:
-        # Check if already loaded to avoid redundant imports
-        if sys.modules.get(module_name) is None:
-            # Load the module (path is already set up, so bare name works)
-            module = import_module(module_name)
+        if str(api_dir) not in sys.path:
+            sys.path.insert(0, str(api_dir))
 
-            # Inject into sys.modules with bare name for convenient importing
-            sys.modules[module_name] = module
+        # For cudaq, may need to reset caches
+        if api == "cudaq":
+            reset_module_caches(api, benchmark_name, module_names)
+
+        # Dynamically load each requested kernel module
+        for module_name in module_names:
+            # Check if already loaded to avoid redundant imports
+            if sys.modules.get(module_name) is None:
+                # Load the module (path is already set up, so bare name works)
+                module = import_module(module_name)
+
+                # Inject into sys.modules with bare name for convenient importing
+                sys.modules[module_name] = module
 
     # Load the API-specific execute module from _common
     if sys.modules.get("execute") is None:
