@@ -57,6 +57,10 @@ from quantum_fourier_transform import qft_benchmark
 qft_benchmark.run(method=1, **app_args, **exec_args)
 ```
 
+#### Streamlined Notebook Configuration
+
+The `benchmarks-qiskit.ipynb` setup cell now presents backend configurations (simulator, IBM Cloud, IBM Platform, IonQ, BlueQubit) as self-contained blocks — uncomment the one you need. Noise model options are consolidated inline. The separate custom options cell has been removed.
+
 #### Simplified Thin Wrappers
 
 Benchmark wrappers (e.g. `maxcut/maxcut_benchmark.py`) now use `run(**kwargs)` forwarding instead of manually listing all parameters. The `api` argument selects the implementation; `backend_id` defaults to `"qasm_simulator"` if not provided.
