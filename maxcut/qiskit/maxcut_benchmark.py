@@ -1068,6 +1068,8 @@ def run_circuits(all_qcs,
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
     """
+    ex.verbose = verbose
+
     if context is None:
         context = f"{benchmark_name} ({method}) Benchmark"
 

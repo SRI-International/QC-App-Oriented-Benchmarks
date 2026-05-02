@@ -48,6 +48,7 @@ def qedc_benchmarks_init(api: str = "qiskit"):
 
     # Import the execution module and make it globally accessible
     import execute as ex
+    ex.verbose = verbose
     globals()["ex"] = ex
 
     # Import the metrics module and make it globally accessible

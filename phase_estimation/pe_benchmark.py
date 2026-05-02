@@ -168,6 +168,7 @@ def run_circuits(all_qcs,
     """
     qedc_get_kernel("pe_kernel", api=api)
     import execute as ex
+    ex.verbose = verbose
 
     if context is None:
         context = f"{benchmark_name} Benchmark"

@@ -1423,6 +1423,8 @@ def run_circuits(all_qcs,
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
     """
+    ex.verbose = verbose
+
     # Result handler: computes fidelity for each circuit
     def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         num_qubits = int(num_qubits)
