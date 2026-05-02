@@ -243,8 +243,11 @@ def store_metric (group, circuit, metric, value):
             # In this case, the metric input will be ignored
             store_metric(group, circuit, key, value[key]) 
     else:
+        # Round time metrics to 4 decimal places for readability
+        if isinstance(value, float) and 'time' in metric:
+            value = round(value, 4)
         circuit_metrics[group][circuit][metric] = value
-    #print(f'{group} {circuit} {metric} -> {value}') 
+    #print(f'{group} {circuit} {metric} -> {value}')
     
 # method to pop the all metrics associated with a group and circuit in the group
 def pop_metric (group, circuit):

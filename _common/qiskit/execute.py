@@ -994,9 +994,9 @@ def get_circuit_metrics(qc):
                 n2q += value
             else:
                 n1q += value
-        qc_xi = n2q / (n1q + n2q)
+        qc_xi = round(n2q / (n1q + n2q), 3)
         qc_n2q = n2q
-    
+
     return qc_depth, qc_size, qc_count_ops, qc_xi, qc_n2q
     
 # Transpile the circuit to obtain normalized size metrics against a common basis gate set
@@ -1033,8 +1033,8 @@ def transpile_for_metrics(qc):
             if key == "barrier": continue
             if key.startswith("c"): n2q += value
             else: n1q += value
-        qc_tr_xi = n2q / (n1q + n2q) 
-        qc_tr_n2q = n2q   
+        qc_tr_xi = round(n2q / (n1q + n2q), 3)
+        qc_tr_n2q = n2q
     #print(f"... qc_tr_xi = {qc_tr_xi} {n1q} {n2q}")
     
     logger.info(f'transpile_for_metrics - {round(time.time() - st, 5)} (ms)')

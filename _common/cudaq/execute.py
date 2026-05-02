@@ -485,7 +485,7 @@ def get_circuit_metrics(qc, qc_size):
         #qc_depth = compute_circuit_depth(qc[0](*qc[1]))
         #print(qc_depth)
         
-        qc_xi = two_qubit_gates / max(total_gates, 1)
+        qc_xi = round(two_qubit_gates / max(total_gates, 1), 3)
         qc_n2q = two_qubit_gates
         
         # not currently used
