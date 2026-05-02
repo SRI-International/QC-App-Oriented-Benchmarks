@@ -37,6 +37,10 @@ import cudaq
 
 verbose = False
 
+# Auto-warmup: execute a tiny circuit on first call to execute_circuits() to prime the JIT
+auto_warmup = True
+_warmup_done = False
+
 # Parallel execution configuration (reserved for future use)
 _parallel_config = {
     "gpus_per_circuit": None,
@@ -910,8 +914,25 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
           or None if wait=False
     """
 
+    global _warmup_done
+
     if verbose:
         print(f"... execute_circuits({len(circuits)}, {num_shots}, wait={wait}, gpus_per_circuit={gpus_per_circuit})")
+
+    # Auto-warmup: run a tiny circuit to prime the JIT compiler on first execution
+    if auto_warmup and not _warmup_done:
+        _warmup_done = True
+        try:
+            @cudaq.kernel
+            def _warmup_kernel():
+                q = cudaq.qubit()
+                h(q)
+                mz(q)
+            cudaq.sample(_warmup_kernel, shots_count=1)
+            if verbose:
+                print("... warmup circuit executed")
+        except Exception:
+            pass  # warmup is best-effort
 
     # Handle empty case
     if not circuits or len(circuits) == 0:

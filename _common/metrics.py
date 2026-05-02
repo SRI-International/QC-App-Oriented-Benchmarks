@@ -72,8 +72,6 @@ save_metrics = True
 # Option to merge new group metrics into existing
 merge_group_metrics = False
 
-# Exclude first circuit from timing stats as warmup
-use_warmup_run = False
 
 # Suffix to append to filename of DATA- files
 data_suffix = os.getenv("QEDCBMS_DATA_SUFFIX", "")
@@ -162,11 +160,8 @@ def set_properties ( properties=None ):
 # DATA ANALYSIS - METRICS COLLECTION AND REPORTING
       
 # Initialize the metrics module, creating an empty table of metrics
-def init_metrics (warmup = False):
-    global start_time, use_warmup_run
-    
-
-    use_warmup_run = warmup
+def init_metrics ():
+    global start_time
     # create empty dictionary for circuit metrics
     circuit_metrics.clear()
     circuit_metrics_detail.clear()
@@ -303,7 +298,6 @@ def get_metric (group, circuit, metric):
    
 # Aggregate metrics for a specific group, creating average across circuits in group
 def aggregate_metrics_for_group (group):
-    global use_warmup_run
     group = str(group)
     
     # generate totals, then divide by number of circuits to calculate averages    
@@ -344,13 +338,13 @@ def aggregate_metrics_for_group (group):
         group_metrics["avg_tr_n2qs"].append(avg)
         
         # aggregate time metrics
-        avg, std = get_circuit_stats_for_metric(group, "create_time", 3, use_warmup_run)
+        avg, std = get_circuit_stats_for_metric(group, "create_time", 3)
         group_metrics["avg_create_times"].append(avg)
         group_metrics["std_create_times"].append(std)
-        avg, std = get_circuit_stats_for_metric(group, "elapsed_time", 3, use_warmup_run)
+        avg, std = get_circuit_stats_for_metric(group, "elapsed_time", 3)
         group_metrics["avg_elapsed_times"].append(avg)
         group_metrics["std_elapsed_times"].append(std)
-        avg, std = get_circuit_stats_for_metric(group, "exec_time", 3, use_warmup_run)
+        avg, std = get_circuit_stats_for_metric(group, "exec_time", 3)
         group_metrics["avg_exec_times"].append(avg)
         group_metrics["std_exec_times"].append(std)
 
@@ -377,13 +371,10 @@ def aggregate_metrics_for_group (group):
         
 # Compute average and stddev for a metric in a given circuit group
 # DEVNOTE: this creates new array every time; could be more efficient if multiple metrics done at once
-def get_circuit_stats_for_metric(group, metric, precision, warmup = False):
+def get_circuit_stats_for_metric(group, metric, precision):
     metric_array = []
     for circuit in circuit_metrics[group]:
         if metric in circuit_metrics[group][circuit]:
-            if warmup:
-                warmup = False
-                continue
             metric_array.append(circuit_metrics[group][circuit][metric])
         else:
             metric_array.append(None)

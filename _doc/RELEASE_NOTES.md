@@ -29,6 +29,10 @@ The execution engine (`_common/qiskit/execute.py` and `_common/cudaq/execute.py`
 
 The older single-circuit pipelined execution functions (`submit_circuit`, `throttle_execution`, `finalize_execution`) remain for backward compatibility but are no longer used by any benchmark.
 
+#### Auto-Warmup (CUDA-Q)
+
+The first call to `execute_circuits()` in CUDA-Q now automatically runs a tiny 1-qubit circuit to prime the JIT compiler before executing the user's circuits. This eliminates the JIT compilation overhead from the first benchmark circuit's timing, without requiring any flags or special handling. The per-benchmark `--warmup` CLI option has been removed. To disable auto-warmup, set `execute.auto_warmup = False`.
+
 #### Per-Circuit Execution Timing (CUDA-Q)
 
 Each circuit executed via `execute_circuits()` in CUDA-Q now records its own execution time individually, rather than dividing the batch total evenly. This provides accurate per-circuit timing without requiring `max_batch_size=1`.

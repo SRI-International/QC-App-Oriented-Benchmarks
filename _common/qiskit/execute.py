@@ -114,6 +114,10 @@ result_handler = None
 # Option to compute normalized depth during execution (can disable to reduce overhead in large circuits)
 use_normalized_depth = True
 
+# Auto-warmup: execute a tiny circuit on first call to execute_circuits() to prime the backend
+auto_warmup = False
+_warmup_done = False
+
 # Option to perform explicit transpile to collect depth metrics
 # (disabled after first circuit in iterative algorithms)
 do_transpile_metrics = True
@@ -1730,8 +1734,22 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
           or None if wait=False
     """
 
+    global _warmup_done
+
     if verbose:
         print(f"... execute_circuits({len(circuits)}, {num_shots}, wait={wait})")
+
+    # Auto-warmup: run a tiny circuit to prime the backend on first execution
+    if auto_warmup and not _warmup_done:
+        _warmup_done = True
+        try:
+            from qiskit import QuantumCircuit as QC
+            wc = QC(1, 1); wc.h(0); wc.measure(0, 0)
+            backend.run(wc, shots=1).result()
+            if verbose:
+                print("... warmup circuit executed")
+        except Exception:
+            pass  # warmup is best-effort
 
     # Extract exec_options from the global set by set_execution_target()
     opts = copy.copy(backend_exec_options) if backend_exec_options else {}

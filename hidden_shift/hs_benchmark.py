@@ -246,7 +246,6 @@ def get_args():
     parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
-    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     return parser.parse_args()
