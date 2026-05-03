@@ -1711,6 +1711,244 @@ def test_execution():
 ###########################################################################
 
 
+def _extract_per_circuit_times(raw_result, num_circuits):
+    """
+    Extract per-circuit execution times from a Qiskit result object.
+
+    Returns a list of floats (one per circuit), or None if per-circuit
+    timing is not available. Ported from the old job_complete() timing logic.
+
+    Timing sources (in priority order):
+    1. Per-experiment time_taken from result.to_dict()["results"][i] (simulators)
+    2. execution_spans from PrimitiveResult metadata (IBM hardware via sampler)
+    3. Total time_taken / num_circuits (evenly divided fallback)
+    4. None (caller falls back to elapsed_time)
+    """
+    if num_circuits == 0:
+        return None
+
+    # Path A: Native Qiskit Result (non-sampler) — has to_dict()
+    if hasattr(raw_result, 'to_dict'):
+        try:
+            result_dict = raw_result.to_dict()
+
+            # Try per-experiment time_taken first (best data for simulators)
+            if "results" in result_dict:
+                experiments = result_dict["results"]
+                per_times = []
+                for exp in experiments:
+                    if "time_taken" in exp:
+                        per_times.append(exp["time_taken"])
+                    else:
+                        break
+                if len(per_times) == num_circuits:
+                    return per_times
+
+            # Fall back to total time_taken divided evenly
+            if "time_taken" in result_dict:
+                avg = result_dict["time_taken"] / num_circuits
+                return [avg] * num_circuits
+        except Exception:
+            pass
+
+        return None
+
+    # Path B: PrimitiveResult (sampler) — iterable over PubResults
+    # The old code submitted one circuit at a time, so top-level metadata was per-circuit.
+    # Now we submit batches, so we need per-pub metadata for individual circuit timing.
+    if hasattr(raw_result, 'metadata'):
+
+        if verbose:
+            print(f"... _extract_per_circuit_times: PrimitiveResult path, {num_circuits} circuits")
+            print(f"... top-level metadata keys: {list(raw_result.metadata.keys()) if isinstance(raw_result.metadata, dict) else type(raw_result.metadata)}")
+            try:
+                first_pub = raw_result[0]
+                print(f"... pub[0].metadata type: {type(first_pub.metadata)}")
+                if isinstance(first_pub.metadata, dict):
+                    print(f"... pub[0].metadata keys: {list(first_pub.metadata.keys())}")
+                    if 'execution' in first_pub.metadata:
+                        print(f"... pub[0].metadata['execution']: {first_pub.metadata['execution']}")
+                else:
+                    print(f"... pub[0].metadata = {first_pub.metadata}")
+            except Exception as e:
+                print(f"... could not inspect pub[0].metadata: {e}")
+
+        # Try per-pub metadata first (each PubResult may have its own timing)
+        # PrimitiveResult is iterable: result[i] is PubResult with its own .metadata
+        try:
+            per_times = []
+            for pub_result in raw_result:
+                pub_meta = pub_result.metadata
+                if isinstance(pub_meta, dict):
+                    if 'execution' in pub_meta:
+                        try:
+                            spans = pub_meta['execution']['execution_spans']['__value__']['spans']
+                            per_times.append(spans[0].duration)
+                            continue
+                        except (KeyError, TypeError, AttributeError, IndexError):
+                            pass
+                    if 'time_taken' in pub_meta:
+                        per_times.append(pub_meta['time_taken'])
+                        continue
+                # This pub has no timing — abort per-pub extraction
+                if verbose:
+                    print(f"... pub has no timing info, aborting per-pub extraction")
+                per_times = []
+                break
+            if len(per_times) == num_circuits:
+                if verbose:
+                    print(f"... per-pub times extracted: {per_times}")
+                return per_times
+        except (TypeError, IndexError) as e:
+            if verbose:
+                print(f"... per-pub iteration failed: {e}")
+
+        # Fall back to top-level metadata (batch-level timing, divided evenly)
+        if isinstance(raw_result.metadata, dict):
+            metadata = raw_result.metadata
+
+            # Try execution_spans (IBM hardware)
+            try:
+                if 'execution' in metadata:
+                    spans = metadata['execution']['execution_spans']['__value__']['spans']
+                    if verbose:
+                        print(f"... top-level execution_spans: {len(spans)} spans")
+                        for i, span in enumerate(spans[:3]):
+                            print(f"...   span[{i}]: duration={span.duration}")
+                    if len(spans) >= num_circuits:
+                        return [span.duration for span in spans[:num_circuits]]
+                    elif len(spans) == 1:
+                        avg = spans[0].duration / num_circuits
+                        if verbose:
+                            print(f"... single span, dividing evenly: {avg}")
+                        return [avg] * num_circuits
+            except (KeyError, TypeError, AttributeError, IndexError):
+                pass
+
+            # Try top-level time_taken divided evenly (last resort before None)
+            if "time_taken" in metadata:
+                try:
+                    avg = metadata["time_taken"] / num_circuits
+                    if verbose:
+                        print(f"... using top-level time_taken / {num_circuits} = {avg}")
+                    return [avg] * num_circuits
+                except (TypeError, ZeroDivisionError):
+                    pass
+
+        if verbose:
+            print(f"... no timing extracted from PrimitiveResult")
+
+    return None
+
+
+def _process_step_times_batch(job, circuits_info):
+    """
+    Extract detailed step timing from IBM hardware jobs and store per circuit.
+    Ported from the old process_step_times() function, adapted for batch processing.
+
+    This may override exec_time with quantum_seconds for real hardware.
+    Only called when job is an IBM backend job (supports time_per_step or metrics).
+    """
+    if job is None:
+        return
+
+    exec_creating_time = 0
+    exec_validating_time = 0
+    exec_queued_time = 0
+    exec_running_time = 0
+
+    # get breakdown of execution time, if method exists
+    # this attribute not available for some providers and only for circuit-runner model
+    if not use_sessions and "time_per_step" in dir(job) and callable(job.time_per_step):
+        try:
+            time_per_step = job.time_per_step()
+            if verbose:
+                print(f"... job.time_per_step() = {time_per_step}")
+
+            creating_time = time_per_step.get("CREATING")
+            validating_time = time_per_step.get("VALIDATING")
+            queued_time = time_per_step.get("QUEUED")
+            running_time = time_per_step.get("RUNNING")
+            completed_time = time_per_step.get("COMPLETED")
+
+            # make these all slightly non-zero so averaging code is triggered (> 0.001 required)
+            exec_creating_time = 0.001
+            exec_validating_time = 0.001
+            exec_queued_time = 0.001
+            exec_running_time = 0.001
+
+            # compute the detailed time metrics
+            if validating_time and creating_time:
+                exec_creating_time = (validating_time - creating_time).total_seconds()
+            if queued_time and validating_time:
+                exec_validating_time = (queued_time - validating_time).total_seconds()
+            if running_time and queued_time:
+                exec_queued_time = (running_time - queued_time).total_seconds()
+            if completed_time and running_time:
+                exec_running_time = (completed_time - running_time).total_seconds()
+        except Exception:
+            pass
+
+    # when sessions and sampler used, we obtain metrics differently
+    if use_sessions:
+        try:
+            job_metrics = job.metrics()
+            job_timestamps = job_metrics['timestamps']
+
+            if verbose:
+                print(f"... job.metrics() = {job_metrics}")
+
+            created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
+            created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds=created_time.microsecond)
+            finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
+            finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds=finished_time.microsecond)
+            running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
+            running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds=running_time.microsecond)
+
+            # compute the total seconds for creating and running the circuit
+            exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
+            exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
+
+            # these do not seem to be available
+            exec_validating_time = 0.001
+            exec_queued_time = 0.001
+
+            # when using sessions, the 'running_time' is the 'quantum exec time' - override it here
+            for ci in circuits_info:
+                metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', exec_running_time)
+
+            # use the data in usage field if it is returned, usually by hardware
+            # here we use the executions field to indicate we are on hardware
+            if "usage" in job_metrics and "executions" in job_metrics:
+                if job_metrics['executions'] > 0:
+                    exec_time = job_metrics['usage']['quantum_seconds']
+
+                    # and use this one as it seems to be valid for this case
+                    for ci in circuits_info:
+                        metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', exec_time)
+
+        except Exception as e:
+            if verbose:
+                print(f'WARNING: incomplete time metrics for batch')
+                print(f"... exception = {e}")
+
+    # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
+    exec_creating_time = max(0.001, exec_creating_time)
+    exec_validating_time = max(0.001, exec_validating_time)
+    exec_queued_time = max(0.001, exec_queued_time)
+    exec_running_time = max(0.001, exec_running_time)
+
+    # Store step breakdown for all circuits in the batch
+    for ci in circuits_info:
+        metrics.store_metric(ci["group"], ci["circuit"], 'exec_creating_time', exec_creating_time)
+        metrics.store_metric(ci["group"], ci["circuit"], 'exec_validating_time', 0.001)
+        metrics.store_metric(ci["group"], ci["circuit"], 'exec_queued_time', 0.001)
+        metrics.store_metric(ci["group"], ci["circuit"], 'exec_running_time', exec_running_time)
+
+    if verbose:
+        print(f"... computed exec times: queued = {exec_queued_time}, creating/transpiling = {exec_creating_time}, validating = {exec_validating_time}, running = {exec_running_time}")
+
+
 def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     """
     Execute an array of circuits. Pure execution — no metrics,
@@ -1786,13 +2024,18 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     if executor:
         pseudo_job = Job()
         counts_array = []
+        per_circuit_times = []
         for qc in circuits:
+            ts_circ = time.time()
             result = executor(qc, backend_name, backend, shots=num_shots, **opts)
+            per_circuit_times.append(time.time() - ts_circ)
             if hasattr(result, 'get_counts'):
                 counts_array.append(result.get_counts())
             else:
                 counts_array.append(result)
-        return (pseudo_job.job_id(), ExecutionResult(counts_array))
+        exec_result = ExecutionResult(counts_array)
+        exec_result._per_circuit_times = per_circuit_times
+        return (pseudo_job.job_id(), exec_result)
 
     ##########
     # Standard execution paths — always pass array
@@ -1869,6 +2112,20 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         if verbose: print(traceback.format_exc())
         result = ExecutionResult([{} for _ in circuits])
 
+    # Extract per-circuit timing from result and attach (cudaq pattern)
+    try:
+        per_circuit_times = _extract_per_circuit_times(raw_result, len(circuits))
+        if per_circuit_times:
+            result._per_circuit_times = per_circuit_times
+    except Exception:
+        pass  # timing extraction is best-effort
+
+    # Attach job object for hardware step timing in process_circuit_results
+    try:
+        result._job = job
+    except Exception:
+        pass
+
     if verbose:
         print(f"... execute_circuits complete, job_id={job_id}")
 
@@ -1920,39 +2177,69 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
     if isinstance(counts_list, dict):
         counts_list = [counts_list]  # single-element array was unwrapped by ExecutionResult
 
-    # Extract exec_time from result object (best-effort)
-    # Results may be a native Qiskit Result (has to_dict) or ExecutionResult (has native_result)
-    exec_time = 0.0
-    try:
-        # Get the native result object for timing extraction
-        native = getattr(results, 'native_result', results)
+    # Extract per-circuit timing (attached by execute_circuits, cudaq pattern)
+    per_circuit_times = getattr(results, '_per_circuit_times', None)
 
-        if hasattr(native, 'to_dict'):
-            # Native Qiskit Result — timing in result dict
-            result_dict = native.to_dict()
-            if "time_taken" in result_dict:
-                exec_time = result_dict["time_taken"]
-            elif "results" in result_dict and len(result_dict["results"]) > 0:
-                if "time_taken" in result_dict["results"][0]:
-                    exec_time = result_dict["results"][0]["time_taken"]
-        elif hasattr(native, 'metadata'):
-            # Sampler/PrimitiveResult — try to extract from metadata
-            pass  # exec_time stays 0, use elapsed_time as fallback
-    except Exception as e:
-        if verbose:
-            print(f"... could not extract exec_time: {e}")
+    # Extract batch-level exec_time as fallback (when per-circuit times not available)
+    batch_exec_time = 0.0
+    if per_circuit_times is None:
+        try:
+            native = getattr(results, 'native_result', results)
+
+            if hasattr(native, 'to_dict'):
+                # Native Qiskit Result — timing in result dict
+                result_dict = native.to_dict()
+                if "time_taken" in result_dict:
+                    batch_exec_time = result_dict["time_taken"]
+                elif "results" in result_dict and len(result_dict["results"]) > 0:
+                    if "time_taken" in result_dict["results"][0]:
+                        batch_exec_time = result_dict["results"][0]["time_taken"]
+            elif hasattr(native, 'metadata') and isinstance(native.metadata, dict):
+                if "time_taken" in native.metadata:
+                    batch_exec_time = native.metadata["time_taken"]
+        except Exception as e:
+            if verbose:
+                print(f"... could not extract exec_time: {e}")
 
     # Fall back to elapsed_time if no exec_time extracted
-    if exec_time == 0.0 and elapsed_time is not None:
-        exec_time = elapsed_time
+    if batch_exec_time == 0.0 and elapsed_time is not None:
+        batch_exec_time = elapsed_time
+
+    # Compute per-circuit elapsed times by distributing overhead proportionally.
+    # Overhead = elapsed_time - total_exec_time (transpilation, submission, queuing, etc.)
+    # Each circuit gets overhead proportional to its share of total exec time,
+    # so larger circuits absorb more overhead (they likely had more prep time too).
+    per_circuit_elapsed = None
+    if per_circuit_times and elapsed_time is not None:
+        total_exec = sum(per_circuit_times)
+        if total_exec > 0:
+            overhead = elapsed_time - total_exec
+            if overhead > 0:
+                per_circuit_elapsed = [
+                    et + overhead * (et / total_exec) for et in per_circuit_times
+                ]
+            else:
+                # No overhead (or negative due to timing granularity) — elapsed = exec
+                per_circuit_elapsed = list(per_circuit_times)
+        else:
+            # All exec times are zero — divide elapsed evenly
+            avg_elapsed = elapsed_time / len(per_circuit_times)
+            per_circuit_elapsed = [avg_elapsed] * len(per_circuit_times)
 
     # Process each circuit's result
-    for ci, counts in zip(circuits_info, counts_list):
+    for idx, (ci, counts) in enumerate(zip(circuits_info, counts_list)):
 
-        # Store timing metrics
-        if elapsed_time is not None:
-            metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time)
-        metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', exec_time)
+        # Store timing metrics: per-circuit if available, otherwise batch time
+        if per_circuit_times and idx < len(per_circuit_times):
+            metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', per_circuit_times[idx])
+            if per_circuit_elapsed:
+                metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', per_circuit_elapsed[idx])
+            elif elapsed_time is not None:
+                metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time)
+        else:
+            if elapsed_time is not None:
+                metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time)
+            metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', batch_exec_time)
 
         # Store job_id for tracking/retrieval
         if job_id is not None:
@@ -1970,6 +2257,11 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
                 print(f'ERROR: failed in result_handler for circuit {ci["group"]} {ci["circuit"]}')
                 print(f"... exception = {e}")
                 if verbose: print(traceback.format_exc())
+
+    # Process hardware step times if job object is available
+    job = getattr(results, '_job', None)
+    if job is not None and not hasattr(job, 'local_job'):
+        _process_step_times_batch(job, circuits_info)
 
 
 def submit_circuits(circuits, metadata=None, num_shots=100, max_batch_size=None, batch_by_group=False):
