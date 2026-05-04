@@ -3,7 +3,7 @@ HamLib Simulation Benchmark Program - CUDA Quantum Kernel
 (C) Quantum Economic Development Consortium (QED-C) 2025.
 '''
 
-from typing import Union, List, Tuple, Dict
+from typing import Union, List, Tuple, Dict, Callable
 import numpy as np
 
 import cudaq
@@ -453,58 +453,44 @@ def create_circuits_for_pauli_terms(qc: list, num_qubits: int, pauli_str_list: l
     return circuits
 
 @cudaq.kernel
-def kernel_with_subkernel(qc: cudaq.kernel, params: list, num_qubits: int) -> cudaq.kernel:
+def kernel_with_subkernel(sub_kernel: Callable[[cudaq.qview], None], num_qubits: int):
     """
-    Creates a quantum circuit for a given Pauli term with necessary rotations and measurements.
-    
+    Allocates a fresh qubit register, runs a sub-kernel on it, and measures.
+
     Args:
-        qc (cudaq.Kernel): The quantum circuit to be cloned.
-        params (list): The parameters of the original quantum kernel that is cloned.
-        num_qubits (int): Number of qubits in the circuit.
-    
-    Returns:
-        cudaq.Kernel: The generated quantum circuit.
+        sub_kernel: A cudaq kernel taking a single qview argument.
+        num_qubits: Number of qubits in the circuit.
     """
-
     qubits = cudaq.qvector(num_qubits)
-
-    qc(qubits, **params) 
-    
-    qc.mz(qubits)  # Measure all qubits in the computational basis
+    sub_kernel(qubits)
+    mz(qubits)
 
 @cudaq.kernel
-def append_measurement_circuit_for_term(qc: cudaq.qview, num_qubits: int, term: str) -> cudaq.kernel:
+def append_measurement_circuit_for_term(num_qubits: int, term: cudaq.pauli_word):
     """
-    Creates a quantum circuit for a given Pauli term with necessary rotations and measurements.
-    
+    Builds a measurement circuit for a given Pauli term: allocates qubits,
+    rotates into the appropriate measurement basis, and measures.
+
     Args:
-        qc (cudaq.Kernel): The quantum circuit to be cloned.
-        num_qubits (int): Number of qubits in the circuit.
-        term (str): The Pauli term to measure (e.g., "XZI").
-    
-    Returns:
-        cudaq.Kernel: The generated quantum circuit.
+        num_qubits: Number of qubits in the circuit.
+        term: The Pauli term to measure (e.g., "XZI").
     """
-
     qubits = cudaq.qvector(num_qubits)
-
-    append_hamiltonian_term_to_circuit(qc, qubits, term)
-    
-    qc.mz(qubits)  # Measure all qubits in the computational basis
+    append_hamiltonian_term_to_circuit(qubits, term)
+    mz(qubits)
 
 @cudaq.kernel
-def append_hamiltonian_term_to_circuit(qc: cudaq.qview, qubits, term):
+def append_hamiltonian_term_to_circuit(qubits: cudaq.qview, term: cudaq.pauli_word):
     """
-    Applies necessary rotations based on the given Pauli term.
-    
+    Applies measurement-basis rotations for the given Pauli term.
+
     Args:
-        qc (cudaq.Kernel): The circuit to which operations will be applied.
-        qubits (list): List of allocated qubits.
-        term (str): The Pauli term to encode (e.g., "XZI").
+        qubits: The qubit register to rotate.
+        term: The Pauli term to encode (e.g., "XZI").
     """
     for i, pauli in enumerate(term):
         if pauli == 'X':
-            qc.h(qubits[i])
+            h(qubits[i])
         elif pauli == 'Y':
-            qc.rx(-1.5708, qubits[i])  # Rotate by -p/2 around X-axis
+            rx(-1.5708, qubits[i])
     
