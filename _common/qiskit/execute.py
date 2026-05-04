@@ -2116,19 +2116,74 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     if not wait:
         return (job_id, None)
 
-    # Wait for result
-    # Only wrap in ExecutionResult for sampler path (PrimitiveResult needs normalization).
-    # Native Qiskit Result (simulator/backend) already supports get_counts() natively.
-    try:
-        raw_result = job.result()
+    # Poll job status before blocking on result (for backends that support it).
+    # Detects CANCELLED/ERROR early and prints comfort dots for long-running jobs.
+    if hasattr(job, 'status'):
+        pollcount = 0
+        while True:
+            try:
+                status = job.status()
+            except Exception:
+                break  # Backend doesn't support status polling — fall through to job.result()
+
+            status_str = str(status).upper()
+            if 'DONE' in status_str:
+                break
+            elif 'ERROR' in status_str:
+                print(f'ERROR: Job {job_id} failed with status {status}')
+                if hasattr(job, 'error_message'):
+                    try:
+                        print(f"... {job.error_message()}")
+                    except Exception:
+                        pass
+                return (job_id, ExecutionResult([{} for _ in circuits]))
+            elif 'CANCEL' in status_str:
+                print(f'WARNING: Job {job_id} was cancelled')
+                return (job_id, ExecutionResult([{} for _ in circuits]))
+            else:
+                # Still queued/running — print comfort indicator
+                pollcount += 1
+                if verbose and (pollcount <= 32 or pollcount % 15 == 0):
+                    print('.', end='', flush=True)
+
+                # Adaptive sleep: fast initially, slower as wait grows
+                if pollcount <= 6:
+                    time.sleep(0.5)
+                elif pollcount <= 60:
+                    time.sleep(1.0)
+                else:
+                    time.sleep(5.0)
+
+        if verbose and pollcount > 0:
+            print()  # newline after dots
+
+    # Wait for result with retry logic (ported from old wait_on_job_result).
+    # Transient network errors during long hardware jobs are common.
+    raw_result = None
+    max_retries = 40
+    retry_interval = 15  # seconds
+
+    for retry_count in range(1, max_retries + 1):
+        try:
+            raw_result = job.result()
+            break
+        except Exception as e:
+            if retry_count < max_retries:
+                print(f'... error during job.result() for job {job_id} — retry {retry_count}/{max_retries}')
+                if verbose: print(f"... exception = {e}")
+                time.sleep(retry_interval)
+            else:
+                print(f'ERROR: Failed to get result for job {job_id} after {max_retries} retries')
+                print(f"... exception = {e}")
+                if verbose: print(traceback.format_exc())
+
+    # Wrap result: ExecutionResult for sampler path, native Result for backend path
+    if raw_result is not None:
         if sampler is not None:
             result = ExecutionResult(raw_result)
         else:
             result = raw_result
-    except Exception as e:
-        print(f'ERROR: Failed to get result for job {job_id}')
-        print(f"... exception = {e}")
-        if verbose: print(traceback.format_exc())
+    else:
         result = ExecutionResult([{} for _ in circuits])
 
     # Extract per-circuit timing from result and attach (cudaq pattern)
@@ -2195,6 +2250,13 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
     counts_list = results.get_counts()
     if isinstance(counts_list, dict):
         counts_list = [counts_list]  # single-element array was unwrapped by ExecutionResult
+
+    # Validate result count matches circuit count
+    if len(counts_list) != len(circuits_info):
+        print(f'WARNING: result count mismatch — expected {len(circuits_info)}, got {len(counts_list)}')
+        # Pad with empty dicts so all circuits get processed (with empty results)
+        while len(counts_list) < len(circuits_info):
+            counts_list.append({})
 
     # Extract per-circuit timing (attached by execute_circuits, cudaq pattern)
     per_circuit_times = getattr(results, '_per_circuit_times', None)
@@ -2272,6 +2334,12 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
         if job_id is not None:
             metrics.store_metric(ci["group"], ci["circuit"], 'job_id', job_id)
 
+        # Validate shot count matches request
+        actual_shots = sum(counts.values()) if counts else 0
+        if actual_shots > 0 and ci["shots"] > 0 and actual_shots != ci["shots"]:
+            if verbose:
+                print(f'WARNING: circuit {ci["group"]}/{ci["circuit"]}: requested {ci["shots"]} shots, got {actual_shots}')
+
         # Wrap individual counts in ExecutionResult for result_handler
         circuit_result = ExecutionResult(counts)
 
@@ -2347,7 +2415,10 @@ def _execute_batch(circuits_info, num_shots, max_batch_size):
         ts = time.time()
         job_id, results = execute_circuits(circuits, num_shots)
         elapsed_time = time.time() - ts
-        process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
+        if results is not None:
+            process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
+        else:
+            print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) — skipping')
 
 
 ###########################################################################
