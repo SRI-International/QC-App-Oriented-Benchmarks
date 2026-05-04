@@ -1732,25 +1732,44 @@ def _extract_per_circuit_times(raw_result, num_circuits):
         try:
             result_dict = raw_result.to_dict()
 
+            if verbose:
+                print(f"... _extract_per_circuit_times: to_dict() path, {num_circuits} circuits")
+                top_keys = list(result_dict.keys())
+                print(f"... result_dict keys: {top_keys}")
+                has_tt = "time_taken" in result_dict
+                print(f"... result_dict has time_taken: {has_tt} {'= ' + str(result_dict['time_taken']) if has_tt else ''}")
+                if "results" in result_dict and len(result_dict["results"]) > 0:
+                    exp0_keys = list(result_dict["results"][0].keys())
+                    print(f"... results[0] keys: {exp0_keys}")
+                    has_exp_tt = "time_taken" in result_dict["results"][0]
+                    print(f"... results[0] has time_taken: {has_exp_tt} {'= ' + str(result_dict['results'][0]['time_taken']) if has_exp_tt else ''}")
+
             # Try per-experiment time_taken first (best data for simulators)
             if "results" in result_dict:
                 experiments = result_dict["results"]
                 per_times = []
                 for exp in experiments:
-                    if "time_taken" in exp:
+                    if "time_taken" in exp and exp["time_taken"] > 0:
                         per_times.append(exp["time_taken"])
                     else:
                         break
                 if len(per_times) == num_circuits:
+                    if verbose:
+                        print(f"... per-experiment times: {per_times[:5]}{'...' if len(per_times) > 5 else ''}")
                     return per_times
 
             # Fall back to total time_taken divided evenly
-            if "time_taken" in result_dict:
+            if "time_taken" in result_dict and result_dict["time_taken"] > 0:
                 avg = result_dict["time_taken"] / num_circuits
+                if verbose:
+                    print(f"... using total time_taken / {num_circuits} = {avg}")
                 return [avg] * num_circuits
-        except Exception:
-            pass
+        except Exception as e:
+            if verbose:
+                print(f"... to_dict() extraction failed: {e}")
 
+        if verbose:
+            print(f"... no timing extracted from to_dict() path")
         return None
 
     # Path B: PrimitiveResult (sampler) — iterable over PubResults
@@ -2201,9 +2220,14 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
             if verbose:
                 print(f"... could not extract exec_time: {e}")
 
-    # Fall back to elapsed_time if no exec_time extracted
-    if batch_exec_time == 0.0 and elapsed_time is not None:
+    # Track whether batch_exec_time came from the backend or is just a fallback
+    exec_time_from_backend = batch_exec_time > 0.0
+
+    # Fall back to elapsed_time for exec_time only if backend provided no timing
+    if not exec_time_from_backend and elapsed_time is not None:
         batch_exec_time = elapsed_time
+
+    num_in_batch = len(counts_list)
 
     # Compute per-circuit elapsed times by distributing overhead proportionally.
     # Overhead = elapsed_time - total_exec_time (transpilation, submission, queuing, etc.)
@@ -2223,8 +2247,8 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
                 per_circuit_elapsed = list(per_circuit_times)
         else:
             # All exec times are zero — divide elapsed evenly
-            avg_elapsed = elapsed_time / len(per_circuit_times)
-            per_circuit_elapsed = [avg_elapsed] * len(per_circuit_times)
+            avg_elapsed = elapsed_time / num_in_batch
+            per_circuit_elapsed = [avg_elapsed] * num_in_batch
 
     # Process each circuit's result
     for idx, (ci, counts) in enumerate(zip(circuits_info, counts_list)):
@@ -2235,11 +2259,14 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
             if per_circuit_elapsed:
                 metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', per_circuit_elapsed[idx])
             elif elapsed_time is not None:
-                metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time)
+                metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time / num_in_batch)
         else:
+            # No per-circuit timing — divide batch elapsed evenly
             if elapsed_time is not None:
-                metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time)
-            metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', batch_exec_time)
+                metrics.store_metric(ci["group"], ci["circuit"], 'elapsed_time', elapsed_time / num_in_batch)
+            # exec_time: use backend-reported time if available, otherwise elapsed as fallback
+            metrics.store_metric(ci["group"], ci["circuit"], 'exec_time',
+                                 batch_exec_time / num_in_batch)
 
         # Store job_id for tracking/retrieval
         if job_id is not None:
