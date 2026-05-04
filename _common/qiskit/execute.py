@@ -2101,7 +2101,7 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     except Exception as e:
         print(f'ERROR: Failed to execute circuits')
         print(f"... exception = {e}")
-        if verbose: print(traceback.format_exc())
+        print(traceback.format_exc())  # always print traceback for execution errors
         # Return empty result with pseudo job_id
         pseudo_job = Job()
         return (pseudo_job.job_id(), ExecutionResult([{} for _ in circuits]))
