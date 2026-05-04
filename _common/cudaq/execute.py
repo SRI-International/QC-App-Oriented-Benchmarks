@@ -1040,6 +1040,12 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
     if isinstance(counts_list, dict):
         counts_list = [counts_list]  # single-element array was unwrapped
 
+    # Validate result count matches circuit count
+    if len(counts_list) != len(circuits_info):
+        print(f'WARNING: result count mismatch — expected {len(circuits_info)}, got {len(counts_list)}')
+        while len(counts_list) < len(circuits_info):
+            counts_list.append({})
+
     # Use per-circuit times if available (from sequential execution), otherwise batch time
     per_circuit_times = getattr(results, '_per_circuit_times', None)
 
@@ -1134,7 +1140,10 @@ def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=No
         ts = time.time()
         job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
         elapsed_time = time.time() - ts
-        process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
+        if results is not None:
+            process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
+        else:
+            print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) — skipping')
 
 
 ###########################################################################
