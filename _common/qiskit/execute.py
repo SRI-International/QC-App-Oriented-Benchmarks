@@ -2344,7 +2344,8 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
         circuit_result = ExecutionResult(counts)
 
         # Call the benchmark's result handler (computes fidelity etc.)
-        if result_handler:
+        # Skip if counts are empty (cancelled/failed job) to avoid division-by-zero in handlers
+        if result_handler and counts:
             try:
                 result_handler(ci["qc"], circuit_result,
                               ci["group"], ci["circuit"], ci["shots"])
@@ -2352,6 +2353,8 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
                 print(f'ERROR: failed in result_handler for circuit {ci["group"]} {ci["circuit"]}')
                 print(f"... exception = {e}")
                 if verbose: print(traceback.format_exc())
+        elif result_handler and not counts:
+            print(f'WARNING: empty results for circuit {ci["group"]}/{ci["circuit"]} — skipping result_handler')
 
     # Process hardware step times if job object is available
     job = getattr(results, '_job', None)

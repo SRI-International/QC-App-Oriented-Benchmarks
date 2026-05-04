@@ -581,6 +581,8 @@ def get_expectation_term(term, counts):
 
         exp_val += parity * count  # Weighted sum of parities
 
+    if total_counts == 0:
+        return 0.0  # No measurement data (cancelled/failed job)
     return exp_val / total_counts  # Normalize by total shots
 
 # This was a modified version that was an attempt to address thebad data issue
@@ -626,6 +628,8 @@ def get_expectation_term1(term, counts):
 
         exp_val += parity * count  # Weight parity by count
 
+    if total_counts == 0:
+        return 0.0
     return exp_val / total_counts  # Normalize by total shots
 
 # This is the previous version that was giving a result that did not match Estimator
@@ -686,6 +690,8 @@ def get_expectation_term0(term, counts):
     """
     
     # Normalize by the total number of measurement shots
+    if total_counts == 0:
+        return 0.0
     return exp_val / total_counts
 
 def convert_to_z_basis(pauli_string):
