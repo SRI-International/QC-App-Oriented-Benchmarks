@@ -1,5 +1,8 @@
 # Application-Oriented Performance Benchmarks for Quantum Computing
 
+> **⚠️ Version 2.0 — Major Restructure:**
+> This repository has been significantly restructured. The shared library code (formerly `_common/`) is now **qedclib**, and all benchmarks have moved into **qedcbench/**. A single `pip install -e .` installs both packages. If you have existing code that depends on the previous repository structure, use branch **[master-260411-v1.2.2](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/tree/master-260411-v1.2.2)** for compatibility. See the [User Guide](./doc/docs/user_guide.md#upgrading-from-v1x) for migration details.
+
 This repository contains a collection of prototypical application- or algorithm-centric benchmark programs designed for the purpose of characterizing the end-user perception of the performance of current-generation Quantum Computers.
 
 The repository is maintained by members of the Quantum Economic Development Consortium (QED-C) Technical Advisory Committee on Standards and Performance Metrics (Standards TAC).

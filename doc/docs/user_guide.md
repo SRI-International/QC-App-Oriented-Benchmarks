@@ -234,5 +234,41 @@ Custom transformers (in `qedclib/transformers/`) and third-party tools can also 
 - `tket_optimiser` — Quantinuum t|ket⟩ optimization
 - `trueq_rc` — True-Q randomized compiling
 
+## Upgrading from v1.x
+
+If you have existing code that uses the previous repository structure, here is what changed and how to update:
+
+**Benchmarks have moved** from the top level into `qedcbench/`:
+```
+# Old:  cd hidden_shift && python hs_benchmark.py
+# New:  cd qedcbench/hidden_shift && python hs_benchmark.py
+```
+
+**Imports changed** from `_common` to `qedclib`:
+```python
+# Old:
+from _common import metrics
+from _common import qcb_mpi as mpi
+
+# New:
+from qedclib import metrics
+from qedclib import qcb_mpi as mpi
+```
+
+A backwards-compatibility shim is included so that `from _common import metrics` continues to work for existing code. However, new code should use `from qedclib import ...`.
+
+**Package imports** now use the `qedcbench` prefix:
+```python
+# Old:
+from hidden_shift import hs_benchmark
+
+# New:
+from qedcbench.hidden_shift import hs_benchmark
+```
+
+**Installation** is now done with `pip install -e .` at the repo root, replacing the old `setup.py`.
+
+For full compatibility with v1.x, use branch [master-260411-v1.2.2](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/tree/master-260411-v1.2.2).
+
 <br>
 &copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.

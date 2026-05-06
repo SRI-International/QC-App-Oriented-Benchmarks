@@ -1,5 +1,7 @@
 # QED-C Application-Oriented Benchmarks
 
+> **Version 2.0** — The repository has been restructured into two packages: **qedclib** (execution library) and **qedcbench** (benchmarks). For the previous structure, use branch [master-260411-v1.2.2](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/tree/master-260411-v1.2.2).
+
 The **QED-C Application-Oriented Benchmarks** provide a suite of quantum computing benchmark programs that measure the performance of quantum computers on practical, application-relevant tasks. The benchmarks are maintained by the Quantum Economic Development Consortium (QED-C) Technical Advisory Committee on Standards and Benchmarks.
 
 ## Documentation Overview

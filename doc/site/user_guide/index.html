@@ -162,6 +162,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-from-v1x" class="nav-link">Upgrading from v1.x</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
               </ul>
             </li>
         </ul>
@@ -465,6 +469,31 @@ metrics.plot_metrics(&quot;Benchmark Title&quot;)
 - <code>qiskit_passmgr</code> — custom Qiskit pass manager
 - <code>tket_optimiser</code> — Quantinuum t|ket⟩ optimization
 - <code>trueq_rc</code> — True-Q randomized compiling</p>
+<h2 id="upgrading-from-v1x">Upgrading from v1.x</h2>
+<p>If you have existing code that uses the previous repository structure, here is what changed and how to update:</p>
+<p><strong>Benchmarks have moved</strong> from the top level into <code>qedcbench/</code>:</p>
+<pre><code># Old:  cd hidden_shift &amp;&amp; python hs_benchmark.py
+# New:  cd qedcbench/hidden_shift &amp;&amp; python hs_benchmark.py
+</code></pre>
+<p><strong>Imports changed</strong> from <code>_common</code> to <code>qedclib</code>:</p>
+<pre><code class="language-python"># Old:
+from _common import metrics
+from _common import qcb_mpi as mpi
+
+# New:
+from qedclib import metrics
+from qedclib import qcb_mpi as mpi
+</code></pre>
+<p>A backwards-compatibility shim is included so that <code>from _common import metrics</code> continues to work for existing code. However, new code should use <code>from qedclib import ...</code>.</p>
+<p><strong>Package imports</strong> now use the <code>qedcbench</code> prefix:</p>
+<pre><code class="language-python"># Old:
+from hidden_shift import hs_benchmark
+
+# New:
+from qedcbench.hidden_shift import hs_benchmark
+</code></pre>
+<p><strong>Installation</strong> is now done with <code>pip install -e .</code> at the repo root, replacing the old <code>setup.py</code>.</p>
+<p>For full compatibility with v1.x, use branch <a href="https://github.com/SRI-International/QC-App-Oriented-Benchmarks/tree/master-260411-v1.2.2">master-260411-v1.2.2</a>.</p>
 <p><br>
 &copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.</p></div>
             </div>
