@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Azure Quantum - QED-C Application-Oriented Benchmarks</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">QED-C Application-Oriented Benchmarks</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../quick_start/" class="nav-link">Quick Start</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../user_guide/" class="nav-link">User Guide</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Setup</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../" class="dropdown-item">Overview</a>
+</li>
+                                    
+<li>
+    <a href="../qiskit/" class="dropdown-item">Qiskit</a>
+</li>
+                                    
+<li>
+    <a href="../cudaq/" class="dropdown-item">CUDA-Q</a>
+</li>
+                                    
+<li>
+    <a href="../cirq/" class="dropdown-item">Cirq</a>
+</li>
+                                    
+<li>
+    <a href="../braket/" class="dropdown-item">Braket</a>
+</li>
+                                    
+<li>
+    <a href="../ocean/" class="dropdown-item">Ocean</a>
+</li>
+                                    
+<li>
+    <a href="../qbraid/" class="dropdown-item">QBraid</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Azure Quantum</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../release_notes/" class="nav-link">Releases</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../known_issues/" class="nav-link">Known Issues</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../about/" class="nav-link">About</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../qbraid/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../../release_notes/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#setup-azure-quantum" class="nav-link">Setup: Azure Quantum</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            
+            <li class="nav-item" data-bs-level="1"><a href="#qiskit-version-for-azure-quantum" class="nav-link">Qiskit Version for Azure Quantum</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#configure-a-qiskit-environment" class="nav-link">Configure a Qiskit Environment</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#install-qiskit" class="nav-link">Install Qiskit</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#configure-azure-quantum-for-access-to-quantum-computing-systems" class="nav-link">Configure Azure Quantum for Access to Quantum Computing Systems</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#run-the-benchmark-programs-in-a-jupyter-notebook" class="nav-link">Run the benchmark programs in a Jupyter Notebook</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#run-the-benchmark-programs-in-a-command-window" class="nav-link">Run the benchmark programs in a command window.</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#tested-versions" class="nav-link">Tested Versions</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="setup-azure-quantum">Setup: Azure Quantum</h1>
+<h1 id="qiskit-version-for-azure-quantum">Qiskit Version for Azure Quantum</h1>
+<p>This directory describes the requirements and operational conventions for using Qiskit as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
+In particular, this document explains how to set up the tools needed to run the Qiskit implementation of these benchmarks using the Azure Quantum SDK.</p>
+<h2 id="configure-a-qiskit-environment">Configure a Qiskit Environment</h2>
+<p>If you are using Anaconda environments, create an environment named "qiskit" and then "activate" it using the following commands:</p>
+<pre><code>conda create -n qiskit python=3
+
+conda activate qiskit
+</code></pre>
+<p>The conda environment is now ready for you to install the Qiskit package.</p>
+<h2 id="install-qiskit">Install Qiskit</h2>
+<p>Enter the following commands to install the latest version of the Azure Quantum Qiskit SDK and the other required packages.</p>
+<pre><code>pip install -U numpy matplotlib notebook
+pip install -U azure-quantum azure-quantum[qiskit]
+</code></pre>
+<p>You are now ready to run the benchmark programs.</p>
+<h2 id="configure-azure-quantum-for-access-to-quantum-computing-systems">Configure Azure Quantum for Access to Quantum Computing Systems</h2>
+<p>The Azure Quantum <code>qiskit</code> package allows quantum circuits to be executed on real quantum hardware or simulators provided by a variety of Azure Quantum partners.
+Please see the Azure Quantum documentation for information about how to configure Azure Quantun to enable access to any of these backend systems.</p>
+<p>To configure the benchmark notebooks to select a specific Azure Quantum target for execution, the run() method of each benchmark would require the following arguments be set. </p>
+<pre><code>hub = "azure-quantum";
+backend_id = "&lt;YOUR_BACKEND_NAME_HERE&gt;"
+</code></pre>
+<p>Using the Jupyter notebook described below makes this easy.</p>
+<p>Before running in either a Jupyter notebook or from the command line, you will need to set the Azure Quantum resource_id and location information in the following environment variables:</p>
+<pre><code>set AZURE_QUANTUM_RESOURCE_ID="&lt;YOUR_RESOURCE_ID&gt;"
+set AZURE_QUANTUM_LOCATION="&lt;YOUR_LOCATION&gt;"
+</code></pre>
+<p>You can find this information in the Azure portal under your workspace &gt; Overview &gt; "Resource ID" and "Location". To create an Azure Quantum workspace, you can read documentation at
+<a href="https://aka.ms/AQ/Docs/CreateWorkspace"><code>https://aka.ms/AQ/Docs/CreateWorkspace</code></a></p>
+<h2 id="run-the-benchmark-programs-in-a-jupyter-notebook">Run the benchmark programs in a Jupyter Notebook</h2>
+<p>Many Python users prefer to execute these benchmark programs in a Jupyter notebook.
+Execute the following command in the top-level directory of the benchmark repository and invoke the Jupyter notebook server.</p>
+<pre><code>jupyter-notebook
+</code></pre>
+<p>This will invoke the Jupyter notebook in a new browser tab. There you can select the benchmarks-qiskit.ipynb notebook and execute most of the benchmarks.</p>
+<p>The first code cell of the notebook is configured by default to execute all the benchmarks on the Qiskit Aer simulator, running locally. Simply un-commenting these lines in the Azure Quantum section will select an Azure Quantum backend for the execution.</p>
+<pre><code>hub = "azure-quantum"; backend_id = "&lt;YOUR_BACKEND_NAME_HERE&gt;"
+</code></pre>
+<p>Once configured, you can do a Run All command to execute all the top-level benchmarks at once.</p>
+<pre><code>Important note: there may be costs associated with execution on some hardware systems.
+You may consider lowering the value of the num_shots, max_circuits, and max_qubits settings in the first code cell
+during your initial testing to avoid unexpected charges.
+</code></pre>
+<p>Another note: executing the benchmarks from an unauthenticated command window will result in Azure Quantum requesting authentication upon execution. To avoid this, you can download and install the Azure Quantum Command Line Tool (CLI). In a command window, execute the login command:</p>
+<pre><code>az login
+</code></pre>
+<p>Once you are authenticated, executing the benchmarks will not request further authentication.</p>
+<h2 id="run-the-benchmark-programs-in-a-command-window">Run the benchmark programs in a command window.</h2>
+<p>For example, in an Anaconda command window, you can enter the following commands to change directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:</p>
+<pre><code>cd [your github home directory]/QC-App-Oriented-Benchmarks/bernstein_vazirani
+
+python bv_benchmark.py
+</code></pre>
+<p>This will execute the benchmark program and report the benchmark metrics to the console.</p>
+<p>The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark program filename).</p>
+<h2 id="tested-versions">Tested Versions</h2>
+<p>The repository has been validated on Linux using the following versions as minimums:</p>
+<pre><code>Miniconda Version: 4.10.3
+Python Versions: 3.8.5 and 3.9.7
+Qiskit-Terra Version: 0.18.3
+</code></pre>
+<p>Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise a bug report in the issues tab of the repository.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

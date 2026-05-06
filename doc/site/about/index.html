@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>About - QED-C Application-Oriented Benchmarks</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="..">QED-C Application-Oriented Benchmarks</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href=".." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../quick_start/" class="nav-link">Quick Start</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../user_guide/" class="nav-link">User Guide</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Setup</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../setup/" class="dropdown-item">Overview</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit/" class="dropdown-item">Qiskit</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cudaq/" class="dropdown-item">CUDA-Q</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cirq/" class="dropdown-item">Cirq</a>
+</li>
+                                    
+<li>
+    <a href="../setup/braket/" class="dropdown-item">Braket</a>
+</li>
+                                    
+<li>
+    <a href="../setup/ocean/" class="dropdown-item">Ocean</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qbraid/" class="dropdown-item">QBraid</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit-azure-quantum/" class="dropdown-item">Azure Quantum</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../release_notes/" class="nav-link">Releases</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../known_issues/" class="nav-link">Known Issues</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="./" class="nav-link active" aria-current="page">About</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../known_issues/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" class="nav-link disabled">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#about" class="nav-link">About</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#project-origin" class="nav-link">Project Origin</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#repository-structure" class="nav-link">Repository Structure</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#two-packages-one-install" class="nav-link">Two Packages, One Install</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#related-repositories" class="nav-link">Related Repositories</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#license" class="nav-link">License</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#version" class="nav-link">Version</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="about">About</h1>
+<h2 id="project-origin">Project Origin</h2>
+<p>The <strong>QED-C Application-Oriented Benchmarks</strong> were developed by the Quantum Economic Development Consortium (QED-C) Technical Advisory Committee on Standards and Performance Metrics (Standards TAC). The project began in 2019 with the goal of providing standardized, application-relevant benchmarks for comparing quantum computing platforms.</p>
+<p>Unlike gate-level or volume-based benchmarks, these benchmarks measure performance on complete quantum algorithms — providing an end-user perspective on what today's quantum computers can actually accomplish.</p>
+<h2 id="repository-structure">Repository Structure</h2>
+<pre><code>QC-App-Oriented-Benchmarks/
+├── README.md               # Project overview and links
+├── pyproject.toml          # Package configuration (pip install -e .)
+│
+├── qedclib/                # Execution and metrics library
+│   ├── __init__.py         # Top-level API: initialize(), set_api(), get_kernel(), etc.
+│   ├── metrics.py          # Metrics collection, aggregation, and plotting
+│   ├── qcb_mpi.py         # MPI support for multi-GPU execution
+│   ├── job_store.py        # Job persistence across sessions
+│   ├── _init_engine.py     # Dynamic module loading system
+│   ├── qiskit/             # Qiskit execution backend (no __init__.py)
+│   ├── cudaq/              # CUDA-Q execution backend
+│   ├── cirq/               # Cirq execution backend
+│   ├── braket/             # Braket execution backend
+│   ├── ocean/              # Ocean execution backend
+│   ├── custom/             # Custom noise models
+│   ├── executors/          # Third-party executors (BlueQubit, cuQuantum, Fire Opal)
+│   ├── transformers/       # Compiler optimizations (tket, TrueQ, Qiskit PassMgr)
+│   └── postprocessors/     # Error mitigation (mthree)
+│
+├── qedcbench/              # Benchmark applications (17 benchmarks)
+│   ├── __init__.py         # Registers benchmark root with qedclib
+│   ├── hidden_shift/       # Each has README.md + API subdirs
+│   ├── hamlib/
+│   ├── quantum_fourier_transform/
+│   └── ...
+│
+├── _common/                # Backwards-compatibility shim
+│   ├── __init__.py         # Re-exports from qedclib
+│   └── qedc_init.py       # Re-exports init functions
+│
+├── doc/                    # Documentation
+│   ├── index.md            # Documentation overview
+│   ├── quick_start.md      # First-time user guide
+│   ├── user_guide.md       # Complete reference
+│   ├── release_notes.md    # Version history
+│   ├── known_issues.md     # PAL (Problems, Anomalies, Limitations)
+│   ├── about.md            # This file
+│   ├── setup/              # Platform-specific setup guides
+│   └── _design/            # Internal design documents
+│
+└── _doc/                   # Legacy doc location (being migrated)
+</code></pre>
+<h2 id="two-packages-one-install">Two Packages, One Install</h2>
+<p>The repository provides two importable Python packages from a single installation:</p>
+<ul>
+<li>
+<p><strong>qedclib</strong> — The execution and metrics library. Useful independently for researchers who want metrics tracking, backend abstraction, and MPI support for their own quantum programs.</p>
+</li>
+<li>
+<p><strong>qedcbench</strong> — The 17 benchmark applications. Depends on qedclib. Provides standardized benchmarks across multiple quantum platforms.</p>
+</li>
+</ul>
+<p>Install both with: <code>pip install -e .</code></p>
+<h2 id="related-repositories">Related Repositories</h2>
+<ul>
+<li>
+<p><strong>QC-App-Benchmarks-Data</strong> — Benchmark execution scripts, data collection results, and plotting programs for generating publication figures.</p>
+</li>
+<li>
+<p><strong>qhpctools</strong> — HPC utilities for running benchmarks on NERSC/Slurm clusters (GPU allocation scripts, job monitoring).</p>
+</li>
+</ul>
+<h2 id="license">License</h2>
+<p>Copyright 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.</p>
+<p>Licensed under the Apache License, Version 2.0. See LICENSE file for details.</p>
+<h2 id="version">Version</h2>
+<p>Current version: <strong>2.0.0</strong> (May 2026)</p>
+<p>See <a href="../release_notes/">Release Notes</a> for version history.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
