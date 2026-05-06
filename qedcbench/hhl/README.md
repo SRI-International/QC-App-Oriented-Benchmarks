@@ -33,7 +33,7 @@ The state starts with the initial state, <img align="center" src="https://latex.
 The following circuit is the general quantum circuit for the HHL algorithm with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n_b"> b-register qubits, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n"> c-register(clock) qubits and 1 ancilla qubit. 
 
 <p align="center">
-   <img align=center src="../_doc/images/hhl/hhl_circuit.png"  width="600" />
+   <img align=center src="../../doc/docs/images/hhl/hhl_circuit.png"  width="600" />
 </p>
 
 *Fig 1. Diagram of general quantum circuit for Bernstein-Vazirani Algorithm [[2]](#references)*
@@ -138,12 +138,12 @@ This rotation process can be implemented by setting the angle of rotation:
 
 Controlled Rotations can be implemented like this,
    <p align="center">
-   <img align=center src="../_doc/images/hhl/old_ry.png" width="600"/>
+   <img align=center src="../../doc/docs/images/hhl/old_ry.png" width="600"/>
    </p>
 
 However, it can also be implemented using single CNOT and rotation gates by changing the angles as can be seen below
    <p align="center">
-   <img align=center src="../_doc/images/hhl/new_ry.png" width="600"/>
+   <img align=center src="../../doc/docs/images/hhl/new_ry.png" width="600"/>
    </p>
 
 To do this, the user needs to apply the following matrix to the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\alpha"> angles. 
@@ -207,7 +207,7 @@ We start of by defining the V gate, mainly the $v_c(a)$ function. The $v_c(i)$ r
 For example in the below matrix:
 
 <p align="center">
-   <img align=center src="../_doc/images/hhl/sparse_matrix.png"  width="600" />
+   <img align=center src="../../doc/docs/images/hhl/sparse_matrix.png"  width="600" />
 </p>
 
 

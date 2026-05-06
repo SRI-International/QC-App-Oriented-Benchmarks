@@ -71,7 +71,7 @@ the quantum phase estimation circuit where the only difference is the implementa
 <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U"> performs the following transformation <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U|x\rangle=|ax\mod{N}\rangle">.
 
 <p align="center">
-<img align=center src="../_doc/images/shors/shors1_circ.png"  width="800" /> <!---upload accurate image--->
+<img align=center src="../../doc/docs/images/shors/shors1_circ.png"  width="800" /> <!---upload accurate image--->
 </p>
 
 *Fig. 1. Circuit with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n=2">. The first register is at the top, `q0` with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}2n=4"> qubits. We also have `q1` as the second register with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n=2"> qubits and `q2` as the third register with <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n+2=4"> qubits.*
@@ -153,10 +153,10 @@ The following section depicts how the <img align=center src="https://latex.codec
 
 |Gate Name| Circuit Image |
 | --- | ---| 
-|Controlled Ua Operator|<img align=center src="../_doc/images/shors/CUA_gate.png" width="600"/>
-|Controlled Multiplier Operator |<img align=center src="../_doc/images/shors/cMULTamodN_gate.png" width="600" />|
-|Controlled Modular Adder Operator|<img align=center src="../_doc/images/shors/ccphiamodN_gate.png" width="1200"/>|  <!---upload accurate image--->
-|Phi Adder Operator|<img align=center src="../_doc/images/shors/phiADD_gate.png" width="300"/>|
+|Controlled Ua Operator|<img align=center src="../../doc/docs/images/shors/CUA_gate.png" width="600"/>
+|Controlled Multiplier Operator |<img align=center src="../../doc/docs/images/shors/cMULTamodN_gate.png" width="600" />|
+|Controlled Modular Adder Operator|<img align=center src="../../doc/docs/images/shors/ccphiamodN_gate.png" width="1200"/>|  <!---upload accurate image--->
+|Phi Adder Operator|<img align=center src="../../doc/docs/images/shors/phiADD_gate.png" width="300"/>|
 
 ### Circuit Methods
 This benchmark has two circuit implementations of Shor's Period Finding algorithm that will be described below:
@@ -164,7 +164,7 @@ This benchmark has two circuit implementations of Shor's Period Finding algorith
 - **Method 1**: the standard implementation that was described above with 3 quantum registers and *4n+2* qubits.
    
    <p align="center">
-   <img align=center src="../_doc/images/shors/shors1_circ.png"  width="800" />
+   <img align=center src="../../doc/docs/images/shors/shors1_circ.png"  width="800" />
    </p>
    
 - **Method 2**: reduces the circuit in method 1 by utilizing mid-circuit measurement. Instead of using *2n* control qubits in the first register, this counting
@@ -173,7 +173,7 @@ This benchmark has two circuit implementations of Shor's Period Finding algorith
    sequence which is repeated *2n* times
    
    <p align="center">
-   <img align=center src="../_doc/images/shors/seq_meas_circ.png"  width="800" />
+   <img align=center src="../../doc/docs/images/shors/seq_meas_circ.png"  width="800" />
    </p>
 
 

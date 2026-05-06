@@ -143,7 +143,7 @@ to the computation basis.
 Below is the general circuit. We have our initialization using the Hartree-Fock state and then the cluster OPs for the single excitations from 0 to 1 and 2 to 3 orbitals as well as the double excitation from the 0,1 to 2,3 orbitals. In this case, we are measuring the YYYY off-diagonal term, so we need to shift to the basis of this term before measuring.
 
 <p align="center">
-<img src="../_doc/images/vqe/vqe_circuit.png"/>
+<img src="../../doc/docs/images/vqe/vqe_circuit.png"/>
 </p>
 
 ### Algorithm Steps
@@ -172,7 +172,7 @@ As an example, the term <img align=center src="https://latex.codecogs.com/svg.la
 could be implemented with the following circuit. [[10]](#references)
 
 <p align="center">
-<img align=center src="../_doc/images/vqe/circuit_XXXY.png"  width="700" />
+<img align=center src="../../doc/docs/images/vqe/circuit_XXXY.png"  width="700" />
 </p>
 
 *Fig 1. The circuit that implements <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}e^{i\theta{Y}XXX}"/> term. The first 4 single qubit 

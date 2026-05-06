@@ -64,7 +64,7 @@ With some investigation, we can see the corresponence with Grover's algorithm. T
 
 ### General Quantum Circuit 
 <p align="center">
-<img src="../_doc/images/amplitude_estimation/qae_circuit.png"  width="800" />
+<img src="../../doc/docs/images/amplitude_estimation/qae_circuit.png"  width="800" />
 </p>
 
 *Fig 1. Circuit diagram for QAE using PE as presented by Grinko et al. [[3]](#references)*
@@ -88,17 +88,17 @@ To implement this algorithm, all that is necessary is explicit definitions for t
 <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A},\mathcal{A}^{-1}\"> are given to the algorithm as the oracle. <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}-S_{\chi}\"> performs a phase flip only if the objective qubit is in the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle"> state. This is equivalent to the operations <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}XZX"> on the objective qubit. Lastly, <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}S_{|0\rangle_{n+1}}\">, the phase flip only when all state registers are <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|0\rangle">, is equivalent to performing <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X\"> on all qubits in the register except the objective qubit, then a multi-controlled-phase gate between the <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}n"> state qubits and objective qubit, and another set of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X\"> gates. Equivalent to multi-controlled-phase is a <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}H\"> on the objective qubit, multi-controlled-NOT, and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}H\"> again on the objective qubit.
 
 <p align="center">
-<img src="../_doc/images/amplitude_estimation/ae_circuit.png" />
+<img src="../../doc/docs/images/amplitude_estimation/ae_circuit.png" />
 </p>
 
 If we then copy the circuits for the oracle and diffuser from Grover's algorithm:
 
 <p align="center">
-<img align="center" src="../_doc/images/grovers/oracle.png"  width="400" />
+<img align="center" src="../../doc/docs/images/grovers/oracle.png"  width="400" />
 </p>
 
 <p align="center">
-<img align="center" src="../_doc/images/grovers/diffuser.png"  width="400" />
+<img align="center" src="../../doc/docs/images/grovers/diffuser.png"  width="400" />
 </p>
 
 We can see the correspondence that <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}S_{\chi}=U_{f}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}\mathcal{A}S_{|0\rangle_{n+1}}\mathcal{A}^{-1}=U_s">. The circuit used for QAA (<img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}S_{\chi}">) is simpler than the Grover oracle (<img align=center src="https://latex.codecogs.com/svg.latex?\pagecolor{white}U_{f}">) as the "correct" state we are marking is only dependent on the objective qubit. The second statement can be explicitely seen by taking <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{A}^{-1}"> to be Hadamards on all qubits. Additionally, we note that while the negative sign in Grover's algorithm didn't matter as it was global, because <img src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\mathcal{Q}"> is not applied on all qubits, the negative sign matters.
@@ -108,7 +108,7 @@ We can see the correspondence that <img align=center src="https://latex.codecogs
 In our default implementation of A, we set <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_0\rangle=|00\ldots\rangle"> and <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|\psi_1\rangle=|11\ldots\rangle">. To implement arbitrary angles, we use a y-rotation and CNOTs to engtangle all of the states. As an example, with two state qubits and the single "correct-ness" qubit, if we start in the initial state of <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|000\rangle">, after applying an <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\textrm{Ry}(2\theta_a)"> gate, we will be in the state <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|00\rangle(\cos(\theta_a)|0\rangle+\sin(\theta_a)|1\rangle)">. By then applying CNOT gates controlled by the last qubits, we entangle the first two qubits with the state of the last: <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\cos(\theta_a)|000\rangle+\sin(\theta_a)|111\rangle">. By remembering that <img align=center src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\theta_a=\sin^{-1}{\sqrt{a}}\">, we have now generated the state we are looking for.  
 
 <p align="center">
-<img src="../_doc/images/amplitude_estimation/A.png" />
+<img src="../../doc/docs/images/amplitude_estimation/A.png" />
 </p>
 
 ## References

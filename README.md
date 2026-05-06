@@ -55,7 +55,7 @@ Level 5: MaxCut, Hydrogen Lattice, Image Recognition
 
 ## Implementation Status
 
-![Application-Oriented Benchmarks - Implementation Status](./_doc/images/proto_benchmarks_status.png)
+![Application-Oriented Benchmarks - Implementation Status](./doc/docs/images/proto_benchmarks_status.png)
 
 <br>
 &copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.

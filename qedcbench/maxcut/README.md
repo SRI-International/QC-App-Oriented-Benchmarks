@@ -98,13 +98,13 @@ States starts at <img align=center src="https://latex.codecogs.com/svg.latex?\sm
 ### General Quantum Circuit
 
    <p align="center">
-   <img align=center src="../_doc/images/maxcut/circuit_visual.png"  width="600" />
+   <img align=center src="../../doc/docs/images/maxcut/circuit_visual.png"  width="600" />
    </p>
 
 ### Algorithmic Visualization
 
    <p align="center">
-   <img align=center src="../_doc/images/maxcut/algo_visual.png"  width="600" />
+   <img align=center src="../../doc/docs/images/maxcut/algo_visual.png"  width="600" />
    </p>
 
 Described in detail in the referenced paper.
@@ -112,11 +112,11 @@ Described in detail in the referenced paper.
 ### Algorithm Steps
 
    <p align="center">
-   <img align=center src="../_doc/images/maxcut/algo1.png"  width="600" />
+   <img align=center src="../../doc/docs/images/maxcut/algo1.png"  width="600" />
    </p>
    
       <p align="center">
-   <img align=center src="../_doc/images/maxcut/algo2.png"  width="600" />
+   <img align=center src="../../doc/docs/images/maxcut/algo2.png"  width="600" />
    </p>
 
 ## Gate Implementation

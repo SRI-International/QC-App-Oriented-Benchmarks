@@ -51,7 +51,7 @@ The following circuit is the general quantum circuit for quantum phase estimatio
 state as the data register.
 
 <p align="center">
-<img align=center src="../_doc/images/phase_estimation/qpe_tex_qz.png"  width="600" />
+<img align=center src="../../doc/docs/images/phase_estimation/qpe_tex_qz.png"  width="600" />
 </p>
 
 *Fig 1. Diagram of general quantum circuit for Phase Estimation Algorithm [[4]](#references)*
@@ -137,7 +137,7 @@ In this benchmark, we chose to only have a single qubit in the data register, us
 This benchmark's gate implementation deviates slightly from way we've described the algorithm above in one important way: our C-U gates start with the most significant qubit in the counting register and work towards the least significant qubit. This can bee seen in the below image of the circuit we apply:
 
 <p align="center">
-<img align=center src="../_doc/images/phase_estimation/qpe_circuit.png"  width="600" />
+<img align=center src="../../doc/docs/images/phase_estimation/qpe_circuit.png"  width="600" />
 </p>
 
 This is because the benchmark uses this repository's internal inverse quantum Fourier transform gate. Like we mention in the [Quantum Fourier Transform benchmark](../quantum_fourier_transform/), we have removed the cannonical swaps to improve performance. This means that our qubits are instead ordered in the reverse way by the inverse QFT gate, which is why our applications of C-U work the other way around.

@@ -19,7 +19,7 @@ The primary intuition behind this algorithm can come from the geometric picture 
 ---
 
 <p align="center">
-<img align="center" src="../_doc/images/grovers/grover_step1.jpg"  width="600" />
+<img align="center" src="../../doc/docs/images/grovers/grover_step1.jpg"  width="600" />
 </p>
 
 This image and the following two come from [[2]](#references). We initially start in a uniform superposition of all <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}N"> states,
@@ -33,7 +33,7 @@ where <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagec
 ---
 
 <p align="center">
-<img align="center" src="../_doc/images/grovers/grover_step2.jpg"  width="600" />
+<img align="center" src="../../doc/docs/images/grovers/grover_step2.jpg"  width="600" />
 </p>
 
 We then apply the oracle, which by defintion will add a phase of <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}-1"> to the state <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|w\rangle">, which is stated as a unitary operator as <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U_{w}=1-2|w\rangle\langle{w}|">. This definition does what we expect, as any state that is orthogonal to <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|w\rangle"> will only have the identity operator applied to it, while the state <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|w\rangle"> itself will have a non-zero result from both terms, leading to <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U_w|w\rangle=-|w\rangle">. Geometrically, this is a reflection around <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|s'\rangle">. 
@@ -41,7 +41,7 @@ We then apply the oracle, which by defintion will add a phase of <img align="cen
 ---
 
 <p align="center">
-<img align="center" src="../_doc/images/grovers/grover_step3.jpg"  width="600" />
+<img align="center" src="../../doc/docs/images/grovers/grover_step3.jpg"  width="600" />
 </p>
 
 We will then apply <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U_s=2|s\rangle\langle{s}|-1">, which will give a reflection across <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|s\rangle">. (Note: we will actually apply <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}-U_s">, but there is no difference as this negative sign is a global phase which is unobservable). We can then successively apply <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}U_sU_w"> to bring the solution as close to <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|w\rangle"> as possible. By using the definitions of these operators and some matrix manipulation, we see that <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}(U_sU_w)^t|s\rangle=\sin[(2t+1)\theta]|w\rangle+\cos[(2t+1)\theta]|s'\rangle"> for <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}t"> applications of the oracle and diffuser. From this, we can see that the probability of measuring <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|w\rangle"> is maximized when <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}(2t+1)\theta\approx\pi/2">, which will only take <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}r\sim\sqrt{N}"> applications of these operators. This is much better than the <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}\sim{N}"> applications with the classical algorithm!
@@ -49,7 +49,7 @@ We will then apply <img align="center" src="https://latex.codecogs.com/svg.latex
 ### General Quantum Circuit
 
 <p align="center">
-<img align="center" src="../_doc/images/grovers/grovers_circuit.png"  width="800" />
+<img align="center" src="../../doc/docs/images/grovers/grovers_circuit.png"  width="800" />
 </p>
 
 Circuit diagram for Grover's algorithm with 4 qubits.
@@ -92,7 +92,7 @@ The steps for Grover's algorithm are the following:
 The following is the quantum circuit for the Grover oracle for 4 qubits with <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}s=1100">. The oracle applies a phase just to this correct state. Note that the barrier is solely for better visualization. To create this oracle, we start by applying <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X"> gates on just the qubits which are not <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}1"> in the solution <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|w\rangle">. This ensures that the correct bitstring goes to the state <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|11\ldots\rangle">. We then apply a multi-<img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}CZ"> on all qubits to add a phase of <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}-1"> to only <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|11\ldots\rangle">. We then apply the same <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X"> gates to make sure that only <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|w\rangle"> has aquired the relative phase of <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}-1">.
 
 <p align="center">
-<img align="center" src="../_doc/images/grovers/oracle.png"  width="400" />
+<img align="center" src="../../doc/docs/images/grovers/oracle.png"  width="400" />
 </p>
 
 ### Grover Diffuser <img align="center" src="https://latex.codecogs.com/svg.latex?\pagecolor{white}U_{s}">
@@ -100,7 +100,7 @@ The following is the quantum circuit for the Grover oracle for 4 qubits with <im
 The following is the quantum circuit for the Diffuser for 4 qubits. As implemented, this will only provide a phase to the state <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|s\rangle">. Note that the barrier is solely for better visualization. We start by applying a Hadamard gate all qubits to take <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|s\rangle\rightarrow|00\ldots\rangle">. We then add a phase of <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}-1"> to only <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}|00\ldots\rangle"> by applying <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X"> gates on every qubit, applying a multi-<img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}CZ">, and applying the <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}X"> gates again. We finally Hadamard all qubits again to take <img align="center" src="https://latex.codecogs.com/svg.latex?\small\pagecolor{white}-|00\ldots\rangle\rightarrow-|s\rangle">.
 
 <p align="center">
-<img align="center" src="../_doc/images/grovers/diffuser.png"  width="400" />
+<img align="center" src="../../doc/docs/images/grovers/diffuser.png"  width="400" />
 </p>
 
 ---
