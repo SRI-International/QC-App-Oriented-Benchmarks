@@ -131,7 +131,7 @@ As benchmarks execute, the following metrics are collected and reported for each
 | **Execution Time** | Time spent running on the quantum backend (excludes queue wait) |
 | **Elapsed Time** | Total wall-clock time including queue wait |
 | **Hellinger Fidelity** | Similarity between measured and ideal output distributions (0 to 1) |
-| **Normalized Fidelity** | Hellinger fidelity normalized to account for maximally noisy output (see [Polarization Fidelity](./_design/polarization_fidelity.md)) |
+| **Normalized Fidelity** | Hellinger fidelity normalized to account for maximally noisy output |
 | **Circuit Depth** | Number of gate layers in the algorithm |
 | **Transpiled Depth** | Gate count after transpilation to a standard gate set (`rx`, `ry`, `rz`, `cx`) |
 
@@ -204,7 +204,7 @@ For platform-specific setup instructions, see the [Setup Guides](./setup/README.
 
 ## Available Benchmarks
 
-The suite includes 17 benchmarks organized by complexity level (see the main [README](../README.md) for the full list). All benchmarks are located under `qedcbench/`.
+The suite includes 17 benchmarks organized by complexity level. All benchmarks are located under `qedcbench/`.
 
 Each benchmark directory contains its own `README.md` with algorithm-specific documentation, including:
 - Algorithm description and motivation

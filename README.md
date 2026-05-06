@@ -22,12 +22,12 @@ For detailed instructions, see the [Quick Start](./doc/quick_start.md) guide.
 
 | Document | Description |
 |----------|-------------|
-| [Quick Start](./doc/quick_start.md) | Install and run your first benchmark |
-| [User Guide](./doc/user_guide.md) | Complete reference for all features |
-| [Release Notes](./doc/release_notes.md) | Version history and changes |
-| [Known Issues](./doc/known_issues.md) | Problems, anomalies, and limitations |
-| [About](./doc/about.md) | Project background, structure, and credits |
-| [Setup Guides](./doc/setup/) | Platform-specific installation (Qiskit, CUDA-Q, etc.) |
+| [Quick Start](./doc/docs/quick_start.md) | Install and run your first benchmark |
+| [User Guide](./doc/docs/user_guide.md) | Complete reference for all features |
+| [Release Notes](./doc/docs/release_notes.md) | Version history and changes |
+| [Known Issues](./doc/docs/known_issues.md) | Problems, anomalies, and limitations |
+| [About](./doc/docs/about.md) | Project background, structure, and credits |
+| [Setup Guides](./doc/docs/setup/) | Platform-specific installation (Qiskit, CUDA-Q, etc.) |
 
 ## Benchmark Complexity Levels
 

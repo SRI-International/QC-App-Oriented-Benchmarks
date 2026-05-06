@@ -16,7 +16,7 @@ click using the button below.
 5. You are now ready to run the benchmarking notebooks!
 
 For other questions or additional help using qBraid, see
-[Lab Docs](docs.qbraid.com).
+[Lab Docs](https://docs.qbraid.com).
 
 [<img src="https://qbraid-static.s3.amazonaws.com/logos/Launch_on_qBraid_white.png" width="150">](https://account.qbraid.com?gitHubUrl=https://github.com/SRI-International/QC-App-Oriented-Benchmarks.git)
 
