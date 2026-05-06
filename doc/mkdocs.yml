@@ -6,6 +6,7 @@ nav:
     - Home: index.md
     - Quick Start: quick_start.md
     - User Guide: user_guide.md
+    - Benchmarks: benchmarks.md
     - Setup:
         - Overview: setup/README.md
         - Qiskit: setup/qiskit/README.md
