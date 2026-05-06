@@ -6,7 +6,7 @@ This guide walks you through installing the **QED-C Application-Oriented Benchma
 
 - **Python 3.9 or later** (we recommend using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) for environment management)
 - **A quantum computing SDK** — either:
-  - [Qiskit](https://qiskit.org/) 1.0+ (includes a local simulator), or
+  - [Qiskit](https://qiskit.org/) 2.0+ (includes a local simulator), or
   - [CUDA-Q](https://developer.nvidia.com/cuda-quantum) (requires NVIDIA GPU)
 
 ## Installation

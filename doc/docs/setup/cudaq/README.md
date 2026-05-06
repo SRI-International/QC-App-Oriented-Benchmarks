@@ -58,7 +58,7 @@ In the section below, we provide some instructions for executing the benchmarks 
 
 To execute the benchmarks in a command or shell window, you simply change directory to the desired benchmark directory and execute the benchmark program as follows:
 
-    cd [your github home directory]/QC-App-Oriented-Benchmarks/bernstein_vazirani
+    cd [your github home directory]/QC-App-Oriented-Benchmarks/qedcbench/bernstein_vazirani
 
   
     python bv_benchmark.py -a cudaq

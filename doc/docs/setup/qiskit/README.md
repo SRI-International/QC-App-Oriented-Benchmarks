@@ -5,7 +5,7 @@
 This directory describes the requirements and operational conventions for using Qiskit as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
 In particular, this document explains how to set up the tools needed to run the Qiskit implementation of these benchmarks.
 
-**NOTE** This repository now requires Qiskit version 1.0 or greater.  A branch named **__master-240322-works-0.46** has been preserved for use with earlier versions of Qiskit. 
+**NOTE** This repository requires Qiskit version 2.0 or greater.
 
 ## Configure a Qiskit Environment
 If you are using Anaconda environments, create an environment named "qiskit" and then "activate" it using the following commands:
@@ -72,7 +72,7 @@ Important note: there may be costs associated with execution on some hardware sy
 
 For example, in an Anaconda command window, you can enter the following commands to change the directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:
 
-    cd [your github home directory]/QC-App-Oriented-Benchmarks/bernstein_vazirani
+    cd [your github home directory]/QC-App-Oriented-Benchmarks/qedcbench/bernstein_vazirani
 
   
     python bv_benchmark.py
@@ -89,6 +89,6 @@ The repository has been validated on Linux using the following versions as minim
 
     Miniconda Version: 4.10.3
     Python Version: 3.9 or later
-    Qiskit Version: 1.0 or later
+    Qiskit Version: 2.0 or later
 
 Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.

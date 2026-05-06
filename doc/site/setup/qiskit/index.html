@@ -174,7 +174,7 @@
 <h1 id="qiskit-version">Qiskit Version</h1>
 <p>This directory describes the requirements and operational conventions for using Qiskit as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
 In particular, this document explains how to set up the tools needed to run the Qiskit implementation of these benchmarks.</p>
-<p><strong>NOTE</strong> This repository now requires Qiskit version 1.0 or greater.  A branch named <strong>__master-240322-works-0.46</strong> has been preserved for use with earlier versions of Qiskit. </p>
+<p><strong>NOTE</strong> This repository requires Qiskit version 2.0 or greater.</p>
 <h2 id="configure-a-qiskit-environment">Configure a Qiskit Environment</h2>
 <p>If you are using Anaconda environments, create an environment named "qiskit" and then "activate" it using the following commands:</p>
 <pre><code>conda create -n qiskit python=3
@@ -217,7 +217,7 @@ Execute the following commands in the top-level directory of the benchmark repos
 <p>Important note: there may be costs associated with execution on some hardware systems. You may consider lowering the value of the num_shots, max_circuits, and max_qubits settings in the first code cell, during your initial testing to avoid unexpected charges.</p>
 <h2 id="run-the-benchmark-programs-in-a-command-window">Run the benchmark programs in a command window.</h2>
 <p>For example, in an Anaconda command window, you can enter the following commands to change the directory to the Qiskit Bernstein-Vazirani directory and run the benchmark program:</p>
-<pre><code>cd [your github home directory]/QC-App-Oriented-Benchmarks/bernstein_vazirani
+<pre><code>cd [your github home directory]/QC-App-Oriented-Benchmarks/qedcbench/bernstein_vazirani
 
 
 python bv_benchmark.py
@@ -228,7 +228,7 @@ python bv_benchmark.py
 <p>The repository has been validated on Linux using the following versions as minimums:</p>
 <pre><code>Miniconda Version: 4.10.3
 Python Version: 3.9 or later
-Qiskit Version: 1.0 or later
+Qiskit Version: 2.0 or later
 </code></pre>
 <p>Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.</p></div>
             </div>
