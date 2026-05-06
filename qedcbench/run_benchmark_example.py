@@ -4,10 +4,10 @@ Demonstrates the three-step benchmark execution: get_circuits, run_circuits, plo
 Run from the repository root, or after pip install -e .
 '''
 
-from qedclib.qedc_init import qedc_set_api
+from qedclib import set_api
 
 # Step 0: Configure the API (once, at startup)
-qedc_set_api("qiskit")
+set_api("qiskit")
 
 # Import the benchmark you want to run
 from quantum_fourier_transform import qft_benchmark as qft

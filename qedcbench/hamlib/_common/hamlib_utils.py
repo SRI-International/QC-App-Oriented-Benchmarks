@@ -767,7 +767,7 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    #PhaseEstimation, kernel_draw = qedc_benchmarks_init(args.api)
+    #PhaseEstimation, kernel_draw = initialize(args.api)
     
     # special argument handling
     #ex.verbose = args.verbose

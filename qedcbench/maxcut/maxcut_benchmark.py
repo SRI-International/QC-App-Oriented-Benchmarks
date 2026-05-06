@@ -9,7 +9,7 @@ This is a thin wrapper that delegates to the API-specific implementation.
 import sys
 from pathlib import Path
 
-from qedclib.qedc_init import qedc_benchmarks_init
+from qedclib import initialize
 
 # Benchmark Name
 benchmark_name = "MaxCut"
@@ -23,7 +23,7 @@ def run(**kwargs):
     selected_api = kwargs.pop('api', None) or "qiskit"
 
     # Configure the QED-C Benchmark package for use with the given API
-    qedc_benchmarks_init(selected_api, "maxcut", ["maxcut_benchmark"])
+    initialize(selected_api, "maxcut", ["maxcut_benchmark"])
 
     # Import the actual benchmark module (now available after qedc_init)
     import maxcut_benchmark as maxcut_impl
@@ -40,7 +40,7 @@ def load_data_and_plot(folder=None, backend_id=None, api=None, **kwargs):
     """
     Load data from a previous run and regenerate plots.
     Delegates to the API-specific implementation.
-    Assumes run() or qedc_benchmarks_init() was already called.
+    Assumes run() or initialize() was already called.
     """
     # Import the actual benchmark module (assumes paths already set up)
     import maxcut_benchmark as maxcut_impl

@@ -36,10 +36,6 @@ QC-App-Oriented-Benchmarks/
 │   ├── quantum_fourier_transform/
 │   └── ...
 │
-├── _common/                # Backwards-compatibility shim
-│   ├── __init__.py         # Re-exports from qedclib
-│   └── qedc_init.py       # Re-exports init functions
-│
 ├── doc/                    # Documentation
 │   ├── index.md            # Documentation overview
 │   ├── quick_start.md      # First-time user guide
@@ -50,7 +46,6 @@ QC-App-Oriented-Benchmarks/
 │   ├── setup/              # Platform-specific setup guides
 │   └── _design/            # Internal design documents
 │
-└── _doc/                   # Legacy doc location (being migrated)
 ```
 
 ## Two Packages, One Install

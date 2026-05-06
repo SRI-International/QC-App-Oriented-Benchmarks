@@ -1308,7 +1308,7 @@ def get_circuits(
         max_circuits: max circuits per qubit group (default 3)
         num_shots: measurement shots, stored in metrics (default 100)
         method: 1=standard fidelity metrics (default 1). Method 2/3 not supported.
-        api: programming API; None = use qedc_set_api() value (default None)
+        api: programming API; None = use set_api() value (default None)
 
     App-specific args:
         thetas_array: initial parameter values (default None)

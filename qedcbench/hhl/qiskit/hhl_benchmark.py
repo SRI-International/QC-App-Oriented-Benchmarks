@@ -669,7 +669,7 @@ def get_circuits(
         min_register_qubits: skip widths where input or clock < this (default 1)
         min/max_input_qubits: explicit input qubit range; overrides min/max_qubits (default None)
         min/max_clock_qubits: explicit clock qubit range; overrides min/max_qubits (default None)
-        api: programming API; None = use qedc_set_api() value (default None)
+        api: programming API; None = use set_api() value (default None)
 
     Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
     """

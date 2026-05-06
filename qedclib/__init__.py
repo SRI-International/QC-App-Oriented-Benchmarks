@@ -14,7 +14,7 @@ Usage:
     qedclib.metrics.plot_metrics(...)
 """
 
-from qedclib._init_engine import (
+from qedclib.api import (
     qedc_benchmarks_init as initialize,
     qedc_set_api as set_api,
     qedc_get_api as get_api,

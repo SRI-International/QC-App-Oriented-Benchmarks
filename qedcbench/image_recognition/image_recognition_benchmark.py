@@ -9,7 +9,7 @@ This is a thin wrapper that delegates to the qiskit implementation.
 import sys
 from pathlib import Path
 
-from qedclib.qedc_init import qedc_benchmarks_init
+from qedclib import initialize
 
 # Benchmark Name
 benchmark_name = "Image Recognition"
@@ -21,7 +21,7 @@ def run(**kwargs):
 
     # Configure the QED-C Benchmark package for use with the given API
     # Note: image_recognition only has qiskit implementation
-    qedc_benchmarks_init(kwargs.pop('api', None) or "qiskit", "image_recognition", ["image_recognition_benchmark"])
+    initialize(kwargs.pop('api', None) or "qiskit", "image_recognition", ["image_recognition_benchmark"])
 
     # Import the actual benchmark module (now available after qedc_init)
     import image_recognition_benchmark as img_impl
@@ -38,7 +38,7 @@ def load_data_and_plot(folder=None, backend_id=None, **kwargs):
     """
     Load data from a previous run and regenerate plots.
     Delegates to the API-specific implementation.
-    Assumes run() or qedc_benchmarks_init() was already called.
+    Assumes run() or initialize() was already called.
     """
     # Import the actual benchmark module (assumes paths already set up)
     import image_recognition_benchmark as img_impl

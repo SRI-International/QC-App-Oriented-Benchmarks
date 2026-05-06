@@ -149,13 +149,13 @@
 <p>The <strong>QED-C Application-Oriented Benchmarks</strong> suite is continually evolving, with issues fixed and enhancements made to add features.
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
 <h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
-<p>This version constitutes a major refactor of the entire benchmark repository.  For backwards compatibility with externally developed work that uses the repo, use version 1.2.1, the last satable release of the earlier benchmark repository structure.</p>
+<p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
 <h3 id="release-200-15-may-2026">Release 2.0.0 - 15 May 2026</h3>
 <h4 id="repository-restructure-qedclib-qedcbench">Repository Restructure: qedclib + qedcbench</h4>
 <p>The repository has been split into two packages, both installable with a single <code>pip install -e .</code>:
 - <strong>qedclib</strong> — the execution and metrics library (formerly <code>_common/</code>). Import as <code>import qedclib</code>.
 - <strong>qedcbench</strong> — the 17 benchmark applications (moved into <code>qedcbench/</code> directory). Import as <code>from qedcbench.hidden_shift import hs_benchmark</code>.</p>
-<p>A backwards-compatibility shim (<code>_common/</code>) remains for external code that uses <code>from _common import metrics</code>.</p>
+<p>Code that previously used <code>from _common import metrics</code> should change to <code>from qedclib import metrics</code>.</p>
 <h4 id="three-function-benchmark-api">Three-Function Benchmark API</h4>
 <p>All 16 benchmarks now expose a standard three-function interface for independent circuit creation, execution, and plotting:</p>
 <pre><code class="language-python">all_qcs, metrics = benchmark.get_circuits(min_qubits=2, max_qubits=8, ...)
@@ -164,7 +164,7 @@ benchmark.plot_results(...)
 </code></pre>
 <p>The convenience <code>run(**kwargs)</code> function calls all three and routes arguments automatically. Variational benchmarks (maxcut, hydrogen_lattice, image_recognition, VQE, QRL) support <code>get_circuits</code> for method 1 (fidelity); method 2 optimizer loops remain in a dedicated <code>run_method2()</code>.</p>
 <h4 id="array-based-execution-path">Array-Based Execution Path</h4>
-<p>The execution engine (<code>_common/qiskit/execute.py</code> and <code>_common/cudaq/execute.py</code>) now uses a batch-oriented API:
+<p>The execution engine (<code>qedclib/qiskit/execute.py</code> and <code>qedclib/cudaq/execute.py</code>) now uses a batch-oriented API:
 - <code>execute_circuits(circuits, num_shots)</code> — execute an array of circuits
 - <code>process_circuit_results(circuits_info, results)</code> — map results back to metrics
 - <code>submit_circuits(circuits_dict, num_shots)</code> — convenience wrapper for the above
@@ -181,7 +181,7 @@ exec_options = {&quot;noise_model&quot;: None}        # no noise (noiseless simu
 exec_options = {&quot;noise_model&quot;: my_model}    # custom noise model object
 </code></pre>
 <h4 id="simplified-init-api">Simplified Init API</h4>
-<p>New helper functions in <code>_common/qedc_init.py</code> reduce boilerplate:
+<p>New helper functions in <code>qedclib</code> reduce boilerplate:
 - <code>qedc_set_api("qiskit")</code> — set the default API once
 - <code>qedc_get_kernel("kernel_name")</code> — one-line kernel loading with auto-detection
 - <code>qedc_is_leader()</code> — MPI leader check abstraction</p>

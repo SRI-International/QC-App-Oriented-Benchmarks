@@ -5,7 +5,7 @@ This section presents a brief record of relevant changes made to each version th
 
 ## Version 2.0 Release Notes 
 
-This version constitutes a major refactor of the entire benchmark repository.  For backwards compatibility with externally developed work that uses the repo, use version 1.2.1, the last satable release of the earlier benchmark repository structure.
+This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
 ### Release 2.0.0 - 15 May 2026
 
@@ -15,7 +15,7 @@ The repository has been split into two packages, both installable with a single 
 - **qedclib** — the execution and metrics library (formerly `_common/`). Import as `import qedclib`.
 - **qedcbench** — the 17 benchmark applications (moved into `qedcbench/` directory). Import as `from qedcbench.hidden_shift import hs_benchmark`.
 
-A backwards-compatibility shim (`_common/`) remains for external code that uses `from _common import metrics`.
+Code that previously used `from _common import metrics` should change to `from qedclib import metrics`.
 
 #### Three-Function Benchmark API
 
@@ -29,7 +29,7 @@ The convenience `run(**kwargs)` function calls all three and routes arguments au
 
 #### Array-Based Execution Path
 
-The execution engine (`_common/qiskit/execute.py` and `_common/cudaq/execute.py`) now uses a batch-oriented API:
+The execution engine (`qedclib/qiskit/execute.py` and `qedclib/cudaq/execute.py`) now uses a batch-oriented API:
 - `execute_circuits(circuits, num_shots)` — execute an array of circuits
 - `process_circuit_results(circuits_info, results)` — map results back to metrics
 - `submit_circuits(circuits_dict, num_shots)` — convenience wrapper for the above
@@ -56,7 +56,7 @@ exec_options = {"noise_model": my_model}    # custom noise model object
 
 #### Simplified Init API
 
-New helper functions in `_common/qedc_init.py` reduce boilerplate:
+New helper functions in `qedclib` reduce boilerplate:
 - `qedc_set_api("qiskit")` — set the default API once
 - `qedc_get_kernel("kernel_name")` — one-line kernel loading with auto-detection
 - `qedc_is_leader()` — MPI leader check abstraction

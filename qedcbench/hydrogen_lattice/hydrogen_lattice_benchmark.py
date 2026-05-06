@@ -9,7 +9,7 @@ This is a thin wrapper that delegates to the qiskit implementation.
 import sys
 from pathlib import Path
 
-from qedclib.qedc_init import qedc_benchmarks_init
+from qedclib import initialize
 
 # Benchmark Name
 benchmark_name = "Hydrogen Lattice"
@@ -21,7 +21,7 @@ def run(**kwargs):
 
     # Configure the QED-C Benchmark package for use with the given API
     # Note: hydrogen_lattice only has qiskit implementation
-    qedc_benchmarks_init(kwargs.pop('api', None) or "qiskit", "hydrogen_lattice", ["hydrogen_lattice_benchmark"])
+    initialize(kwargs.pop('api', None) or "qiskit", "hydrogen_lattice", ["hydrogen_lattice_benchmark"])
 
     # Import the actual benchmark module (now available after qedc_init)
     import hydrogen_lattice_benchmark as hl_impl

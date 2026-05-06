@@ -394,7 +394,7 @@ def get_circuits(
         max_circuits: max circuits per qubit group (default 1)
         num_shots: measurement shots, stored in metrics (default 100)
         method: 1=Beauregard, 2=standard QPE, 3=iterative QPE (default 1)
-        api: programming API; None = use qedc_set_api() value (default None)
+        api: programming API; None = use set_api() value (default None)
 
     Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
     """

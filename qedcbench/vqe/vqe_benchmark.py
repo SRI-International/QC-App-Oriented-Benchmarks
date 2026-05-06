@@ -8,7 +8,7 @@ This is a thin wrapper that delegates to the qiskit implementation.
 import sys
 from pathlib import Path
 
-from qedclib.qedc_init import qedc_benchmarks_init
+from qedclib import initialize
 
 benchmark_name = "VQE Simulation"
 
@@ -17,7 +17,7 @@ def run(**kwargs):
     """Create circuits, execute, and plot. Delegates to qiskit implementation.
     See vqe/qiskit/vqe_benchmark.py for detailed parameter documentation."""
 
-    qedc_benchmarks_init(kwargs.get('api', None) or "qiskit", "vqe", ["vqe_benchmark"])
+    initialize(kwargs.get('api', None) or "qiskit", "vqe", ["vqe_benchmark"])
     import vqe_benchmark as vqe_impl
 
     return vqe_impl.run(**kwargs)

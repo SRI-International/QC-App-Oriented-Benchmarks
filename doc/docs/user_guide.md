@@ -255,7 +255,7 @@ from qedclib import metrics
 from qedclib import qcb_mpi as mpi
 ```
 
-A backwards-compatibility shim is included so that `from _common import metrics` continues to work for existing code. However, new code should use `from qedclib import ...`.
+The `_common` directory no longer exists. All imports must use `qedclib`.
 
 **Package imports** now use the `qedcbench` prefix:
 ```python

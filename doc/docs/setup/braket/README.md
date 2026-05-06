@@ -89,7 +89,7 @@ It is best to begin your exploration with smaller numbers as you become familiar
 ## Run the benchmark programs in an Anaconda command window.
 
 Each of the benchmark programs may be run directly from within a command shell window. 
-The code for the each of the application benchmarks is largely self-contained, except for a few references to the folder at top-lvel named **_common**.
+The code for each of the application benchmarks is largely self-contained, using the shared **qedclib** library for execution and metrics.
 
 For example, in an Anaconda command window, you can enter the following commands to change directory to the Braket Bernstein-Vazirani directory and run the benchmark program:
 

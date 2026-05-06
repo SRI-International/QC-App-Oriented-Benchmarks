@@ -24,7 +24,7 @@ import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 # The QED-C initialization module
-from qedclib.qedc_init import qedc_benchmarks_init
+from qedclib import initialize
 from qedclib import metrics
 from qedclib import qcb_mpi as mpi
 
@@ -351,7 +351,7 @@ def run(min_qubits: int = 2,
 	Imports are here (not at module level) to support dynamic loading
 	of API-specific implementations (qiskit/cirq/cudaq/etc).
 	"""
-    qedc_benchmarks_init(api, "hamlib", ["hamlib_simulation_kernel"])
+    initialize(api, "hamlib", ["hamlib_simulation_kernel"])
     import hamlib_simulation_kernel
     import execute as ex
 

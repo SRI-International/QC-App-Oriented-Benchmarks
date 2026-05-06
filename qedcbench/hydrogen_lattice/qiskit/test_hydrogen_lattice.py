@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.resolve()))
 
-from qedclib.qedc_init import qedc_benchmarks_init
-qedc_benchmarks_init("qiskit", "hydrogen_lattice", ["hydrogen_lattice_benchmark"])
+from qedclib import initialize
+initialize("qiskit", "hydrogen_lattice", ["hydrogen_lattice_benchmark"])
 import hydrogen_lattice_benchmark
 
 import numpy as np

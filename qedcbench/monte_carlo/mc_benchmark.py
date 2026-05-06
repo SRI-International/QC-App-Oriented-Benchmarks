@@ -17,7 +17,7 @@ import numpy as np
 import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-from qedclib.qedc_init import qedc_get_kernel, qedc_is_leader
+from qedclib import get_kernel, is_leader
 from qedclib import metrics
 
 # Add local _common to path for mc_utils
@@ -67,13 +67,13 @@ def get_circuits(
         epsilon: approximation error parameter (default 0.05)
         degree: polynomial degree for f(x) (default 2)
         num_state_qubits: number of state qubits (default 1)
-        api: programming API; None = use qedc_set_api() value (default None)
+        api: programming API; None = use set_api() value (default None)
 
     Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
     """
 
     # Load the API-specific circuit kernel for this benchmark
-    kernel = qedc_get_kernel("mc_kernel", api=api)
+    kernel = get_kernel("mc_kernel", api=api)
 
     if max_qubits > MAX_QUBITS:
         print(f"INFO: {benchmark_name} benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
@@ -218,7 +218,7 @@ def run_circuits(all_qcs,
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
     """
-    qedc_get_kernel("mc_kernel", api=api)
+    get_kernel("mc_kernel", api=api)
     import execute as ex
     ex.verbose = verbose
 
@@ -262,9 +262,9 @@ def plot_results(
         draw_circuits: draw a sample circuit diagram (default True)
         plot_results: generate metrics plots (default True)
     """
-    kernel = qedc_get_kernel("mc_kernel", api=api)
+    kernel = get_kernel("mc_kernel", api=api)
 
-    if qedc_is_leader():
+    if is_leader():
         if draw_circuits:
             kernel.kernel_draw()
 

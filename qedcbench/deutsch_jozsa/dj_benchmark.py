@@ -16,7 +16,7 @@ import numpy as np
 import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-from qedclib.qedc_init import qedc_get_kernel, qedc_is_leader
+from qedclib import get_kernel, is_leader
 from qedclib import metrics
 
 benchmark_name = "Deutsch-Jozsa"
@@ -41,7 +41,7 @@ def get_circuits(
         skip_qubits: increment between widths (default 1)
         max_circuits: max circuits per qubit group (default 3)
         num_shots: measurement shots, stored in metrics (default 100)
-        api: programming API; None = use qedc_set_api() value (default None)
+        api: programming API; None = use set_api() value (default None)
 
     Note: DJ creates exactly 2 circuits per width (constant and balanced).
 
@@ -49,7 +49,7 @@ def get_circuits(
     """
 
     # Load the API-specific circuit kernel for this benchmark (e.g. qiskit or cudaq)
-    kernel = qedc_get_kernel("dj_kernel", api=api)
+    kernel = get_kernel("dj_kernel", api=api)
 
     max_qubits = max(3, max_qubits)
     min_qubits = min(max(3, min_qubits), max_qubits)
@@ -121,7 +121,7 @@ def run_circuits(all_qcs,
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
     """
-    qedc_get_kernel("dj_kernel", api=api)
+    get_kernel("dj_kernel", api=api)
     import execute as ex
     ex.verbose = verbose
 
@@ -161,9 +161,9 @@ def plot_results(
         draw_circuits: draw a sample circuit diagram (default True)
         plot_results: generate metrics plots (default True)
     """
-    kernel = qedc_get_kernel("dj_kernel", api=api)
+    kernel = get_kernel("dj_kernel", api=api)
 
-    if qedc_is_leader():
+    if is_leader():
         if draw_circuits:
             kernel.kernel_draw()
 

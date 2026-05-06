@@ -8,7 +8,7 @@ This is a thin wrapper that delegates to the qiskit implementation.
 import sys
 from pathlib import Path
 
-from qedclib.qedc_init import qedc_benchmarks_init
+from qedclib import initialize
 
 benchmark_name = "Shor's Order Finding"
 
@@ -17,7 +17,7 @@ def run(**kwargs):
     """Create circuits, execute, and plot. Delegates to qiskit implementation.
     See shors/qiskit/shors_benchmark.py for detailed parameter documentation."""
 
-    qedc_benchmarks_init(kwargs.get('api', None) or "qiskit", "shors", ["shors_benchmark"])
+    initialize(kwargs.get('api', None) or "qiskit", "shors", ["shors_benchmark"])
     import shors_benchmark as shors_impl
 
     return shors_impl.run(**kwargs)

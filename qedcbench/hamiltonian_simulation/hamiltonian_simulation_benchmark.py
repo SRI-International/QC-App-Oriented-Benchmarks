@@ -18,7 +18,7 @@ import numpy as np
 import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-from qedclib.qedc_init import qedc_get_kernel, qedc_is_leader
+from qedclib import get_kernel, is_leader
 from qedclib import metrics
 
 benchmark_name = "Hamiltonian Simulation"
@@ -65,13 +65,13 @@ def get_circuits(
         init_state: initial state "checkerboard" or "ghz"; None = auto (default None)
         K: number of Trotter steps; None = use precalculated (default None)
         t: time of simulation; None = use precalculated (default None)
-        api: programming API; None = use qedc_set_api() value (default None)
+        api: programming API; None = use set_api() value (default None)
 
     Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
     """
 
     # Load the API-specific circuit kernel for this benchmark
-    kernel = qedc_get_kernel("hamiltonian_simulation_kernel", api=api)
+    kernel = get_kernel("hamiltonian_simulation_kernel", api=api)
 
     max_qubits = max(2, max_qubits)
     min_qubits = min(max(2, min_qubits), max_qubits)
@@ -228,7 +228,7 @@ def run_circuits(all_qcs,
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
     """
-    qedc_get_kernel("hamiltonian_simulation_kernel", api=api)
+    get_kernel("hamiltonian_simulation_kernel", api=api)
     import execute as ex
     ex.verbose = verbose
 
@@ -279,9 +279,9 @@ def plot_results(
         draw_circuits: draw a sample circuit diagram (default True)
         plot_results: generate metrics plots (default True)
     """
-    kernel = qedc_get_kernel("hamiltonian_simulation_kernel", api=api)
+    kernel = get_kernel("hamiltonian_simulation_kernel", api=api)
 
-    if qedc_is_leader():
+    if is_leader():
         if draw_circuits:
             kernel.kernel_draw(hamiltonian, use_XX_YY_ZZ_gates, method, random_pauli_flag)
 

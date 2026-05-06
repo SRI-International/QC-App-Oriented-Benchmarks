@@ -8,7 +8,7 @@ import numpy as np
 
 ############### Configure API
 
-def qedc_benchmarks_init(api: str = "qiskit"):
+def initialize(api: str = "qiskit"):
     """
     Initialize the QED-C Benchmark environment for the specified API.
     Sets up sys.path for API-specific and common modules, imports and initializes
@@ -436,7 +436,7 @@ def get_circuits(
         return {}, {}
 
     # configure the QED-C Benchmark package for use with the given API
-    generate_pqc_circuit, ideal_simulation, kernel_draw = qedc_benchmarks_init(api)
+    generate_pqc_circuit, ideal_simulation, kernel_draw = initialize(api)
     globals().update(
         generate_pqc_circuit=generate_pqc_circuit,
         ideal_simulation=ideal_simulation,
@@ -547,7 +547,7 @@ def run_method2(
     """
 
     # configure the QED-C Benchmark package for use with the given API
-    generate_pqc_circuit, ideal_simulation, kernel_draw = qedc_benchmarks_init(api)
+    generate_pqc_circuit, ideal_simulation, kernel_draw = initialize(api)
     globals().update(
         generate_pqc_circuit=generate_pqc_circuit,
         ideal_simulation=ideal_simulation,
@@ -751,7 +751,7 @@ if __name__ == '__main__':
     
     # configure the QED-C Benchmark package for use with the given API
     # (done here so we can set verbose for now)
-    generate_pqc_circuit, ideal_simulation, kernel_draw = qedc_benchmarks_init(args.api)
+    generate_pqc_circuit, ideal_simulation, kernel_draw = initialize(args.api)
     
     # special argument handling
     ex.verbose = args.verbose

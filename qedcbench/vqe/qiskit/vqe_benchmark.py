@@ -334,7 +334,7 @@ def get_circuits(
         max_circuits: max circuits per qubit group (default 3; method 2 forces 1)
         num_shots: measurement shots, stored in metrics (default 4092)
         method: 1=single ansatz circuit, 2=per-Pauli-term circuits (default 1)
-        api: programming API; None = use qedc_set_api() value (default None)
+        api: programming API; None = use set_api() value (default None)
 
     Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
     """
