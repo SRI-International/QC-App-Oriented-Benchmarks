@@ -1,4 +1,4 @@
-# Quantum Computing - Toolkit Information
+# Setup: Braket
 
 # Amazon Braket Version
 

@@ -1,4 +1,4 @@
-# Quantum Computing - Toolkit Information
+# Setup: CUDA-Q
 
 # CUDA Quantum Version
 

@@ -1,4 +1,4 @@
-# Quantum Computing - Toolkit Information
+# Setup: Cirq
 
 # Cirq Version
 

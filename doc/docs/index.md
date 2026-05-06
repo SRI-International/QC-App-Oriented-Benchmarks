@@ -1,6 +1,8 @@
-# Documentation Overview
+# QED-C Application-Oriented Benchmarks
 
 The **QED-C Application-Oriented Benchmarks** provide a suite of quantum computing benchmark programs that measure the performance of quantum computers on practical, application-relevant tasks. The benchmarks are maintained by the Quantum Economic Development Consortium (QED-C) Technical Advisory Committee on Standards and Benchmarks.
+
+## Documentation Overview
 
 Documentation is organized into the following sections, each addressing a specific need.
 
@@ -38,7 +40,7 @@ The *About* section provides background information about the project, its contr
 
 Detailed instructions for setting up specific quantum computing platforms (Qiskit, CUDA-Q, Cirq, Braket, Ocean) are available in the setup guides.
 
-&nbsp;&nbsp;&nbsp;&nbsp;Go to the [Setup Guides](./setup/README.md).
+&nbsp;&nbsp;&nbsp;&nbsp;Go to the [Setup Guides](setup/README.md).
 
 <br>
 &copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.

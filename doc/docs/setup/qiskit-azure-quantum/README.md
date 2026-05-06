@@ -1,4 +1,4 @@
-# Quantum Computing - Toolkit Information
+# Setup: Azure Quantum
 
 # Qiskit Version for Azure Quantum
 

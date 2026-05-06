@@ -1,4 +1,4 @@
-# Quantum Computing - Toolkit Information
+# Setup: Qiskit
 
 # Qiskit Version
 

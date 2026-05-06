@@ -1,4 +1,4 @@
-# Quantum Computing - Toolkit Information
+# Setup: QBraid
 
 ## Running Benchmarks on qBraid
 

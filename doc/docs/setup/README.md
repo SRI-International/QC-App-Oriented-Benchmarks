@@ -1,4 +1,4 @@
-# Preparing to Run Benchmarks
+# Setup: Preparing to Run Benchmarks
 
 You can run the benchmarks in Qiskit, CUDA-Q, Cirq, Braket, or Ocean. For each of the programming environments supported by this project, there is a subdirectory containing detailed information about requirements and operational conventions. To view this information, along with instructions on how to to configure a unique environment for the API of your choice, follow the links in [Links to API Specific Setup](#links-to-api-specific-setup) below.
 

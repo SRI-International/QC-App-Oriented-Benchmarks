@@ -26,14 +26,13 @@ pip install -e .
 
 This single command installs both **qedclib** (the execution library) and **qedcbench** (the benchmarks). No additional setup is needed for simulator-based execution.
 
-3. **Install your quantum SDK** (if not already installed):
+3. **Install your quantum SDK** (if not already installed). For example, if you are using Qiskit:
 
 ```bash
-# For Qiskit:
 pip install qiskit qiskit-aer qiskit-ibm-runtime
-
-# For CUDA-Q: see doc/setup/cudaq/README.md
 ```
+
+For other platforms (CUDA-Q, Cirq, Braket), see the [Setup Guides](./setup/README.md).
 
 ## Run Your First Benchmark
 
