@@ -209,12 +209,11 @@ def end_metrics():
     print("")
 
 def finalize_all_groups():
-    """Finalize all groups and end metrics collection."""
+    """Finalize all groups that have completed execution."""
     for group in list(circuit_metrics.keys()):
         if group == "subtitle":
             continue
         finalize_group(group)
-    end_metrics()
 
 ##################################################
 # METRICS STORE AND GET FUNCTIONS
@@ -299,8 +298,12 @@ def get_metric (group, circuit, metric):
 # Aggregate metrics for a specific group, creating average across circuits in group
 def aggregate_metrics_for_group (group):
     group = str(group)
-    
-    # generate totals, then divide by number of circuits to calculate averages    
+
+    # skip if already aggregated
+    if group in group_metrics["groups"]:
+        return
+
+    # generate totals, then divide by number of circuits to calculate averages
     if group in circuit_metrics:
 
         # job ids handled specially, maintain array in the aggregate
@@ -469,18 +472,22 @@ def report_metrics ():
 # Aggregate and report on metrics for the given groups, if all circuits in group are complete
 def finalize_group(group, report=True):
     group = str(group)
-    
+
     #print(f"... finalize group={group}")
+
+    # skip if already finalized (aggregated and reported)
+    if group in group_metrics["groups"]:
+        return
 
     # loop over circuits in group to generate totals
     group_done = True
     for circuit in circuit_metrics[group]:
         #print(f"  ... metrics = {group} {circuit} {circuit_metrics[group][circuit]}")
-        
+
         if "elapsed_time" not in circuit_metrics[group][circuit]:
             group_done = False
             break
-    
+
     #print(f"  ... group_done = {group} {group_done}")
     if group_done and report:
         aggregate_metrics_for_group(group)
