@@ -251,7 +251,6 @@ def run(**kwargs):
     # Step 1: Create the benchmark circuits
     metrics.init_metrics()
     all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
-    if not all_qcs: return
 
     # Step 2: Execute circuits on the target backend
     run_circuits(all_qcs, **_for(run_circuits))

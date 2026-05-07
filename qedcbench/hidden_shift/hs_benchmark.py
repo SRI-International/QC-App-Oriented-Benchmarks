@@ -30,7 +30,7 @@ verbose = False
 def get_circuits(
     # Standard args (common across benchmarks)
     min_qubits=2, max_qubits=6, skip_qubits=2,
-    max_circuits=3, num_shots=100, method=1,
+    max_circuits=3, method=1,
     # App-specific args
     input_value=None,
     api=None,
@@ -42,7 +42,6 @@ def get_circuits(
         max_qubits: largest circuit width (default 6)
         skip_qubits: increment between widths (default 2)
         max_circuits: max circuits per qubit group (default 3)
-        num_shots: measurement shots, stored in metrics (default 100)
         method: algorithm method (default 1)
 
     App-specific args:
@@ -59,8 +58,6 @@ def get_circuits(
     min_qubits = min(max(2, min_qubits), max_qubits)
     if min_qubits % 2 == 1: min_qubits += 1   # min_qubits must be even
     skip_qubits = max(2, skip_qubits)
-
-    metrics.init_metrics()
 
     # Build circuits at each qubit width, with max_circuits random inputs per width
     all_qcs = {}
@@ -206,24 +203,24 @@ def run(**kwargs):
     """Create circuits, execute, and plot. Accepts any arg from
     get_circuits(), run_circuits(), or plot_results()."""
 
+    # If max_batch_size set, use batched create-execute loop to limit memory
+    if kwargs.get('max_batch_size') is not None:
+        from qedclib.batched import batched_run
+        return batched_run(get_circuits, run_circuits, plot_results, **kwargs)
+
+    # Partition incoming arguments to the function that accepts them
     def _for(func):
         return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
 
-    get_circuits_only = kwargs.pop('get_circuits', False)
-
     # Step 1: Create the benchmark circuits
+    metrics.init_metrics()
     all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
-    if not all_qcs: return
 
-    # Step 2: If user just wants circuits, return them now
-    if get_circuits_only:
-        print(f"************\nReturning circuits and circuit information")
-        return all_qcs, circuit_metrics
-
-    # Step 3: Execute circuits on the target backend
+    # Step 2: Execute circuits on the target backend
     run_circuits(all_qcs, **_for(run_circuits))
+    metrics.end_metrics()
 
-    # Step 4: Draw sample circuit and plot metrics
+    # Step 3: Draw sample circuit and plot metrics
     plot_results(**_for(plot_results))
 
 

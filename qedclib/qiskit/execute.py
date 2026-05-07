@@ -2392,6 +2392,10 @@ def submit_circuits(circuits, metadata=None, num_shots=100, max_batch_size=None,
                 "shots": num_shots
             })
 
+    if len(circuits_info) == 0:
+        print("WARNING: No circuits to execute")
+        return
+
     if verbose:
         print(f"... submit_circuits({len(circuits_info)} circuits, max_batch={max_batch_size}, by_group={batch_by_group})")
 

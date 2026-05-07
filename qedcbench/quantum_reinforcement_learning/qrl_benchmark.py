@@ -417,7 +417,7 @@ import inspect
 
 def get_circuits(
     min_qubits=3, max_qubits=6, skip_qubits=1,
-    max_circuits=3, num_shots=100, method=1,
+    max_circuits=3, method=1,
     num_layers=2, init_state=1, n_measurements=0,
     num_qubits=3, data_reupload=False,
     api=None,
@@ -441,9 +441,6 @@ def get_circuits(
         generate_pqc_circuit=generate_pqc_circuit,
         ideal_simulation=ideal_simulation,
         kernel_draw=kernel_draw)
-
-    # Initialize metrics module
-    metrics.init_metrics()
 
     all_qcs = {}
 
@@ -712,11 +709,16 @@ def run(**kwargs):
     """Create circuits, execute, and plot. Accepts any arg from
     get_circuits(), run_circuits(), plot_results_fn(), or run_method2()."""
 
+    # If max_batch_size set, use batched create-execute loop to limit memory
+    if kwargs.get('max_batch_size') is not None:
+        from qedclib.batched import batched_run
+        return batched_run(get_circuits, run_circuits, plot_results_fn, **kwargs)
+
+    # Partition incoming arguments to the function that accepts them
     def _for(func):
         return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
 
     method = kwargs.get('method', 1)
-    get_circuits_only = kwargs.pop('get_circuits', False)
 
     # Handle None backend_id
     if kwargs.get('backend_id') is None:
@@ -725,18 +727,13 @@ def run(**kwargs):
     print(f"{benchmark_name} ({method}) Benchmark Program")
 
     if method in (1, 3):
+        metrics.init_metrics()
         all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
-        if not all_qcs:
-            return
-        if get_circuits_only:
-            return all_qcs, circuit_metrics
         run_circuits(all_qcs, **_for(run_circuits))
+        metrics.end_metrics()
         plot_results_fn(**_for(plot_results_fn))
 
     elif method == 2:
-        if get_circuits_only:
-            print(f"WARNING: get_circuits is not supported for method {method}")
-            return None
         run_method2(**_for(run_method2))
 
     else:

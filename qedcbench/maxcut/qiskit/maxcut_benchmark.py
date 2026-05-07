@@ -929,7 +929,7 @@ import inspect
 def get_circuits(
     # Standard args (common across benchmarks)
     min_qubits=3, max_qubits=6, skip_qubits=2,
-    max_circuits=1, num_shots=100, method=1,
+    max_circuits=1, method=1,
     # App-specific args
     rounds=1, degree=3, thetas_array=None,
     parameterized=False, do_fidelities=True,
@@ -943,7 +943,6 @@ def get_circuits(
         max_qubits: largest circuit width (default 6)
         skip_qubits: increment between widths (default 2)
         max_circuits: circuit repetitions / restarts (default 1)
-        num_shots: measurement shots, stored in metrics (default 100)
         method: 1=standard fidelity metrics (default 1). Method 2 not supported.
         api: programming API; None = use set_api() value (default None)
 
@@ -983,9 +982,6 @@ def get_circuits(
         if thetas_array == None:
             print(f"ERROR: no fixed angles for rounds = {rounds}")
             return {}, {}
-
-    # Initialize metrics module
-    metrics.init_metrics()
 
     # Build circuits at each qubit width
     all_qcs = {}
@@ -1410,21 +1406,24 @@ def run(**kwargs):
     """Create circuits, execute, and plot. Accepts any arg from
     get_circuits(), run_circuits(), plot_results_fn(), or run_method2()."""
 
+    # If max_batch_size set, use batched create-execute loop to limit memory
+    if kwargs.get('max_batch_size') is not None:
+        from qedclib.batched import batched_run
+        return batched_run(get_circuits, run_circuits, plot_results_fn, **kwargs)
+
+    # Partition incoming arguments to the function that accepts them
     def _for(func):
         return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
 
     method = kwargs.get('method', 1)
-    get_circuits_only = kwargs.pop('get_circuits', False)
 
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
     if method == 1:
+        metrics.init_metrics()
         all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
-        if not all_qcs:
-            return
-        if get_circuits_only:
-            return all_qcs, circuit_metrics
         run_circuits(all_qcs, **_for(run_circuits))
+        metrics.end_metrics()
         plot_results_fn(**_for(plot_results_fn))
 
     elif method == 2:
