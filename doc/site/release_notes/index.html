@@ -172,6 +172,11 @@ benchmark.plot_results(...)
 <p>The older single-circuit pipelined execution functions (<code>submit_circuit</code>, <code>throttle_execution</code>, <code>finalize_execution</code>) remain for backward compatibility but are no longer used by any benchmark.</p>
 <h4 id="auto-warmup-cuda-q">Auto-Warmup (CUDA-Q)</h4>
 <p>The first call to <code>execute_circuits()</code> in CUDA-Q now automatically runs a tiny 1-qubit circuit to prime the JIT compiler before executing the user's circuits. This eliminates the JIT compilation overhead from the first benchmark circuit's timing, without requiring any flags or special handling. The per-benchmark <code>--warmup</code> CLI option has been removed. To disable auto-warmup, set <code>execute.auto_warmup = False</code>.</p>
+<h4 id="batched-execution">Batched Execution</h4>
+<p>When <code>max_batch_size</code> (<code>-mbs</code>) is set, <code>run()</code> alternates between circuit creation and execution rather than creating all circuits up front. Circuits are created one qubit width at a time (up to <code>max_circuits</code> per width) and accumulated until adding another width would exceed the batch limit. The accumulated batch is then executed before continuing to the next set of widths. Batch boundaries always align with qubit-width boundaries — a width's circuits are never split across batches.</p>
+<p>This reduces peak memory usage for large sweeps, particularly on GPU backends where many simultaneous state vectors can cause out-of-memory errors.</p>
+<pre><code class="language-bash">python qft_benchmark.py --min_qubits 2 --max_qubits 20 -c 3 --max_batch_size 10
+</code></pre>
 <h4 id="per-circuit-execution-timing-cuda-q">Per-Circuit Execution Timing (CUDA-Q)</h4>
 <p>Each circuit executed via <code>execute_circuits()</code> in CUDA-Q now records its own execution time individually, rather than dividing the batch total evenly. This provides accurate per-circuit timing without requiring <code>max_batch_size=1</code>.</p>
 <h4 id="noise-model-via-exec_options">Noise Model via exec_options</h4>

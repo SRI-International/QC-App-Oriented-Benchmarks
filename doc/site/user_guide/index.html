@@ -275,8 +275,21 @@ python bv_benchmark.py --api qiskit --min_qubits 2 --max_qubits 10 --num_shots 1
 <td>Algorithm variant (where applicable)</td>
 <td>1</td>
 </tr>
+<tr>
+<td><code>--max_batch_size</code></td>
+<td><code>-mbs</code></td>
+<td>Max circuits to execute at a time (see below)</td>
+<td>None</td>
+</tr>
 </tbody>
 </table>
+<h3 id="batched-execution">Batched Execution</h3>
+<p>By default, <code>run()</code> creates all circuits up front and then executes them as a single batch. For large sweeps this can use excessive memory, particularly on GPU backends.</p>
+<p>When <code>--max_batch_size</code> (<code>-mbs</code>) is set, the benchmark alternates between circuit creation and execution: it creates all circuits for one qubit width at a time (up to <code>max_circuits</code>), accumulates widths until adding another would exceed the batch limit, then executes the accumulated batch before continuing. Batch boundaries always fall on qubit-width boundaries — a width's circuits are never split across batches.</p>
+<pre><code class="language-bash"># Execute at most 10 circuits at a time, creating one width at a time
+python qft_benchmark.py --min_qubits 2 --max_qubits 20 --max_circuits 3 --max_batch_size 10
+</code></pre>
+<p>Within each batch, <code>max_batch_size</code> also controls how many circuits are submitted to the backend in a single execution call. For example, if a batch contains 9 circuits and <code>max_batch_size</code> is 10, all 9 are submitted at once. If the batch contains 12 (because a single width produced 12 circuits), they are submitted in chunks of 10 and 2.</p>
 <h3 id="from-jupyter-notebooks">From Jupyter Notebooks</h3>
 <p>Suite notebooks are provided in <code>qedcbench/</code> for running multiple benchmarks with shared configuration:</p>
 <ol>

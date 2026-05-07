@@ -20,6 +20,12 @@ The *User Guide* is the definitive reference for all features of the benchmark s
 
 &nbsp;&nbsp;&nbsp;&nbsp;Go to the [User Guide](./user_guide.md).
 
+## Benchmarks
+
+The *Benchmarks* section describes each of the benchmark applications available in the suite, including their purpose, algorithm, and key parameters.
+
+&nbsp;&nbsp;&nbsp;&nbsp;Go to the [Benchmarks](./benchmarks.md) overview.
+
 ## Release Notes
 
 The benchmark suite is continually evolving, with issues fixed and enhancements made to add features. This section presents a record of changes made to each released version.
