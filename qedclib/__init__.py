@@ -24,7 +24,6 @@ from qedclib.api import (
 from qedclib import metrics
 from qedclib import qcb_mpi
 from qedclib import job_store
-from qedclib.batched import batched_run
 
 __version__ = "2.0.0"
 
