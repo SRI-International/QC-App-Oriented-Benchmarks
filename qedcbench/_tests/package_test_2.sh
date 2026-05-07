@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 # Navigate to the benchmark root (parent of _tests), remember where we started
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"

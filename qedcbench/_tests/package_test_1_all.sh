@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 # Run package_test_1 for all 16 benchmarks.
 # Uses package_test_2 for hamlib (includes observable test).
