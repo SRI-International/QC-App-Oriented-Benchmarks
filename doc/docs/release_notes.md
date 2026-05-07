@@ -41,6 +41,16 @@ The older single-circuit pipelined execution functions (`submit_circuit`, `throt
 
 The first call to `execute_circuits()` in CUDA-Q now automatically runs a tiny 1-qubit circuit to prime the JIT compiler before executing the user's circuits. This eliminates the JIT compilation overhead from the first benchmark circuit's timing, without requiring any flags or special handling. The per-benchmark `--warmup` CLI option has been removed. To disable auto-warmup, set `execute.auto_warmup = False`.
 
+#### Batched Execution
+
+When `max_batch_size` (`-mbs`) is set, `run()` alternates between circuit creation and execution rather than creating all circuits up front. Circuits are created one qubit width at a time (up to `max_circuits` per width) and accumulated until adding another width would exceed the batch limit. The accumulated batch is then executed before continuing to the next set of widths. Batch boundaries always align with qubit-width boundaries — a width's circuits are never split across batches.
+
+This reduces peak memory usage for large sweeps, particularly on GPU backends where many simultaneous state vectors can cause out-of-memory errors.
+
+```bash
+python qft_benchmark.py --min_qubits 2 --max_qubits 20 -c 3 --max_batch_size 10
+```
+
 #### Per-Circuit Execution Timing (CUDA-Q)
 
 Each circuit executed via `execute_circuits()` in CUDA-Q now records its own execution time individually, rather than dividing the batch total evenly. This provides accurate per-circuit timing without requiring `max_batch_size=1`.

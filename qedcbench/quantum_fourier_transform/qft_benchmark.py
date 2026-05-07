@@ -241,7 +241,7 @@ def run(**kwargs):
 
     # If max_batch_size set, use batched create-execute loop to limit memory
     if kwargs.get('max_batch_size') is not None:
-        from qedclib import batched_run
+        from qedclib.batched import batched_run
         return batched_run(get_circuits, run_circuits, plot_results, **kwargs)
 
     # Partition incoming arguments to the function that accepts them

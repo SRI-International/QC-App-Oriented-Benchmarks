@@ -82,6 +82,20 @@ python bv_benchmark.py -h
 | `--num_circuits` | `-c` | Circuits per qubit group | 3 |
 | `--backend_id` | `-b` | Backend/simulator name | `qasm_simulator` |
 | `--method` | `-m` | Algorithm variant (where applicable) | 1 |
+| `--max_batch_size` | `-mbs` | Max circuits to execute at a time (see below) | None |
+
+### Batched Execution
+
+By default, `run()` creates all circuits up front and then executes them as a single batch. For large sweeps this can use excessive memory, particularly on GPU backends.
+
+When `--max_batch_size` (`-mbs`) is set, the benchmark alternates between circuit creation and execution: it creates all circuits for one qubit width at a time (up to `max_circuits`), accumulates widths until adding another would exceed the batch limit, then executes the accumulated batch before continuing. Batch boundaries always fall on qubit-width boundaries — a width's circuits are never split across batches.
+
+```bash
+# Execute at most 10 circuits at a time, creating one width at a time
+python qft_benchmark.py --min_qubits 2 --max_qubits 20 --max_circuits 3 --max_batch_size 10
+```
+
+Within each batch, `max_batch_size` also controls how many circuits are submitted to the backend in a single execution call. For example, if a batch contains 9 circuits and `max_batch_size` is 10, all 9 are submitted at once. If the batch contains 12 (because a single width produced 12 circuits), they are submitted in chunks of 10 and 2.
 
 ### From Jupyter Notebooks
 
