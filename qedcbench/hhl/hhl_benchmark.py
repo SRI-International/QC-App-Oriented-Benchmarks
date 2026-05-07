@@ -7,6 +7,7 @@ This is a thin wrapper that delegates to the qiskit implementation.
 
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 from qedclib import initialize
 
