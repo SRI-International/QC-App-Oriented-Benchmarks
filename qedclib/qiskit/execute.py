@@ -2149,14 +2149,16 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
             else:
                 # Still queued/running — print comfort indicator
                 pollcount += 1
-                if verbose and (pollcount <= 32 or pollcount % 15 == 0):
+                if verbose and (pollcount <= 10 or pollcount % 10 == 0):
                     print('.', end='', flush=True)
 
-                # Adaptive sleep: fast initially, slower as wait grows
-                if pollcount <= 6:
+                # Adaptive sleep: fast at first to minimize latency on quick jobs,
+                # then ramp up to avoid busy-polling on long hardware runs
+                # Phase 1: 0.2s x 10 = 2s, Phase 2: 0.5s x 10 = 5s, Phase 3: 5.0s
+                if pollcount <= 10:
+                    time.sleep(0.2)
+                elif pollcount <= 20:
                     time.sleep(0.5)
-                elif pollcount <= 60:
-                    time.sleep(1.0)
                 else:
                     time.sleep(5.0)
 
