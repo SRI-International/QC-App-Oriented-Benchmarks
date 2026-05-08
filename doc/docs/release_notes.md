@@ -7,6 +7,10 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.1 - May 2026
+
+- Performance improvements and Qiskit 2.x compatibility fixes in the execution engine.
+
 ### Release 2.0.0 - 15 May 2026
 
 #### Repository Restructure: qedclib + qedcbench
