@@ -935,6 +935,8 @@ def wait_on_job_result(job, active_circuit):
             retry_count += 1
             result = job.result()
             break
+        except KeyboardInterrupt:
+            raise
         except Exception:
             print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
             if verbose: print(traceback.format_exc())
@@ -2098,6 +2100,8 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
 
             job = backend.run(trans_qcs, shots=num_shots, **opts)
 
+    except KeyboardInterrupt:
+        raise  # always let Ctrl-C through
     except Exception as e:
         print(f'ERROR: Failed to execute circuits')
         print(f"... exception = {e}")
@@ -2123,6 +2127,8 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         while True:
             try:
                 status = job.status()
+            except KeyboardInterrupt:
+                raise
             except Exception:
                 break  # Backend doesn't support status polling — fall through to job.result()
 
@@ -2167,6 +2173,8 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         try:
             raw_result = job.result()
             break
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             if retry_count < max_retries:
                 print(f'... error during job.result() for job {job_id} — retry {retry_count}/{max_retries}')
