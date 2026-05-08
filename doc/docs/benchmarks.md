@@ -48,3 +48,17 @@ Each benchmark application includes its own documentation describing the algorit
 | Benchmark | Description |
 |-----------|-------------|
 | [Quantum Reinforcement Learning](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/blob/master/qedcbench/quantum_reinforcement_learning/README.md) | Reinforcement learning with parameterized quantum circuits |
+
+## Programming Examples
+
+Ready-to-use examples are provided in `qedcbench/` showing how to run benchmarks from code:
+
+| Example | Description |
+|---------|-------------|
+| `run_benchmark_example.py` | Minimal Python script — runs anywhere after `pip install -e .` |
+| `benchmarks-qiskit-modularized.ipynb` | Notebook: baseline three-part flow (get_circuits → run_circuits → plot_results) |
+| `benchmarks-qiskit-modularized-IBM.ipynb` | Notebook: custom execution on IBM hardware |
+| `benchmarks-qiskit-modularized-IQM.ipynb` | Notebook: custom execution on IQM hardware |
+| `benchmarks-qiskit-modularized-MQT.ipynb` | Notebook: custom circuit generation from MQT Bench |
+
+The modularized notebooks illustrate how to substitute custom code for any of the three parts. See the [User Guide](./user_guide.md#from-jupyter-notebooks) for details.

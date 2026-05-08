@@ -154,6 +154,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#programming-examples" class="nav-link">Programming Examples</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
               </ul>
             </li>
         </ul>
@@ -296,7 +300,40 @@
 <td>Reinforcement learning with parameterized quantum circuits</td>
 </tr>
 </tbody>
-</table></div>
+</table>
+<h2 id="programming-examples">Programming Examples</h2>
+<p>Ready-to-use examples are provided in <code>qedcbench/</code> showing how to run benchmarks from code:</p>
+<table>
+<thead>
+<tr>
+<th>Example</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_benchmark_example.py</code></td>
+<td>Minimal Python script — runs anywhere after <code>pip install -e .</code></td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized.ipynb</code></td>
+<td>Notebook: baseline three-part flow (get_circuits → run_circuits → plot_results)</td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized-IBM.ipynb</code></td>
+<td>Notebook: custom execution on IBM hardware</td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized-IQM.ipynb</code></td>
+<td>Notebook: custom execution on IQM hardware</td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized-MQT.ipynb</code></td>
+<td>Notebook: custom circuit generation from MQT Bench</td>
+</tr>
+</tbody>
+</table>
+<p>The modularized notebooks illustrate how to substitute custom code for any of the three parts. See the <a href="../user_guide/#from-jupyter-notebooks">User Guide</a> for details.</p></div>
             </div>
         </div>
 

@@ -22,7 +22,7 @@ The *User Guide* is the definitive reference for all features of the benchmark s
 
 ## Benchmarks
 
-The *Benchmarks* section describes each of the benchmark applications available in the suite, including their purpose, algorithm, and key parameters.
+The *Benchmarks* section describes each of the benchmark applications available in the suite, including their purpose, algorithm, and key parameters. Ready-to-use programming examples are provided as Python scripts and Jupyter notebooks showing how to run benchmarks from code, execute on different hardware backends, and integrate external circuit sources.
 
 &nbsp;&nbsp;&nbsp;&nbsp;Go to the [Benchmarks](./benchmarks.md) overview.
 

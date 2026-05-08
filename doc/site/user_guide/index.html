@@ -298,6 +298,40 @@ python qft_benchmark.py --min_qubits 2 --max_qubits 20 --max_circuits 3 --max_ba
 <li>Configure the first cell with your backend and execution options</li>
 <li>Run individual benchmark cells</li>
 </ol>
+<h4 id="modularized-notebooks">Modularized Notebooks</h4>
+<p>The modularized notebooks demonstrate the three-part API (get_circuits, run_circuits, plot_results) with explicit control over each step. A base notebook shows all three parts using QED-C defaults, and variant notebooks show how to substitute custom code for individual parts:</p>
+<table>
+<thead>
+<tr>
+<th>Notebook</th>
+<th>Customizes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>benchmarks-qiskit-modularized.ipynb</code></td>
+<td>Baseline — all parts use QED-C defaults</td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized-IBM.ipynb</code></td>
+<td><strong>Part 2</strong> — execution on IBM hardware</td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized-IQM.ipynb</code></td>
+<td><strong>Part 2</strong> — execution on IQM hardware</td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized-MQT.ipynb</code></td>
+<td><strong>Part 1</strong> — circuit generation from MQT Bench</td>
+</tr>
+</tbody>
+</table>
+<p>Each notebook defines an <strong>execution handler</strong> that processes results per circuit (computing fidelity, storing metrics). This is the recommended pattern for custom analysis — see Part 3 in any modularized notebook.</p>
+<h4 id="python-script-example">Python Script Example</h4>
+<p>A standalone script is also provided for running benchmarks programmatically:</p>
+<pre><code class="language-bash">python qedcbench/run_benchmark_example.py
+</code></pre>
+<p>This runs anywhere after <code>pip install -e .</code> and demonstrates the three-step API in minimal code.</p>
 <h3 id="execution-options">Execution Options</h3>
 <p>Additional execution options can be passed via <code>exec_options</code> dict in notebooks or as keyword arguments:</p>
 <pre><code class="language-python">exec_options = {

@@ -106,6 +106,29 @@ Suite notebooks are provided in `qedcbench/` for running multiple benchmarks wit
 3. Configure the first cell with your backend and execution options
 4. Run individual benchmark cells
 
+#### Modularized Notebooks
+
+The modularized notebooks demonstrate the three-part API (get_circuits, run_circuits, plot_results) with explicit control over each step. A base notebook shows all three parts using QED-C defaults, and variant notebooks show how to substitute custom code for individual parts:
+
+| Notebook | Customizes |
+|----------|-----------|
+| `benchmarks-qiskit-modularized.ipynb` | Baseline — all parts use QED-C defaults |
+| `benchmarks-qiskit-modularized-IBM.ipynb` | **Part 2** — execution on IBM hardware |
+| `benchmarks-qiskit-modularized-IQM.ipynb` | **Part 2** — execution on IQM hardware |
+| `benchmarks-qiskit-modularized-MQT.ipynb` | **Part 1** — circuit generation from MQT Bench |
+
+Each notebook defines an **execution handler** that processes results per circuit (computing fidelity, storing metrics). This is the recommended pattern for custom analysis — see Part 3 in any modularized notebook.
+
+#### Python Script Example
+
+A standalone script is also provided for running benchmarks programmatically:
+
+```bash
+python qedcbench/run_benchmark_example.py
+```
+
+This runs anywhere after `pip install -e .` and demonstrates the three-step API in minimal code.
+
 ### Execution Options
 
 Additional execution options can be passed via `exec_options` dict in notebooks or as keyword arguments:
@@ -283,6 +306,74 @@ from qedcbench.hidden_shift import hs_benchmark
 **Installation** is now done with `pip install -e .` at the repo root, replacing the old `setup.py`.
 
 For full compatibility with v1.x, use branch [master-260411-v1.2.2](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/tree/master-260411-v1.2.2).
+
+## Developer Notes
+
+This section is for developers working on the repository source code.
+
+### Setup
+
+After cloning the repository, install in editable mode from the repo root:
+
+```bash
+pip install -e .
+```
+
+This registers both `qedclib` and `qedcbench` as importable packages that point to your local source. Changes to `.py` files take effect immediately without re-installing. You only need to re-run `pip install -e .` if you modify `pyproject.toml`.
+
+### Repository Layout
+
+```
+QC-App-Oriented-Benchmarks-master/
+├── pyproject.toml              # Package definition (provides qedclib + qedcbench)
+├── qedclib/                    # Execution library
+│   ├── __init__.py             # Public API
+│   ├── api.py                  # Dynamic loader, init, kernel discovery
+│   ├── metrics.py              # Metrics collection and plotting
+│   ├── batched.py              # Batched execution (batched_run)
+│   ├── qiskit/execute.py       # Qiskit execution backend
+│   └── cudaq/execute.py        # CUDA-Q execution backend
+├── qedcbench/                  # Benchmarks (17 benchmarks + notebooks)
+│   ├── __init__.py             # Registers benchmark root with qedclib
+│   ├── {benchmark}/            # Each benchmark has its own directory
+│   ├── benchmarks-*.ipynb      # Suite and modularized notebooks
+│   └── run_benchmark_example.py
+├── doc/                        # Documentation (mkdocs)
+│   ├── docs/                   # Source .md files (this user guide, etc.)
+│   ├── mkdocs.yml              # Navigation config
+│   └── site/                   # Generated HTML (python -m mkdocs build)
+└── server/app.py               # FastAPI doc server
+```
+
+### Documentation
+
+Documentation source is in `doc/docs/`. To build:
+
+```bash
+cd doc
+python -m mkdocs build
+```
+
+To serve locally for preview:
+
+```bash
+cd doc
+python -m mkdocs serve
+```
+
+Or use the FastAPI server (serves the built site with additional features):
+
+```bash
+python server/app.py
+```
+
+### Key Conventions
+
+- **No `__init__.py` in API subdirectories** (`qedclib/qiskit/`, `qedclib/cudaq/`, etc.) — this avoids namespace conflicts with vendor packages.
+- **Benchmark directories keep `__init__.py`** — needed for `from qedcbench.{name} import ...` imports.
+- **`import execute as ex`** — after `initialize()` or `get_kernel()`, the execute module is importable by bare name. Never use `from qedclib.qiskit import execute` directly.
+- **Absolute paths** — use `os.path.dirname(os.path.abspath(__file__))` in benchmark files, never relative paths.
+- **`sys.path.insert` lines** — keep these in benchmark files; they're needed for benchmark-local imports (e.g., `hamlib/_common/`).
 
 <br>
 &copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.
