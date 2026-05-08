@@ -1,16 +1,20 @@
 '''
-QED-C Benchmark - Simple Example
-Demonstrates the three-step benchmark execution: get_circuits, run_circuits, plot_results.
-Run from the repository root, or after pip install -e .
+QED-C Benchmark - Simple Programming Example
+
+Run from anywhere after: pip install -e .
+This demonstrates the three-step modularized API:
+  1. get_circuits  — generate benchmark circuits
+  2. run_circuits  — execute on a backend and compute fidelities
+  3. plot_results  — visualize metrics
 '''
 
 from qedclib import set_api
 
-# Step 0: Configure the API (once, at startup)
+# Configure the API (once, at startup)
 set_api("qiskit")
 
 # Import the benchmark you want to run
-from quantum_fourier_transform import qft_benchmark as qft
+from qedcbench.quantum_fourier_transform import qft_benchmark as qft
 
 # Step 1: Create benchmark circuits
 all_qcs, circuit_metrics = qft.get_circuits(min_qubits=3, max_qubits=8, max_circuits=3)
