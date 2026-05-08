@@ -94,17 +94,14 @@ You can use the execution and metrics infrastructure independently of the benchm
 ```python
 import qedclib
 
-# Set the quantum API
-qedclib.set_api("qiskit")
+# Initialize qedclib with the API to use (once, at startup)
+qedclib.initialize("qiskit")
+import execute as ex
+ex.set_execution_target("qasm_simulator")
 
 # Access metrics
 from qedclib import metrics
 metrics.init_metrics()
-
-# The full initialization (loads execute module dynamically)
-qedclib.initialize("qiskit")
-import execute as ex
-ex.set_execution_target("qasm_simulator")
 ```
 
 ## Using Benchmarks as a Package

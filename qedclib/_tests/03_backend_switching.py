@@ -22,7 +22,6 @@ import argparse
 import os
 import time
 
-qedclib.set_api("qiskit")
 qedclib.initialize("qiskit")
 import execute as ex
 

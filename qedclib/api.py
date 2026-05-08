@@ -224,6 +224,9 @@ def qedc_benchmarks_init(api: str, benchmark_name: str = None, module_names: lis
     if api is None:
         api = "qiskit"
 
+    # Set the default API so get_kernel() and other functions pick it up
+    qedc_set_api(api)
+
     if module_names is None:
         module_names = []
 

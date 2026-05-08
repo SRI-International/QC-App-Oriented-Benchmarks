@@ -1,17 +1,14 @@
 """
 01_basic_api.py — Verify qedclib works as a standalone library.
 
-Tests: import, set_api, set_execution_target, execute_circuits, get results.
+Tests: initialize, set_execution_target, execute_circuits, get results.
 This is the simplest possible use case — just run some circuits and get counts.
 """
 
 import qedclib
 import time
 
-# Set the API we want to use
-qedclib.set_api("qiskit")
-
-# Now we can get the execute module
+# Initialize qedclib with the API we want to use (also loads the execute module)
 qedclib.initialize("qiskit")
 import execute as ex
 

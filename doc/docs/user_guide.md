@@ -193,25 +193,22 @@ The **qedclib** package provides execution infrastructure and metrics collection
 import qedclib
 from qedclib import metrics
 
-# Initialize metrics tracking
-metrics.init_metrics()
-
-# Set default API
-qedclib.set_api("qiskit")
-
-# Initialize the execution backend
+# Initialize qedclib with the API to use (once, at startup)
 qedclib.initialize("qiskit")
 import execute as ex
 ex.set_execution_target("qasm_simulator")
+
+# Initialize metrics tracking
+metrics.init_metrics()
 ```
 
 ### Top-Level API
 
 | Function | Description |
 |----------|-------------|
-| `qedclib.set_api(api)` | Set default quantum SDK |
+| `qedclib.initialize(api, benchmark, kernels)` | Initialize qedclib: set API, load execution backend and kernel modules |
 | `qedclib.get_api()` | Get current default SDK |
-| `qedclib.initialize(api, benchmark, kernels)` | Load execution backend and kernel modules |
+| `qedclib.set_api(api)` | Set default quantum SDK (called automatically by `initialize`) |
 | `qedclib.get_kernel(name, api, benchmark)` | Load and return a kernel module |
 | `qedclib.is_leader()` | True if MPI rank 0 or MPI not active |
 

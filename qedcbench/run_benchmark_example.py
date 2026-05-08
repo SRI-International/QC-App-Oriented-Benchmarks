@@ -8,10 +8,10 @@ This demonstrates the three-step modularized API:
   3. plot_results  — visualize metrics
 '''
 
-from qedclib import set_api
+from qedclib import initialize
 
-# Configure the API (once, at startup)
-set_api("qiskit")
+# Initialize qedclib with the API to use (once, at startup)
+initialize("qiskit")
 
 # Import the benchmark you want to run
 from qedcbench.quantum_fourier_transform import qft_benchmark as qft

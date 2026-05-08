@@ -12,7 +12,6 @@ import qedclib
 import numpy as np
 import time
 
-qedclib.set_api("qiskit")
 qedclib.initialize("qiskit")
 import execute as ex
 
