@@ -1,5 +1,7 @@
 # Setup: Azure Quantum
 
+> **Note:** The Azure Quantum backend is not actively maintained. The setup instructions below may be outdated. Community contributions are welcome.
+
 # Qiskit Version for Azure Quantum
 
 This directory describes the requirements and operational conventions for using Qiskit as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.

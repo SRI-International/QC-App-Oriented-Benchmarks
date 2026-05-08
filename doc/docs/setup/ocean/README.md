@@ -1,5 +1,7 @@
 # Setup: Ocean
 
+> **Note:** The Ocean backend is not actively maintained. The setup instructions below may be outdated. Community contributions are welcome.
+
 # Ocean Version
 
 This directory describes the requirements and operational conventions for using Ocean as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
