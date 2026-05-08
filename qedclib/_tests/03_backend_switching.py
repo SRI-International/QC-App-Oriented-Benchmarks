@@ -7,8 +7,8 @@ Usage:
     python 03_backend_switching.py -b statevector_simulator
     python 03_backend_switching.py -b ibm              # least-busy IBM backend (ibm_cloud)
     python 03_backend_switching.py -b ibm_sherbrooke   # specific IBM backend
-    python 03_backend_switching.py -b ionq_simulator   # IonQ simulator
-    python 03_backend_switching.py -b ionq_qpu         # IonQ QPU
+    python 03_backend_switching.py -b ionq              # IonQ simulator (default)
+    python 03_backend_switching.py -b ionq_qpu         # IonQ QPU (requires access)
     python 03_backend_switching.py -b iqm              # IQM Garnet via Resonance
 
 Environment variables for hardware backends:
@@ -89,11 +89,13 @@ def configure_backend(backend_id):
         )
         return backend_id
 
-    # IonQ backends: "ionq_simulator" or "ionq_qpu"
+    # IonQ backends: "ionq" uses simulator, "ionq_qpu" for real hardware
     if backend_id.startswith("ionq"):
         from qiskit_ionq import IonQProvider
         provider = IonQProvider()
-        provider_backend = provider.get_backend(backend_id)
+        # Default to simulator — IonQ QPU requires explicit request
+        ionq_backend = "ionq_simulator" if backend_id == "ionq" else backend_id
+        provider_backend = provider.get_backend(ionq_backend)
 
         ex.set_execution_target(
             backend_id=backend_id,
