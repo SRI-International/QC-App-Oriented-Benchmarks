@@ -67,20 +67,25 @@ def configure_backend(backend_id):
     """Configure execution target based on backend_id string."""
 
     # IBM backends: "ibm" for least-busy, or specific like "ibm_sherbrooke"
+    # Uses IBM Cloud channel; set IBM_INSTANCE env var to your CRN or service name
     if backend_id.startswith("ibm"):
-        from qiskit_ibm_runtime import QiskitRuntimeService
-
-        service = QiskitRuntimeService(channel="ibm_cloud")
+        ibm_instance = os.environ.get("IBM_INSTANCE", "")
+        if not ibm_instance:
+            print("  WARNING: IBM_INSTANCE not set — will use saved default credentials.")
+            print("  Set IBM_INSTANCE to your CRN or service name to target a specific plan.")
 
         if backend_id == "ibm":
-            # Find least-busy backend with enough qubits
+            # Find least-busy backend
+            from qiskit_ibm_runtime import QiskitRuntimeService
+            service = QiskitRuntimeService(channel="ibm_cloud", instance=ibm_instance)
             backend = service.least_busy(simulator=False, operational=True, min_num_qubits=100)
             backend_id = backend.name
             print(f"  Least-busy IBM backend: {backend_id}")
 
         ex.set_execution_target(
             backend_id=backend_id,
-            exec_options={"use_ibm_quantum_platform": True, "use_sessions": False},
+            project=ibm_instance,
+            exec_options={"use_ibm_quantum_platform": False, "use_sessions": False},
         )
         return backend_id
 
