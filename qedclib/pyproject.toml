@@ -2,9 +2,9 @@
 name = "qedclib"
 version = "2.0.0"
 description = "Quantum program execution engine with built-in performance monitoring"
-readme = "README.md"
+readme = "qedclib/README.md"
 requires-python = ">=3.9"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [{name = "Quantum Economic Development Consortium (QED-C)"}]
 keywords = ["quantum computing", "execution engine", "benchmarks", "metrics", "qiskit", "cuda-q"]
 classifiers = [
@@ -12,7 +12,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Physics",
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
     "numpy",
