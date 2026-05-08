@@ -714,8 +714,9 @@ def execute_circuit(circuit):
                 # (only for simulator;  for other backends, it is treaded like keyword arg)
                 dummy = backend_exec_options_copy.pop("noise_model", None)
                         
-                # transpile and bind circuit with parameters; use cache if flagged   
-                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend, basis_gates=this_noise.basis_gates)
+                # transpile and bind circuit with parameters; use cache if flagged
+                # Pass basis_gates without backend to avoid Qiskit 2.x warning
+                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], None, basis_gates=this_noise.basis_gates)
                 simulation_circuits = trans_qc
                         
                 # apply transformer pass if provided
@@ -2072,8 +2073,9 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
             job = sampler.run(trans_qcs, shots=num_shots)
 
         elif this_noise is not None and not sampler and backend_name.endswith("qasm_simulator"):
-            # Noisy simulator path — transpile with noise model's basis gates
-            trans_qcs = transpile(circuits, backend,
+            # Noisy simulator path — transpile to noise model's basis gates only;
+            # don't pass backend alongside basis_gates (Qiskit 2.x warning)
+            trans_qcs = transpile(circuits,
                 basis_gates=this_noise.basis_gates)
 
             # Copy noise model QV to metrics if available
