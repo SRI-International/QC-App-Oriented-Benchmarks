@@ -190,3 +190,7 @@ __images/
 # Backup files
 *- Copy*
 *.bak
+
+# PyPI publishing (local-only build tools)
+pyproject-qedclib.toml
+build_qedclib.*
