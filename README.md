@@ -25,6 +25,8 @@ For detailed instructions, see the [Quick Start](./doc/quick_start.md) guide.
 
 **[Full Documentation Site](https://sri-international.github.io/QC-App-Oriented-Benchmarks/)** — Quick start, user guide, benchmark descriptions, and setup guides.
 
+**Standalone execution engine:** `pip install qedclib` — use the execution and metrics library without cloning this repo. See [qedclib on PyPI](https://pypi.org/project/qedclib/).
+
 | Document | Description |
 |----------|-------------|
 | [Quick Start](./doc/docs/quick_start.md) | Install and run your first benchmark |

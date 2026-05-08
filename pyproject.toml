@@ -2,11 +2,26 @@
 name = "qedcbench"
 version = "2.0.0"
 description = "QED-C Application-Oriented Quantum Computing Benchmarks and Execution Library"
+readme = "README.md"
 requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+authors = [{name = "Quantum Economic Development Consortium (QED-C)"}]
+keywords = ["quantum computing", "benchmarks", "qiskit", "cuda-q", "performance"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+]
 dependencies = [
     "numpy",
     "matplotlib",
 ]
+
+[project.urls]
+Homepage = "https://github.com/SRI-International/QC-App-Oriented-Benchmarks"
+Documentation = "https://sri-international.github.io/QC-App-Oriented-Benchmarks/"
 
 [build-system]
 requires = ["setuptools>=68.0"]
