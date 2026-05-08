@@ -969,6 +969,8 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
                 counts = {key: val for key, val in result.items()}
                 counts_array.append(counts)
 
+            except KeyboardInterrupt:
+                raise
             except Exception as e:
                 print(f'ERROR: Failed to execute circuit')
                 print(f"... exception = {e}")
