@@ -2120,9 +2120,11 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     if not wait:
         return (job_id, None)
 
-    # Poll job status before blocking on result (for backends that support it).
+    # Poll job status before blocking on result (for hardware backends).
     # Detects CANCELLED/ERROR early and prints comfort dots for long-running jobs.
-    if hasattr(job, 'status'):
+    # Skip for local simulators — job.result() handles errors and returns fast.
+    is_local_simulator = 'simulator' in backend_name.lower()
+    if hasattr(job, 'status') and not is_local_simulator:
         pollcount = 0
         while True:
             try:
