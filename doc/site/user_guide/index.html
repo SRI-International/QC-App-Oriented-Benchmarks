@@ -166,6 +166,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#developer-notes" class="nav-link">Developer Notes</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
               </ul>
             </li>
         </ul>
@@ -541,6 +545,54 @@ from qedcbench.hidden_shift import hs_benchmark
 </code></pre>
 <p><strong>Installation</strong> is now done with <code>pip install -e .</code> at the repo root, replacing the old <code>setup.py</code>.</p>
 <p>For full compatibility with v1.x, use branch <a href="https://github.com/SRI-International/QC-App-Oriented-Benchmarks/tree/master-260411-v1.2.2">master-260411-v1.2.2</a>.</p>
+<h2 id="developer-notes">Developer Notes</h2>
+<p>This section is for developers working on the repository source code.</p>
+<h3 id="setup">Setup</h3>
+<p>After cloning the repository, install in editable mode from the repo root:</p>
+<pre><code class="language-bash">pip install -e .
+</code></pre>
+<p>This registers both <code>qedclib</code> and <code>qedcbench</code> as importable packages that point to your local source. Changes to <code>.py</code> files take effect immediately without re-installing. You only need to re-run <code>pip install -e .</code> if you modify <code>pyproject.toml</code>.</p>
+<h3 id="repository-layout">Repository Layout</h3>
+<pre><code>QC-App-Oriented-Benchmarks-master/
+├── pyproject.toml              # Package definition (provides qedclib + qedcbench)
+├── qedclib/                    # Execution library
+│   ├── __init__.py             # Public API
+│   ├── api.py                  # Dynamic loader, init, kernel discovery
+│   ├── metrics.py              # Metrics collection and plotting
+│   ├── batched.py              # Batched execution (batched_run)
+│   ├── qiskit/execute.py       # Qiskit execution backend
+│   └── cudaq/execute.py        # CUDA-Q execution backend
+├── qedcbench/                  # Benchmarks (17 benchmarks + notebooks)
+│   ├── __init__.py             # Registers benchmark root with qedclib
+│   ├── {benchmark}/            # Each benchmark has its own directory
+│   ├── benchmarks-*.ipynb      # Suite and modularized notebooks
+│   └── run_benchmark_example.py
+├── doc/                        # Documentation (mkdocs)
+│   ├── docs/                   # Source .md files (this user guide, etc.)
+│   ├── mkdocs.yml              # Navigation config
+│   └── site/                   # Generated HTML (python -m mkdocs build)
+└── server/app.py               # FastAPI doc server
+</code></pre>
+<h3 id="documentation">Documentation</h3>
+<p>Documentation source is in <code>doc/docs/</code>. To build:</p>
+<pre><code class="language-bash">cd doc
+python -m mkdocs build
+</code></pre>
+<p>To serve locally for preview:</p>
+<pre><code class="language-bash">cd doc
+python -m mkdocs serve
+</code></pre>
+<p>Or use the FastAPI server (serves the built site with additional features):</p>
+<pre><code class="language-bash">python server/app.py
+</code></pre>
+<h3 id="key-conventions">Key Conventions</h3>
+<ul>
+<li><strong>No <code>__init__.py</code> in API subdirectories</strong> (<code>qedclib/qiskit/</code>, <code>qedclib/cudaq/</code>, etc.) — this avoids namespace conflicts with vendor packages.</li>
+<li><strong>Benchmark directories keep <code>__init__.py</code></strong> — needed for <code>from qedcbench.{name} import ...</code> imports.</li>
+<li><strong><code>import execute as ex</code></strong> — after <code>initialize()</code> or <code>get_kernel()</code>, the execute module is importable by bare name. Never use <code>from qedclib.qiskit import execute</code> directly.</li>
+<li><strong>Absolute paths</strong> — use <code>os.path.dirname(os.path.abspath(__file__))</code> in benchmark files, never relative paths.</li>
+<li><strong><code>sys.path.insert</code> lines</strong> — keep these in benchmark files; they're needed for benchmark-local imports (e.g., <code>hamlib/_common/</code>).</li>
+</ul>
 <p><br>
 &copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.</p></div>
             </div>

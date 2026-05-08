@@ -177,8 +177,24 @@ benchmark.plot_results(...)
 <p>This reduces peak memory usage for large sweeps, particularly on GPU backends where many simultaneous state vectors can cause out-of-memory errors.</p>
 <pre><code class="language-bash">python qft_benchmark.py --min_qubits 2 --max_qubits 20 -c 3 --max_batch_size 10
 </code></pre>
-<h4 id="per-circuit-execution-timing-cuda-q">Per-Circuit Execution Timing (CUDA-Q)</h4>
-<p>Each circuit executed via <code>execute_circuits()</code> in CUDA-Q now records its own execution time individually, rather than dividing the batch total evenly. This provides accurate per-circuit timing without requiring <code>max_batch_size=1</code>.</p>
+<h4 id="per-circuit-execution-timing">Per-Circuit Execution Timing</h4>
+<p>Each circuit now records its own execution time individually:</p>
+<ul>
+<li><strong>CUDA-Q</strong>: Times each <code>cudaq.sample()</code> call directly, rather than dividing the batch total evenly.</li>
+<li><strong>Qiskit (Aer simulator)</strong>: Extracts per-experiment <code>time_taken</code> from results.</li>
+<li><strong>Qiskit (IBM hardware)</strong>: Divides <code>execution_spans</code> duration evenly across circuits in the batch. Per-width timing requires batched execution (<code>-mbs</code>).</li>
+<li><strong>Qiskit (IonQ, IQM)</strong>: Falls back to <code>elapsed_time / N</code> when backends report <code>time_taken=0</code>.</li>
+</ul>
+<p>Elapsed-time overhead (queue wait, network) is distributed proportionally by execution time across circuits in a batch.</p>
+<h4 id="job-status-error-handling">Job Status &amp; Error Handling</h4>
+<p>The execution engine now includes robust job management for hardware backends:</p>
+<ul>
+<li><strong>Retry logic</strong>: <code>job.result()</code> is retried up to 40 times at 15-second intervals, with early detection of cancelled or errored jobs.</li>
+<li><strong>Status polling</strong>: Job status is checked before blocking on results, with comfort dots printed while queued or running (in verbose mode).</li>
+<li><strong>Result validation</strong>: Warns if the number of results returned doesn't match the number of circuits submitted, and pads missing results. Warns if actual shot count differs from requested.</li>
+<li><strong>Empty counts guard</strong>: Circuits that return empty measurement counts (e.g., from cancelled jobs) are skipped during result processing to avoid division-by-zero errors.</li>
+</ul>
+<p>These improvements apply to both <code>qedclib/qiskit/execute.py</code> and <code>qedclib/cudaq/execute.py</code>.</p>
 <h4 id="noise-model-via-exec_options">Noise Model via exec_options</h4>
 <p>Both Qiskit and CUDA-Q now support setting the noise model through <code>exec_options</code>, eliminating the need to import the execute module directly:</p>
 <pre><code class="language-python">exec_options = {&quot;noise_model&quot;: &quot;default&quot;}   # built-in depolarization model
@@ -195,6 +211,17 @@ exec_options = {&quot;noise_model&quot;: my_model}    # custom noise model objec
 <pre><code class="language-python">from quantum_fourier_transform import qft_benchmark
 qft_benchmark.run(method=1, **app_args, **exec_args)
 </code></pre>
+<h4 id="modularized-notebooks">Modularized Notebooks</h4>
+<p>A new set of modularized notebooks splits benchmark execution into three independent parts (Get Circuits, Run Circuits, Plot Results), allowing any part to be customized while reusing the others:</p>
+<ul>
+<li><strong>benchmarks-qiskit-modularized.ipynb</strong> — baseline, all parts use QED-C defaults</li>
+<li><strong>benchmarks-qiskit-modularized-IBM.ipynb</strong> — custom Part 2 for execution on IBM hardware</li>
+<li><strong>benchmarks-qiskit-modularized-IQM.ipynb</strong> — custom Part 2 for execution on IQM hardware</li>
+<li><strong>benchmarks-qiskit-modularized-MQT.ipynb</strong> — custom Part 1 for circuit generation from MQT Bench</li>
+</ul>
+<p>Results analysis uses an <code>execution_handler</code> callback pattern via <code>ex.init_execution(handler)</code> and <code>ex.process_circuit_results()</code>, replacing manual iteration over result indices.</p>
+<h4 id="braket-cirq-notebooks-unmaintained">Braket &amp; Cirq Notebooks (Unmaintained)</h4>
+<p>The Braket and Cirq suite notebooks have been renamed to <code>zz-benchmarks-braket.ipynb</code> and <code>zz-benchmarks-cirq.ipynb</code> and marked as unmaintained. These APIs are not actively tested; community contributions are welcome.</p>
 <h4 id="streamlined-notebook-configuration">Streamlined Notebook Configuration</h4>
 <p>The <code>benchmarks-qiskit.ipynb</code> setup cell now presents backend configurations (simulator, IBM Cloud, IBM Platform, IonQ, BlueQubit) as self-contained blocks — uncomment the one you need. Noise model options are consolidated inline. The separate custom options cell has been removed.</p>
 <h4 id="simplified-thin-wrappers">Simplified Thin Wrappers</h4>

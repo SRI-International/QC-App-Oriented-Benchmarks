@@ -51,9 +51,27 @@ This reduces peak memory usage for large sweeps, particularly on GPU backends wh
 python qft_benchmark.py --min_qubits 2 --max_qubits 20 -c 3 --max_batch_size 10
 ```
 
-#### Per-Circuit Execution Timing (CUDA-Q)
+#### Per-Circuit Execution Timing
 
-Each circuit executed via `execute_circuits()` in CUDA-Q now records its own execution time individually, rather than dividing the batch total evenly. This provides accurate per-circuit timing without requiring `max_batch_size=1`.
+Each circuit now records its own execution time individually:
+
+- **CUDA-Q**: Times each `cudaq.sample()` call directly, rather than dividing the batch total evenly.
+- **Qiskit (Aer simulator)**: Extracts per-experiment `time_taken` from results.
+- **Qiskit (IBM hardware)**: Divides `execution_spans` duration evenly across circuits in the batch. Per-width timing requires batched execution (`-mbs`).
+- **Qiskit (IonQ, IQM)**: Falls back to `elapsed_time / N` when backends report `time_taken=0`.
+
+Elapsed-time overhead (queue wait, network) is distributed proportionally by execution time across circuits in a batch.
+
+#### Job Status & Error Handling
+
+The execution engine now includes robust job management for hardware backends:
+
+- **Retry logic**: `job.result()` is retried up to 40 times at 15-second intervals, with early detection of cancelled or errored jobs.
+- **Status polling**: Job status is checked before blocking on results, with comfort dots printed while queued or running (in verbose mode).
+- **Result validation**: Warns if the number of results returned doesn't match the number of circuits submitted, and pads missing results. Warns if actual shot count differs from requested.
+- **Empty counts guard**: Circuits that return empty measurement counts (e.g., from cancelled jobs) are skipped during result processing to avoid division-by-zero errors.
+
+These improvements apply to both `qedclib/qiskit/execute.py` and `qedclib/cudaq/execute.py`.
 
 #### Noise Model via exec_options
 
@@ -78,6 +96,21 @@ New helper functions in `qedclib` reduce boilerplate:
 from quantum_fourier_transform import qft_benchmark
 qft_benchmark.run(method=1, **app_args, **exec_args)
 ```
+
+#### Modularized Notebooks
+
+A new set of modularized notebooks splits benchmark execution into three independent parts (Get Circuits, Run Circuits, Plot Results), allowing any part to be customized while reusing the others:
+
+- **benchmarks-qiskit-modularized.ipynb** — baseline, all parts use QED-C defaults
+- **benchmarks-qiskit-modularized-IBM.ipynb** — custom Part 2 for execution on IBM hardware
+- **benchmarks-qiskit-modularized-IQM.ipynb** — custom Part 2 for execution on IQM hardware
+- **benchmarks-qiskit-modularized-MQT.ipynb** — custom Part 1 for circuit generation from MQT Bench
+
+Results analysis uses an `execution_handler` callback pattern via `ex.init_execution(handler)` and `ex.process_circuit_results()`, replacing manual iteration over result indices.
+
+#### Braket & Cirq Notebooks (Unmaintained)
+
+The Braket and Cirq suite notebooks have been renamed to `zz-benchmarks-braket.ipynb` and `zz-benchmarks-cirq.ipynb` and marked as unmaintained. These APIs are not actively tested; community contributions are welcome.
 
 #### Streamlined Notebook Configuration
 
