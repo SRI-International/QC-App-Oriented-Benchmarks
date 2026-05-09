@@ -1705,6 +1705,12 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
                 optimization_level=optimization_level,
                 layout_method=layout_method,
                 routing_method=routing_method)
+
+            # set job tags if SamplerV2 on IBM Quantum Platform
+            if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
+                job_tags = [qc.name for qc in circuits if hasattr(qc, 'name')]
+                sampler.options.environment.job_tags = job_tags
+
             job = sampler.run(trans_qcs, shots=num_shots)
 
         elif this_noise is not None and not sampler and backend_name.endswith("qasm_simulator"):
@@ -1844,6 +1850,8 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
     if results is None:
         print("WARNING: No results to process (execution may have failed)")
         return
+
+    logger.info(f'process_circuit_results({len(circuits_info)}, job_id={job_id})')
 
     if verbose:
         print(f"... process_circuit_results({len(circuits_info)}, job_id={job_id})")
@@ -2088,6 +2096,12 @@ def _compute_circuit_timing(results, elapsed_time, num_in_batch):
 
     # Extract per-circuit timing (attached by execute_circuits)
     per_circuit_times = getattr(results, '_per_circuit_times', None)
+
+    # Executor/local_job path: if the result has exec_time attached (from a custom executor),
+    # use it as the batch exec time when no per-circuit times are available
+    if per_circuit_times is None and hasattr(results, 'exec_time'):
+        batch_exec_time = results.exec_time
+        return per_circuit_times, None, batch_exec_time
 
     # Extract batch-level exec_time as fallback (when per-circuit times not available)
     batch_exec_time = 0.0
