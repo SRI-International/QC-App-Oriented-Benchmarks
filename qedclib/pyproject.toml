@@ -5,7 +5,13 @@ description = "Quantum program execution engine with built-in performance monito
 readme = "qedclib/README.md"
 requires-python = ">=3.9"
 license = "Apache-2.0"
-authors = [{name = "Quantum Economic Development Consortium (QED-C)"}]
+authors = [
+    {name = "Thomas Lubinski"},
+    {name = "Quantum Economic Development Consortium (QED-C) Standards TAC"},
+]
+maintainers = [
+    {name = "Thomas Lubinski"},
+]
 keywords = ["quantum computing", "execution engine", "benchmarks", "metrics", "qiskit", "cuda-q"]
 classifiers = [
     "Development Status :: 4 - Beta",
