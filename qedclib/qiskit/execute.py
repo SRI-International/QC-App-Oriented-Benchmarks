@@ -1290,7 +1290,7 @@ def job_complete(job):
         metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
         
         # process additional detailed step times, if they exist (this might override exec_time too)
-        process_step_times(job, result, active_circuit)
+        process_step_times_old(job, result, active_circuit)
     
     # remove from list of active circuits
     del active_circuits[job]
@@ -1330,112 +1330,6 @@ def job_complete(job):
                 print(traceback.format_exc())
 
 # Process detailed step times, if they exist
-def process_step_times(job, result, active_circuit):
-    #print("... processing step times")
-    
-    exec_creating_time = 0
-    exec_validating_time = 0
-    exec_queued_time = 0
-    exec_running_time = 0
-        
-    # get breakdown of execution time, if method exists 
-    # this attribute not available for some providers and only for circuit-runner model;
-    if not use_sessions and "time_per_step" in dir(job) and callable(job.time_per_step):
-        time_per_step = job.time_per_step()
-        if verbose:
-            print(f"... job.time_per_step() = {time_per_step}")
-        
-        creating_time = time_per_step.get("CREATING")
-        validating_time = time_per_step.get("VALIDATING")
-        queued_time = time_per_step.get("QUEUED")
-        running_time = time_per_step.get("RUNNING")
-        completed_time = time_per_step.get("COMPLETED")
-        
-        # for testing, since hard to reproduce on some systems
-        #running_time = None
-        
-        # make these all slightly non-zero so averaging code is triggered (> 0.001 required)
-        exec_creating_time = 0.001
-        exec_validating_time = 0.001
-        exec_queued_time = 0.001
-        exec_running_time = 0.001
-        
-        # this is note used
-        exec_quantum_classical_time = 0.001
-
-        # compute the detailed time metrics
-        if validating_time and creating_time:
-            exec_creating_time = (validating_time - creating_time).total_seconds()
-        if queued_time and validating_time:
-            exec_validating_time = (queued_time - validating_time).total_seconds()
-        if running_time and queued_time:
-            exec_queued_time = (running_time - queued_time).total_seconds()
-        if completed_time and running_time:
-            exec_running_time = (completed_time - running_time).total_seconds()
-
-    # when sessions and sampler used, we obtain metrics differently
-    if use_sessions:
-        job_timestamps = job.metrics()['timestamps']
-        job_metrics = job.metrics()
-        # print(f"... usage = {job_metrics['usage']} {job_metrics['executions']}")
-        
-        if verbose:
-            print(f"... job.metrics() = {job.metrics()}")
-            print(f"... job.result().metadata[0] = {result.metadata}")
-
-        # occasionally, these metrics come back as None, so try to use them
-        try:
-            created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
-            created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
-            finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
-            finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
-            running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
-            running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
-            
-            # compute the total seconds for creating and running the circuit
-            exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
-            exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
-            
-            # these do not seem to be avaiable
-            exec_validating_time = 0.001
-            exec_queued_time = 0.001
-            
-            # when using sessions, the 'running_time' is the 'quantum exec time' - override it here.
-            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
-            
-            # use the data in usage field if it is returned, usually by hardware
-            # here we use the executions field to indicate we are on hardware
-            if "usage" in job_metrics and "executions" in job_metrics:
-                if job_metrics['executions'] > 0:
-                    exec_time = job_metrics['usage']['quantum_seconds'] 
-                    
-                    # and use this one as it seems to be valid for this case
-                    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
-            
-            # DEVNOTE: we do not compute this yet
-            # exec_quantum_classical_time = job.metrics()['bss']
-            # metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)     
-        
-        except Exception as e:
-            if verbose:
-                print(f'WARNING: incomplete time metrics for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-                print(f"... job = {job.job_id()}  exception = {e}")
-
-    # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
-    exec_creating_time = max(0.001, exec_creating_time)
-    exec_validating_time = max(0.001, exec_validating_time)
-    exec_queued_time = max(0.001, exec_queued_time)
-    exec_running_time = max(0.001, exec_running_time)
-
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', 0.001)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', 0.001)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
-
-    #print("... time_per_step = ", str(time_per_step))
-    if verbose:
-        print(f"... computed exec times: queued = {exec_queued_time}, creating/transpiling = {exec_creating_time}, validating = {exec_validating_time}, running = {exec_running_time}") 
-
 # Process a job, whose status cannot be obtained
 def job_status_failed(job):
     active_circuit = active_circuits[job]
@@ -2236,7 +2130,7 @@ def _process_step_times_batch(job, circuits_info):
 
     # get breakdown of execution time, if method exists
     # this attribute not available for some providers and only for circuit-runner model
-    if not use_sessions and "time_per_step" in dir(job) and callable(job.time_per_step):
+    if "time_per_step" in dir(job) and callable(job.time_per_step):
         try:
             time_per_step = job.time_per_step()
             if verbose:
@@ -2266,14 +2160,22 @@ def _process_step_times_batch(job, circuits_info):
         except Exception:
             pass
 
-    # when sessions and sampler used, we obtain metrics differently
-    if use_sessions:
+    # Sampler timing from job.metrics() — timestamps and usage data.
+    #
+    # NOTE: We extract these values for verbose reporting but do NOT overwrite exec_time.
+    # The execution_spans duration from _extract_per_circuit_times (called earlier in
+    # execute_circuits) provides more precise quantum execution time than what we get here.
+    # Testing on IBM backends (May 2026) showed:
+    #   - execution_spans: 2.20s (precise, fractional seconds)
+    #   - quantum_seconds: 3s (same value rounded up to the nearest second)
+    #   - timestamps running→finished: 4.9s (includes server-side overhead)
+    # The execution_spans value best represents actual quantum execution time.
+    # For larger circuits or error-mitigated workloads, these values may diverge further
+    # and this decision may need to be revisited.
+    if sampler is not None:
         try:
             job_metrics = job.metrics()
             job_timestamps = job_metrics['timestamps']
-
-            if verbose:
-                print(f"... job.metrics() = {job_metrics}")
 
             created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
             created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds=created_time.microsecond)
@@ -2290,23 +2192,25 @@ def _process_step_times_batch(job, circuits_info):
             exec_validating_time = 0.001
             exec_queued_time = 0.001
 
-            # when using sessions, the 'running_time' is the 'quantum exec time' - override it here
-            for ci in circuits_info:
-                metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', exec_running_time)
+            # Extract quantum_seconds from usage data if available
+            sampler_quantum_seconds = None
+            if "usage" in job_metrics:
+                sampler_quantum_seconds = job_metrics['usage'].get('quantum_seconds')
 
-            # use the data in usage field if it is returned, usually by hardware
-            # here we use the executions field to indicate we are on hardware
-            if "usage" in job_metrics and "executions" in job_metrics:
-                if job_metrics['executions'] > 0:
-                    exec_time = job_metrics['usage']['quantum_seconds']
+            # Report sampler timing in verbose mode for comparison with execution_spans
+            if verbose:
+                print(f"... sampler timing: creating={exec_creating_time:.3f}s, "
+                      f"running={exec_running_time:.3f}s")
+                if sampler_quantum_seconds is not None:
+                    print(f"... sampler quantum_seconds={sampler_quantum_seconds}s "
+                          f"(rounded up from execution_spans)")
 
-                    # and use this one as it seems to be valid for this case
-                    for ci in circuits_info:
-                        metrics.store_metric(ci["group"], ci["circuit"], 'exec_time', exec_time)
+            # NOT overwriting exec_time here — execution_spans from
+            # _extract_per_circuit_times is more precise (see note above)
 
         except Exception as e:
             if verbose:
-                print(f'WARNING: incomplete time metrics for batch')
+                print(f'WARNING: incomplete sampler time metrics for batch')
                 print(f"... exception = {e}")
 
     # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
@@ -2547,6 +2451,113 @@ def get_job_status_old(job, active_circuit):
         pass
 
     return status
+
+
+def process_step_times_old(job, result, active_circuit):
+    #print("... processing step times")
+
+    exec_creating_time = 0
+    exec_validating_time = 0
+    exec_queued_time = 0
+    exec_running_time = 0
+
+    # get breakdown of execution time, if method exists
+    # this attribute not available for some providers and only for circuit-runner model;
+    if not use_sessions and "time_per_step" in dir(job) and callable(job.time_per_step):
+        time_per_step = job.time_per_step()
+        if verbose:
+            print(f"... job.time_per_step() = {time_per_step}")
+
+        creating_time = time_per_step.get("CREATING")
+        validating_time = time_per_step.get("VALIDATING")
+        queued_time = time_per_step.get("QUEUED")
+        running_time = time_per_step.get("RUNNING")
+        completed_time = time_per_step.get("COMPLETED")
+
+        # for testing, since hard to reproduce on some systems
+        #running_time = None
+
+        # make these all slightly non-zero so averaging code is triggered (> 0.001 required)
+        exec_creating_time = 0.001
+        exec_validating_time = 0.001
+        exec_queued_time = 0.001
+        exec_running_time = 0.001
+
+        # this is note used
+        exec_quantum_classical_time = 0.001
+
+        # compute the detailed time metrics
+        if validating_time and creating_time:
+            exec_creating_time = (validating_time - creating_time).total_seconds()
+        if queued_time and validating_time:
+            exec_validating_time = (queued_time - validating_time).total_seconds()
+        if running_time and queued_time:
+            exec_queued_time = (running_time - queued_time).total_seconds()
+        if completed_time and running_time:
+            exec_running_time = (completed_time - running_time).total_seconds()
+
+    # when sessions and sampler used, we obtain metrics differently
+    if use_sessions:
+        job_timestamps = job.metrics()['timestamps']
+        job_metrics = job.metrics()
+        # print(f"... usage = {job_metrics['usage']} {job_metrics['executions']}")
+
+        if verbose:
+            print(f"... job.metrics() = {job.metrics()}")
+            print(f"... job.result().metadata[0] = {result.metadata}")
+
+        # occasionally, these metrics come back as None, so try to use them
+        try:
+            created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
+            created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
+            finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
+            finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
+            running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
+            running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
+
+            # compute the total seconds for creating and running the circuit
+            exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
+            exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
+
+            # these do not seem to be avaiable
+            exec_validating_time = 0.001
+            exec_queued_time = 0.001
+
+            # when using sessions, the 'running_time' is the 'quantum exec time' - override it here.
+            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
+
+            # use the data in usage field if it is returned, usually by hardware
+            # here we use the executions field to indicate we are on hardware
+            if "usage" in job_metrics and "executions" in job_metrics:
+                if job_metrics['executions'] > 0:
+                    exec_time = job_metrics['usage']['quantum_seconds']
+
+                    # and use this one as it seems to be valid for this case
+                    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
+
+            # DEVNOTE: we do not compute this yet
+            # exec_quantum_classical_time = job.metrics()['bss']
+            # metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
+
+        except Exception as e:
+            if verbose:
+                print(f'WARNING: incomplete time metrics for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+                print(f"... job = {job.job_id()}  exception = {e}")
+
+    # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
+    exec_creating_time = max(0.001, exec_creating_time)
+    exec_validating_time = max(0.001, exec_validating_time)
+    exec_queued_time = max(0.001, exec_queued_time)
+    exec_running_time = max(0.001, exec_running_time)
+
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', 0.001)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', 0.001)
+    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
+
+    #print("... time_per_step = ", str(time_per_step))
+    if verbose:
+        print(f"... computed exec times: queued = {exec_queued_time}, creating/transpiling = {exec_creating_time}, validating = {exec_validating_time}, running = {exec_running_time}")
 
 
 def execute_circuits_immed(
