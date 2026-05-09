@@ -151,6 +151,15 @@
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
 <h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
 <p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
+<h3 id="release-201-9-may-2026">Release 2.0.1 - 9 May 2026</h3>
+<ul>
+<li>Updated author and project attribution in package metadata and documentation.</li>
+<li><code>submit_circuits()</code>: removed unused <code>metadata</code> parameter.</li>
+<li><code>submit_circuits()</code>: auto-calls <code>metrics.init_metrics()</code> if not yet initialized.</li>
+<li>Added <code>metrics.get_circuit_metrics()</code> and <code>metrics.get_group_metrics()</code> accessor functions for clean retrieval of collected metrics data.</li>
+<li>Added test script <code>05_submit_with_metrics.py</code> demonstrating the submit/finalize/get metrics flow.</li>
+<li>Execution engine cleanup: threaded <code>job.result()</code>, timing function extraction, sampler timing fix.</li>
+</ul>
 <h3 id="release-200-15-may-2026">Release 2.0.0 - 15 May 2026</h3>
 <h4 id="repository-restructure-qedclib-qedcbench">Repository Restructure: qedclib + qedcbench</h4>
 <p>The repository has been split into two packages, both installable with a single <code>pip install -e .</code>:

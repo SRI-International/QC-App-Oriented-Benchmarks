@@ -411,16 +411,13 @@ benchmark.run(**app_args, **exec_options)
 <pre><code class="language-python">import qedclib
 from qedclib import metrics
 
-# Initialize metrics tracking
-metrics.init_metrics()
-
-# Set default API
-qedclib.set_api(&quot;qiskit&quot;)
-
-# Initialize the execution backend
+# Initialize qedclib with the API to use (once, at startup)
 qedclib.initialize(&quot;qiskit&quot;)
 import execute as ex
 ex.set_execution_target(&quot;qasm_simulator&quot;)
+
+# Initialize metrics tracking
+metrics.init_metrics()
 </code></pre>
 <h3 id="top-level-api">Top-Level API</h3>
 <table>
@@ -432,16 +429,16 @@ ex.set_execution_target(&quot;qasm_simulator&quot;)
 </thead>
 <tbody>
 <tr>
-<td><code>qedclib.set_api(api)</code></td>
-<td>Set default quantum SDK</td>
+<td><code>qedclib.initialize(api, benchmark, kernels)</code></td>
+<td>Initialize qedclib: set API, load execution backend and kernel modules</td>
 </tr>
 <tr>
 <td><code>qedclib.get_api()</code></td>
 <td>Get current default SDK</td>
 </tr>
 <tr>
-<td><code>qedclib.initialize(api, benchmark, kernels)</code></td>
-<td>Load execution backend and kernel modules</td>
+<td><code>qedclib.set_api(api)</code></td>
+<td>Set default quantum SDK (called automatically by <code>initialize</code>)</td>
 </tr>
 <tr>
 <td><code>qedclib.get_kernel(name, api, benchmark)</code></td>

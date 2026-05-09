@@ -275,17 +275,14 @@ Average Hellinger, Normalized Fidelity for the 2 qubit group = 0.998, 0.997
 <p>You can use the execution and metrics infrastructure independently of the benchmarks:</p>
 <pre><code class="language-python">import qedclib
 
-# Set the quantum API
-qedclib.set_api(&quot;qiskit&quot;)
+# Initialize qedclib with the API to use (once, at startup)
+qedclib.initialize(&quot;qiskit&quot;)
+import execute as ex
+ex.set_execution_target(&quot;qasm_simulator&quot;)
 
 # Access metrics
 from qedclib import metrics
 metrics.init_metrics()
-
-# The full initialization (loads execute module dynamically)
-qedclib.initialize(&quot;qiskit&quot;)
-import execute as ex
-ex.set_execution_target(&quot;qasm_simulator&quot;)
 </code></pre>
 <h2 id="using-benchmarks-as-a-package">Using Benchmarks as a Package</h2>
 <p>You can import and run benchmarks programmatically:</p>

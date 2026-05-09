@@ -7,9 +7,14 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
-### Release 2.0.1 - May 2026
+### Release 2.0.1 - 9 May 2026
 
-- Performance improvements and Qiskit 2.x compatibility fixes in the execution engine.
+- Updated author and project attribution in package metadata and documentation.
+- `submit_circuits()`: removed unused `metadata` parameter.
+- `submit_circuits()`: auto-calls `metrics.init_metrics()` if not yet initialized.
+- Added `metrics.get_circuit_metrics()` and `metrics.get_group_metrics()` accessor functions for clean retrieval of collected metrics data.
+- Added test script `05_submit_with_metrics.py` demonstrating the submit/finalize/get metrics flow.
+- Execution engine cleanup: threaded `job.result()`, timing function extraction, sampler timing fix.
 
 ### Release 2.0.0 - 15 May 2026
 
