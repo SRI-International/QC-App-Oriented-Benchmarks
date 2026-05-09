@@ -1860,59 +1860,10 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
         while len(counts_list) < len(circuits_info):
             counts_list.append({})
 
-    # Extract per-circuit timing (attached by execute_circuits, cudaq pattern)
-    per_circuit_times = getattr(results, '_per_circuit_times', None)
-
-    # Extract batch-level exec_time as fallback (when per-circuit times not available)
-    batch_exec_time = 0.0
-    if per_circuit_times is None:
-        try:
-            native = getattr(results, 'native_result', results)
-
-            if hasattr(native, 'to_dict'):
-                # Native Qiskit Result — timing in result dict
-                result_dict = native.to_dict()
-                if "time_taken" in result_dict:
-                    batch_exec_time = result_dict["time_taken"]
-                elif "results" in result_dict and len(result_dict["results"]) > 0:
-                    if "time_taken" in result_dict["results"][0]:
-                        batch_exec_time = result_dict["results"][0]["time_taken"]
-            elif hasattr(native, 'metadata') and isinstance(native.metadata, dict):
-                if "time_taken" in native.metadata:
-                    batch_exec_time = native.metadata["time_taken"]
-        except Exception as e:
-            if verbose:
-                print(f"... could not extract exec_time: {e}")
-
-    # Track whether batch_exec_time came from the backend or is just a fallback
-    exec_time_from_backend = batch_exec_time > 0.0
-
-    # Fall back to elapsed_time for exec_time only if backend provided no timing
-    if not exec_time_from_backend and elapsed_time is not None:
-        batch_exec_time = elapsed_time
-
+    # Compute per-circuit timing from the results object and elapsed wall-clock time
     num_in_batch = len(counts_list)
-
-    # Compute per-circuit elapsed times by distributing overhead proportionally.
-    # Overhead = elapsed_time - total_exec_time (transpilation, submission, queuing, etc.)
-    # Each circuit gets overhead proportional to its share of total exec time,
-    # so larger circuits absorb more overhead (they likely had more prep time too).
-    per_circuit_elapsed = None
-    if per_circuit_times and elapsed_time is not None:
-        total_exec = sum(per_circuit_times)
-        if total_exec > 0:
-            overhead = elapsed_time - total_exec
-            if overhead > 0:
-                per_circuit_elapsed = [
-                    et + overhead * (et / total_exec) for et in per_circuit_times
-                ]
-            else:
-                # No overhead (or negative due to timing granularity) — elapsed = exec
-                per_circuit_elapsed = list(per_circuit_times)
-        else:
-            # All exec times are zero — divide elapsed evenly
-            avg_elapsed = elapsed_time / num_in_batch
-            per_circuit_elapsed = [avg_elapsed] * num_in_batch
+    per_circuit_times, per_circuit_elapsed, batch_exec_time = \
+        _compute_circuit_timing(results, elapsed_time, num_in_batch)
 
     # Process each circuit's result
     for idx, (ci, counts) in enumerate(zip(circuits_info, counts_list)):
@@ -2112,6 +2063,84 @@ def _extract_per_circuit_times(raw_result, num_circuits):
     return None
 
 
+def _compute_circuit_timing(results, elapsed_time, num_in_batch):
+    """
+    Compute per-circuit execution and elapsed times from a batch result.
+
+    Uses per-circuit times from _extract_per_circuit_times (attached to results
+    as _per_circuit_times) if available. Falls back to batch-level time_taken
+    from the result object, or elapsed_time as last resort.
+
+    Distributes elapsed_time overhead proportionally by exec_time so that
+    larger circuits absorb more overhead.
+
+    Args:
+        results: ExecutionResult or native result object
+        elapsed_time: wall-clock seconds for the batch (or None)
+        num_in_batch: number of circuits in the batch
+
+    Returns:
+        (per_circuit_times, per_circuit_elapsed, batch_exec_time):
+        - per_circuit_times: list of exec times per circuit, or None
+        - per_circuit_elapsed: list of elapsed times per circuit, or None
+        - batch_exec_time: total batch exec time (fallback when no per-circuit)
+    """
+
+    # Extract per-circuit timing (attached by execute_circuits)
+    per_circuit_times = getattr(results, '_per_circuit_times', None)
+
+    # Extract batch-level exec_time as fallback (when per-circuit times not available)
+    batch_exec_time = 0.0
+    if per_circuit_times is None:
+        try:
+            native = getattr(results, 'native_result', results)
+
+            if hasattr(native, 'to_dict'):
+                # Native Qiskit Result — timing in result dict
+                result_dict = native.to_dict()
+                if "time_taken" in result_dict:
+                    batch_exec_time = result_dict["time_taken"]
+                elif "results" in result_dict and len(result_dict["results"]) > 0:
+                    if "time_taken" in result_dict["results"][0]:
+                        batch_exec_time = result_dict["results"][0]["time_taken"]
+            elif hasattr(native, 'metadata') and isinstance(native.metadata, dict):
+                if "time_taken" in native.metadata:
+                    batch_exec_time = native.metadata["time_taken"]
+        except Exception as e:
+            if verbose:
+                print(f"... could not extract exec_time: {e}")
+
+    # Track whether batch_exec_time came from the backend or is just a fallback
+    exec_time_from_backend = batch_exec_time > 0.0
+
+    # Fall back to elapsed_time for exec_time only if backend provided no timing
+    if not exec_time_from_backend and elapsed_time is not None:
+        batch_exec_time = elapsed_time
+
+    # Compute per-circuit elapsed times by distributing overhead proportionally.
+    # Overhead = elapsed_time - total_exec_time (transpilation, submission, queuing, etc.)
+    # Each circuit gets overhead proportional to its share of total exec time,
+    # so larger circuits absorb more overhead (they likely had more prep time too).
+    per_circuit_elapsed = None
+    if per_circuit_times and elapsed_time is not None:
+        total_exec = sum(per_circuit_times)
+        if total_exec > 0:
+            overhead = elapsed_time - total_exec
+            if overhead > 0:
+                per_circuit_elapsed = [
+                    et + overhead * (et / total_exec) for et in per_circuit_times
+                ]
+            else:
+                # No overhead (or negative due to timing granularity) — elapsed = exec
+                per_circuit_elapsed = list(per_circuit_times)
+        else:
+            # All exec times are zero — divide elapsed evenly
+            avg_elapsed = elapsed_time / num_in_batch
+            per_circuit_elapsed = [avg_elapsed] * num_in_batch
+
+    return per_circuit_times, per_circuit_elapsed, batch_exec_time
+
+
 def _process_step_times_batch(job, circuits_info):
     """
     Extract detailed step timing from IBM hardware jobs and store per circuit.
@@ -2129,7 +2158,7 @@ def _process_step_times_batch(job, circuits_info):
     exec_running_time = 0
 
     # get breakdown of execution time, if method exists
-    # this attribute not available for some providers and only for circuit-runner model
+    # this attribute not available for some providers
     if "time_per_step" in dir(job) and callable(job.time_per_step):
         try:
             time_per_step = job.time_per_step()
