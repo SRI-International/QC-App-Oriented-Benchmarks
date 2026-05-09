@@ -64,6 +64,14 @@ Install both with: `pip install -e .`
 
 - **qhpctools** — HPC utilities for running benchmarks on NERSC/Slurm clusters (GPU allocation scripts, job monitoring).
 
+## Project Lead
+
+This project was created and is maintained by **Thomas Lubinski**, former Chair of the QED-C Technical Advisory Committee on Standards and Performance Metrics and currently Sub-committee Lead for Quantum Computing. Tom has led the design, development, and evolution of the benchmarking framework since its inception in 2019, including authoring the core execution library (qedclib), directing the research agenda, and mentoring summer interns whose work has contributed to multiple published papers using this repository.
+
+## Contributors
+
+The benchmarks and supporting research have benefited from contributions by members of the QED-C Standards TAC, summer research interns (2019–present), and the broader quantum computing community.
+
 ## License
 
 Copyright 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.

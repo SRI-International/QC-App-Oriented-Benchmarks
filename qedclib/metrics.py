@@ -293,8 +293,29 @@ def get_metric (group, circuit, metric):
 
 
 ##################################################
+# METRICS ACCESSOR FUNCTIONS
+
+def get_circuit_metrics():
+    """Return the circuit-level metrics dict.
+
+    Structure: {group: {circuit: {metric_name: value, ...}, ...}, ...}
+    Also contains a "subtitle" key with display metadata.
+    """
+    return circuit_metrics
+
+def get_group_metrics():
+    """Return the group-level (aggregated) metrics dict.
+
+    Structure: {"groups": [...], "avg_depths": [...], "avg_exec_times": [...], ...}
+    Each list is parallel to "groups" — index i corresponds to groups[i].
+    Call finalize_all_groups() or aggregate_metrics() before this to populate.
+    """
+    return group_metrics
+
+
+##################################################
 # METRICS AGGREGATION FUNCTIONS
-   
+
 # Aggregate metrics for a specific group, creating average across circuits in group
 def aggregate_metrics_for_group (group):
     group = str(group)

@@ -908,22 +908,26 @@ def test_execution():
 #   Level 3 (benchmark): calls submit_circuits or Level 1 directly
 ###########################################################################
 
-def submit_circuits(circuits, metadata=None, num_shots=100, max_batch_size=None, batch_by_group=False):
+def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group=False):
     """
     Execute a dict of circuit arrays and store execution metrics.
 
     Assumes circuit depth metrics have already been computed (via compute_and_store_circuit_info)
     if desired. This function handles execution and timing only.
 
+    Automatically calls metrics.init_metrics() if not already initialized.
+
     Args:
         circuits: nested dict {group: {circuit_id: qc}} from get_circuits()
-        metadata: nested dict for storing execution timing metrics (elapsed_time, exec_time,
-                  job_id). Typically metrics.circuit_metrics. If None, timing not stored.
         num_shots: shots per circuit
         max_batch_size: max circuits per batch (None = no limit)
         batch_by_group: if True, batch boundaries align with group changes.
                         If False (default), batch by max_batch_size only.
     """
+
+    # Auto-initialize metrics if not yet done
+    if metrics.start_time == 0:
+        metrics.init_metrics()
 
     # Flatten circuits dict to ordered list for execution
     circuits_info = []
