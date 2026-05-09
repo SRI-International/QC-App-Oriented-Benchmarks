@@ -9,14 +9,12 @@ This version constitutes a major refactor of the entire benchmark repository. Fo
 
 ### Release 2.0.1 - 9 May 2026
 
-- Updated author and project attribution in package metadata and documentation.
-- `submit_circuits()`: removed unused `metadata` parameter.
-- `submit_circuits()`: auto-calls `metrics.init_metrics()` if not yet initialized.
+- General performance improvements to Qiskit execution logic
 - Added `metrics.get_circuit_metrics()` and `metrics.get_group_metrics()` accessor functions for clean retrieval of collected metrics data.
 - Added test script `05_submit_with_metrics.py` demonstrating the submit/finalize/get metrics flow.
 - Execution engine cleanup: threaded `job.result()`, timing function extraction, sampler timing fix.
 
-### Release 2.0.0 - 15 May 2026
+### Release 2.0.0 - 5 May 2026
 
 #### Repository Restructure: qedclib + qedcbench
 
