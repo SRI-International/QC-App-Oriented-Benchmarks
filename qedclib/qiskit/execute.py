@@ -28,6 +28,7 @@ import time
 import copy
 import importlib
 import traceback
+import threading
 from collections import Counter
 import logging
 import numpy as np
@@ -832,7 +833,7 @@ def execute_circuit(circuit):
     # special handling when only runnng one job at a time: wait for result here
     # so the status check called later immediately returns done and avoids polling
     if max_jobs_active <= 1:
-        wait_on_job_result(job, active_circuit)
+        wait_on_job_result_old(job, active_circuit)
 
     # return, so caller can do other things while waiting for jobs to complete    
 
@@ -1564,7 +1565,7 @@ def check_jobs(completion_handler=None):
 
         try:
             #status = job.status()
-            status = get_job_status(job, circuit)   # use this version, robust to network failure 
+            status = get_job_status_old(job, circuit)   # use this version, robust to network failure
             #print("Job status is ", status)
             
         except Exception as e:
@@ -1636,60 +1637,7 @@ def check_jobs(completion_handler=None):
         if verbose:
             print(f'... pop and submit circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]}')
             
-        execute_circuit(circuit)  
-
-# block and wait for the job result to be returned
-# handle network timeouts by doing up to 40 retries once every 15 seconds
-def wait_on_job_result(job, active_circuit):
-    retry_count = 0
-    result = None
-    while retry_count < 40:
-        try:
-            retry_count += 1
-            result = job.result()
-            break
-        except KeyboardInterrupt:
-            raise
-        except Exception:
-            print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
-            if verbose: print(traceback.format_exc())
-            time.sleep(15)
-            continue
-    
-    if result == None:
-        print(f'ERROR: during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-        raise ValueError("Failed to execute job")
-    else:
-        #print(f"... job.result() is done, with result data, continuing")
-        pass
-    
-# Check and return job_status
-# handle network timeouts by doing up to 40 retries once every 15 seconds
-def get_job_status(job, active_circuit):
-    retry_count = 0
-    status = None
-    while retry_count < 3:
-        try:
-            retry_count += 1
-            #print(f"... calling job.status()")
-            status = job.status()
-            break
-                         
-        except Exception:
-            print(f'... error occurred during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
-            if verbose: print(traceback.format_exc())
-            time.sleep(15)
-            continue
-    
-    if status == None:
-        print(f'ERROR: during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-        raise ValueError("Failed to get job status")
-    else:
-        #print(f"... job.result() is done, with result data, continuing")
-        pass
-        
-    return status
-       
+        execute_circuit(circuit)
 
 # Test circuit execution
 def test_execution():
@@ -1915,74 +1863,12 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     if not wait:
         return (job_id, None)
 
-    # Poll job status before blocking on result (for hardware backends).
-    # Detects CANCELLED/ERROR early and prints comfort dots for long-running jobs.
-    # Skip for local simulators — job.result() handles errors and returns fast.
+    # Wait for result using threaded approach: job.result() runs in a background
+    # thread with retry logic, while main thread prints comfort dots and checks
+    # job status for early error/cancel detection. Result is returned instantly
+    # via threading.Event — no polling delay.
     is_local_simulator = 'simulator' in backend_name.lower()
-    if hasattr(job, 'status') and not is_local_simulator:
-        pollcount = 0
-        while True:
-            try:
-                status = job.status()
-            except KeyboardInterrupt:
-                raise
-            except Exception:
-                break  # Backend doesn't support status polling — fall through to job.result()
-
-            status_str = str(status).upper()
-            if 'DONE' in status_str:
-                break
-            elif 'ERROR' in status_str:
-                print(f'ERROR: Job {job_id} failed with status {status}')
-                if hasattr(job, 'error_message'):
-                    try:
-                        print(f"... {job.error_message()}")
-                    except Exception:
-                        pass
-                return (job_id, ExecutionResult([{} for _ in circuits]))
-            elif 'CANCEL' in status_str:
-                print(f'WARNING: Job {job_id} was cancelled')
-                return (job_id, ExecutionResult([{} for _ in circuits]))
-            else:
-                # Still queued/running — print comfort indicator
-                pollcount += 1
-                if verbose and (pollcount <= 10 or pollcount % 10 == 0):
-                    print('.', end='', flush=True)
-
-                # Adaptive sleep: fast at first to minimize latency on quick jobs,
-                # then ramp up to avoid busy-polling on long hardware runs
-                # Phase 1: 0.2s x 10 = 2s, Phase 2: 0.5s x 10 = 5s, Phase 3: 5.0s
-                if pollcount <= 10:
-                    time.sleep(0.2)
-                elif pollcount <= 20:
-                    time.sleep(0.5)
-                else:
-                    time.sleep(5.0)
-
-        if verbose and pollcount > 0:
-            print()  # newline after dots
-
-    # Wait for result with retry logic (ported from old wait_on_job_result).
-    # Transient network errors during long hardware jobs are common.
-    raw_result = None
-    max_retries = 40
-    retry_interval = 15  # seconds
-
-    for retry_count in range(1, max_retries + 1):
-        try:
-            raw_result = job.result()
-            break
-        except KeyboardInterrupt:
-            raise
-        except Exception as e:
-            if retry_count < max_retries:
-                print(f'... error during job.result() for job {job_id} — retry {retry_count}/{max_retries}')
-                if verbose: print(f"... exception = {e}")
-                time.sleep(retry_interval)
-            else:
-                print(f'ERROR: Failed to get result for job {job_id} after {max_retries} retries')
-                print(f"... exception = {e}")
-                if verbose: print(traceback.format_exc())
+    raw_result = wait_for_result_threaded(job, job_id, circuits, is_local_simulator)
 
     # Wrap result: ExecutionResult for sampler path, native Result for backend path
     if raw_result is not None:
@@ -2442,10 +2328,225 @@ def _process_step_times_batch(job, circuits_info):
 
 
 ###########################################################################
+# JOB RESULT WAITING AND STATUS CHECKING
+# These functions handle waiting for job completion with retry logic,
+# comfort dots, and early error/cancel detection using a background thread.
+###########################################################################
+
+
+def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
+    """
+    Wait for job completion with comfort dots and retry logic.
+
+    For local simulators: calls job.result() directly (no thread overhead).
+    For hardware: runs job.result() in a background thread so main thread
+    can print comfort dots and check for errors.
+
+    Returns: raw_result (or None if all retries exhausted)
+    """
+
+    # Fast path: simulators return immediately, no need for threading.
+    # Also skip threading if job doesn't support status polling — no comfort dots possible.
+    if is_local_simulator or not hasattr(job, 'status'):
+        return _wait_on_job_result(job, job_id)
+
+    # Hardware path: thread for job.result(), main thread for comfort dots
+
+    # Shared state between main thread and worker thread.
+    # These are arrays (not plain variables) so the worker function can
+    # modify the contents — like passing a pointer in C.
+    result_holder = [None]       # [0] = raw_result when done
+    error_holder = [None]        # [0] = exception if all retries failed
+    done_event = threading.Event()
+
+    def worker():
+        """Background thread: call job.result() with retry logic."""
+        try:
+            result_holder[0] = _wait_on_job_result(job, job_id)
+        except Exception as e:
+            error_holder[0] = e
+        finally:
+            done_event.set()     # instantly wakes the main thread
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+
+    # Main thread: print comfort dots and check for errors while waiting.
+    # done_event.wait(timeout=N) returns immediately when the event is set,
+    # so there is ZERO delay between job.result() completing and us getting it.
+    # The timeout only controls how often we print dots / check status.
+    pollcount = 0
+    while not done_event.is_set():
+
+        # Wait for result — returns instantly if thread finished
+        if done_event.wait(timeout=2.0):
+            break   # result is ready
+
+        # Still waiting — check job status (with retry, robust to network errors)
+        pollcount += 1
+        status = _get_job_status(job, job_id)
+
+        if status is None:
+            # get_job_status already printed the error — bail out
+            return None
+
+        # Error: don't wait for thread, return immediately
+        if status == JobStatus.ERROR or status == 'ERROR':
+            print(f'\nERROR: job execution failed: {job_id}')
+            if hasattr(job, 'error_message'):
+                print(f"... {job.error_message()}")
+            else:
+                try:
+                    _ = job.result()
+                except Exception as ex:
+                    print(f"... {ex}")
+                    if verbose:
+                        print(traceback.format_exc())
+            return None
+
+        # Cancelled: don't wait for thread, return immediately
+        if status == JobStatus.CANCELLED or status == 'CANCELLED':
+            print(f'\nWARNING: Job {job_id} was cancelled')
+            return None
+
+        # Comfort dots showing job state (matches old check_jobs pattern)
+        if verbose:
+            if status == JobStatus.QUEUED or status == 'QUEUED':
+                if pollcount < 32 or pollcount % 15 == 0:
+                    print('.', end='', flush=True)
+            elif status == JobStatus.INITIALIZING or status == 'INITIALIZING':
+                print('i', end='', flush=True)
+            elif status == JobStatus.VALIDATING or status == 'VALIDATING':
+                print('v', end='', flush=True)
+            elif status == JobStatus.RUNNING or status == 'RUNNING':
+                print('r', end='', flush=True)
+            elif status == JobStatus.DONE or status == 'DONE':
+                pass  # thread should be finishing momentarily
+
+    if verbose and pollcount > 0:
+        print()  # newline after dots
+
+    # Thread is done — check for errors
+    if error_holder[0] is not None:
+        print(f'ERROR: Failed to get result for job {job_id} after all retries')
+        if verbose: print(f"... exception = {error_holder[0]}")
+        return None
+
+    return result_holder[0]
+
+
+def _wait_on_job_result(job, job_id):
+    """
+    Call job.result() with retry logic for network errors.
+    Reuses the existing wait_on_job_result pattern (40 retries, 15s apart).
+
+    This runs in the background thread for hardware, or directly for simulators.
+    """
+    max_retries = 40
+    retry_interval = 15
+
+    result = None
+    for retry_count in range(1, max_retries + 1):
+        try:
+            result = job.result()
+            break
+        except KeyboardInterrupt:
+            raise
+        except Exception:
+            print(f'... error during job.result() for job {job_id} — retry {retry_count}/{max_retries}')
+            if verbose: print(traceback.format_exc())
+            if retry_count < max_retries:
+                time.sleep(retry_interval)
+
+    if result is None:
+        print(f'ERROR: Failed to get result for job {job_id} after {max_retries} retries')
+        raise ValueError(f"Failed to get result for job {job_id}")
+
+    return result
+
+
+def _get_job_status(job, job_id):
+    """
+    Check job status with retry logic for network errors.
+    Reuses the existing get_job_status pattern (3 retries, 15s apart).
+    """
+    max_retries = 3
+
+    for retry_count in range(1, max_retries + 1):
+        try:
+            status = job.status()
+            return status
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            print(f'... error during job.status() for job {job_id} — retry {retry_count}/{max_retries}')
+            if verbose: print(traceback.format_exc())
+            if retry_count < max_retries:
+                time.sleep(15)
+
+    # All retries failed — return None (caller decides what to do)
+    print(f'ERROR: Failed to get status for job {job_id} after {max_retries} retries')
+    return None
+
+
+###########################################################################
 # DEPRECATED FUNCTIONS
 # These functions are kept for backward compatibility but will be removed
 # in a future release. They delegate to the new array-based execution path.
 ###########################################################################
+
+
+# block and wait for the job result to be returned
+# handle network timeouts by doing up to 40 retries once every 15 seconds
+def wait_on_job_result_old(job, active_circuit):
+    retry_count = 0
+    result = None
+    while retry_count < 40:
+        try:
+            retry_count += 1
+            result = job.result()
+            break
+        except KeyboardInterrupt:
+            raise
+        except Exception:
+            print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
+            if verbose: print(traceback.format_exc())
+            time.sleep(15)
+            continue
+
+    if result == None:
+        print(f'ERROR: during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+        raise ValueError("Failed to execute job")
+    else:
+        #print(f"... job.result() is done, with result data, continuing")
+        pass
+
+# Check and return job_status
+# handle network timeouts by doing up to 40 retries once every 15 seconds
+def get_job_status_old(job, active_circuit):
+    retry_count = 0
+    status = None
+    while retry_count < 3:
+        try:
+            retry_count += 1
+            #print(f"... calling job.status()")
+            status = job.status()
+            break
+
+        except Exception:
+            print(f'... error occurred during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
+            if verbose: print(traceback.format_exc())
+            time.sleep(15)
+            continue
+
+    if status == None:
+        print(f'ERROR: during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
+        raise ValueError("Failed to get job status")
+    else:
+        #print(f"... job.result() is done, with result data, continuing")
+        pass
+
+    return status
 
 
 def execute_circuits_immed(
