@@ -64,7 +64,7 @@ cd qedcbench
 jupyter notebook benchmarks-qiskit.ipynb
 ```
 
-> **Note:** If you have existing code that depends on the v1.x repository structure, use branch **[master-260411-v1.2.2](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/tree/master-260411-v1.2.2)** for compatibility. See the [User Guide](./doc/docs/user_guide.md#upgrading-from-v1x) for migration details.
+> **Note:** If you have existing code that depends on the v1.x repository structure, use branch **[master-260411-v1.2.2](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/tree/master-260411-v1.2.2)** for compatibility. See the [User Guide](https://sri-international.github.io/QC-App-Oriented-Benchmarks/user_guide/#upgrading-from-v1x) for migration details.
 
 ## Documentation
 
@@ -72,13 +72,14 @@ jupyter notebook benchmarks-qiskit.ipynb
 
 | Document | Description |
 |----------|-------------|
-| [User Guide](./doc/docs/user_guide.md) | Complete reference for running benchmarks |
-| [qedclib Guide](./doc/docs/qedclib_guide.md) | Execution engine API, metrics, and backend configuration |
-| [Quick Start](./doc/docs/quick_start.md) | First-time setup walkthrough |
-| [Release Notes](./doc/docs/release_notes.md) | Version history and changes |
-| [PAL](./doc/docs/known_issues.md) | Problems, Anomalies, and Limitations |
-| [About](./doc/docs/about.md) | Project background, structure, and credits |
-| [Setup Guides](./doc/docs/setup/) | Platform-specific installation (Qiskit, CUDA-Q, etc.) |
+| [User Guide](https://sri-international.github.io/QC-App-Oriented-Benchmarks/user_guide/) | Complete reference for running benchmarks |
+| [Benchmarks](https://sri-international.github.io/QC-App-Oriented-Benchmarks/benchmarks/) | All 17 benchmarks with algorithm descriptions |
+| [qedclib Guide](https://sri-international.github.io/QC-App-Oriented-Benchmarks/qedclib_guide/) | Execution engine API, metrics, and backend configuration |
+| [Quick Start](https://sri-international.github.io/QC-App-Oriented-Benchmarks/quick_start/) | First-time setup walkthrough |
+| [Release Notes](https://sri-international.github.io/QC-App-Oriented-Benchmarks/release_notes/) | Version history and changes |
+| [PAL](https://sri-international.github.io/QC-App-Oriented-Benchmarks/known_issues/) | Problems, Anomalies, and Limitations |
+| [About](https://sri-international.github.io/QC-App-Oriented-Benchmarks/about/) | Project background, structure, and credits |
+| [Setup Guides](https://sri-international.github.io/QC-App-Oriented-Benchmarks/setup/README/) | Platform-specific installation (Qiskit, CUDA-Q, etc.) |
 
 **Standalone execution engine:** `pip install qedclib` — use the execution and metrics library in your own projects without the benchmarks. See [qedclib on PyPI](https://pypi.org/project/qedclib/).
 
