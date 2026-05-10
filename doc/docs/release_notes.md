@@ -7,6 +7,13 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.2 - 10 May 2026
+
+- Added CLI benchmark runner (`python -m qedcbench.run_all`) for running a standard set of benchmarks from the command line with a combined volumetric plot.
+- Created dedicated qedclib Guide documentation page with API reference, execution paths, and metrics workflow.
+- Updated README to support both `pip install` and repository cloning workflows.
+- Published `qedcbench` package to PyPI (`pip install qedcbench`).
+
 ### Release 2.0.1 - 9 May 2026
 
 - General performance improvements to Qiskit execution logic
