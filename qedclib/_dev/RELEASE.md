@@ -1,6 +1,6 @@
 # Release Checklist
 
-Step-by-step instructions for publishing a new version.
+Step-by-step instructions for publishing a new version. All build scripts are in `qedclib/_dev/`.
 
 ---
 
@@ -57,16 +57,22 @@ git commit -m "Update docs for vX.Y.Z"
 git push
 ```
 
-## 5. Build the PyPI Package
+## 5. Build PyPI Packages
 
-From anywhere (scripts auto-navigate to repo root):
+Two packages are published separately. Both scripts auto-navigate to the repo root.
+
+### qedclib (standalone execution engine)
+
+Uses the swap trick: temporarily replaces `pyproject.toml` with `pyproject-qedclib.toml`, builds, then restores.
 
 ```bash
-qedclib\_dev\build_pypi.bat              # Windows
+qedclib\_dev\build_pypi.bat              # Windows (build only)
+qedclib\_dev\build_pypi.bat upload       # Windows (build and upload)
 ./qedclib/_dev/build_pypi.sh             # Linux
+./qedclib/_dev/build_pypi.sh upload      # Linux
 ```
 
-### Verify before uploading:
+Verify before uploading:
 
 - [ ] `dist/` contains `qedclib-X.Y.Z-py3-none-any.whl` and `qedclib-X.Y.Z.tar.gz`
 - [ ] Package name is `qedclib` (not `qedcbench`)
@@ -79,21 +85,30 @@ Quick metadata check:
 python -c "import zipfile; z=zipfile.ZipFile('dist/qedclib-X.Y.Z-py3-none-any.whl'); print(z.read('qedclib-X.Y.Z.dist-info/METADATA').decode()[:500])"
 ```
 
-## 6. Upload to PyPI
+### qedcbench (full suite: qedclib + qedcbench + benchmarks)
+
+Builds directly from the top-level `pyproject.toml` — no swap needed.
 
 ```bash
-qedclib\_dev\build_pypi.bat upload       # Windows
-./qedclib/_dev/build_pypi.sh upload      # Linux
+qedclib\_dev\build_pypi_qedcbench.bat              # Windows (build only)
+qedclib\_dev\build_pypi_qedcbench.bat upload       # Windows (build and upload)
+./qedclib/_dev/build_pypi_qedcbench.sh             # Linux
+./qedclib/_dev/build_pypi_qedcbench.sh upload      # Linux
 ```
 
-Or manually: `twine upload dist/*`
+Verify before uploading:
 
-## 7. Verify on PyPI
+- [ ] `dist/` contains `qedcbench-X.Y.Z-py3-none-any.whl` and `qedcbench-X.Y.Z.tar.gz`
+- [ ] Package contains both `qedclib/` and `qedcbench/` directories
 
-- Visit https://pypi.org/project/qedclib/ and confirm the new version appears
-- Check that author, description, and README render correctly
+## 6. Verify on PyPI
 
-## 8. Update Local Install
+- https://pypi.org/project/qedclib/ — standalone engine
+- https://pypi.org/project/qedcbench/ — full benchmark suite
+
+Check that version, author, description, and README render correctly on both.
+
+## 7. Update Local Install
 
 ```bash
 pip install -e .
@@ -105,5 +120,7 @@ python -c "import qedclib; print(qedclib.__version__)"
 ## Notes
 
 - **Versioning:** Use semantic versioning. Patch (X.Y.Z+1) for bug fixes and small additions. Minor (X.Y+1.0) for new features. Major (X+1.0.0) for breaking changes.
+- **Two PyPI packages:** `qedclib` (standalone engine) and `qedcbench` (full suite including qedclib). Each has its own build script. Version numbers should stay in sync.
 - **Two pyproject files for qedclib:** `qedclib/pyproject.toml` is the source of truth. `pyproject-qedclib.toml` is a copy at the repo root needed because `python -m build` must run from the top level to find the `qedclib/` package directory. The build script swaps it in temporarily.
+- **Build order:** Build qedclib first, verify, then build qedcbench. If either fails, don't upload the other.
 - **TestPyPI:** To test before a real publish: `twine upload --repository testpypi dist/*`
