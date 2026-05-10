@@ -20,5 +20,5 @@ nav:
         - QBraid: setup/qbraid/README.md
         - Azure Quantum: setup/qiskit-azure-quantum/README.md
     - Releases: release_notes.md
-    - Known Issues: known_issues.md
+    - PAL: known_issues.md
     - About: about.md

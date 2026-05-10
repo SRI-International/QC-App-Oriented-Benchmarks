@@ -1,16 +1,24 @@
 # User Guide
 
-This is the complete reference for the **QED-C Application-Oriented Benchmarks** suite. It covers the repository structure, execution options, metrics, supported platforms, and how to use **qedclib** as a standalone library.
+This guide covers installing, configuring, and running the **QED-C Application-Oriented Benchmarks** — a suite of 17 application-level quantum computing benchmarks with built-in performance metrics. It also describes **qedclib**, the execution engine that powers the benchmarks and can be used independently in your own projects.
+
+For a quick first run, see the [Quick Start](./quick_start.md). This guide provides the complete reference.
 
 ## Repository Structure
 
-After installation (`pip install -e .`), the repository provides two Python packages:
+Clone the repository and install:
+
+```bash
+git clone https://github.com/SRI-International/QC-App-Oriented-Benchmarks.git
+cd QC-App-Oriented-Benchmarks
+pip install -e .
+```
+
+This installs two Python packages:
 
 ```
 QC-App-Oriented-Benchmarks/
 ├── qedclib/              # Execution and metrics library
-│   ├── metrics.py        # Performance metrics collection and plotting
-│   ├── qcb_mpi.py       # MPI support for multi-GPU execution
 │   ├── qiskit/           # Qiskit execution backend
 │   ├── cudaq/            # CUDA-Q execution backend
 │   ├── cirq/             # Cirq execution backend (limited)
@@ -25,40 +33,20 @@ QC-App-Oriented-Benchmarks/
 └── pyproject.toml        # Package configuration
 ```
 
-## Architecture
-
-### Three-Function Benchmark API
-
-All benchmarks expose a standard interface:
-
-```python
-from qedcbench.hidden_shift import hs_benchmark
-
-# 1. Create circuits
-circuits = hs_benchmark.get_circuits(min_qubits=2, max_qubits=8, num_shots=1000, api="qiskit")
-
-# 2. Execute circuits
-hs_benchmark.run_circuits(circuits, backend_id="qasm_simulator")
-
-# 3. Plot results
-hs_benchmark.plot_results()
-```
-
-The convenience function `run(**kwargs)` calls all three and routes arguments automatically:
-
-```python
-hs_benchmark.run(min_qubits=2, max_qubits=8, num_shots=1000, api="qiskit", backend_id="qasm_simulator")
-```
-
-### Dynamic Module Loading
-
-The benchmarks support multiple quantum computing APIs without hard-coding imports. When you specify `--api qiskit` (or pass `api="qiskit"`), the system dynamically loads the appropriate kernel implementation and execution backend. This is handled internally by `qedclib.initialize()` — you don't need to interact with it directly when running benchmarks normally.
-
 ## Running Benchmarks
+
+After installation (see above), you can run benchmarks from within the repo or copy benchmark scripts and notebooks anywhere on your system and run them from there.
 
 ### From the Command Line
 
-Navigate to the benchmark directory and run the benchmark script:
+Navigate to the `qedcbench` directory and run a benchmark as a module or script:
+
+```bash
+cd qedcbench
+python -m hidden_shift.hs_benchmark --api qiskit --min_qubits 2 --max_qubits 8 --num_shots 1000
+```
+
+Or navigate to the benchmark directory and run the script directly:
 
 ```bash
 cd qedcbench/bernstein_vazirani
@@ -183,47 +171,6 @@ When benchmarks run, results are saved to the current working directory:
 
 After execution, `plot_results()` generates bar charts showing metrics across qubit widths. Plots are displayed inline in Jupyter or saved to `__images/`.
 
-## Using qedclib as a Library
-
-The **qedclib** package provides execution infrastructure and metrics collection independent of any specific benchmark. You can use it for your own quantum programs.
-
-### Basic Usage
-
-```python
-import qedclib
-from qedclib import metrics
-
-# Initialize qedclib with the API to use (once, at startup)
-qedclib.initialize("qiskit")
-import execute as ex
-ex.set_execution_target("qasm_simulator")
-
-# Initialize metrics tracking
-metrics.init_metrics()
-```
-
-### Top-Level API
-
-| Function | Description |
-|----------|-------------|
-| `qedclib.initialize(api, benchmark, kernels)` | Initialize qedclib: set API, load execution backend and kernel modules |
-| `qedclib.get_api()` | Get current default SDK |
-| `qedclib.set_api(api)` | Set default quantum SDK (called automatically by `initialize`) |
-| `qedclib.get_kernel(name, api, benchmark)` | Load and return a kernel module |
-| `qedclib.is_leader()` | True if MPI rank 0 or MPI not active |
-
-### Metrics Module
-
-```python
-from qedclib import metrics
-
-metrics.init_metrics()
-metrics.store_metric(group_id, circuit_id, "fidelity", 0.95)
-metrics.aggregate_metrics()
-metrics.report_metrics()
-metrics.plot_metrics("Benchmark Title")
-```
-
 ## Supported Platforms
 
 | Platform | Status | Backends |
@@ -267,6 +214,45 @@ Custom transformers (in `qedclib/transformers/`) and third-party tools can also 
 - `qiskit_passmgr` — custom Qiskit pass manager
 - `tket_optimiser` — Quantinuum t|ket⟩ optimization
 - `trueq_rc` — True-Q randomized compiling
+
+## Architecture
+
+### Three-Function Benchmark API
+
+All benchmarks expose a standard interface:
+
+```python
+from qedcbench.hidden_shift import hs_benchmark
+
+# 1. Create circuits
+circuits = hs_benchmark.get_circuits(min_qubits=2, max_qubits=8, num_shots=1000, api="qiskit")
+
+# 2. Execute circuits
+hs_benchmark.run_circuits(circuits, backend_id="qasm_simulator")
+
+# 3. Plot results
+hs_benchmark.plot_results()
+```
+
+The convenience function `run(**kwargs)` calls all three and routes arguments automatically:
+
+```python
+hs_benchmark.run(min_qubits=2, max_qubits=8, num_shots=1000, api="qiskit", backend_id="qasm_simulator")
+```
+
+### Dynamic Module Loading
+
+The benchmarks support multiple quantum computing APIs without hard-coding imports. When you specify `--api qiskit` (or pass `api="qiskit"`), the system dynamically loads the appropriate kernel implementation and execution backend. This is handled internally by `qedclib.initialize()` — you don't need to interact with it directly when running benchmarks normally.
+
+---
+
+## The qedclib Execution Engine
+
+All of the benchmark code in this suite is built on top of **qedclib**, a quantum circuit execution engine that manages backend configuration, circuit submission, batched execution, per-circuit timing extraction, and automatic performance metrics collection. It supports both Qiskit and CUDA-Q, with multi-GPU parallelization via MPI.
+
+While qedclib was developed to power these benchmarks, it is also available as a **standalone library** for use in your own quantum computing projects — any application that needs to execute circuits at scale and collect performance data. It is published independently on [PyPI](https://pypi.org/project/qedclib/) (`pip install qedclib`).
+
+For the full qedclib API reference, execution paths, metrics workflow, and backend configuration examples, see the **[qedclib Guide](./qedclib_guide.md)**.
 
 ## Upgrading from v1.x
 

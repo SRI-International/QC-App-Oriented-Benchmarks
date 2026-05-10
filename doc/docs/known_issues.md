@@ -1,6 +1,6 @@
-# Known Issues
+# PAL — Problems, Anomalies, and Limitations
 
-As with most complex and evolving software, the **QED-C Application-Oriented Benchmarks** have several issues you may want to be aware of. This section describes known **Problems, Anomalies, and Limitations** (PAL). Being aware of these in advance can help avoid frustration.
+As with most complex and evolving software, the **QED-C Application-Oriented Benchmarks** have several issues you may want to be aware of. This section describes known **P**roblems, **A**nomalies, and **L**imitations. Being aware of these in advance can help avoid frustration.
 
 ## Limitations
 

@@ -3,7 +3,7 @@ setlocal
 
 echo ... making documentation
 
-call mkdocs build
+call python -m mkdocs build
 
 echo ... DONE making documentation
 echo Output is in site/ folder. Open site/index.html to view.
