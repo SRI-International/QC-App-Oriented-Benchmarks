@@ -24,8 +24,8 @@ import sys
 
 from qedclib import metrics
 
-# Default benchmark set — spans complexity levels 1-3, all have uniform run() interface
-DEFAULT_BENCHMARKS = [
+# Default benchmark sets by API
+DEFAULT_BENCHMARKS_QISKIT = [
     "hidden_shift",
     "bernstein_vazirani",
     "quantum_fourier_transform",
@@ -33,8 +33,15 @@ DEFAULT_BENCHMARKS = [
     "amplitude_estimation",
 ]
 
-# All benchmarks with uniform run() interface
-ALL_UNIFORM_BENCHMARKS = [
+DEFAULT_BENCHMARKS_CUDAQ = [
+    "hidden_shift",
+    "bernstein_vazirani",
+    "quantum_fourier_transform",
+    "phase_estimation",
+]
+
+# All benchmarks with uniform run() interface, by API
+ALL_UNIFORM_BENCHMARKS_QISKIT = [
     "hidden_shift",
     "bernstein_vazirani",
     "quantum_fourier_transform",
@@ -45,16 +52,26 @@ ALL_UNIFORM_BENCHMARKS = [
     "hamiltonian_simulation",
 ]
 
+ALL_UNIFORM_BENCHMARKS_CUDAQ = [
+    "hidden_shift",
+    "bernstein_vazirani",
+    "quantum_fourier_transform",
+    "phase_estimation",
+]
 
-def list_benchmarks():
+
+def list_benchmarks(api="qiskit"):
     """Print available benchmarks, highlighting the default set."""
-    print("\nAvailable benchmarks with uniform run() interface:\n")
-    for name in ALL_UNIFORM_BENCHMARKS:
-        marker = " *" if name in DEFAULT_BENCHMARKS else "  "
+    all_bms = ALL_UNIFORM_BENCHMARKS_CUDAQ if api == "cudaq" else ALL_UNIFORM_BENCHMARKS_QISKIT
+    default_bms = DEFAULT_BENCHMARKS_CUDAQ if api == "cudaq" else DEFAULT_BENCHMARKS_QISKIT
+
+    print(f"\nAvailable benchmarks for {api}:\n")
+    for name in all_bms:
+        marker = " *" if name in default_bms else "  "
         print(f"  {marker} {name}")
-    print(f"\n  * = included in default set ({len(DEFAULT_BENCHMARKS)} benchmarks)")
+    print(f"\n  * = included in default set ({len(default_bms)} benchmarks)")
     print(f"\nUse --benchmarks to specify a custom list, e.g.:")
-    print(f"  python -m qedcbench.run_all --benchmarks hidden_shift,grovers,monte_carlo\n")
+    print(f"  python -m qedcbench.run_all --benchmarks hidden_shift,grovers\n")
 
 
 def import_benchmark(name):
@@ -152,7 +169,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 parser.add_argument("-a", "--api", default="qiskit", help="Quantum SDK (default: qiskit)")
-parser.add_argument("-b", "--backend_id", default="qasm_simulator", help="Backend (default: qasm_simulator)")
+parser.add_argument("-b", "--backend_id", default=None, help="Backend (default: qasm_simulator for qiskit, nvidia for cudaq)")
 parser.add_argument("-min", "--min_qubits", type=int, default=2, help="Min qubits (default: 2)")
 parser.add_argument("-max", "--max_qubits", type=int, default=8, help="Max qubits (default: 8)")
 parser.add_argument("-c", "--max_circuits", type=int, default=3, help="Circuits per group (default: 3)")
@@ -165,14 +182,18 @@ parser.add_argument("--list", action="store_true", help="Show available benchmar
 args = parser.parse_args()
 
 if args.list:
-    list_benchmarks()
+    list_benchmarks(args.api)
     sys.exit(0)
+
+# Set default backend based on API
+if args.backend_id is None:
+    args.backend_id = "nvidia" if args.api == "cudaq" else "qasm_simulator"
 
 # Determine which benchmarks to run
 if args.benchmarks:
     benchmarks = [b.strip() for b in args.benchmarks.split(",")]
 else:
-    benchmarks = DEFAULT_BENCHMARKS
+    benchmarks = DEFAULT_BENCHMARKS_CUDAQ if args.api == "cudaq" else DEFAULT_BENCHMARKS_QISKIT
 
 # Build the kwargs dict passed to each benchmark's run()
 run_args = {
