@@ -25,7 +25,7 @@ from qedclib import metrics
 from qedclib import qcb_mpi
 from qedclib import job_store
 
-__version__ = "2.0.1"
+__version__ = "2.0.2"
 
 # Benchmark root registration for dynamic kernel loading
 _benchmark_root = None

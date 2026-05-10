@@ -19,6 +19,7 @@ Arguments match individual benchmark scripts:
 """
 
 import argparse
+import os
 import time
 import sys
 
@@ -105,6 +106,57 @@ def import_benchmark(name):
         return None
 
 
+def configure_backend(backend_id, run_args):
+    """Set up run_args for the given backend_id.
+
+    Resolves provider credentials and adds the params that run_circuits()
+    needs to call set_execution_target() correctly.
+    """
+
+    # IBM backends: "ibm" for least-busy, or specific like "ibm_sherbrooke"
+    if backend_id.startswith("ibm"):
+        ibm_instance = os.environ.get("IBM_INSTANCE", "")
+        if not ibm_instance:
+            print("  WARNING: IBM_INSTANCE not set — will use saved default credentials.")
+            print("  Set IBM_INSTANCE to your CRN or service name to target a specific plan.")
+
+        if backend_id == "ibm":
+            from qiskit_ibm_runtime import QiskitRuntimeService
+            service = QiskitRuntimeService(channel="ibm_cloud", instance=ibm_instance)
+            backend = service.least_busy(simulator=False, operational=True, min_num_qubits=100)
+            backend_id = backend.name
+            print(f"  Least-busy IBM backend: {backend_id}")
+
+        run_args["backend_id"] = backend_id
+        run_args["hub"] = ""
+        run_args["group"] = ""
+        run_args["project"] = ibm_instance
+        run_args["exec_options"] = {"use_ibm_quantum_platform": False, "use_sessions": False}
+        return
+
+    # IonQ backends: "ionq" for simulator, "ionq_qpu" for real hardware
+    if backend_id.startswith("ionq"):
+        from qiskit_ionq import IonQProvider
+        provider = IonQProvider()
+        ionq_backend = "ionq_simulator" if backend_id == "ionq" else backend_id
+        run_args["provider_backend"] = provider.get_backend(ionq_backend)
+        return
+
+    # IQM backends: "iqm" for Garnet via Resonance
+    if backend_id.startswith("iqm"):
+        from iqm.qiskit_iqm import IQMProvider
+        iqm_server_url = "https://resonance.meetiqm.com"
+        quantum_computer = "garnet"
+        iqm_token = os.environ.get("IQM_API_TOKEN")
+
+        provider = IQMProvider(iqm_server_url, quantum_computer=quantum_computer, token=iqm_token)
+        run_args["backend_id"] = quantum_computer
+        run_args["provider_backend"] = provider.get_backend()
+        return
+
+    # Local simulators: no special setup needed
+
+
 def run_benchmarks(benchmarks, run_args):
     """Run a list of benchmarks with shared arguments."""
     total = len(benchmarks)
@@ -158,8 +210,12 @@ def run_benchmarks(benchmarks, run_args):
     print()
 
     # Show combined volumetric plot at the end
-    backend_id = run_args.get("backend_id", "qasm_simulator")
-    metrics.plot_all_app_metrics(backend_id)
+    try:
+        backend_id = run_args.get("backend_id", "qasm_simulator")
+        metrics.plot_all_app_metrics(backend_id)
+    except KeyboardInterrupt:
+        print("... KeyboardInterrupt: plot display cancelled.")
+        pass
 
 
 # === Main ===
@@ -207,5 +263,8 @@ run_args = {
     "draw_circuits": False,
     "plot_results": False,
 }
+
+# Configure hardware backend (IBM, IonQ, IQM) — adds provider params to run_args
+configure_backend(args.backend_id, run_args)
 
 run_benchmarks(benchmarks, run_args)
