@@ -248,9 +248,11 @@ ex.submit_circuits(circuits, num_shots=1000)
     → submit_circuits (one or more calls)
     → metrics.end_metrics()
     → metrics.finalize_all_groups()
+    → metrics.save_app_metrics(benchmark_name, method=method)
     → metrics.get_group_metrics() / get_circuit_metrics()
     → metrics.plot_metrics(&quot;Title&quot;)
 </code></pre>
+<p>Note: <code>save_app_metrics</code> writes benchmark results to <code>__data/DATA-{backend_id}.json</code>. It is called explicitly in each benchmark's <code>run_circuits()</code> and is separate from plotting. The <code>plot_metrics</code> function is purely for visualization.</p>
 <p><code>submit_circuits</code> auto-calls <code>metrics.init_metrics()</code> if not yet initialized. You can call <code>submit_circuits</code> multiple times before finalizing — all results accumulate in the metrics module.</p>
 <h2 id="backend-configuration">Backend Configuration</h2>
 <h3 id="local-simulators-qiskit">Local Simulators (Qiskit)</h3>
@@ -393,8 +395,12 @@ job_id, result = ex.execute_circuits(circuits, num_shots=1000)
 <td>Print a summary of all group metrics</td>
 </tr>
 <tr>
+<td><code>save_app_metrics(name, method)</code></td>
+<td>Save metrics to <code>__data/DATA-{backend_id}.json</code></td>
+</tr>
+<tr>
 <td><code>plot_metrics(title)</code></td>
-<td>Generate volumetric benchmarking plots</td>
+<td>Generate volumetric benchmarking plots (no side effects)</td>
 </tr>
 </tbody>
 </table>

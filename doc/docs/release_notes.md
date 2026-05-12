@@ -7,7 +7,7 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
-### Release 2.0.2 - 10 May 2026
+### Release 2.0.2 - 12 May 2026
 
 - **Metrics save separated from plotting**: `plot_metrics()` no longer saves data as a side effect. Each benchmark's `run_circuits()` now calls `metrics.save_app_metrics(benchmark_name, method=method)` explicitly after `finalize_all_groups()`. This makes the save visible and controllable.
 - **Simplified data file keys**: Data file keys changed from `"Benchmark Results - Quantum Fourier Transform (1) - Qiskit"` to `"Quantum Fourier Transform (1)"`. The API name is now stored as a separate `"api"` field in the data record. **Breaking change**: existing `__data/DATA-*.json` files must be regenerated.

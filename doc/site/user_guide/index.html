@@ -390,7 +390,7 @@ benchmark.run(**app_args, **exec_options)
 <h3 id="output-files">Output Files</h3>
 <p>When benchmarks run, results are saved to the current working directory:</p>
 <ul>
-<li><code>__data/DATA-{backend_id}.json</code> — Raw metrics data in JSON format</li>
+<li><code>__data/DATA-{backend_id}.json</code> — Metrics data in JSON format, keyed by benchmark name (e.g. <code>"Quantum Fourier Transform (1)"</code>).</li>
 <li><code>__images/{backend_id}/</code> — Generated plot images (JPG/PDF)</li>
 </ul>
 <h3 id="plotting">Plotting</h3>
