@@ -96,12 +96,12 @@ import qedclib
 
 # Initialize qedclib with the API to use (once, at startup)
 qedclib.initialize("qiskit")
-import execute as ex
+
+# Execute and metrics are now available
+ex = qedclib.execute
 ex.set_execution_target("qasm_simulator")
 
-# Access metrics
-from qedclib import metrics
-metrics.init_metrics()
+qedclib.metrics.init_metrics()
 ```
 
 ## Using Benchmarks as a Package

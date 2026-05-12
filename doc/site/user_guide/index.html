@@ -547,7 +547,7 @@ python -m mkdocs serve
 <ul>
 <li><strong>No <code>__init__.py</code> in API subdirectories</strong> (<code>qedclib/qiskit/</code>, <code>qedclib/cudaq/</code>, etc.) — this avoids namespace conflicts with vendor packages.</li>
 <li><strong>Benchmark directories keep <code>__init__.py</code></strong> — needed for <code>from qedcbench.{name} import ...</code> imports.</li>
-<li><strong><code>import execute as ex</code></strong> — after <code>initialize()</code> or <code>get_kernel()</code>, the execute module is importable by bare name. Never use <code>from qedclib.qiskit import execute</code> directly.</li>
+<li><strong><code>ex = qedclib.execute</code></strong> — after <code>initialize()</code> or <code>get_kernel()</code>, the execute module is available as <code>qedclib.execute</code>. Use <code>ex = qedclib.execute</code> for a short reference. Metrics are always available as <code>qedclib.metrics</code>.</li>
 <li><strong>Absolute paths</strong> — use <code>os.path.dirname(os.path.abspath(__file__))</code> in benchmark files, never relative paths.</li>
 <li><strong><code>sys.path.insert</code> lines</strong> — keep these in benchmark files; they're needed for benchmark-local imports (e.g., <code>hamlib/_common/</code>).</li>
 </ul>

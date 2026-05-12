@@ -16,8 +16,8 @@ import numpy as np
 import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-from qedclib import get_kernel, is_leader
-from qedclib import metrics
+import qedclib
+from qedclib import get_kernel, is_leader, metrics
 
 benchmark_name = "Hidden Shift"
 
@@ -145,7 +145,7 @@ def run_circuits(all_qcs,
         api: programming API if not already initialized (default None)
     """
     get_kernel("hs_kernel", api=api)
-    import execute as ex
+    ex = qedclib.execute
     ex.verbose = verbose
 
     if context is None:

@@ -166,14 +166,17 @@ pip install -e .
 <p>Before using qedclib, initialize it with the quantum computing API you want to use. This loads the appropriate execution backend module.</p>
 <pre><code class="language-python">import qedclib
 
-# Initialize with the API (loads the execute module into sys.modules)
+# Initialize with the API (loads the execute module)
 qedclib.initialize(&quot;qiskit&quot;)
-import execute as ex
 
-# Configure the backend
+# Access execute and metrics directly from qedclib
+ex = qedclib.execute
 ex.set_execution_target(backend_id=&quot;qasm_simulator&quot;)
+
+# Metrics is always available
+qedclib.metrics.verbose = True
 </code></pre>
-<p>The <code>import execute as ex</code> pattern gives you access to the execution functions. The module is loaded dynamically by <code>initialize()</code> — do not import it directly via <code>from qedclib.qiskit import execute</code> as that creates a separate module instance.</p>
+<p>After <code>initialize()</code> or <code>get_kernel()</code>, the execute module is available as <code>qedclib.execute</code>. Use <code>ex = qedclib.execute</code> for a shorter reference. The <code>from qedclib import metrics</code> shorthand also works: <code>import qedclib.metrics as metrics</code>.</p>
 <h2 id="execution-paths">Execution Paths</h2>
 <p>qedclib provides two execution paths depending on whether you want automatic metrics collection.</p>
 <h3 id="path-1-direct-execution">Path 1: Direct Execution</h3>
@@ -244,8 +247,11 @@ ex.submit_circuits(circuits, num_shots=1000)
 </code></pre>
 <h2 id="metrics-flow">Metrics Flow</h2>
 <p>The full metrics-integrated workflow:</p>
-<pre><code>initialize → set_execution_target → init_execution(handler)
-    → submit_circuits (one or more calls)
+<pre><code>qedclib.initialize(&quot;qiskit&quot;)
+ex = qedclib.execute
+
+ex.set_execution_target → ex.init_execution(handler)
+    → ex.submit_circuits (one or more calls)
     → metrics.end_metrics()
     → metrics.finalize_all_groups()
     → metrics.save_app_metrics(benchmark_name, method=method)

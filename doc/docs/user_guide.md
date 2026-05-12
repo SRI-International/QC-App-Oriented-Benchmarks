@@ -354,7 +354,7 @@ python server/app.py
 
 - **No `__init__.py` in API subdirectories** (`qedclib/qiskit/`, `qedclib/cudaq/`, etc.) — this avoids namespace conflicts with vendor packages.
 - **Benchmark directories keep `__init__.py`** — needed for `from qedcbench.{name} import ...` imports.
-- **`import execute as ex`** — after `initialize()` or `get_kernel()`, the execute module is importable by bare name. Never use `from qedclib.qiskit import execute` directly.
+- **`ex = qedclib.execute`** — after `initialize()` or `get_kernel()`, the execute module is available as `qedclib.execute`. Use `ex = qedclib.execute` for a short reference. Metrics are always available as `qedclib.metrics`.
 - **Absolute paths** — use `os.path.dirname(os.path.abspath(__file__))` in benchmark files, never relative paths.
 - **`sys.path.insert` lines** — keep these in benchmark files; they're needed for benchmark-local imports (e.g., `hamlib/_common/`).
 

@@ -23,15 +23,18 @@ Before using qedclib, initialize it with the quantum computing API you want to u
 ```python
 import qedclib
 
-# Initialize with the API (loads the execute module into sys.modules)
+# Initialize with the API (loads the execute module)
 qedclib.initialize("qiskit")
-import execute as ex
 
-# Configure the backend
+# Access execute and metrics directly from qedclib
+ex = qedclib.execute
 ex.set_execution_target(backend_id="qasm_simulator")
+
+# Metrics is always available
+qedclib.metrics.verbose = True
 ```
 
-The `import execute as ex` pattern gives you access to the execution functions. The module is loaded dynamically by `initialize()` — do not import it directly via `from qedclib.qiskit import execute` as that creates a separate module instance.
+After `initialize()` or `get_kernel()`, the execute module is available as `qedclib.execute`. Use `ex = qedclib.execute` for a shorter reference. The `from qedclib import metrics` shorthand also works: `import qedclib.metrics as metrics`.
 
 ## Execution Paths
 
@@ -120,8 +123,11 @@ ex.submit_circuits(circuits, num_shots=1000)
 The full metrics-integrated workflow:
 
 ```
-initialize → set_execution_target → init_execution(handler)
-    → submit_circuits (one or more calls)
+qedclib.initialize("qiskit")
+ex = qedclib.execute
+
+ex.set_execution_target → ex.init_execution(handler)
+    → ex.submit_circuits (one or more calls)
     → metrics.end_metrics()
     → metrics.finalize_all_groups()
     → metrics.save_app_metrics(benchmark_name, method=method)

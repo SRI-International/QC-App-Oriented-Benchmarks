@@ -20,7 +20,7 @@ import uniform_controlled_rotation as ucr
 # cannot use the QFT common yet, as HHL seems to use reverse bit order
 # from quantum_fourier_transform.qiskit.qft_benchmark import qft_gate, inv_qft_gate
 
-import execute as ex
+import qedclib
 from qedclib import metrics
 
 # Benchmark Name
@@ -788,6 +788,7 @@ def run_circuits(all_qcs,
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
     """
+    ex = qedclib.execute
     ex.verbose = verbose
 
     if context is None:

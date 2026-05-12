@@ -24,8 +24,8 @@ import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 # The QED-C initialization module
-from qedclib import initialize
-from qedclib import metrics
+import qedclib
+from qedclib import initialize, metrics
 from qedclib import qcb_mpi as mpi
 
 
@@ -353,7 +353,7 @@ def run(min_qubits: int = 2,
 	"""
     initialize(api, "hamlib", ["hamlib_simulation_kernel"])
     import hamlib_simulation_kernel
-    import execute as ex
+    ex = qedclib.execute
 
     from hamlib._common import evolution_exact
     from hamlib._common import metric_plots

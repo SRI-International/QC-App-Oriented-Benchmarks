@@ -13,7 +13,7 @@ import time
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
-import execute as ex
+import qedclib
 from qedclib import metrics
 from shors._common.shors_utils import getAngles, getAngle, modinv, generate_base
 
@@ -481,6 +481,7 @@ def run_circuits(all_qcs,
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
     """
+    ex = qedclib.execute
     ex.verbose = verbose
 
     if context is None:

@@ -11,7 +11,12 @@ Usage:
     kernel = qedclib.get_kernel("hs_kernel", api="qiskit")
 
     # Metrics always available
+    qedclib.metrics.verbose = True
     qedclib.metrics.plot_metrics(...)
+
+    # Execute available after get_kernel() or initialize()
+    ex = qedclib.execute
+    ex.set_execution_target("qasm_simulator")
 """
 
 from qedclib.api import (
@@ -24,6 +29,9 @@ from qedclib.api import (
 from qedclib import metrics
 from qedclib import qcb_mpi
 from qedclib import job_store
+
+# Set after initialize() or get_kernel() loads the API-specific execute module
+execute = None
 
 __version__ = "2.0.2"
 

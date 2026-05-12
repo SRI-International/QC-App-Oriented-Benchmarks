@@ -17,7 +17,7 @@ from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.synthesis import LieTrotter
 
-import execute as ex
+import qedclib
 from qedclib import metrics
 
 # Benchmark Name
@@ -413,6 +413,7 @@ def run_circuits(all_qcs,
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
     """
+    ex = qedclib.execute
     ex.verbose = verbose
 
     if context is None:

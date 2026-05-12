@@ -11,6 +11,7 @@ This version constitutes a major refactor of the entire benchmark repository. Fo
 
 - **Metrics save separated from plotting**: `plot_metrics()` no longer saves data as a side effect. Each benchmark's `run_circuits()` now calls `metrics.save_app_metrics(benchmark_name, method=method)` explicitly after `finalize_all_groups()`. This makes the save visible and controllable.
 - **Simplified data file keys**: Data file keys changed from `"Benchmark Results - Quantum Fourier Transform (1) - Qiskit"` to `"Quantum Fourier Transform (1)"`. The API name is now stored as a separate `"api"` field in the data record. **Breaking change**: existing `__data/DATA-*.json` files must be regenerated.
+- **Simplified imports**: After `initialize()` or `get_kernel()`, the execute module is available as `qedclib.execute`. Use `ex = qedclib.execute` instead of `import execute as ex`. Metrics are always available as `qedclib.metrics`. All standard benchmarks updated to use this pattern.
 - Added CLI benchmark runner (`python -m qedcbench.run_all`) for running a standard set of benchmarks from the command line with a combined volumetric plot.
 - Created dedicated qedclib Guide documentation page with API reference, execution paths, and metrics workflow.
 - Updated README to support both `pip install` and repository cloning workflows.

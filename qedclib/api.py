@@ -271,6 +271,10 @@ def qedc_benchmarks_init(api: str, benchmark_name: str = None, module_names: lis
         module = import_module("execute")
         sys.modules["execute"] = module
 
+    # Make execute accessible as qedclib.execute
+    import qedclib
+    qedclib.execute = sys.modules["execute"]
+
 
 def reset_module_caches(api: str, benchmark_name: str, module_names: list[str] = None) -> None:
     """
