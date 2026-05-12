@@ -124,9 +124,12 @@ initialize → set_execution_target → init_execution(handler)
     → submit_circuits (one or more calls)
     → metrics.end_metrics()
     → metrics.finalize_all_groups()
+    → metrics.save_app_metrics(benchmark_name, method=method)
     → metrics.get_group_metrics() / get_circuit_metrics()
     → metrics.plot_metrics("Title")
 ```
+
+Note: `save_app_metrics` writes benchmark results to `__data/DATA-{backend_id}.json`. It is called explicitly in each benchmark's `run_circuits()` and is separate from plotting. The `plot_metrics` function is purely for visualization.
 
 `submit_circuits` auto-calls `metrics.init_metrics()` if not yet initialized. You can call `submit_circuits` multiple times before finalizing — all results accumulate in the metrics module.
 
@@ -207,7 +210,8 @@ job_id, result = ex.execute_circuits(circuits, num_shots=1000)
 | `finalize_all_groups()` | Aggregate per-circuit metrics into group averages |
 | `aggregate_metrics()` | Compute group averages (called by `finalize_all_groups`) |
 | `report_metrics()` | Print a summary of all group metrics |
-| `plot_metrics(title)` | Generate volumetric benchmarking plots |
+| `save_app_metrics(name, method)` | Save metrics to `__data/DATA-{backend_id}.json` |
+| `plot_metrics(title)` | Generate volumetric benchmarking plots (no side effects) |
 
 ### Group Metrics Keys
 

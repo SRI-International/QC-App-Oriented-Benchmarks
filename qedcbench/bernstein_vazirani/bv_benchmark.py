@@ -178,6 +178,10 @@ def run_circuits(all_qcs,
     ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
     metrics.finalize_all_groups()
 
+    metrics.save_app_metrics(benchmark_name, method=method,
+        transform_qubit_group=(method == 2),
+        new_qubit_group=mid_circuit_qubit_group)
+
 
 ############### Plot Results
 

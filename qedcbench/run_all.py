@@ -186,14 +186,6 @@ def run_benchmarks(benchmarks, run_args):
             results[name] = f"OK ({elapsed:.1f}s)"
             print(f"\n  completed in {elapsed:.1f}s")
 
-            # Store metrics to data file (normally done inside plot_metrics)
-            backend_id = run_args.get("backend_id", "qasm_simulator")
-            api = run_args.get("api", "qiskit")
-            app_title = f"Benchmark Results - {bm.benchmark_name} - {api.capitalize()}"
-            metrics.store_app_metrics(backend_id, metrics.circuit_metrics,
-                                     metrics.group_metrics, app_title,
-                                     start_time=metrics.start_time, end_time=metrics.end_time)
-
         except Exception as e:
             elapsed = time.time() - t0
             results[name] = f"FAILED: {e}"

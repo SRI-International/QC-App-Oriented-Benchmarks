@@ -100,6 +100,12 @@ The following are the important methods that may be called from a benchmark prog
 ```
   Report all metrics for all groups.
 ```
+#### save_app_metrics (benchmark_name, method=None)
+```
+  Save current benchmark metrics to __data/DATA-{backend_id}.json.
+  Key format: "{benchmark_name} ({method})" or just "{benchmark_name}".
+  Called in run_circuits() after finalize_all_groups().
+```
 #### plot_metrics ()
 ```
   Plot bar charts for each metric over all groups.

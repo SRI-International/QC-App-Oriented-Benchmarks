@@ -893,7 +893,38 @@ def get_appname_from_title(suptitle):
     
     return appname
 
-    
+
+# Save current benchmark metrics to the shared data file.
+# Key format: "{benchmark_name} ({method})" when method is not None, else "{benchmark_name}".
+def save_app_metrics(benchmark_name, method=None,
+                     transform_qubit_group=False, new_qubit_group=None):
+
+    if not save_metrics or not mpi.leader():
+        return
+
+    if method is not None:
+        app_key = f"{benchmark_name} ({method})"
+    else:
+        app_key = benchmark_name
+
+    backend_id = get_backend_id()
+
+    # Get API from the initialized state
+    from qedclib.api import qedc_get_api
+    api = qedc_get_api()
+
+    # Handle qubit group transformation (e.g. BV method 2 mid-circuit measurement)
+    if transform_qubit_group and new_qubit_group is not None:
+        original_groups = group_metrics["groups"]
+        group_metrics["groups"] = new_qubit_group
+        store_app_metrics(backend_id, circuit_metrics, group_metrics, app_key,
+            api=api, start_time=start_time, end_time=end_time)
+        group_metrics["groups"] = original_groups
+    else:
+        store_app_metrics(backend_id, circuit_metrics, group_metrics, app_key,
+            api=api, start_time=start_time, end_time=end_time)
+
+
 ############################################
 # ANALYSIS AND VISUALIZATION - METRICS PLOTS
 
@@ -911,20 +942,6 @@ def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_g
     # Extract shorter app name from the title passed in by user   
     appname = get_appname_from_title(suptitle)
     
-    # save the metrics for current application to the DATA file, one file per device
-    if save_metrics:
-
-        # If using mid-circuit transformation, convert old qubit group to new qubit group
-        if transform_qubit_group:
-            original_data = group_metrics["groups"]
-            group_metrics["groups"] = new_qubit_group
-            store_app_metrics(backend_id, circuit_metrics, group_metrics, suptitle,
-                start_time=start_time, end_time=end_time)
-            group_metrics["groups"] = original_data
-        else:
-            store_app_metrics(backend_id, circuit_metrics, group_metrics, suptitle,
-                start_time=start_time, end_time=end_time)
-        
     if len(group_metrics["groups"]) == 0:
         print(f"\n{suptitle}")
         print("     ****** NO RESULTS ****** ")
@@ -1535,10 +1552,8 @@ def plot_metrics_all_overlaid (shared_data, backend_id, suptitle=None, imagename
         for app in shared_data:
             #print(shared_data[app])
 
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
+            appname = app
+
             group_metrics = shared_data[app]["group_metrics"]
             #print(group_metrics)
             
@@ -1653,13 +1668,11 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
         # In this merged version of plottig, we suppress the border as it is already drawn
         appname = None
         for app in shared_data:
-        
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-    
+
+            appname = app
+
             group_metrics = shared_data[app]["group_metrics"]
-            
+
             # check if we have depth metrics for group
             if len(group_metrics["groups"]) == 0:
                 continue
@@ -1723,11 +1736,9 @@ def plot_merged_result_rectangles(shared_data, ax, max_qubits, w_max, num_grads=
     
     # run through depth metrics for all apps, splitting cells into gradations
     for app in shared_data:
-        
-        # Extract shorter app name from the title passed in by user
-        appname = app[len('Benchmark Results - '):len(app)]
-        appname = appname[:appname.index(' - ')]
-        
+
+        appname = app
+
         group_metrics = shared_data[app]["group_metrics"]
         if len(group_metrics["groups"]) == 0:
             print(f"****** NO RESULTS for {appname} ****** ")
@@ -1852,28 +1863,16 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
     if include_apps != None:
         new_shared_data = {}
         for app in shared_data:
-        
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
-            if appname in include_apps:
+            if app in include_apps:
                 new_shared_data[app] = shared_data[app]
-                
         shared_data = new_shared_data
-    
+
     if exclude_apps != None:
         new_shared_data = {}
         for app in shared_data:
-        
-            # Extract shorter app name from the title passed in by user
-            appname = app[len('Benchmark Results - '):len(app)]
-            appname = appname[:appname.index(' - ')]
-            
-            if appname not in exclude_apps:
+            if app not in exclude_apps:
                 new_shared_data[app] = shared_data[app]
-                
-        shared_data = new_shared_data  
+        shared_data = new_shared_data
  
     #print(shared_data)
     
@@ -1905,7 +1904,9 @@ def plot_all_app_metrics(backend_id, do_all_plots=False,
             #print("")
             #print(app)
             group_metrics = shared_data[app]["group_metrics"]
-            plot_metrics(app, filters=filters, options=options)
+            api_label = shared_data[app].get("api", "Qiskit") or "Qiskit"
+            suptitle = f"Benchmark Results - {app} - {api_label}"
+            plot_metrics(suptitle, filters=filters, options=options)
 
 
 ### Plot Metrics for a specific application
@@ -1921,14 +1922,16 @@ def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, op
     # since the bar plots use the subtitle field, set it here
     circuit_metrics["subtitle"] = f"device = {backend_id}"
         
-    app = "Benchmark Results - " + appname + " - " + apiname
-    
+    app = appname
+
     if app not in shared_data:
         print(f"ERROR: cannot find app: {appname}")
         return
-    
+
+    api_label = shared_data[app].get("api", apiname) or apiname
+    suptitle = f"Benchmark Results - {app} - {api_label}"
     group_metrics = shared_data[app]["group_metrics"]
-    plot_metrics(app, filters=filters, suffix=suffix, options=options)
+    plot_metrics(suptitle, filters=filters, suffix=suffix, options=options)
 
 # save plot as image
 def save_plot_image(plt, imagename, backend_id):
@@ -2856,7 +2859,7 @@ def plot_metrics_optgaps (suptitle="",
 ##### Data File Methods      
      
 # Save the application metrics data to a shared file for the current device
-def store_app_metrics (backend_id, circuit_metrics, group_metrics, app, start_time=None, end_time=None):
+def store_app_metrics (backend_id, circuit_metrics, group_metrics, app, api=None, start_time=None, end_time=None):
     # print(f"... storing {title} {group_metrics}")
     
     # don't leave slashes in the filename
@@ -2872,15 +2875,17 @@ def store_app_metrics (backend_id, circuit_metrics, group_metrics, app, start_ti
     
     # if merging data, merge the new data into the existing group metrics
     if merge_group_metrics:
-        #merged_metrics = do_merge_group_metrics(existing_metrics, new_metrics) 
-        shared_data[app]["group_metrics"] = do_merge_group_metrics(shared_data[app]["group_metrics"], group_metrics) 
-    
+        #merged_metrics = do_merge_group_metrics(existing_metrics, new_metrics)
+        shared_data[app]["group_metrics"] = do_merge_group_metrics(shared_data[app]["group_metrics"], group_metrics)
+        shared_data[app]["api"] = api
+
     # otherwise overwrite (the default mode)
     else:
         shared_data[app]["backend_id"] = backend_id
+        shared_data[app]["api"] = api
         shared_data[app]["start_time"] = start_time
         shared_data[app]["end_time"] = end_time
-        
+
         shared_data[app]["group_metrics"] = group_metrics
 
     # if saving raw circuit data, add it too

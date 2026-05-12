@@ -164,7 +164,7 @@ As benchmarks execute, the following metrics are collected and reported for each
 
 When benchmarks run, results are saved to the current working directory:
 
-- `__data/DATA-{backend_id}.json` — Raw metrics data in JSON format
+- `__data/DATA-{backend_id}.json` — Metrics data in JSON format, keyed by benchmark name (e.g. `"Quantum Fourier Transform (1)"`).
 - `__images/{backend_id}/` — Generated plot images (JPG/PDF)
 
 ### Plotting
