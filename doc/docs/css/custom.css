@@ -1,0 +1,40 @@
+/* QED-C custom theme overrides */
+
+/* Navbar — override gradient and color */
+.navbar.bg-primary {
+    background-image: none !important;
+    background-color: #2980B9 !important;
+}
+
+/* Active nav item — stronger highlight */
+.navbar .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+/* Hide Previous/Next nav links in top bar */
+.navbar-nav .nav-link[rel="prev"],
+.navbar-nav .nav-link[rel="next"] {
+    display: none !important;
+}
+
+/* Section headings — slightly bolder */
+h1 {
+    color: #1a5276;
+    font-weight: 600;
+}
+h2 {
+    color: #1f618d;
+    font-weight: 600;
+    border-bottom: 1px solid #d4e6f1;
+    padding-bottom: 0.3em;
+}
+h3 {
+    color: #2471a3;
+    font-weight: 600;
+}
+h4, h5, h6 {
+    color: #2e86c1;
+    font-weight: 500;
+}

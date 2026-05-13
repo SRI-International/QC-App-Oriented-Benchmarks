@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>Releases - QED-C Application-Oriented Benchmarks</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <link href="../css/custom.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="..">QED-C Application-Oriented Benchmarks</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href=".." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../quick_start/" class="nav-link">Quick Start</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../user_guide/" class="nav-link">User Guide</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../benchmarks/" class="nav-link">Benchmarks</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Setup</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../setup/" class="dropdown-item">Overview</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit/" class="dropdown-item">Qiskit</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cudaq/" class="dropdown-item">CUDA-Q</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cirq/" class="dropdown-item">Cirq</a>
+</li>
+                                    
+<li>
+    <a href="../setup/braket/" class="dropdown-item">Braket</a>
+</li>
+                                    
+<li>
+    <a href="../setup/ocean/" class="dropdown-item">Ocean</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qbraid/" class="dropdown-item">QBraid</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit-azure-quantum/" class="dropdown-item">Azure Quantum</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="./" class="nav-link active" aria-current="page">Releases</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../known_issues/" class="nav-link">PAL</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../about/" class="nav-link">About</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../setup/qiskit-azure-quantum/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../known_issues/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#release-notes" class="nav-link">Release Notes</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#version-20-release-notes" class="nav-link">Version 2.0 Release Notes</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#version-12-release-notes" class="nav-link">Version 1.2 Release Notes</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="release-notes">Release Notes</h1>
+<p>The <strong>QED-C Application-Oriented Benchmarks</strong> suite is continually evolving, with issues fixed and enhancements made to add features.
+This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
+<h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
+<p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
+<h3 id="release-202-12-may-2026">Release 2.0.2 - 12 May 2026</h3>
+<ul>
+<li><strong>Metrics save separated from plotting</strong>: <code>plot_metrics()</code> no longer saves data as a side effect. Each benchmark's <code>run_circuits()</code> now calls <code>metrics.save_app_metrics(benchmark_name, method=method)</code> explicitly after <code>finalize_all_groups()</code>. This makes the save visible and controllable.</li>
+<li><strong>Simplified data file keys</strong>: Data file keys changed from <code>"Benchmark Results - Quantum Fourier Transform (1) - Qiskit"</code> to <code>"Quantum Fourier Transform (1)"</code>. The API name is now stored as a separate <code>"api"</code> field in the data record. <strong>Breaking change</strong>: existing <code>__data/DATA-*.json</code> files must be regenerated.</li>
+<li><strong>Simplified imports</strong>: After <code>initialize()</code> or <code>get_kernel()</code>, the execute module is available as <code>qedclib.execute</code>. Use <code>ex = qedclib.execute</code> instead of <code>import execute as ex</code>. Metrics are always available as <code>qedclib.metrics</code>. All standard benchmarks updated to use this pattern.</li>
+<li>Added CLI benchmark runner (<code>python -m qedcbench.run_all</code>) for running a standard set of benchmarks from the command line with a combined volumetric plot.</li>
+<li>Created dedicated qedclib Guide documentation page with API reference, execution paths, and metrics workflow.</li>
+<li>Updated README to support both <code>pip install</code> and repository cloning workflows.</li>
+<li>Published <code>qedcbench</code> package to PyPI (<code>pip install qedcbench</code>).</li>
+</ul>
+<h3 id="release-201-9-may-2026">Release 2.0.1 - 9 May 2026</h3>
+<ul>
+<li>General performance improvements to Qiskit execution logic</li>
+<li>Added <code>metrics.get_circuit_metrics()</code> and <code>metrics.get_group_metrics()</code> accessor functions for clean retrieval of collected metrics data.</li>
+<li>Added test script <code>05_submit_with_metrics.py</code> demonstrating the submit/finalize/get metrics flow.</li>
+<li>Execution engine cleanup: threaded <code>job.result()</code>, timing function extraction, sampler timing fix.</li>
+</ul>
+<h3 id="release-200-5-may-2026">Release 2.0.0 - 5 May 2026</h3>
+<h4 id="repository-restructure-qedclib-qedcbench">Repository Restructure: qedclib + qedcbench</h4>
+<p>The repository has been split into two packages, both installable with a single <code>pip install -e .</code>:
+- <strong>qedclib</strong> — the execution and metrics library (formerly <code>_common/</code>). Import as <code>import qedclib</code>.
+- <strong>qedcbench</strong> — the 17 benchmark applications (moved into <code>qedcbench/</code> directory). Import as <code>from qedcbench.hidden_shift import hs_benchmark</code>.</p>
+<p>Code that previously used <code>from _common import metrics</code> should change to <code>from qedclib import metrics</code>.</p>
+<h4 id="three-function-benchmark-api">Three-Function Benchmark API</h4>
+<p>All 16 benchmarks now expose a standard three-function interface for independent circuit creation, execution, and plotting:</p>
+<pre><code class="language-python">all_qcs, metrics = benchmark.get_circuits(min_qubits=2, max_qubits=8, ...)
+benchmark.run_circuits(all_qcs, backend_id=&quot;qasm_simulator&quot;, ...)
+benchmark.plot_results(...)
+</code></pre>
+<p>The convenience <code>run(**kwargs)</code> function calls all three and routes arguments automatically. Variational benchmarks (maxcut, hydrogen_lattice, image_recognition, VQE, QRL) support <code>get_circuits</code> for method 1 (fidelity); method 2 optimizer loops remain in a dedicated <code>run_method2()</code>.</p>
+<h4 id="array-based-execution-path">Array-Based Execution Path</h4>
+<p>The execution engine (<code>qedclib/qiskit/execute.py</code> and <code>qedclib/cudaq/execute.py</code>) now uses a batch-oriented API:
+- <code>execute_circuits(circuits, num_shots)</code> — execute an array of circuits
+- <code>process_circuit_results(circuits_info, results)</code> — map results back to metrics
+- <code>submit_circuits(circuits_dict, num_shots)</code> — convenience wrapper for the above
+- <code>compute_all_circuit_metrics(all_qcs)</code> — batch circuit depth/gate metrics</p>
+<p>The older single-circuit pipelined execution functions (<code>submit_circuit</code>, <code>throttle_execution</code>, <code>finalize_execution</code>) remain for backward compatibility but are no longer used by any benchmark.</p>
+<h4 id="auto-warmup-cuda-q">Auto-Warmup (CUDA-Q)</h4>
+<p>The first call to <code>execute_circuits()</code> in CUDA-Q now automatically runs a tiny 1-qubit circuit to prime the JIT compiler before executing the user's circuits. This eliminates the JIT compilation overhead from the first benchmark circuit's timing, without requiring any flags or special handling. The per-benchmark <code>--warmup</code> CLI option has been removed. To disable auto-warmup, set <code>execute.auto_warmup = False</code>.</p>
+<h4 id="batched-execution">Batched Execution</h4>
+<p>When <code>max_batch_size</code> (<code>-mbs</code>) is set, <code>run()</code> alternates between circuit creation and execution rather than creating all circuits up front. Circuits are created one qubit width at a time (up to <code>max_circuits</code> per width) and accumulated until adding another width would exceed the batch limit. The accumulated batch is then executed before continuing to the next set of widths. Batch boundaries always align with qubit-width boundaries — a width's circuits are never split across batches.</p>
+<p>This reduces peak memory usage for large sweeps, particularly on GPU backends where many simultaneous state vectors can cause out-of-memory errors.</p>
+<pre><code class="language-bash">python qft_benchmark.py --min_qubits 2 --max_qubits 20 -c 3 --max_batch_size 10
+</code></pre>
+<h4 id="per-circuit-execution-timing">Per-Circuit Execution Timing</h4>
+<p>Each circuit now records its own execution time individually:</p>
+<ul>
+<li><strong>CUDA-Q</strong>: Times each <code>cudaq.sample()</code> call directly, rather than dividing the batch total evenly.</li>
+<li><strong>Qiskit (Aer simulator)</strong>: Extracts per-experiment <code>time_taken</code> from results.</li>
+<li><strong>Qiskit (IBM hardware)</strong>: Divides <code>execution_spans</code> duration evenly across circuits in the batch. Per-width timing requires batched execution (<code>-mbs</code>).</li>
+<li><strong>Qiskit (IonQ, IQM)</strong>: Falls back to <code>elapsed_time / N</code> when backends report <code>time_taken=0</code>.</li>
+</ul>
+<p>Elapsed-time overhead (queue wait, network) is distributed proportionally by execution time across circuits in a batch.</p>
+<h4 id="job-status-error-handling">Job Status &amp; Error Handling</h4>
+<p>The execution engine now includes robust job management for hardware backends:</p>
+<ul>
+<li><strong>Retry logic</strong>: <code>job.result()</code> is retried up to 40 times at 15-second intervals, with early detection of cancelled or errored jobs.</li>
+<li><strong>Status polling</strong>: Job status is checked before blocking on results, with comfort dots printed while queued or running (in verbose mode).</li>
+<li><strong>Result validation</strong>: Warns if the number of results returned doesn't match the number of circuits submitted, and pads missing results. Warns if actual shot count differs from requested.</li>
+<li><strong>Empty counts guard</strong>: Circuits that return empty measurement counts (e.g., from cancelled jobs) are skipped during result processing to avoid division-by-zero errors.</li>
+</ul>
+<p>These improvements apply to both <code>qedclib/qiskit/execute.py</code> and <code>qedclib/cudaq/execute.py</code>.</p>
+<h4 id="noise-model-via-exec_options">Noise Model via exec_options</h4>
+<p>Both Qiskit and CUDA-Q now support setting the noise model through <code>exec_options</code>, eliminating the need to import the execute module directly:</p>
+<pre><code class="language-python">exec_options = {&quot;noise_model&quot;: &quot;default&quot;}   # built-in depolarization model
+exec_options = {&quot;noise_model&quot;: None}        # no noise (noiseless simulation)
+exec_options = {&quot;noise_model&quot;: my_model}    # custom noise model object
+</code></pre>
+<h4 id="simplified-init-api">Simplified Init API</h4>
+<p>New helper functions in <code>qedclib</code> reduce boilerplate:
+- <code>qedc_set_api("qiskit")</code> — set the default API once
+- <code>qedc_get_kernel("kernel_name")</code> — one-line kernel loading with auto-detection
+- <code>qedc_is_leader()</code> — MPI leader check abstraction</p>
+<h4 id="updated-benchmark-notebooks">Updated Benchmark Notebooks</h4>
+<p><code>benchmarks-qiskit.ipynb</code> and <code>benchmarks-cudaq.ipynb</code> now use grouped <code>app_args</code> and <code>exec_args</code> dictionaries, matching the pattern used in the HamLib observables notebooks. Each benchmark cell is two lines:</p>
+<pre><code class="language-python">from quantum_fourier_transform import qft_benchmark
+qft_benchmark.run(method=1, **app_args, **exec_args)
+</code></pre>
+<h4 id="modularized-notebooks">Modularized Notebooks</h4>
+<p>A new set of modularized notebooks splits benchmark execution into three independent parts (Get Circuits, Run Circuits, Plot Results), allowing any part to be customized while reusing the others:</p>
+<ul>
+<li><strong>benchmarks-qiskit-modularized.ipynb</strong> — baseline, all parts use QED-C defaults</li>
+<li><strong>benchmarks-qiskit-modularized-IBM.ipynb</strong> — custom Part 2 for execution on IBM hardware</li>
+<li><strong>benchmarks-qiskit-modularized-IQM.ipynb</strong> — custom Part 2 for execution on IQM hardware</li>
+<li><strong>benchmarks-qiskit-modularized-MQT.ipynb</strong> — custom Part 1 for circuit generation from MQT Bench</li>
+</ul>
+<p>Results analysis uses an <code>execution_handler</code> callback pattern via <code>ex.init_execution(handler)</code> and <code>ex.process_circuit_results()</code>, replacing manual iteration over result indices.</p>
+<h4 id="braket-cirq-notebooks-unmaintained">Braket &amp; Cirq Notebooks (Unmaintained)</h4>
+<p>The Braket and Cirq suite notebooks have been renamed to <code>zz-benchmarks-braket.ipynb</code> and <code>zz-benchmarks-cirq.ipynb</code> and marked as unmaintained. These APIs are not actively tested; community contributions are welcome.</p>
+<h4 id="streamlined-notebook-configuration">Streamlined Notebook Configuration</h4>
+<p>The <code>benchmarks-qiskit.ipynb</code> setup cell now presents backend configurations (simulator, IBM Cloud, IBM Platform, IonQ, BlueQubit) as self-contained blocks — uncomment the one you need. Noise model options are consolidated inline. The separate custom options cell has been removed.</p>
+<h4 id="simplified-thin-wrappers">Simplified Thin Wrappers</h4>
+<p>Benchmark wrappers (e.g. <code>maxcut/maxcut_benchmark.py</code>) now use <code>run(**kwargs)</code> forwarding instead of manually listing all parameters. The <code>api</code> argument selects the implementation; <code>backend_id</code> defaults to <code>"qasm_simulator"</code> if not provided.</p>
+<h4 id="qiskit-2x-estimator-migration">Qiskit 2.x Estimator Migration</h4>
+<p>The <code>hydrogen_lattice</code> and <code>hamlib</code> benchmarks have been updated for the Qiskit 2.x Estimator API:
+- <code>Estimator</code> → <code>StatevectorEstimator</code> / <code>BackendEstimatorV2</code>
+- New call format: <code>estimator.run([(qc, operator)])</code>
+- Result extraction: <code>result[0].data.evs.item()</code></p>
+<h4 id="windows-compatibility">Windows Compatibility</h4>
+<p>Fixed <code>UnicodeEncodeError</code> on Windows terminals (cp1252) by replacing the Greek xi character (ξ) with ASCII "xi" in metrics output.</p>
+<h4 id="bug-fixes">Bug Fixes</h4>
+<ul>
+<li>Fixed <code>get_appname_from_title()</code> crash when plot title missing expected delimiter</li>
+<li>Fixed <code>run_objective_function()</code> in hydrogen_lattice to work with newer scipy (COBYLA minimum function evaluation requirement)</li>
+<li>Fixed test imports for restructured package layout (hydrogen_lattice, hamiltonian_simulation)</li>
+<li>Removed duplicate benchmark files (<code>grovers/qiskit/grovers_benchmark.py</code>, <code>amplitude_estimation/qiskit/ae_benchmark.py</code>)</li>
+</ul>
+<hr />
+<h2 id="version-12-release-notes">Version 1.2 Release Notes</h2>
+<p>This is the last stable version of the earlier benchmark repository structure. For convenience in running externally developed work with no changes, a branch names master-260414 contains source code for this version.</p>
+<h3 id="release-121-14-april-2026">Release 1.2.1 - 14 April 2026</h3>
+<ul>
+<li>
+<p><strong>Parallel Execution Logic modifed to use GPU Cluster Size</strong> The pair of options that was implemented earlier to support parallel execution of circuits in hamlib has been modifed. The options <strong>--parallel_mode</strong> and <strong>--num_gpus</strong> have been removed and replaced with the <strong>--gpus_per_cluster (-gpc)</strong> option, which indicates the number of GPUs that cluster together to execute a single circuit. E.g., if you have 16 GPUs and set -gpc to 1, then you could execute 16 circuits in parallel. with 1 GPU used for each execution. The default is to use ALL GPUs in a cluster if MPI is enabled. This is the option which provides more qubits by distributing the state vector across all of the GPUs. The "hybrid" mode in which you might set -gpc to a number other than 1 is not yet implemented.</p>
+</li>
+<li>
+<p><strong>Refactor of API-specific Execution Logic</strong> This set of changes consolidated and normalized the result object returned from execution of a quantum circuit across all APIs.  The ExecutionResult object provides the get_counts() method which returns a dictionary of measurment results.  The counts dict can be populated in serverl methods unique to the API.</p>
+</li>
+</ul>
+<h3 id="release-120-11-april-2026">Release 1.2.0 - 11 April 2026</h3>
+<ul>
+<li><strong>Added Support for Parallel Circuit Execution</strong> The Hamlib benchmark on CUDA-Q now supports an execution mode in which a subset of circuits generated for the selected Hamiltonian simulation are executed in parallel in order to reduce the total execution time.</li>
+</ul>
+<h3 id="release-110-25-january-2026">Release 1.1.0 - 25 January 2026</h3>
+<ul>
+<li><strong>Completed Refactoring of API-specific kernel Files</strong> All benchmarks are now structured so that API-specific code, e.g for Qiskit or CUDA-Q, is contained in a correspondingly named sub-directory. The primary benchmark file resides at the benchmark directory level and is API-agnostic.  The --app (-a) command line argument is used to specify the name of the API, cudaq or qiskit, from which the appropriate kernel code will be dynamically imported.</li>
+</ul>
+<h3 id="release-100-prior-to-12-november-2025">Release 1.0.0 - Prior to 12 November 2025</h3>
+<ul>
+<li><strong>Multiple Years of Development and Testing</strong> Since 2019, QED-C has been working to develop, test, and polish the complete set of benchmark programs.</li>
+</ul>
+<p><br>
+&nbsp;&copy;&nbsp;2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

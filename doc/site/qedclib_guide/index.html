@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>qedclib Guide - QED-C Application-Oriented Benchmarks</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <link href="../css/custom.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="..">QED-C Application-Oriented Benchmarks</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href=".." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../quick_start/" class="nav-link">Quick Start</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../user_guide/" class="nav-link">User Guide</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../benchmarks/" class="nav-link">Benchmarks</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Setup</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../setup/" class="dropdown-item">Overview</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit/" class="dropdown-item">Qiskit</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cudaq/" class="dropdown-item">CUDA-Q</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cirq/" class="dropdown-item">Cirq</a>
+</li>
+                                    
+<li>
+    <a href="../setup/braket/" class="dropdown-item">Braket</a>
+</li>
+                                    
+<li>
+    <a href="../setup/ocean/" class="dropdown-item">Ocean</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qbraid/" class="dropdown-item">QBraid</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit-azure-quantum/" class="dropdown-item">Azure Quantum</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../release_notes/" class="nav-link">Releases</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../known_issues/" class="nav-link">PAL</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../about/" class="nav-link">About</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#qedclib-guide" class="nav-link">qedclib Guide</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#initialization" class="nav-link">Initialization</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#execution-paths" class="nav-link">Execution Paths</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#metrics-flow" class="nav-link">Metrics Flow</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#backend-configuration" class="nav-link">Backend Configuration</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#api-reference" class="nav-link">API Reference</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#examples" class="nav-link">Examples</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="qedclib-guide">qedclib Guide</h1>
+<p><strong>qedclib</strong> is a quantum program execution engine with built-in performance monitoring. It provides backend abstraction, automatic metrics collection, batched execution, and multi-GPU support for quantum computing applications.</p>
+<p>You can use qedclib independently of the QED-C benchmarks — it is available as a standalone package on <a href="https://pypi.org/project/qedclib/">PyPI</a>:</p>
+<pre><code class="language-bash">pip install qedclib
+</code></pre>
+<p>Or install from the full repository (includes qedcbench benchmarks):</p>
+<pre><code class="language-bash">git clone https://github.com/SRI-International/QC-App-Oriented-Benchmarks.git
+cd QC-App-Oriented-Benchmarks
+pip install -e .
+</code></pre>
+<h2 id="initialization">Initialization</h2>
+<p>Before using qedclib, initialize it with the quantum computing API you want to use. This loads the appropriate execution backend module.</p>
+<pre><code class="language-python">import qedclib
+
+# Initialize with the API (loads the execute module)
+qedclib.initialize(&quot;qiskit&quot;)
+
+# Access execute and metrics directly from qedclib
+ex = qedclib.execute
+ex.set_execution_target(backend_id=&quot;qasm_simulator&quot;)
+
+# Metrics is always available
+qedclib.metrics.verbose = True
+</code></pre>
+<p>After <code>initialize()</code> or <code>get_kernel()</code>, the execute module is available as <code>qedclib.execute</code>. Use <code>ex = qedclib.execute</code> for a shorter reference. The <code>from qedclib import metrics</code> shorthand also works: <code>import qedclib.metrics as metrics</code>.</p>
+<h2 id="execution-paths">Execution Paths</h2>
+<p>qedclib provides two execution paths depending on whether you want automatic metrics collection.</p>
+<h3 id="path-1-direct-execution">Path 1: Direct Execution</h3>
+<p>Use <code>execute_circuits()</code> for raw execution. You get back results directly and handle timing yourself.</p>
+<pre><code class="language-python">from qiskit import QuantumCircuit
+
+# Build circuits
+circuits = []
+for n in [3, 5, 8]:
+    qc = QuantumCircuit(n, n)
+    qc.h(0)
+    for i in range(n - 1):
+        qc.cx(i, i + 1)
+    qc.measure(range(n), range(n))
+    circuits.append(qc)
+
+# Execute and get results
+job_id, result = ex.execute_circuits(circuits, num_shots=1000)
+
+# Process results
+for i, counts in enumerate(result.get_counts()):
+    print(f&quot;Circuit {i}: {counts}&quot;)
+</code></pre>
+<h3 id="path-2-metrics-integrated-execution">Path 2: Metrics-Integrated Execution</h3>
+<p>Use <code>submit_circuits()</code> for automatic metrics collection. Circuits are organized as a nested dict keyed by group (typically qubit width) and circuit ID. Timing, job IDs, and result processing are handled automatically.</p>
+<pre><code class="language-python">from qedclib import metrics
+
+# Build circuits as a nested dict {group: {circuit_id: qc}}
+circuits = {}
+for n_qubits in [4, 6, 8]:
+    group = str(n_qubits)
+    circuits[group] = {}
+    for cid in range(3):
+        qc = QuantumCircuit(n_qubits, n_qubits)
+        qc.h(0)
+        for i in range(n_qubits - 1):
+            qc.cx(i, i + 1)
+        qc.measure(range(n_qubits), range(n_qubits))
+        circuits[group][str(cid)] = qc
+
+# Submit — auto-initializes metrics if needed
+ex.submit_circuits(circuits, num_shots=1000)
+
+# Finalize and retrieve metrics
+metrics.end_metrics()
+metrics.finalize_all_groups()
+
+# Per-circuit metrics: {group: {circuit_id: {metric: value}}}
+cm = metrics.get_circuit_metrics()
+
+# Group-level averages with standard deviations
+gm = metrics.get_group_metrics()
+for i, group in enumerate(gm[&quot;groups&quot;]):
+    print(f&quot;Group {group}: avg_exec={gm['avg_exec_times'][i]:.4f}s &quot;
+          f&quot;+/- {gm['std_exec_times'][i]:.4f}s&quot;)
+</code></pre>
+<h3 id="result-handlers">Result Handlers</h3>
+<p>A result handler is a callback that processes each circuit's results as they arrive. Use <code>init_execution()</code> to register one before calling <code>submit_circuits()</code>.</p>
+<pre><code class="language-python">def my_handler(qc, result, group, circuit_id, num_shots):
+    &quot;&quot;&quot;Called for each circuit after execution.&quot;&quot;&quot;
+    counts = result.get_counts()
+    # Compute and store your own metrics (fidelity, expectation values, etc.)
+    fidelity = compute_fidelity(counts, expected)
+    metrics.store_metric(group, circuit_id, &quot;fidelity&quot;, fidelity)
+
+ex.init_execution(my_handler)
+ex.submit_circuits(circuits, num_shots=1000)
+</code></pre>
+<h2 id="metrics-flow">Metrics Flow</h2>
+<p>The full metrics-integrated workflow:</p>
+<pre><code>qedclib.initialize(&quot;qiskit&quot;)
+ex = qedclib.execute
+
+ex.set_execution_target → ex.init_execution(handler)
+    → ex.submit_circuits (one or more calls)
+    → metrics.end_metrics()
+    → metrics.finalize_all_groups()
+    → metrics.save_app_metrics(benchmark_name, method=method)
+    → metrics.get_group_metrics() / get_circuit_metrics()
+    → metrics.plot_metrics(&quot;Title&quot;)
+</code></pre>
+<p>Note: <code>save_app_metrics</code> writes benchmark results to <code>__data/DATA-{backend_id}.json</code>. It is called explicitly in each benchmark's <code>run_circuits()</code> and is separate from plotting. The <code>plot_metrics</code> function is purely for visualization.</p>
+<p><code>submit_circuits</code> auto-calls <code>metrics.init_metrics()</code> if not yet initialized. You can call <code>submit_circuits</code> multiple times before finalizing — all results accumulate in the metrics module.</p>
+<h2 id="backend-configuration">Backend Configuration</h2>
+<h3 id="local-simulators-qiskit">Local Simulators (Qiskit)</h3>
+<pre><code class="language-python">ex.set_execution_target(backend_id=&quot;qasm_simulator&quot;)
+</code></pre>
+<h3 id="ibm-hardware">IBM Hardware</h3>
+<pre><code class="language-python">ex.set_execution_target(
+    backend_id=&quot;ibm_sherbrooke&quot;,
+    project=&quot;your-crn-or-instance&quot;,
+    exec_options={&quot;use_ibm_quantum_platform&quot;: False}
+)
+</code></pre>
+<h3 id="ionq">IonQ</h3>
+<pre><code class="language-python">from qiskit_ionq import IonQProvider
+provider = IonQProvider()
+backend = provider.get_backend(&quot;ionq_simulator&quot;)
+
+ex.set_execution_target(
+    backend_id=&quot;ionq_simulator&quot;,
+    provider_backend=backend
+)
+</code></pre>
+<h3 id="cuda-q-gpu-simulator">CUDA-Q (GPU Simulator)</h3>
+<pre><code class="language-python">qedclib.initialize(&quot;cudaq&quot;)
+import execute as ex
+
+ex.set_execution_target(backend_id=&quot;nvidia&quot;)
+job_id, result = ex.execute_circuits(circuits, num_shots=1000)
+</code></pre>
+<h2 id="api-reference">API Reference</h2>
+<h3 id="top-level-functions-qedclib">Top-Level Functions (<code>qedclib</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>initialize(api)</code></td>
+<td>Initialize qedclib: set API and load execution backend</td>
+</tr>
+<tr>
+<td><code>get_api()</code></td>
+<td>Get current quantum SDK name</td>
+</tr>
+<tr>
+<td><code>set_api(api)</code></td>
+<td>Set default quantum SDK (called automatically by <code>initialize</code>)</td>
+</tr>
+<tr>
+<td><code>get_kernel(name, api, benchmark)</code></td>
+<td>Load and return a benchmark kernel module</td>
+</tr>
+<tr>
+<td><code>is_leader()</code></td>
+<td>True if MPI rank 0 or MPI not active</td>
+</tr>
+</tbody>
+</table>
+<h3 id="execution-functions-execute-as-ex">Execution Functions (<code>execute as ex</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_execution_target(backend_id, ...)</code></td>
+<td>Configure the backend for execution</td>
+</tr>
+<tr>
+<td><code>init_execution(handler)</code></td>
+<td>Register a result handler callback</td>
+</tr>
+<tr>
+<td><code>execute_circuits(circuits, num_shots)</code></td>
+<td>Execute a list of circuits, return <code>(job_id, result)</code></td>
+</tr>
+<tr>
+<td><code>submit_circuits(circuits, num_shots, max_batch_size, batch_by_group)</code></td>
+<td>Execute a circuit dict with automatic metrics collection</td>
+</tr>
+<tr>
+<td><code>process_circuit_results(circuits_info, results, ...)</code></td>
+<td>Map batch results back to individual circuits and store metrics</td>
+</tr>
+<tr>
+<td><code>compute_all_circuit_metrics(circuits)</code></td>
+<td>Compute depth, gate count, and transpiled metrics for a circuit dict</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metrics-functions-from-qedclib-import-metrics">Metrics Functions (<code>from qedclib import metrics</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>init_metrics()</code></td>
+<td>Initialize/reset metrics tracking</td>
+</tr>
+<tr>
+<td><code>end_metrics()</code></td>
+<td>Record end time for the execution run</td>
+</tr>
+<tr>
+<td><code>store_metric(group, circuit, name, value)</code></td>
+<td>Store a custom metric value</td>
+</tr>
+<tr>
+<td><code>get_metric(group, circuit, name)</code></td>
+<td>Retrieve a stored metric value</td>
+</tr>
+<tr>
+<td><code>get_circuit_metrics()</code></td>
+<td>Return the full per-circuit metrics dict</td>
+</tr>
+<tr>
+<td><code>get_group_metrics()</code></td>
+<td>Return the aggregated group-level metrics dict</td>
+</tr>
+<tr>
+<td><code>finalize_all_groups()</code></td>
+<td>Aggregate per-circuit metrics into group averages</td>
+</tr>
+<tr>
+<td><code>aggregate_metrics()</code></td>
+<td>Compute group averages (called by <code>finalize_all_groups</code>)</td>
+</tr>
+<tr>
+<td><code>report_metrics()</code></td>
+<td>Print a summary of all group metrics</td>
+</tr>
+<tr>
+<td><code>save_app_metrics(name, method)</code></td>
+<td>Save metrics to <code>__data/DATA-{backend_id}.json</code></td>
+</tr>
+<tr>
+<td><code>plot_metrics(title)</code></td>
+<td>Generate volumetric benchmarking plots (no side effects)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="group-metrics-keys">Group Metrics Keys</h3>
+<p>After calling <code>finalize_all_groups()</code>, <code>get_group_metrics()</code> returns a dict with parallel arrays indexed by group. Key fields:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>groups</code></td>
+<td>Group names (typically qubit widths)</td>
+</tr>
+<tr>
+<td><code>avg_elapsed_times</code> / <code>std_elapsed_times</code></td>
+<td>Wall-clock time per circuit (mean / std)</td>
+</tr>
+<tr>
+<td><code>avg_exec_times</code> / <code>std_exec_times</code></td>
+<td>Backend execution time per circuit (mean / std)</td>
+</tr>
+<tr>
+<td><code>avg_create_times</code> / <code>std_create_times</code></td>
+<td>Circuit creation time (mean / std)</td>
+</tr>
+<tr>
+<td><code>avg_depths</code></td>
+<td>Average algorithmic circuit depth</td>
+</tr>
+<tr>
+<td><code>avg_tr_depths</code> / <code>avg_tr_xis</code> / <code>avg_tr_n2qs</code></td>
+<td>Transpiled depth, xi, and 2-qubit gate counts</td>
+</tr>
+<tr>
+<td><code>avg_fidelities</code> / <code>std_fidelities</code></td>
+<td>Normalized fidelity (mean / std)</td>
+</tr>
+<tr>
+<td><code>avg_hf_fidelities</code> / <code>std_hf_fidelities</code></td>
+<td>Hellinger fidelity (mean / std)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="examples">Examples</h2>
+<p>See the <a href="https://github.com/quantumcomputingdata/qedclib-examples">qedclib-examples</a> repository for standalone usage examples.</p>
+<p>Test scripts demonstrating various patterns are also included in <code>qedclib/_tests/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Script</th>
+<th>What it demonstrates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>01_basic_api.py</code></td>
+<td>Initialize, execute circuits, get counts</td>
+</tr>
+<tr>
+<td><code>02_parameter_sweep.py</code></td>
+<td>Parameterized circuits, batch execution</td>
+</tr>
+<tr>
+<td><code>03_backend_switching.py</code></td>
+<td>Configure different backends (simulator, IBM, IonQ, IQM)</td>
+</tr>
+<tr>
+<td><code>04_batch_scaling.py</code></td>
+<td>Batch size scaling, serial vs batch performance</td>
+</tr>
+<tr>
+<td><code>05_submit_with_metrics.py</code></td>
+<td>submit_circuits with automatic metrics collection</td>
+</tr>
+</tbody>
+</table>
+<p><br>
+&copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

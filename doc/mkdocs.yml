@@ -1,0 +1,24 @@
+site_name: QED-C Application-Oriented Benchmarks
+
+theme: mkdocs
+
+extra_css:
+    - css/custom.css
+
+nav:
+    - Home: index.md
+    - Quick Start: quick_start.md
+    - User Guide: user_guide.md
+    - Benchmarks: benchmarks.md
+    - Setup:
+        - Overview: setup/README.md
+        - Qiskit: setup/qiskit/README.md
+        - CUDA-Q: setup/cudaq/README.md
+        - Cirq: setup/cirq/README.md
+        - Braket: setup/braket/README.md
+        - Ocean: setup/ocean/README.md
+        - QBraid: setup/qbraid/README.md
+        - Azure Quantum: setup/qiskit-azure-quantum/README.md
+    - Releases: release_notes.md
+    - PAL: known_issues.md
+    - About: about.md
