@@ -7,6 +7,10 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.3 - 13 May 2026
+
+- (changes pending)
+
 ### Release 2.0.2 - 12 May 2026
 
 - **Metrics save separated from plotting**: `plot_metrics()` no longer saves data as a side effect. Each benchmark's `run_circuits()` now calls `metrics.save_app_metrics(benchmark_name, method=method)` explicitly after `finalize_all_groups()`. This makes the save visible and controllable.
