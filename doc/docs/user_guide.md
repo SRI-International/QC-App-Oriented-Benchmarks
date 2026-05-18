@@ -29,6 +29,19 @@ pip install -e .
 
 This gives you the full source code, Jupyter notebooks for interactive exploration, and the ability to modify benchmarks. Changes to `.py` files take effect immediately. The rest of this guide assumes this approach.
 
+### Dependencies
+
+Both options require `numpy`, `matplotlib`, and a quantum computing SDK:
+
+```bash
+pip install numpy matplotlib
+pip install qiskit qiskit-aer qiskit-ibm-runtime   # for Qiskit
+```
+
+For CUDA-Q, install `cuda-quantum` instead of the Qiskit packages. See the [Setup Guides](setup/README.md) for platform-specific instructions.
+
+Some benchmarks have additional dependencies (e.g., `scipy` for Hamiltonian Simulation and HamLib). See individual benchmark directories for details.
+
 ## Repository Structure
 
 The repository installs two Python packages:
