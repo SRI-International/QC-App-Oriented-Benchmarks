@@ -7,9 +7,12 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
-### Release 2.0.3 - 13 May 2026
+### Release 2.0.3 - 18 May 2026
 
-- (changes pending)
+- **Documentation improvements**: User Guide now presents both installation options (pip install vs clone) up front. Quick Start mentions pip install as an alternative. Dependency requirements (numpy, matplotlib, Qiskit/CUDA-Q packages) documented in both guides.
+- Added `qedcbench/README.md` with benchmark listing and usage examples for repo browsers.
+- Updated `qedclib/README.md` example to use the `qedclib.execute` import pattern.
+- Created starter examples in [qedclib-examples](https://github.com/quantumcomputingdata/qedclib-examples) and [qedcbench-examples](https://github.com/quantumcomputingdata/qedcbench-examples) repos for pip install users.
 
 ### Release 2.0.2 - 12 May 2026
 
