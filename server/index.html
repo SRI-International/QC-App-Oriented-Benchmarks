@@ -216,7 +216,6 @@
 
     <script>
     let currentRunId = null;
-    let eventSource = null;
 
     // --- Load benchmarks ---
 
@@ -329,28 +328,68 @@
         }
     }
 
-    // --- SSE Stream ---
+    // --- SSE Stream (using fetch + ReadableStream to avoid EventSource auto-reconnect) ---
+
+    let streamAbort = null;  // AbortController for active stream
 
     function connectStream(runId) {
-        eventSource = new EventSource(`/api/run/${runId}/stream`);
+        streamAbort = new AbortController();
 
-        eventSource.addEventListener('progress', (e) => {
-            const d = JSON.parse(e.data);
+        fetch(`/api/run/${runId}/stream`, { signal: streamAbort.signal })
+            .then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                function pump() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) { cleanup(); return; }
+
+                        buffer += decoder.decode(value, { stream: true });
+
+                        // Parse SSE messages from buffer
+                        const parts = buffer.split('\n\n');
+                        buffer = parts.pop();  // keep incomplete message
+
+                        for (const part of parts) {
+                            if (!part.trim()) continue;
+                            let event = 'message', data = '';
+                            for (const line of part.split('\n')) {
+                                if (line.startsWith('event: ')) event = line.slice(7);
+                                else if (line.startsWith('data: ')) data = line.slice(6);
+                            }
+                            handleSSEEvent(event, data);
+                        }
+
+                        return pump();
+                    });
+                }
+
+                return pump();
+            })
+            .catch(e => {
+                if (e.name !== 'AbortError') {
+                    console.error('Stream error:', e);
+                }
+                cleanup();
+            });
+    }
+
+    function handleSSEEvent(event, data) {
+        if (event === 'progress') {
+            const d = JSON.parse(data);
             const pct = Math.round((d.index / d.total) * 100);
             document.getElementById('progress-bar').style.width = pct + '%';
             document.getElementById('progress-label').textContent =
                 `${d.index + 1} / ${d.total} — ${formatName(d.benchmark)}`;
 
-            // Mark row as running
             const row = document.getElementById('row-' + d.benchmark);
             if (row) {
                 row.cells[1].textContent = 'Running...';
                 row.cells[1].className = 'status-running';
             }
-        });
-
-        eventSource.addEventListener('result', (e) => {
-            const d = JSON.parse(e.data);
+        } else if (event === 'result') {
+            const d = JSON.parse(data);
             const row = document.getElementById('row-' + d.benchmark);
             if (row) {
                 const ok = d.status === 'OK';
@@ -359,25 +398,17 @@
                 row.cells[1].className = ok ? 'status-ok' : failed ? 'status-failed' : 'status-skipped';
                 row.cells[2].textContent = d.elapsed > 0 ? d.elapsed + 's' : '';
             }
-        });
-
-        eventSource.addEventListener('log', (e) => {
+        } else if (event === 'log') {
             const output = document.getElementById('console-output');
-            output.textContent += e.data + '\n';
+            output.textContent += data + '\n';
             output.scrollTop = output.scrollHeight;
-        });
-
-        eventSource.addEventListener('done', (e) => {
-            const d = JSON.parse(e.data);
+        } else if (event === 'done') {
+            const d = JSON.parse(data);
             document.getElementById('progress-bar').style.width = '100%';
             document.getElementById('progress-label').textContent =
                 `Complete — ${d.total_elapsed}s total`;
             cleanup();
-        });
-
-        eventSource.onerror = () => {
-            cleanup();
-        };
+        }
     }
 
     // --- Stop ---
@@ -392,7 +423,7 @@
     // --- Helpers ---
 
     function cleanup() {
-        if (eventSource) { eventSource.close(); eventSource = null; }
+        if (streamAbort) { streamAbort.abort(); streamAbort = null; }
         currentRunId = null;
         resetButtons();
     }

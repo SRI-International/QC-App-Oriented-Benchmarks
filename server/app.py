@@ -17,7 +17,7 @@ import threading
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,24 +62,24 @@ class RunRequest(BaseModel):
 
 
 class OutputCapture(io.TextIOBase):
-    """Captures stdout and stores lines in a thread-safe buffer."""
+    """Captures stdout and stores complete lines in a thread-safe buffer."""
 
     def __init__(self, original):
         self.original = original
-        self.buffer = []
+        self.buffer = []       # complete lines ready to send
+        self._partial = ""     # incomplete line being accumulated
         self.lock = threading.Lock()
 
     def write(self, s):
         if s:
             self.original.write(s)
             self.original.flush()
-            # Split on newlines so each buffer entry is a single line.
-            # This prevents multi-line strings (e.g. "***\nCreating...")
-            # from breaking SSE data fields which cannot contain raw newlines.
             with self.lock:
-                for line in s.splitlines():
-                    if line:
-                        self.buffer.append(line)
+                self._partial += s
+                # Emit complete lines (terminated by \n), keep any trailing partial
+                while '\n' in self._partial:
+                    line, self._partial = self._partial.split('\n', 1)
+                    self.buffer.append(line)
         return len(s) if s else 0
 
     def flush(self):
@@ -243,10 +243,11 @@ async def start_run(req: RunRequest):
 
 
 @app.get("/api/run/{run_id}/stream")
-async def stream_run(run_id: str):
+async def stream_run(run_id: str, request: Request):
     """SSE stream of run output — log lines, progress, results, done."""
     if not active_run or active_run["id"] != run_id:
-        raise HTTPException(404, "Run not found")
+        # Run not found or already finished — return 204 to prevent EventSource reconnect
+        raise HTTPException(204)
 
     run_state = active_run
 
@@ -257,24 +258,45 @@ async def stream_run(run_id: str):
     async def event_generator():
         log_cursor = 0
         event_cursor = 0
+        done = False
 
-        while True:
-            # Send new structured events (progress, result, done)
-            new_events = run_state["events"][event_cursor:]
-            for ev in new_events:
-                yield format_sse(ev["event"], ev["data"])
-                event_cursor += 1
+        try:
+            while not done:
+                # Check if client disconnected (prevents socket.send() warnings on Windows)
+                if await request.is_disconnected():
+                    break
 
-            # Send new log lines (already split per-line by OutputCapture)
-            new_lines = run_state["capture"].get_new_lines(log_cursor)
-            for line in new_lines:
-                yield format_sse("log", line)
-            log_cursor += len(new_lines)
+                # If this run was replaced by a new one, stop streaming
+                if active_run is not run_state:
+                    break
 
-            if run_state["finished"] and event_cursor >= len(run_state["events"]):
-                break
+                # Send new log lines first (before events, so "done" is the last thing sent)
+                new_lines = run_state["capture"].get_new_lines(log_cursor)
+                for line in new_lines:
+                    yield format_sse("log", line)
+                log_cursor += len(new_lines)
 
-            await asyncio.sleep(0.3)
+                # Send new structured events (progress, result, done)
+                new_events = run_state["events"][event_cursor:]
+                for ev in new_events:
+                    yield format_sse(ev["event"], ev["data"])
+                    event_cursor += 1
+                    if ev["event"] == "done":
+                        done = True
+                        break  # stop yielding immediately after "done"
+
+                if not done and run_state["finished"] and event_cursor >= len(run_state["events"]):
+                    break
+
+                if not done:
+                    await asyncio.sleep(0.3)
+
+        except asyncio.CancelledError:
+            pass  # Client disconnected — normal during SSE
+        except Exception as e:
+            import traceback
+            print(f"\n[SSE stream error] {type(e).__name__}: {e}")
+            traceback.print_exc()
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
