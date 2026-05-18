@@ -4,9 +4,22 @@ This guide covers installing, configuring, and running the **QED-C Application-O
 
 For a quick first run, see the [Quick Start](./quick_start.md). This guide provides the complete reference.
 
-## Repository Structure
+## Installation
 
-Clone the repository and install:
+There are two ways to install and use the benchmarks:
+
+### Option 1: pip install (run benchmarks immediately)
+
+```bash
+pip install qedcbench
+python -m qedcbench.run_all
+```
+
+This installs both **qedcbench** (the 17 benchmark applications) and **qedclib** (the execution engine). You can run the standard benchmark suite, customize parameters, run individual benchmarks, or import benchmark modules programmatically. See the [top-level README](https://github.com/SRI-International/QC-App-Oriented-Benchmarks#readme) for command-line examples.
+
+For standalone use of the execution engine without the benchmarks: `pip install qedclib`. See the [qedclib Guide](qedclib_guide.md) and [qedclib-examples](https://github.com/quantumcomputingdata/qedclib-examples) for usage.
+
+### Option 2: Clone the repository (full source, notebooks, editable)
 
 ```bash
 git clone https://github.com/SRI-International/QC-App-Oriented-Benchmarks.git
@@ -14,7 +27,11 @@ cd QC-App-Oriented-Benchmarks
 pip install -e .
 ```
 
-This installs two Python packages:
+This gives you the full source code, Jupyter notebooks for interactive exploration, and the ability to modify benchmarks. Changes to `.py` files take effect immediately. The rest of this guide assumes this approach.
+
+## Repository Structure
+
+The repository installs two Python packages:
 
 ```
 QC-App-Oriented-Benchmarks/
