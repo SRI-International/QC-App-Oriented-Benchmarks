@@ -1063,9 +1063,9 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
                 layout_method=layout_method,
                 routing_method=routing_method)
 
-            # set job tags if SamplerV2 on IBM Quantum Platform
+            # set job tags if SamplerV2 on IBM Quantum Platform (max 8 tags allowed)
             if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
-                job_tags = [qc.name for qc in circuits if hasattr(qc, 'name')]
+                job_tags = [qc.name for qc in circuits if hasattr(qc, 'name')][:8]
                 sampler.options.environment.job_tags = job_tags
 
             job = sampler.run(trans_qcs, shots=num_shots)
