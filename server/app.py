@@ -10,6 +10,10 @@ Usage:
 Or use the start_server scripts at the repo root.
 """
 
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend — no plt.show() popups
+
+import os
 import sys
 import io
 import time
@@ -36,6 +40,9 @@ from qedcbench.run_all import (
     DEFAULT_BENCHMARKS_QISKIT, DEFAULT_BENCHMARKS_CUDAQ,
 )
 from qedclib import metrics
+
+# Disable interactive plot display — save to files only
+metrics.show_plot_images = False
 
 app = FastAPI(title="QED-C Benchmarks")
 
@@ -154,10 +161,31 @@ def run_benchmarks_thread(run_state):
                 })
                 print(f"\n  FAILED after {elapsed}s: {e}")
 
+        # Generate combined volumetric plot
+        images = []
+        try:
+            backend_id = run_state["run_args"].get("backend_id", "qasm_simulator")
+            metrics.plot_all_app_metrics(backend_id)
+            import matplotlib.pyplot as plt
+            plt.close('all')
+
+            # Find generated images
+            img_dir = os.path.join(os.getcwd(), "__images", backend_id.replace("/", "_"))
+            if os.path.isdir(img_dir):
+                for f in sorted(os.listdir(img_dir)):
+                    if f.endswith(".jpg"):
+                        images.append(f"/api/images/{backend_id.replace('/', '_')}/{f}")
+        except Exception as e:
+            print(f"  Plot generation failed: {e}")
+
         total_elapsed = round(time.time() - run_state["start_time"], 1)
         run_state["events"].append({
             "event": "done",
-            "data": json.dumps({"total_elapsed": total_elapsed, "results": run_state["results"]})
+            "data": json.dumps({
+                "total_elapsed": total_elapsed,
+                "results": run_state["results"],
+                "images": images,
+            })
         })
 
     finally:
@@ -323,6 +351,16 @@ async def run_status(run_id: str):
         "total": len(active_run["benchmarks"]),
         "results": active_run["results"],
     }
+
+
+@app.get("/api/images/{backend_id}/{filename}")
+async def serve_image(backend_id: str, filename: str):
+    """Serve a generated plot image."""
+    filepath = Path(os.getcwd()) / "__images" / backend_id / filename
+    if not filepath.exists() or not filepath.suffix in (".jpg", ".png", ".pdf"):
+        raise HTTPException(404, "Image not found")
+    media = "image/jpeg" if filepath.suffix == ".jpg" else f"image/{filepath.suffix[1:]}"
+    return StreamingResponse(open(filepath, "rb"), media_type=media)
 
 
 # === Static files and UI ===

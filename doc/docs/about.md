@@ -80,6 +80,6 @@ Licensed under the Apache License, Version 2.0. See LICENSE file for details.
 
 ## Version
 
-Current version: **2.0.3** (May 2026)
+Current version: **2.0.4** (May 2026)
 
 See [Release Notes](./release_notes.md) for version history.

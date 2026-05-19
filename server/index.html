@@ -133,6 +133,14 @@
             width: auto;
         }
 
+        #plots-container { text-align: center; }
+        #plots-container img {
+            max-width: 100%;
+            margin: 0.75rem 0;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
         main.container { max-width: 800px; padding-bottom: 3rem; }
         article { margin-bottom: 1rem; padding: 1.25rem; }
         h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
@@ -203,6 +211,11 @@
                     </thead>
                     <tbody id="results-body"></tbody>
                 </table>
+            </div>
+
+            <div id="plots-section" style="display:none">
+                <h3>Plots</h3>
+                <div id="plots-container"></div>
             </div>
 
             <div class="console-section">
@@ -293,6 +306,8 @@
         document.getElementById('progress-bar').style.width = '0%';
         document.getElementById('progress-label').textContent = 'Starting...';
         document.getElementById('console-output').textContent = '';
+        document.getElementById('plots-section').style.display = 'none';
+        document.getElementById('plots-container').innerHTML = '';
 
         // Build initial results table
         const tbody = document.getElementById('results-body');
@@ -407,6 +422,21 @@
             document.getElementById('progress-bar').style.width = '100%';
             document.getElementById('progress-label').textContent =
                 `Complete — ${d.total_elapsed}s total`;
+
+            // Show plot images if available
+            const plotsSection = document.getElementById('plots-section');
+            const plotsContainer = document.getElementById('plots-container');
+            plotsContainer.innerHTML = '';
+            if (d.images && d.images.length > 0) {
+                for (const src of d.images) {
+                    const img = document.createElement('img');
+                    img.src = src;
+                    img.alt = 'Benchmark plot';
+                    plotsContainer.appendChild(img);
+                }
+                plotsSection.style.display = '';
+            }
+
             cleanup();
         }
     }

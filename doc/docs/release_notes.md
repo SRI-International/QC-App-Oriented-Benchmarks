@@ -7,6 +7,10 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.4 - 18 May 2026
+
+- **Benchmark Runner Web UI**: Added a browser-based interface for executing benchmarks. Select benchmarks, configure run parameters (API, backend, qubits, shots), and launch execution from the browser. Live progress updates, a console output panel streaming benchmark output in real time, and volumetric positioning plots displayed after completion. Launch with `uvicorn app:app --port 8088` from the `server/` directory (requires `pip install fastapi uvicorn`).
+
 ### Release 2.0.3 - 18 May 2026
 
 - **Documentation improvements**: User Guide now presents both installation options (pip install vs clone) up front. Quick Start mentions pip install as an alternative. Dependency requirements (numpy, matplotlib, Qiskit/CUDA-Q packages) documented in both guides.
