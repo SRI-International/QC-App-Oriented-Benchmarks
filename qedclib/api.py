@@ -220,6 +220,12 @@ def qedc_benchmarks_init(api: str, benchmark_name: str = None, module_names: lis
     from qedclib import qcb_mpi as mpi
     mpi.init()
 
+    # Print version on first initialization
+    import qedclib
+    if not getattr(qedc_benchmarks_init, '_initialized', False):
+        print(f"... qedclib {qedclib.__version__}")
+        qedc_benchmarks_init._initialized = True
+
     # Default to qiskit if no API specified
     if api is None:
         api = "qiskit"
