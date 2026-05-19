@@ -362,16 +362,30 @@ async def run_status(run_id: str):
     }
 
 
+@app.get("/api/data_files")
+async def list_data_files():
+    """List all DATA-*.json files in __data/."""
+    data_dir = Path(os.getcwd()) / "__data"
+    if not data_dir.exists():
+        return {"files": []}
+    files = sorted(f.name for f in data_dir.glob("DATA-*.json"))
+    return {"files": files}
+
+
 @app.post("/api/clear_data")
-async def clear_data(backend_id: str = "qasm_simulator"):
-    """Delete the data file for the given backend."""
-    safe_id = backend_id.replace("/", "_")
-    suffix = getattr(metrics, 'data_suffix', '')
-    filepath = Path(os.getcwd()) / "__data" / f"DATA-{safe_id}{suffix}.json"
-    if filepath.exists():
-        filepath.unlink()
-        return {"status": "cleared", "file": filepath.name}
-    return {"status": "not_found", "file": filepath.name}
+async def clear_data(files: list[str]):
+    """Delete specified data files from __data/."""
+    data_dir = Path(os.getcwd()) / "__data"
+    cleared = []
+    for name in files:
+        # Only allow DATA-*.json files, no path traversal
+        if not name.startswith("DATA-") or not name.endswith(".json") or "/" in name or "\\" in name:
+            continue
+        filepath = data_dir / name
+        if filepath.exists():
+            filepath.unlink()
+            cleared.append(name)
+    return {"cleared": cleared}
 
 
 @app.get("/api/images/{backend_id}/{filename}")
