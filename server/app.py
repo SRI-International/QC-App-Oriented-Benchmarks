@@ -238,6 +238,10 @@ async def start_run(req: RunRequest):
             "plot_results": False,
         }
 
+        # Use batch_size=1 for simulators so cancel can take effect between circuits
+        if "simulator" in req.backend_id or req.backend_id == "nvidia":
+            run_args["max_batch_size"] = 1
+
         # Configure hardware backend
         configure_backend(req.backend_id, run_args)
 
@@ -335,6 +339,11 @@ async def stop_run(run_id: str):
     if not active_run or active_run["id"] != run_id:
         raise HTTPException(404, "Run not found")
     active_run["cancelled"] = True
+    # Signal the execute module to stop between circuits/batches
+    import qedclib
+    ex = qedclib.execute
+    if ex and hasattr(ex, 'request_cancel'):
+        ex.request_cancel()
     return {"status": "cancelling"}
 
 

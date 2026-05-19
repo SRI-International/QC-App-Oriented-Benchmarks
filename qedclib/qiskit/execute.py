@@ -63,6 +63,14 @@ job_mode = False
 # Print progress of execution
 verbose = False
 
+# Cancel flag — set by request_cancel() to interrupt execution between batches/circuits
+cancel_requested = False
+
+def request_cancel():
+    """Request cancellation of the current execution."""
+    global cancel_requested
+    cancel_requested = True
+
 # Print additional time metrics for each stage of execution
 verbose_time = False
 
@@ -1158,8 +1166,13 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
 
 def _execute_batch(circuits_info, num_shots, max_batch_size):
     """Internal: execute circuits_info in chunks of max_batch_size."""
+    global cancel_requested
+    cancel_requested = False
     batch_size = max_batch_size or len(circuits_info)
     for i in range(0, len(circuits_info), batch_size):
+        if cancel_requested:
+            print("\n... execution cancelled by user")
+            break
         batch = circuits_info[i:i + batch_size]
         circuits = [ci["qc"] for ci in batch]
         ts = time.time()
