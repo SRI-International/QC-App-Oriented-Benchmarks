@@ -164,7 +164,9 @@
                     </select>
                 </label>
                 <label>Backend
-                    <input id="cfg-backend" type="text" value="qasm_simulator">
+                    <select id="cfg-backend-select"></select>
+                    <input id="cfg-backend" type="text" value="qasm_simulator"
+                           style="display:none" placeholder="custom backend">
                 </label>
                 <label>Shots
                     <input id="cfg-shots" type="number" value="100" min="1" max="100000">
@@ -283,12 +285,46 @@
         ).map(cb => cb.value);
     }
 
-    // --- Update backend default when API changes ---
+    // --- Backend options per API ---
+
+    const BACKEND_OPTIONS = {
+        qiskit: ['qasm_simulator', 'ibm', 'ionq_simulator', 'iqm'],
+        cudaq: ['nvidia', 'density-matrix-cpu'],
+    };
+
+    function updateBackendOptions(api) {
+        const sel = document.getElementById('cfg-backend-select');
+        const input = document.getElementById('cfg-backend');
+        const options = BACKEND_OPTIONS[api] || BACKEND_OPTIONS.qiskit;
+        sel.innerHTML = options.map(b => `<option value="${b}">${b}</option>`).join('')
+            + '<option value="__custom">Other...</option>';
+        sel.value = options[0];
+        input.value = options[0];
+        input.style.display = 'none';
+    }
+
+    function getBackendId() {
+        const sel = document.getElementById('cfg-backend-select');
+        const input = document.getElementById('cfg-backend');
+        return sel.value === '__custom' ? input.value : sel.value;
+    }
+
+    document.getElementById('cfg-backend-select').addEventListener('change', () => {
+        const sel = document.getElementById('cfg-backend-select');
+        const input = document.getElementById('cfg-backend');
+        if (sel.value === '__custom') {
+            input.style.display = '';
+            input.value = '';
+            input.focus();
+        } else {
+            input.style.display = 'none';
+            input.value = sel.value;
+        }
+    });
 
     document.getElementById('cfg-api').addEventListener('change', () => {
         const api = document.getElementById('cfg-api').value;
-        document.getElementById('cfg-backend').value =
-            api === 'cudaq' ? 'nvidia' : 'qasm_simulator';
+        updateBackendOptions(api);
         loadBenchmarks();
     });
 
@@ -303,7 +339,7 @@
 
         const config = {
             api: document.getElementById('cfg-api').value,
-            backend_id: document.getElementById('cfg-backend').value,
+            backend_id: getBackendId(),
             min_qubits: parseInt(document.getElementById('cfg-min').value),
             max_qubits: parseInt(document.getElementById('cfg-max').value),
             max_circuits: parseInt(document.getElementById('cfg-circuits').value),
@@ -478,7 +514,7 @@
         // Show dialog with checkboxes
         const dialog = document.getElementById('clear-dialog');
         const list = document.getElementById('clear-file-list');
-        const backend = document.getElementById('cfg-backend').value;
+        const backend = getBackendId();
         list.innerHTML = data.files.map(f => {
             const match = f.toLowerCase().includes(backend.toLowerCase().replace('/', '_'));
             return `<label>
@@ -537,7 +573,9 @@
     }
 
     // --- Init ---
+    updateBackendOptions('qiskit');
     loadBenchmarks();
+
     </script>
 </body>
 </html>

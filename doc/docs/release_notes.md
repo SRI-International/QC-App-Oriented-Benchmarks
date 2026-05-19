@@ -7,9 +7,11 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
-### Release 2.0.4 - 18 May 2026
+### Release 2.0.4 - 19 May 2026
 
-- **Benchmark Runner Web UI**: Added a browser-based interface for executing benchmarks. Select benchmarks, configure run parameters (API, backend, qubits, shots), and launch execution from the browser. Live progress updates, a console output panel streaming benchmark output in real time, and volumetric positioning plots displayed after completion. Launch with `uvicorn app:app --port 8088` from the `server/` directory (requires `pip install fastapi uvicorn`).
+- **Benchmark Runner Web UI (experimental)**: Added a preliminary browser-based interface for executing benchmarks. Select benchmarks, configure run parameters (API, backend, qubits, shots), and launch execution from the browser. Live progress updates, a console output panel streaming benchmark output in real time, and volumetric positioning plots displayed after completion. Includes backend presets dropdown, data file management, and run cancellation support. To try it: `cd server && uvicorn app:app --port 8088` (requires `pip install fastapi uvicorn`).
+- Fixed IBM job tags exceeding the 8-tag limit on large circuit batches.
+- Added cancellation support in qiskit and cudaq execute modules (`request_cancel()`).
 
 ### Release 2.0.3 - 18 May 2026
 

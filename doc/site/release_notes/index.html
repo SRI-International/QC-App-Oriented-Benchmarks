@@ -151,6 +151,12 @@
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
 <h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
 <p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
+<h3 id="release-204-19-may-2026">Release 2.0.4 - 19 May 2026</h3>
+<ul>
+<li><strong>Benchmark Runner Web UI (experimental)</strong>: Added a preliminary browser-based interface for executing benchmarks. Select benchmarks, configure run parameters (API, backend, qubits, shots), and launch execution from the browser. Live progress updates, a console output panel streaming benchmark output in real time, and volumetric positioning plots displayed after completion. Includes backend presets dropdown, data file management, and run cancellation support. To try it: <code>cd server &amp;&amp; uvicorn app:app --port 8088</code> (requires <code>pip install fastapi uvicorn</code>).</li>
+<li>Fixed IBM job tags exceeding the 8-tag limit on large circuit batches.</li>
+<li>Added cancellation support in qiskit and cudaq execute modules (<code>request_cancel()</code>).</li>
+</ul>
 <h3 id="release-203-18-may-2026">Release 2.0.3 - 18 May 2026</h3>
 <ul>
 <li><strong>Documentation improvements</strong>: User Guide now presents both installation options (pip install vs clone) up front. Quick Start mentions pip install as an alternative. Dependency requirements (numpy, matplotlib, Qiskit/CUDA-Q packages) documented in both guides.</li>
