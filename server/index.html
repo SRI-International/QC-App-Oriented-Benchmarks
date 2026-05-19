@@ -191,6 +191,7 @@
             <div class="btn-row">
                 <button id="btn-run" onclick="startRun()">Run Benchmarks</button>
                 <button id="btn-stop" onclick="stopRun()">Stop</button>
+                <button id="btn-clear" class="secondary outline" onclick="clearData()">Clear Data</button>
             </div>
         </article>
 
@@ -430,7 +431,7 @@
             if (d.images && d.images.length > 0) {
                 for (const src of d.images) {
                     const img = document.createElement('img');
-                    img.src = src;
+                    img.src = src + '?t=' + Date.now();
                     img.alt = 'Benchmark plot';
                     plotsContainer.appendChild(img);
                 }
@@ -447,6 +448,21 @@
         if (currentRunId) {
             await fetch(`/api/run/${currentRunId}/stop`, {method: 'POST'});
             document.getElementById('progress-label').textContent = 'Cancelling...';
+        }
+    }
+
+    // --- Clear Data ---
+
+    async function clearData() {
+        const backend = document.getElementById('cfg-backend').value;
+        const resp = await fetch(`/api/clear_data?backend_id=${encodeURIComponent(backend)}`, {
+            method: 'POST',
+        });
+        const data = await resp.json();
+        if (data.status === 'cleared') {
+            alert(`Cleared data file: ${data.file}`);
+        } else {
+            alert(`No data file found: ${data.file}`);
         }
     }
 

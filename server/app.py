@@ -353,6 +353,18 @@ async def run_status(run_id: str):
     }
 
 
+@app.post("/api/clear_data")
+async def clear_data(backend_id: str = "qasm_simulator"):
+    """Delete the data file for the given backend."""
+    safe_id = backend_id.replace("/", "_")
+    suffix = getattr(metrics, 'data_suffix', '')
+    filepath = Path(os.getcwd()) / "__data" / f"DATA-{safe_id}{suffix}.json"
+    if filepath.exists():
+        filepath.unlink()
+        return {"status": "cleared", "file": filepath.name}
+    return {"status": "not_found", "file": filepath.name}
+
+
 @app.get("/api/images/{backend_id}/{filename}")
 async def serve_image(backend_id: str, filename: str):
     """Serve a generated plot image."""
