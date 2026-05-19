@@ -37,6 +37,14 @@ import cudaq
 
 verbose = False
 
+# Cancel flag — set by request_cancel() to interrupt execution between circuits
+cancel_requested = False
+
+def request_cancel():
+    """Request cancellation of the current execution."""
+    global cancel_requested
+    cancel_requested = True
+
 # Auto-warmup: execute a tiny circuit on first call to execute_circuits() to prime the JIT
 auto_warmup = True
 _warmup_done = False
@@ -954,9 +962,14 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
 
     # Default: sequential execution (single GPU or mgpu mode)
     if counts_array is None:
+        global cancel_requested
+        cancel_requested = False
         counts_array = []
         per_circuit_times = []
         for circuit in circuits:
+            if cancel_requested:
+                print("\n... execution cancelled by user")
+                break
             try:
                 ts_circ = time.time()
                 if noise is None:

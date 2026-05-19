@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QED-C Benchmark Runner</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        :root {
+            --qedc-blue: #1a56db;
+            --qedc-dark: #1e293b;
+            --qedc-light: #f8fafc;
+        }
+        header.app-header {
+            background: var(--qedc-dark);
+            color: white;
+            padding: 0.75rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        header.app-header h1 { margin: 0; font-size: 1.3rem; color: white; }
+        header.app-header a { color: #93c5fd; font-size: 0.9rem; }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .config-grid label { margin-bottom: 0; font-size: 0.85rem; }
+        .config-grid input, .config-grid select {
+            padding: 0.4rem 0.5rem;
+            margin-top: 0.2rem;
+            margin-bottom: 0;
+        }
+
+        .benchmarks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 0.25rem 1.5rem;
+            margin: 0.75rem 0;
+        }
+        .benchmarks-grid label {
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            margin-bottom: 0.2rem;
+        }
+        .benchmarks-grid input[type="checkbox"] { margin: 0; }
+
+        .btn-row {
+            display: flex;
+            gap: 0.75rem;
+            margin: 1rem 0;
+        }
+        .btn-row button { width: auto; margin: 0; }
+        #btn-stop { background: #dc2626; border-color: #dc2626; display: none; }
+
+        .progress-section { margin: 1rem 0; }
+        .progress-bar-outer {
+            background: #e2e8f0;
+            border-radius: 6px;
+            height: 24px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar-inner {
+            background: var(--qedc-blue);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 6px;
+        }
+        .progress-label {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-top: 0.3rem;
+        }
+
+        .results-table { margin: 1rem 0; }
+        .results-table table { font-size: 0.9rem; }
+        .results-table td:last-child { text-align: right; }
+        .status-ok { color: #16a34a; font-weight: 600; }
+        .status-running { color: var(--qedc-blue); font-weight: 600; }
+        .status-failed { color: #dc2626; font-weight: 600; }
+        .status-skipped { color: #9ca3af; }
+        .status-pending { color: #9ca3af; }
+
+        .console-section { margin: 1rem 0; }
+        .console-output {
+            background: var(--qedc-dark);
+            color: #e2e8f0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8rem;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            display: none;
+        }
+        .console-toggle {
+            background: none;
+            border: none;
+            color: var(--qedc-blue);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 0;
+            margin: 0;
+            outline: none;
+            width: auto;
+        }
+        .console-toggle:hover { text-decoration: underline; }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .section-head h3 { margin-bottom: 0; }
+        .link-btn {
+            background: none;
+            border: none;
+            color: var(--qedc-blue);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 0;
+            width: auto;
+        }
+
+        #plots-container { text-align: center; }
+        #plots-container img {
+            max-width: 100%;
+            margin: 0.75rem 0;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        main.container { max-width: 800px; padding-bottom: 3rem; }
+        article { margin-bottom: 1rem; padding: 1.25rem; }
+        h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <header class="app-header">
+        <h1>QED-C Benchmark Runner</h1>
+        <a href="/site/" target="_blank">Documentation</a>
+    </header>
+
+    <main class="container">
+        <!-- Configuration -->
+        <article>
+            <h3>Configuration</h3>
+            <div class="config-grid">
+                <label>API
+                    <select id="cfg-api">
+                        <option value="qiskit" selected>Qiskit</option>
+                        <option value="cudaq">CUDA-Q</option>
+                    </select>
+                </label>
+                <label>Backend
+                    <select id="cfg-backend-select"></select>
+                    <input id="cfg-backend" type="text" value="qasm_simulator"
+                           style="display:none" placeholder="custom backend">
+                </label>
+                <label>Shots
+                    <input id="cfg-shots" type="number" value="100" min="1" max="100000">
+                </label>
+                <label>Min Qubits
+                    <input id="cfg-min" type="number" value="2" min="1" max="30">
+                </label>
+                <label>Max Qubits
+                    <input id="cfg-max" type="number" value="8" min="1" max="30">
+                </label>
+                <label>Circuits / Group
+                    <input id="cfg-circuits" type="number" value="3" min="1" max="20">
+                </label>
+            </div>
+        </article>
+
+        <!-- Benchmark Selection -->
+        <article>
+            <div class="section-head">
+                <h3>Benchmarks</h3>
+                <button class="link-btn" onclick="selectDefaults()">Select Defaults</button>
+            </div>
+            <div id="benchmarks-list" class="benchmarks-grid"></div>
+            <div class="btn-row">
+                <button id="btn-run" onclick="startRun()">Run Benchmarks</button>
+                <button id="btn-stop" onclick="stopRun()">Stop</button>
+                <button id="btn-clear" class="secondary outline" onclick="clearData()">Clear Data</button>
+            </div>
+        </article>
+
+        <!-- Progress & Results -->
+        <article id="results-section" style="display:none">
+            <h3>Progress</h3>
+            <div class="progress-section">
+                <div class="progress-bar-outer">
+                    <div id="progress-bar" class="progress-bar-inner"></div>
+                </div>
+                <div id="progress-label" class="progress-label"></div>
+            </div>
+
+            <div class="results-table">
+                <table id="results-table">
+                    <thead>
+                        <tr><th>Benchmark</th><th>Status</th><th>Time</th></tr>
+                    </thead>
+                    <tbody id="results-body"></tbody>
+                </table>
+            </div>
+
+            <div id="plots-section" style="display:none">
+                <h3>Plots</h3>
+                <div id="plots-container"></div>
+            </div>
+
+            <div class="console-section">
+                <button class="console-toggle" onclick="toggleConsole()">
+                    <span id="console-arrow">&#9654;</span> Console Output
+                </button>
+                <pre id="console-output" class="console-output"></pre>
+            </div>
+        </article>
+        <!-- Clear Data Dialog -->
+        <dialog id="clear-dialog">
+            <article style="margin:0; min-width:300px;">
+                <h3>Clear Data Files</h3>
+                <p style="font-size:0.85rem; color:#64748b;">Select files to delete:</p>
+                <div id="clear-file-list" class="benchmarks-grid" style="margin:0.75rem 0;"></div>
+                <div class="btn-row">
+                    <button onclick="clearDialogConfirm()">Delete Selected</button>
+                    <button class="secondary outline" onclick="document.getElementById('clear-dialog').close()">Cancel</button>
+                </div>
+            </article>
+        </dialog>
+    </main>
+
+    <script>
+    let currentRunId = null;
+
+    // --- Load benchmarks ---
+
+    async function loadBenchmarks() {
+        const api = document.getElementById('cfg-api').value;
+        try {
+            const resp = await fetch(`/api/benchmarks?api=${api}`);
+            const data = await resp.json();
+            renderBenchmarks(data.benchmarks);
+        } catch (e) {
+            console.error('Failed to load benchmarks:', e);
+        }
+    }
+
+    function renderBenchmarks(benchmarks) {
+        const container = document.getElementById('benchmarks-list');
+        container.innerHTML = benchmarks.map(b => `
+            <label>
+                <input type="checkbox" value="${b.name}" ${b.default ? 'checked' : ''}
+                       data-default="${b.default}">
+                ${formatName(b.name)}
+            </label>
+        `).join('');
+    }
+
+    function formatName(name) {
+        return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function selectDefaults() {
+        document.querySelectorAll('#benchmarks-list input[type="checkbox"]').forEach(cb => {
+            cb.checked = cb.dataset.default === 'true';
+        });
+    }
+
+    function getSelectedBenchmarks() {
+        return Array.from(
+            document.querySelectorAll('#benchmarks-list input[type="checkbox"]:checked')
+        ).map(cb => cb.value);
+    }
+
+    // --- Backend options per API ---
+
+    const BACKEND_OPTIONS = {
+        qiskit: ['qasm_simulator', 'ibm', 'ionq_simulator', 'iqm'],
+        cudaq: ['nvidia', 'density-matrix-cpu'],
+    };
+
+    function updateBackendOptions(api) {
+        const sel = document.getElementById('cfg-backend-select');
+        const input = document.getElementById('cfg-backend');
+        const options = BACKEND_OPTIONS[api] || BACKEND_OPTIONS.qiskit;
+        sel.innerHTML = options.map(b => `<option value="${b}">${b}</option>`).join('')
+            + '<option value="__custom">Other...</option>';
+        sel.value = options[0];
+        input.value = options[0];
+        input.style.display = 'none';
+    }
+
+    function getBackendId() {
+        const sel = document.getElementById('cfg-backend-select');
+        const input = document.getElementById('cfg-backend');
+        return sel.value === '__custom' ? input.value : sel.value;
+    }
+
+    document.getElementById('cfg-backend-select').addEventListener('change', () => {
+        const sel = document.getElementById('cfg-backend-select');
+        const input = document.getElementById('cfg-backend');
+        if (sel.value === '__custom') {
+            input.style.display = '';
+            input.value = '';
+            input.focus();
+        } else {
+            input.style.display = 'none';
+            input.value = sel.value;
+        }
+    });
+
+    document.getElementById('cfg-api').addEventListener('change', () => {
+        const api = document.getElementById('cfg-api').value;
+        updateBackendOptions(api);
+        loadBenchmarks();
+    });
+
+    // --- Run benchmarks ---
+
+    async function startRun() {
+        const benchmarks = getSelectedBenchmarks();
+        if (benchmarks.length === 0) {
+            alert('Select at least one benchmark.');
+            return;
+        }
+
+        const config = {
+            api: document.getElementById('cfg-api').value,
+            backend_id: getBackendId(),
+            min_qubits: parseInt(document.getElementById('cfg-min').value),
+            max_qubits: parseInt(document.getElementById('cfg-max').value),
+            max_circuits: parseInt(document.getElementById('cfg-circuits').value),
+            num_shots: parseInt(document.getElementById('cfg-shots').value),
+            method: 1,
+            benchmarks: benchmarks,
+        };
+
+        // Reset UI
+        document.getElementById('results-section').style.display = '';
+        document.getElementById('btn-run').disabled = true;
+        document.getElementById('btn-stop').style.display = 'inline-block';
+        document.getElementById('progress-bar').style.width = '0%';
+        document.getElementById('progress-label').textContent = 'Starting...';
+        document.getElementById('console-output').textContent = '';
+        document.getElementById('plots-section').style.display = 'none';
+        document.getElementById('plots-container').innerHTML = '';
+
+        // Build initial results table
+        const tbody = document.getElementById('results-body');
+        tbody.innerHTML = benchmarks.map(name => `
+            <tr id="row-${name}">
+                <td>${formatName(name)}</td>
+                <td class="status-pending">Pending</td>
+                <td></td>
+            </tr>
+        `).join('');
+
+        try {
+            const resp = await fetch('/api/run', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(config),
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json();
+                alert(err.detail || 'Failed to start run');
+                resetButtons();
+                return;
+            }
+
+            const data = await resp.json();
+            currentRunId = data.run_id;
+            connectStream(currentRunId);
+
+        } catch (e) {
+            alert('Server error: ' + e.message);
+            resetButtons();
+        }
+    }
+
+    // --- SSE Stream (using fetch + ReadableStream to avoid EventSource auto-reconnect) ---
+
+    let streamAbort = null;  // AbortController for active stream
+
+    function connectStream(runId) {
+        streamAbort = new AbortController();
+
+        fetch(`/api/run/${runId}/stream`, { signal: streamAbort.signal })
+            .then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                function pump() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) { cleanup(); return; }
+
+                        buffer += decoder.decode(value, { stream: true });
+
+                        // Parse SSE messages from buffer
+                        const parts = buffer.split('\n\n');
+                        buffer = parts.pop();  // keep incomplete message
+
+                        for (const part of parts) {
+                            if (!part.trim()) continue;
+                            let event = 'message', data = '';
+                            for (const line of part.split('\n')) {
+                                if (line.startsWith('event: ')) event = line.slice(7);
+                                else if (line.startsWith('data: ')) data = line.slice(6);
+                            }
+                            handleSSEEvent(event, data);
+                        }
+
+                        return pump();
+                    });
+                }
+
+                return pump();
+            })
+            .catch(e => {
+                if (e.name !== 'AbortError') {
+                    console.error('Stream error:', e);
+                }
+                cleanup();
+            });
+    }
+
+    function handleSSEEvent(event, data) {
+        if (event === 'progress') {
+            const d = JSON.parse(data);
+            const pct = Math.round((d.index / d.total) * 100);
+            document.getElementById('progress-bar').style.width = pct + '%';
+            document.getElementById('progress-label').textContent =
+                `${d.index + 1} / ${d.total} — ${formatName(d.benchmark)}`;
+
+            const row = document.getElementById('row-' + d.benchmark);
+            if (row) {
+                row.cells[1].textContent = 'Running...';
+                row.cells[1].className = 'status-running';
+            }
+        } else if (event === 'result') {
+            const d = JSON.parse(data);
+            const row = document.getElementById('row-' + d.benchmark);
+            if (row) {
+                const ok = d.status === 'OK';
+                const failed = d.status.startsWith('FAILED');
+                row.cells[1].textContent = d.status;
+                row.cells[1].className = ok ? 'status-ok' : failed ? 'status-failed' : 'status-skipped';
+                row.cells[2].textContent = d.elapsed > 0 ? d.elapsed + 's' : '';
+            }
+        } else if (event === 'log') {
+            const output = document.getElementById('console-output');
+            output.textContent += data + '\n';
+            output.scrollTop = output.scrollHeight;
+        } else if (event === 'done') {
+            const d = JSON.parse(data);
+            document.getElementById('progress-bar').style.width = '100%';
+            document.getElementById('progress-label').textContent =
+                `Complete — ${d.total_elapsed}s total`;
+
+            // Show plot images if available
+            const plotsSection = document.getElementById('plots-section');
+            const plotsContainer = document.getElementById('plots-container');
+            plotsContainer.innerHTML = '';
+            if (d.images && d.images.length > 0) {
+                for (const src of d.images) {
+                    const img = document.createElement('img');
+                    img.src = src + '?t=' + Date.now();
+                    img.alt = 'Benchmark plot';
+                    plotsContainer.appendChild(img);
+                }
+                plotsSection.style.display = '';
+            }
+
+            cleanup();
+        }
+    }
+
+    // --- Stop ---
+
+    async function stopRun() {
+        if (currentRunId) {
+            await fetch(`/api/run/${currentRunId}/stop`, {method: 'POST'});
+            document.getElementById('progress-label').textContent = 'Cancelling...';
+        }
+    }
+
+    // --- Clear Data ---
+
+    async function clearData() {
+        // Fetch list of data files
+        const resp = await fetch('/api/data_files');
+        const data = await resp.json();
+
+        if (data.files.length === 0) {
+            alert('No data files found.');
+            return;
+        }
+
+        // Show dialog with checkboxes
+        const dialog = document.getElementById('clear-dialog');
+        const list = document.getElementById('clear-file-list');
+        const backend = getBackendId();
+        list.innerHTML = data.files.map(f => {
+            const match = f.toLowerCase().includes(backend.toLowerCase().replace('/', '_'));
+            return `<label>
+                <input type="checkbox" value="${f}" ${match ? 'checked' : ''}>
+                ${f}
+            </label>`;
+        }).join('');
+        dialog.showModal();
+    }
+
+    function clearDialogConfirm() {
+        const dialog = document.getElementById('clear-dialog');
+        const selected = Array.from(
+            dialog.querySelectorAll('input[type="checkbox"]:checked')
+        ).map(cb => cb.value);
+        dialog.close();
+
+        if (selected.length === 0) return;
+
+        fetch('/api/clear_data', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(selected),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.cleared.length > 0) {
+                alert(`Cleared: ${data.cleared.join(', ')}`);
+            }
+        });
+    }
+
+    // --- Helpers ---
+
+    function cleanup() {
+        if (streamAbort) { streamAbort.abort(); streamAbort = null; }
+        currentRunId = null;
+        resetButtons();
+    }
+
+    function resetButtons() {
+        document.getElementById('btn-run').disabled = false;
+        document.getElementById('btn-stop').style.display = 'none';
+    }
+
+    function toggleConsole() {
+        const el = document.getElementById('console-output');
+        const arrow = document.getElementById('console-arrow');
+        if (el.style.display === 'none' || el.style.display === '') {
+            el.style.display = 'block';
+            arrow.innerHTML = '&#9660;';
+        } else {
+            el.style.display = 'none';
+            arrow.innerHTML = '&#9654;';
+        }
+    }
+
+    // --- Init ---
+    updateBackendOptions('qiskit');
+    loadBenchmarks();
+
+    </script>
+</body>
+</html>

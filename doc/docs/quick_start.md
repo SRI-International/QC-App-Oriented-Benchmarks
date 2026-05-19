@@ -2,6 +2,8 @@
 
 This guide walks you through installing the **QED-C Application-Oriented Benchmarks** and running your first benchmark. By the end, you'll have executed a quantum algorithm benchmark and seen its performance metrics.
 
+> **Tip:** If you just want to run the standard benchmarks without cloning the repository, you can `pip install qedcbench` and then `python -m qedcbench.run_all`. See the [User Guide](user_guide.md) for details on both installation options.
+
 ## Prerequisites
 
 - **Python 3.9 or later** (we recommend using [Miniconda](https://docs.conda.io/en/latest/miniconda.html) for environment management)
@@ -26,13 +28,16 @@ pip install -e .
 
 This single command installs both **qedclib** (the execution library) and **qedcbench** (the benchmarks). No additional setup is needed for simulator-based execution.
 
-3. **Install your quantum SDK** (if not already installed). For example, if you are using Qiskit:
+3. **Install dependencies** (if not already installed):
 
 ```bash
-pip install qiskit qiskit-aer qiskit-ibm-runtime
+pip install numpy matplotlib
+pip install qiskit qiskit-aer qiskit-ibm-runtime   # for Qiskit
 ```
 
-For other platforms (CUDA-Q, Cirq, Braket), see the [Setup Guides](./setup/README.md).
+For CUDA-Q, install `cuda-quantum` instead of the Qiskit packages. See the [Setup Guides](./setup/README.md) for platform-specific instructions.
+
+Some benchmarks have additional dependencies (e.g., `scipy` for Hamiltonian Simulation and HamLib). See individual benchmark directories for details.
 
 ## Run Your First Benchmark
 

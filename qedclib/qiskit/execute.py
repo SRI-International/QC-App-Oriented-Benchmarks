@@ -63,6 +63,14 @@ job_mode = False
 # Print progress of execution
 verbose = False
 
+# Cancel flag — set by request_cancel() to interrupt execution between batches/circuits
+cancel_requested = False
+
+def request_cancel():
+    """Request cancellation of the current execution."""
+    global cancel_requested
+    cancel_requested = True
+
 # Print additional time metrics for each stage of execution
 verbose_time = False
 
@@ -1063,9 +1071,9 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
                 layout_method=layout_method,
                 routing_method=routing_method)
 
-            # set job tags if SamplerV2 on IBM Quantum Platform
+            # set job tags if SamplerV2 on IBM Quantum Platform (max 8 tags allowed)
             if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
-                job_tags = [qc.name for qc in circuits if hasattr(qc, 'name')]
+                job_tags = [qc.name for qc in circuits if hasattr(qc, 'name')][:8]
                 sampler.options.environment.job_tags = job_tags
 
             job = sampler.run(trans_qcs, shots=num_shots)
@@ -1158,8 +1166,13 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
 
 def _execute_batch(circuits_info, num_shots, max_batch_size):
     """Internal: execute circuits_info in chunks of max_batch_size."""
+    global cancel_requested
+    cancel_requested = False
     batch_size = max_batch_size or len(circuits_info)
     for i in range(0, len(circuits_info), batch_size):
+        if cancel_requested:
+            print("\n... execution cancelled by user")
+            break
         batch = circuits_info[i:i + batch_size]
         circuits = [ci["qc"] for ci in batch]
         ts = time.time()
@@ -1685,6 +1698,15 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
         # Wait for result — returns instantly if thread finished
         if done_event.wait(timeout=2.0):
             break   # result is ready
+
+        # Check if cancellation was requested
+        if cancel_requested:
+            print(f'\n... cancelling job {job_id}')
+            try:
+                job.cancel()
+            except Exception:
+                pass  # best effort
+            return None
 
         # Still waiting — check job status (with retry, robust to network errors)
         pollcount += 1

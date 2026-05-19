@@ -212,51 +212,52 @@ def run_benchmarks(benchmarks, run_args):
 
 # === Main ===
 
-parser = argparse.ArgumentParser(
-    description="Run QED-C Application-Oriented Benchmarks",
-    formatter_class=argparse.RawDescriptionHelpFormatter,
-)
-parser.add_argument("-a", "--api", default="qiskit", help="Quantum SDK (default: qiskit)")
-parser.add_argument("-b", "--backend_id", default=None, help="Backend (default: qasm_simulator for qiskit, nvidia for cudaq)")
-parser.add_argument("-min", "--min_qubits", type=int, default=2, help="Min qubits (default: 2)")
-parser.add_argument("-max", "--max_qubits", type=int, default=8, help="Max qubits (default: 8)")
-parser.add_argument("-c", "--max_circuits", type=int, default=3, help="Circuits per group (default: 3)")
-parser.add_argument("-s", "--num_shots", type=int, default=100, help="Shots per circuit (default: 100)")
-parser.add_argument("-m", "--method", type=int, default=1, help="Algorithm variant (default: 1)")
-parser.add_argument("--benchmarks", default=None,
-                    help="Comma-separated list of benchmarks to run (default: standard set)")
-parser.add_argument("--list", action="store_true", help="Show available benchmarks and exit")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Run QED-C Application-Oriented Benchmarks",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("-a", "--api", default="qiskit", help="Quantum SDK (default: qiskit)")
+    parser.add_argument("-b", "--backend_id", default=None, help="Backend (default: qasm_simulator for qiskit, nvidia for cudaq)")
+    parser.add_argument("-min", "--min_qubits", type=int, default=2, help="Min qubits (default: 2)")
+    parser.add_argument("-max", "--max_qubits", type=int, default=8, help="Max qubits (default: 8)")
+    parser.add_argument("-c", "--max_circuits", type=int, default=3, help="Circuits per group (default: 3)")
+    parser.add_argument("-s", "--num_shots", type=int, default=100, help="Shots per circuit (default: 100)")
+    parser.add_argument("-m", "--method", type=int, default=1, help="Algorithm variant (default: 1)")
+    parser.add_argument("--benchmarks", default=None,
+                        help="Comma-separated list of benchmarks to run (default: standard set)")
+    parser.add_argument("--list", action="store_true", help="Show available benchmarks and exit")
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-if args.list:
-    list_benchmarks(args.api)
-    sys.exit(0)
+    if args.list:
+        list_benchmarks(args.api)
+        sys.exit(0)
 
-# Set default backend based on API
-if args.backend_id is None:
-    args.backend_id = "nvidia" if args.api == "cudaq" else "qasm_simulator"
+    # Set default backend based on API
+    if args.backend_id is None:
+        args.backend_id = "nvidia" if args.api == "cudaq" else "qasm_simulator"
 
-# Determine which benchmarks to run
-if args.benchmarks:
-    benchmarks = [b.strip() for b in args.benchmarks.split(",")]
-else:
-    benchmarks = DEFAULT_BENCHMARKS_CUDAQ if args.api == "cudaq" else DEFAULT_BENCHMARKS_QISKIT
+    # Determine which benchmarks to run
+    if args.benchmarks:
+        benchmarks = [b.strip() for b in args.benchmarks.split(",")]
+    else:
+        benchmarks = DEFAULT_BENCHMARKS_CUDAQ if args.api == "cudaq" else DEFAULT_BENCHMARKS_QISKIT
 
-# Build the kwargs dict passed to each benchmark's run()
-run_args = {
-    "min_qubits": args.min_qubits,
-    "max_qubits": args.max_qubits,
-    "max_circuits": args.max_circuits,
-    "num_shots": args.num_shots,
-    "method": args.method,
-    "api": args.api,
-    "backend_id": args.backend_id,
-    "draw_circuits": False,
-    "plot_results": False,
-}
+    # Build the kwargs dict passed to each benchmark's run()
+    run_args = {
+        "min_qubits": args.min_qubits,
+        "max_qubits": args.max_qubits,
+        "max_circuits": args.max_circuits,
+        "num_shots": args.num_shots,
+        "method": args.method,
+        "api": args.api,
+        "backend_id": args.backend_id,
+        "draw_circuits": False,
+        "plot_results": False,
+    }
 
-# Configure hardware backend (IBM, IonQ, IQM) — adds provider params to run_args
-configure_backend(args.backend_id, run_args)
+    # Configure hardware backend (IBM, IonQ, IQM) — adds provider params to run_args
+    configure_backend(args.backend_id, run_args)
 
-run_benchmarks(benchmarks, run_args)
+    run_benchmarks(benchmarks, run_args)

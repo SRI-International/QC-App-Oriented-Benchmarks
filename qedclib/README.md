@@ -15,7 +15,7 @@ import qedclib
 
 # Initialize with the quantum computing API
 qedclib.initialize("qiskit")
-import execute as ex
+ex = qedclib.execute
 
 # Configure the execution backend
 ex.set_execution_target(backend_id="qasm_simulator")

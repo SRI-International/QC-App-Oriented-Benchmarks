@@ -172,6 +172,9 @@
 
 <h1 id="quick-start">Quick Start</h1>
 <p>This guide walks you through installing the <strong>QED-C Application-Oriented Benchmarks</strong> and running your first benchmark. By the end, you'll have executed a quantum algorithm benchmark and seen its performance metrics.</p>
+<blockquote>
+<p><strong>Tip:</strong> If you just want to run the standard benchmarks without cloning the repository, you can <code>pip install qedcbench</code> and then <code>python -m qedcbench.run_all</code>. See the <a href="../user_guide/">User Guide</a> for details on both installation options.</p>
+</blockquote>
 <h2 id="prerequisites">Prerequisites</h2>
 <ul>
 <li><strong>Python 3.9 or later</strong> (we recommend using <a href="https://docs.conda.io/en/latest/miniconda.html">Miniconda</a> for environment management)</li>
@@ -193,11 +196,13 @@ cd QC-App-Oriented-Benchmarks
 </code></pre>
 <p>This single command installs both <strong>qedclib</strong> (the execution library) and <strong>qedcbench</strong> (the benchmarks). No additional setup is needed for simulator-based execution.</p>
 <ol>
-<li><strong>Install your quantum SDK</strong> (if not already installed). For example, if you are using Qiskit:</li>
+<li><strong>Install dependencies</strong> (if not already installed):</li>
 </ol>
-<pre><code class="language-bash">pip install qiskit qiskit-aer qiskit-ibm-runtime
+<pre><code class="language-bash">pip install numpy matplotlib
+pip install qiskit qiskit-aer qiskit-ibm-runtime   # for Qiskit
 </code></pre>
-<p>For other platforms (CUDA-Q, Cirq, Braket), see the <a href="../setup/">Setup Guides</a>.</p>
+<p>For CUDA-Q, install <code>cuda-quantum</code> instead of the Qiskit packages. See the <a href="../setup/">Setup Guides</a> for platform-specific instructions.</p>
+<p>Some benchmarks have additional dependencies (e.g., <code>scipy</code> for Hamiltonian Simulation and HamLib). See individual benchmark directories for details.</p>
 <h2 id="run-your-first-benchmark">Run Your First Benchmark</h2>
 <p>The simplest way to run a benchmark is from the command line:</p>
 <pre><code class="language-bash">cd qedcbench/hidden_shift

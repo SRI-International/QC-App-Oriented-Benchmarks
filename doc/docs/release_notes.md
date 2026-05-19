@@ -7,6 +7,19 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.4 - 19 May 2026
+
+- **Benchmark Runner Web UI (experimental)**: Added a preliminary browser-based interface for executing benchmarks. Select benchmarks, configure run parameters (API, backend, qubits, shots), and launch execution from the browser. Live progress updates, a console output panel streaming benchmark output in real time, and volumetric positioning plots displayed after completion. Includes backend presets dropdown, data file management, and run cancellation support. To try it: `cd server && uvicorn app:app --port 8088` (requires `pip install fastapi uvicorn`).
+- Fixed IBM job tags exceeding the 8-tag limit on large circuit batches.
+- Added cancellation support in qiskit and cudaq execute modules (`request_cancel()`).
+
+### Release 2.0.3 - 18 May 2026
+
+- **Documentation improvements**: User Guide now presents both installation options (pip install vs clone) up front. Quick Start mentions pip install as an alternative. Dependency requirements (numpy, matplotlib, Qiskit/CUDA-Q packages) documented in both guides.
+- Added `qedcbench/README.md` with benchmark listing and usage examples for repo browsers.
+- Updated `qedclib/README.md` example to use the `qedclib.execute` import pattern.
+- Created starter examples in [qedclib-examples](https://github.com/quantumcomputingdata/qedclib-examples) and [qedcbench-examples](https://github.com/quantumcomputingdata/qedcbench-examples) repos for pip install users.
+
 ### Release 2.0.2 - 12 May 2026
 
 - **Metrics save separated from plotting**: `plot_metrics()` no longer saves data as a side effect. Each benchmark's `run_circuits()` now calls `metrics.save_app_metrics(benchmark_name, method=method)` explicitly after `finalize_all_groups()`. This makes the save visible and controllable.
