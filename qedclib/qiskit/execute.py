@@ -1699,6 +1699,15 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
         if done_event.wait(timeout=2.0):
             break   # result is ready
 
+        # Check if cancellation was requested
+        if cancel_requested:
+            print(f'\n... cancelling job {job_id}')
+            try:
+                job.cancel()
+            except Exception:
+                pass  # best effort
+            return None
+
         # Still waiting — check job status (with retry, robust to network errors)
         pollcount += 1
         status = _get_job_status(job, job_id)
