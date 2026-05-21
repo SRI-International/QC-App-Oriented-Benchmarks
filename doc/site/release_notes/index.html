@@ -151,6 +151,15 @@
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
 <h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
 <p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
+<h3 id="release-205-21-may-2026">Release 2.0.5 - 21 May 2026</h3>
+<ul>
+<li><strong>Bug fix: backend switching</strong> — Fixed stale IBM session/sampler state persisting when switching between backends (e.g., IBM → IonQ), causing gate validation errors. State is now fully reset on each call to <code>set_execution_target</code>.</li>
+<li><strong>Bug fix: IBM API credentials</strong> — The execution engine now reads <code>IBM_API_TOKEN</code> from the environment alongside <code>IBM_INSTANCE</code>, instead of always using the saved token. Warns when instance is set without a matching token, and provides a clear error message on authentication failure (403).</li>
+<li><strong>Bug fix: cloud simulator batching</strong> — <code>max_batch_size=1</code> (for cancel responsiveness) is now applied only to local simulators. Cloud backends like <code>ionq_simulator</code> batch all circuits together as expected.</li>
+<li><strong>Hardened CUDA-Q execution</strong> — Added error handling and <code>KeyboardInterrupt</code> propagation around <code>cudaq.sample()</code> in all execution paths. Improved signal handling in <code>run_all.py</code> for more reliable Ctrl-C termination during GPU execution.</li>
+<li><strong>Server UI: cancel status</strong> — Benchmarks that have not yet started when the user cancels a run now show "CANCELLED" instead of remaining as "pending".</li>
+<li>Updated PAL (known issues) documentation for accuracy.</li>
+</ul>
 <h3 id="release-204-19-may-2026">Release 2.0.4 - 19 May 2026</h3>
 <ul>
 <li><strong>Benchmark Runner Web UI (experimental)</strong>: Added a preliminary browser-based interface for executing benchmarks. Select benchmarks, configure run parameters (API, backend, qubits, shots), and launch execution from the browser. Live progress updates, a console output panel streaming benchmark output in real time, and volumetric positioning plots displayed after completion. Includes backend presets dropdown, data file management, and run cancellation support. To try it: <code>cd server &amp;&amp; uvicorn app:app --port 8088</code> (requires <code>pip install fastapi uvicorn</code>).</li>

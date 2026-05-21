@@ -1,6 +1,6 @@
 [project]
 name = "qedclib"
-version = "2.0.4"
+version = "2.0.5"
 description = "Quantum program execution engine with built-in performance monitoring"
 readme = "qedclib/README.md"
 requires-python = ">=3.9"

@@ -7,6 +7,15 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.5 - 21 May 2026
+
+- **Bug fix: backend switching** — Fixed stale IBM session/sampler state persisting when switching between backends (e.g., IBM → IonQ), causing gate validation errors. State is now fully reset on each call to `set_execution_target`.
+- **Bug fix: IBM API credentials** — The execution engine now reads `IBM_API_TOKEN` from the environment alongside `IBM_INSTANCE`, instead of always using the saved token. Warns when instance is set without a matching token, and provides a clear error message on authentication failure (403).
+- **Bug fix: cloud simulator batching** — `max_batch_size=1` (for cancel responsiveness) is now applied only to local simulators. Cloud backends like `ionq_simulator` batch all circuits together as expected.
+- **Hardened CUDA-Q execution** — Added error handling and `KeyboardInterrupt` propagation around `cudaq.sample()` in all execution paths. Improved signal handling in `run_all.py` for more reliable Ctrl-C termination during GPU execution.
+- **Server UI: cancel status** — Benchmarks that have not yet started when the user cancels a run now show "CANCELLED" instead of remaining as "pending".
+- Updated PAL (known issues) documentation for accuracy.
+
 ### Release 2.0.4 - 19 May 2026
 
 - **Benchmark Runner Web UI (experimental)**: Added a preliminary browser-based interface for executing benchmarks. Select benchmarks, configure run parameters (API, backend, qubits, shots), and launch execution from the browser. Live progress updates, a console output panel streaming benchmark output in real time, and volumetric positioning plots displayed after completion. Includes backend presets dropdown, data file management, and run cancellation support. To try it: `cd server && uvicorn app:app --port 8088` (requires `pip install fastapi uvicorn`).
