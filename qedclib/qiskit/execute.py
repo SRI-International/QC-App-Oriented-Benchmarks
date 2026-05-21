@@ -472,8 +472,14 @@ def set_execution_target(backend_id='qasm_simulator',
             backend_name = backend_id
             primitive_name = "sampler"
 
+            # Use token from environment if available, otherwise fall back to saved account
+            ibm_token = os.environ.get("IBM_API_TOKEN", None)
+            if instance and not ibm_token:
+                print("  WARNING: IBM_INSTANCE is set but IBM_API_TOKEN is not — using saved token.")
+                print("  If using a different account, set both IBM_API_TOKEN and IBM_INSTANCE.")
+
             try:
-                service = QiskitRuntimeService(channel=channel, instance=instance)
+                service = QiskitRuntimeService(channel=channel, token=ibm_token, instance=instance)
                 backend = service.backend(backend_name)
 
                 # DEVNOTE : If dynamic circuit is enabled in the exec_options, then If Else Operation
@@ -485,6 +491,11 @@ def set_execution_target(backend_id='qasm_simulator',
                 ######@@@@@@@@@@@@###########
 
             except Exception as ex:
+                if "403" in str(ex) or "Forbidden" in str(ex):
+                    print(f"ERROR: IBM credentials rejected (403 Forbidden) for {backend_id}.")
+                    print("  Check that IBM_API_TOKEN and IBM_INSTANCE match the same account.")
+                    print("  Also verify saved credentials: QiskitRuntimeService.saved_accounts(channel='ibm_cloud')")
+                    raise RuntimeError(f"IBM authentication failed for {backend_id} — 403 Forbidden") from None
                 print(authentication_error_msg.format(backend_id))
                 raise ex
             print(f"... using {backend=} {primitive_name=}")
