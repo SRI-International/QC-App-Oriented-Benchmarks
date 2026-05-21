@@ -238,8 +238,10 @@ async def start_run(req: RunRequest):
             "plot_results": False,
         }
 
-        # Use batch_size=1 for simulators so cancel can take effect between circuits
-        if "simulator" in req.backend_id or req.backend_id == "nvidia":
+        # Use batch_size=1 for local simulators so cancel can take effect between circuits
+        # (don't apply to cloud simulators like ionq_simulator where batching matters)
+        local_simulators = ["qasm_simulator", "statevector_simulator", "aer_sampler", "statevector_sampler", "nvidia"]
+        if req.backend_id in local_simulators:
             run_args["max_batch_size"] = 1
 
         # Configure hardware backend

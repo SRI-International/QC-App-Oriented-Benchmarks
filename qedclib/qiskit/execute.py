@@ -333,9 +333,14 @@ def set_execution_target(backend_id='qasm_simulator',
     if exec_options is None:
         exec_options = {}
 
+    # Reset session state from any previous backend (prevents stale IBM sampler/session
+    # from being used when switching to a different backend like IonQ or qasm_simulator)
+    sampler = None
+    session = None
+
     # set M3 options
     use_m3 = exec_options.get("use_m3", False)
-        
+
     # if a custom provider backend is given, use it ...
     # Note: in this case, the backend_id is an identifier that shows up in plots
     if provider_backend != None:
