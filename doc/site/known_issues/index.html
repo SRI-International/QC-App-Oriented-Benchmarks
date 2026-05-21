@@ -160,13 +160,13 @@
 <p><strong>Cirq and Braket support is out of date.</strong> The benchmark implementations for Google Cirq and Amazon Braket have not been updated for the v2.0 architecture. They may still work for some benchmarks but are not actively tested.</p>
 </li>
 <li>
-<p><strong>Ocean support is limited to MaxCut only.</strong> The D-Wave Ocean integration supports only the MaxCut benchmark.</p>
+<p><strong>Ocean support has not been tested with the v2.0 framework.</strong> The D-Wave Ocean integration (MaxCut benchmark only) was functional in v1.2 but has not been updated or tested with the new repository structure. This will be addressed in a near-term release.</p>
 </li>
 </ul>
 <h4 id="execution">Execution</h4>
 <ul>
 <li>
-<p><strong>CUDA-Q mgpu mode: OOM at 18+ qubits with multiple circuits.</strong> On Perlmutter (post-May 2026 maintenance), even sequential <code>cudaq.sample()</code> calls don't fully release state vector memory between circuits when using mgpu with 8 GPUs. This appears to be a cudaq/cusvsim regression. Workaround: use pipelined execution (when available) or reduce circuit count.</p>
+<p><strong>CUDA-Q execution may fail with multiple circuits per group.</strong> When using <code>-c 2</code> or higher (multiple circuit repetitions per qubit width), execution on CUDA-Q can fail once the total number of circuits across all groups exceeds some threshold. The root cause is under investigation. Workaround: use <code>-c 1</code> or reduce the qubit range.</p>
 </li>
 <li>
 <p><strong>Resumable job persistence is not implemented.</strong> If a hardware job completes after the Python process exits, results cannot currently be recovered and matched to expected distributions for fidelity computation. This feature is deferred pending a group discussion on design.</p>
@@ -177,18 +177,13 @@
 </ul>
 <h4 id="timing">Timing</h4>
 <ul>
-<li>
-<p><strong>IBM hardware returns batch-level timing only.</strong> Per-circuit execution time is not available from IBM when circuits are submitted as a batch. All circuits in a batch receive equal <code>exec_time</code> (total divided by N). Per-width timing requires pipelined execution (Task 1, not yet implemented).</p>
-</li>
-<li>
-<p><strong>IonQ and IQM return zero execution time.</strong> Both backends report <code>time_taken=0.0</code> in results. Timing falls back to <code>elapsed_time / N</code>, which includes queue wait time.</p>
-</li>
+<li><strong>Elapsed time on hardware backends may include queue wait time.</strong> When executing on any hardware backend (IBM, IonQ, IQM, etc.), the reported elapsed time includes time spent waiting in the provider's job queue, not just circuit execution time. The auto-warmup option may reduce queue wait for subsequent batches by keeping the session active, but this has not yet been fully tested.</li>
 </ul>
 <h2 id="anomalies">Anomalies</h2>
 <p>These are not bugs per se, but behaviors worth knowing about.</p>
 <h4 id="module-loading">Module Loading</h4>
 <ul>
-<li><strong><code>import execute</code> vs <code>from qedclib.qiskit import execute</code> are different module instances.</strong> The dynamic loader injects <code>execute</code> into <code>sys.modules</code> after <code>initialize()</code> is called. Importing directly from <code>qedclib.qiskit</code> bypasses this and creates a separate module object. Settings changed on one (e.g., <code>execute.verbose = True</code>) are not reflected in the other. Always use <code>import execute as ex</code> after initialization.</li>
+<li><strong>Always use <code>import execute as ex</code> after calling <code>initialize()</code>.</strong> Do not import execute directly from <code>qedclib.qiskit</code> (e.g., <code>from qedclib.qiskit import execute</code>) — this bypasses the dynamic loader and creates a separate module instance, so settings and state will not be shared correctly.</li>
 </ul>
 <h4 id="benchmark-behavior">Benchmark Behavior</h4>
 <ul>
@@ -210,9 +205,9 @@
 <p><strong>QRL module identity mismatch.</strong> The quantum reinforcement learning benchmark imports metrics in two different ways, which can cause the metrics module to appear as two separate instances.</p>
 </li>
 </ul>
-<h4 id="notebooks">Notebooks</h4>
+<h4 id="benchmark-specific">Benchmark-Specific</h4>
 <ul>
-<li><strong>HHL notebook has hardcoded qubit limits.</strong> The HHL benchmark notebook restricts qubit counts in a way that may not reflect the actual capability of the algorithm implementation.</li>
+<li><strong>Some benchmarks have built-in qubit maximums.</strong> Grover's, Shor's, HHL, and VQE impose default qubit limits to avoid runaway execution times. These can be relaxed by editing the default values in the benchmark source files.</li>
 </ul>
 <p><br>
 &copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.</p></div>

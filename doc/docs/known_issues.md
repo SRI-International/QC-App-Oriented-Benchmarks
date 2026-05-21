@@ -10,11 +10,11 @@ These are fundamental limitations in the current implementation. Some may be rel
 
 - **Cirq and Braket support is out of date.** The benchmark implementations for Google Cirq and Amazon Braket have not been updated for the v2.0 architecture. They may still work for some benchmarks but are not actively tested.
 
-- **Ocean support is limited to MaxCut only.** The D-Wave Ocean integration supports only the MaxCut benchmark.
+- **Ocean support has not been tested with the v2.0 framework.** The D-Wave Ocean integration (MaxCut benchmark only) was functional in v1.2 but has not been updated or tested with the new repository structure. This will be addressed in a near-term release.
 
 #### Execution
 
-- **CUDA-Q mgpu mode: OOM at 18+ qubits with multiple circuits.** On Perlmutter (post-May 2026 maintenance), even sequential `cudaq.sample()` calls don't fully release state vector memory between circuits when using mgpu with 8 GPUs. This appears to be a cudaq/cusvsim regression. Workaround: use pipelined execution (when available) or reduce circuit count.
+- **CUDA-Q execution may fail with multiple circuits per group.** When using `-c 2` or higher (multiple circuit repetitions per qubit width), execution on CUDA-Q can fail once the total number of circuits across all groups exceeds some threshold. The root cause is under investigation. Workaround: use `-c 1` or reduce the qubit range.
 
 - **Resumable job persistence is not implemented.** If a hardware job completes after the Python process exits, results cannot currently be recovered and matched to expected distributions for fidelity computation. This feature is deferred pending a group discussion on design.
 
@@ -22,9 +22,7 @@ These are fundamental limitations in the current implementation. Some may be rel
 
 #### Timing
 
-- **IBM hardware returns batch-level timing only.** Per-circuit execution time is not available from IBM when circuits are submitted as a batch. All circuits in a batch receive equal `exec_time` (total divided by N). Per-width timing requires pipelined execution (Task 1, not yet implemented).
-
-- **IonQ and IQM return zero execution time.** Both backends report `time_taken=0.0` in results. Timing falls back to `elapsed_time / N`, which includes queue wait time.
+- **Elapsed time on hardware backends may include queue wait time.** When executing on any hardware backend (IBM, IonQ, IQM, etc.), the reported elapsed time includes time spent waiting in the provider's job queue, not just circuit execution time. The auto-warmup option may reduce queue wait for subsequent batches by keeping the session active, but this has not yet been fully tested.
 
 ## Anomalies
 
@@ -32,7 +30,7 @@ These are not bugs per se, but behaviors worth knowing about.
 
 #### Module Loading
 
-- **`import execute` vs `from qedclib.qiskit import execute` are different module instances.** The dynamic loader injects `execute` into `sys.modules` after `initialize()` is called. Importing directly from `qedclib.qiskit` bypasses this and creates a separate module object. Settings changed on one (e.g., `execute.verbose = True`) are not reflected in the other. Always use `import execute as ex` after initialization.
+- **Always use `import execute as ex` after calling `initialize()`.** Do not import execute directly from `qedclib.qiskit` (e.g., `from qedclib.qiskit import execute`) — this bypasses the dynamic loader and creates a separate module instance, so settings and state will not be shared correctly.
 
 #### Benchmark Behavior
 
@@ -50,9 +48,9 @@ These are specific bugs or issues that may be fixed in future releases.
 
 - **QRL module identity mismatch.** The quantum reinforcement learning benchmark imports metrics in two different ways, which can cause the metrics module to appear as two separate instances.
 
-#### Notebooks
+#### Benchmark-Specific
 
-- **HHL notebook has hardcoded qubit limits.** The HHL benchmark notebook restricts qubit counts in a way that may not reflect the actual capability of the algorithm implementation.
+- **Some benchmarks have built-in qubit maximums.** Grover's, Shor's, HHL, and VQE impose default qubit limits to avoid runaway execution times. These can be relaxed by editing the default values in the benchmark source files.
 
 <br>
 &copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.
