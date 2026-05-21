@@ -20,10 +20,18 @@ Arguments match individual benchmark scripts:
 
 import argparse
 import os
+import signal
 import time
 import sys
 
 from qedclib import metrics
+
+
+# Use OS-level default for Ctrl-C: terminates process immediately.
+# Python's default SIGINT raises KeyboardInterrupt, but that requires the GIL —
+# cudaq's C++/CUDA calls hold the GIL and block Python from processing the signal.
+# SIG_DFL lets the OS kill the process without waiting for the GIL.
+signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 # Default benchmark sets by API
 DEFAULT_BENCHMARKS_QISKIT = [
