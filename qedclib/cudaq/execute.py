@@ -139,13 +139,20 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
     # Execute this rank's circuits
     local_results = []
     for circuit in my_circuits:
-        kernel, params = circuit[0], circuit[1]
-        if noise is None:
-            counts = cudaq.sample(kernel, *params, shots_count=num_shots)
-        else:
-            counts = cudaq.sample(kernel, *params, shots_count=num_shots, noise_model=noise)
-        # Convert cudaq result to dict
-        local_results.append({k: v for k, v in counts.items()})
+        try:
+            kernel, params = circuit[0], circuit[1]
+            if noise is None:
+                counts = cudaq.sample(kernel, *params, shots_count=num_shots)
+            else:
+                counts = cudaq.sample(kernel, *params, shots_count=num_shots, noise_model=noise)
+            # Convert cudaq result to dict
+            local_results.append({k: v for k, v in counts.items()})
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            print(f'ERROR: Rank {rank} failed to execute circuit')
+            print(f"... exception = {e}")
+            local_results.append({})
 
     # Gather all results to rank 0
     all_results = mpi.gather(local_results)
@@ -414,21 +421,31 @@ def execute_circuit (batched_circuit):
     ts = time.time()
     
     # call sample() on circuit with its list of arguments
-    if verbose: print(f"... during exec, noise model is: {noise}")
-    if noise is None:
-        if verbose: print("... executing without noise")
-        result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
-    else:
-        if verbose: print("... executing WITH noise")
-        result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
-    
+    try:
+        if verbose: print(f"... during exec, noise model is: {noise}")
+        if noise is None:
+            if verbose: print("... executing without noise")
+            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
+        else:
+            if verbose: print("... executing WITH noise")
+            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+    except KeyboardInterrupt:
+        raise
+    except Exception as e:
+        print(f'ERROR: Failed to execute circuit ({batched_circuit["group"]}/{batched_circuit["circuit"]})')
+        print(f"... exception = {e}")
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        raise
+
     # control results print at benchmark level
     #if verbose: print(result)
-        
+
     exec_time = time.time() - ts
-    
+
     # store the result object on the job for processing in job_complete
-    job.executor_result = result 
+    job.executor_result = result
     job.exec_time = exec_time
     
     if verbose:
@@ -695,16 +712,16 @@ def throttle_execution(completion_handler=metrics.finalize_group):
         if len(batched_circuits) < 1:
             break
             
-        # delay a bit, increasing the delay periodically 
-        sleeptime = 0.25
+        # delay a bit, increasing the delay periodically
+        sleeptime = 0.2
         if pollcount > 6: sleeptime = 0.5
-        if pollcount > 60: sleeptime = 1.0
+        if pollcount > 60: sleeptime = 5.0
         time.sleep(sleeptime)
-        
+
         pollcount += 1
-    
+
     if verbose:
-        if pollcount > 0: print("") 
+        if pollcount > 0: print("")
         #print(f"... throttling execution(2), active={len(active_circuits)}, batched={len(batched_circuits)}")
     '''
     
@@ -736,10 +753,10 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
         if len(active_circuits) < 1:
             break
             
-        # delay a bit, increasing the delay periodically 
-        sleeptime = 0.10                        # was 0.25
-        if pollcount > 6: sleeptime = 0.20      # 0.5
-        if pollcount > 60: sleeptime = 0.5      # 1.0
+        # delay a bit, increasing the delay periodically
+        sleeptime = 0.2
+        if pollcount > 6: sleeptime = 0.5
+        if pollcount > 60: sleeptime = 5.0
         time.sleep(sleeptime)
         
         pollcount += 1

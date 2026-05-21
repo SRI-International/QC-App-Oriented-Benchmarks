@@ -114,6 +114,13 @@ def run_benchmarks_thread(run_state):
                 run_state["events"].append({
                     "event": "log", "data": "Run cancelled by user."
                 })
+                # Mark all remaining benchmarks as cancelled
+                for remaining in benchmarks[i:]:
+                    run_state["results"][remaining] = {"status": "CANCELLED", "elapsed": 0}
+                    run_state["events"].append({
+                        "event": "result",
+                        "data": json.dumps({"benchmark": remaining, "status": "CANCELLED", "elapsed": 0})
+                    })
                 break
 
             run_state["current_benchmark"] = name
