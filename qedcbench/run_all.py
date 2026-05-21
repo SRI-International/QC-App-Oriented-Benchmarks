@@ -116,13 +116,17 @@ def configure_backend(backend_id, run_args):
     # IBM backends: "ibm" for least-busy, or specific like "ibm_sherbrooke"
     if backend_id.startswith("ibm"):
         ibm_instance = os.environ.get("IBM_INSTANCE", "")
+        ibm_token = os.environ.get("IBM_API_TOKEN", None)
         if not ibm_instance:
             print("  WARNING: IBM_INSTANCE not set — will use saved default credentials.")
             print("  Set IBM_INSTANCE to your CRN or service name to target a specific plan.")
+        elif not ibm_token:
+            print("  WARNING: IBM_INSTANCE is set but IBM_API_TOKEN is not — using saved token.")
+            print("  If using a different account, set both IBM_API_TOKEN and IBM_INSTANCE.")
 
         if backend_id == "ibm":
             from qiskit_ibm_runtime import QiskitRuntimeService
-            service = QiskitRuntimeService(channel="ibm_cloud", instance=ibm_instance)
+            service = QiskitRuntimeService(channel="ibm_cloud", token=ibm_token, instance=ibm_instance)
             backend = service.least_busy(simulator=False, operational=True, min_num_qubits=100)
             backend_id = backend.name
             print(f"  Least-busy IBM backend: {backend_id}")
