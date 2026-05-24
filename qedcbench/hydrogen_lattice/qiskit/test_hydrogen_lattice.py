@@ -22,6 +22,7 @@ def test_hydrogen_lattice_hartree_fock():
                 parameter_mode=1,  # all thetas are equivalent with parameter_mode=1
                 thetas_array=[0.0],  # all thetas are zero
                 backend_id="statevector_simulator",
+                plot_results=False,
             )
             energy, key_metrics = hydrogen_lattice_benchmark.run_objective_function(**hl_app_args)
             assert np.isclose(energy, key_metrics["hf_energy"])
@@ -74,6 +75,7 @@ def test_all_ones_h4_h6_r1p0():
             "parameter_mode": 2,
             "thetas_array": [1.0],
             "backend_id": "statevector_simulator",
+            "plot_results": False,
         }
         energy, key_metrics = hydrogen_lattice_benchmark.run_objective_function(**hl_app_args)
 
@@ -87,6 +89,7 @@ def test_h4_preoptimized():
         "parameter_mode": 2,
         "thetas_array": [0.06130415054606972, 0.03782678831535015, 0.15185290712860083, 0.03900390773961034],
         "backend_id": "statevector_simulator",
+        "plot_results": False,
     }
     energy, key_metrics = hydrogen_lattice_benchmark.run_objective_function(**hl_app_args)
 
@@ -118,6 +121,7 @@ def test_h8_preoptimized():
             0.01760223626449797,
         ],
         "backend_id": "statevector_simulator",
+        "plot_results": False,
     }
     energy, key_metrics = hydrogen_lattice_benchmark.run_objective_function(**hl_app_args)
 
@@ -142,6 +146,7 @@ def test_h6_preoptimized():
             0.023822028819589253,
         ],
         "backend_id": "statevector_simulator",
+        "plot_results": False,
     }
     energy, key_metrics = hydrogen_lattice_benchmark.run_objective_function(**hl_app_args)
 
@@ -182,6 +187,7 @@ def test_h10_preoptimized():
             0.014217086338594176,
         ],
         "backend_id": "statevector_simulator",
+        "plot_results": False,
     }
     energy, key_metrics = hydrogen_lattice_benchmark.run_objective_function(**hl_app_args)
 

@@ -1793,7 +1793,6 @@ def run_objective_function(**kwargs):
         max_circuits=1,             # only one repetition
         max_iter=1,                 # maximum minimizer iterations to perform, set to 1
         minimizer_function=single_eval,  # single evaluation, no optimization
-
         # disable display options for line plots
         line_y_metrics=None,
         line_x_metrics=None,
