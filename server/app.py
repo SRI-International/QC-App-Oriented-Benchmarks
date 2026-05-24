@@ -168,6 +168,11 @@ def run_benchmarks_thread(run_state):
                 })
                 print(f"\n  FAILED after {elapsed}s: {e}")
 
+                # If the first benchmark fails, likely a backend issue — abort the run
+                if i == 0:
+                    run_state["cancelled"] = True
+                    print("  First benchmark failed — cancelling remaining benchmarks.")
+
         # Generate combined volumetric plot
         images = []
         try:
