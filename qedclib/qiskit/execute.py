@@ -324,7 +324,7 @@ def set_execution_target(backend_id='qasm_simulator',
     global use_sessions
     global session_count
     global use_m3
-    authentication_error_msg = "No credentials for {0} backend found. Using the simulator instead."
+    authentication_error_msg = "ERROR: Failed to connect to backend '{0}'. Check credentials and backend name."
 
     # default to qasm_simulator if None passed in
     if backend_id == None:
@@ -1794,7 +1794,14 @@ def _wait_on_job_result(job, job_id):
             break
         except KeyboardInterrupt:
             raise
-        except Exception:
+        except Exception as ex:
+            ex_str = str(ex)
+            # Don't retry on fatal errors (bad backend, auth failure, invalid circuits)
+            fatal_keywords = ["403", "Forbidden", "not found", "authentication",
+                              "not supported by the target", "IBMInputValueError"]
+            if any(kw.lower() in ex_str.lower() for kw in fatal_keywords):
+                print(f'ERROR: Fatal error for job {job_id} — {ex}')
+                raise
             print(f'... error during job.result() for job {job_id} — retry {retry_count}/{max_retries}')
             if verbose: print(traceback.format_exc())
             if retry_count < max_retries:

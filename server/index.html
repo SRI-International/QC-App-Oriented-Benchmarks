@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>QED-C Benchmark Runner</title>
+    <title>QED-C Application-Oriented Benchmarks</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <style>
         :root {
@@ -12,7 +12,7 @@
             --qedc-light: #f8fafc;
         }
         header.app-header {
-            background: var(--qedc-dark);
+            background: var(--pico-primary-background);
             color: white;
             padding: 0.75rem 2rem;
             display: flex;
@@ -21,7 +21,7 @@
             margin-bottom: 1.5rem;
         }
         header.app-header h1 { margin: 0; font-size: 1.3rem; color: white; }
-        header.app-header a { color: #93c5fd; font-size: 0.9rem; }
+        header.app-header a { color: #ffffff; font-size: 0.9rem; background: rgba(255,255,255,0.2); padding: 0.3rem 0.75rem; border-radius: 4px; text-decoration: none; }
 
         .config-grid {
             display: grid;
@@ -51,6 +51,26 @@
             margin-bottom: 0.2rem;
         }
         .benchmarks-grid input[type="checkbox"] { margin: 0; }
+
+        .combo-box { position: relative; display: inline-block; width: 100%; }
+        .combo-box input { width: 100%; padding-right: 2.5rem; margin-bottom: 0; }
+        .combo-arrow {
+            position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+            width: 2rem; height: calc(100% - 4px); background: none; border: none;
+            cursor: pointer; font-size: 1rem; color: #555; display: flex;
+            align-items: center; justify-content: center;
+        }
+        .combo-arrow:hover { color: #000; }
+        .combo-list {
+            position: absolute; top: 100%; left: 0; right: 0; z-index: 10;
+            background: white; border: 1px solid #ccc; border-radius: 4px;
+            max-height: 200px; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            margin-top: 2px;
+        }
+        .combo-list div {
+            padding: 0.4rem 0.6rem; cursor: pointer; font-size: 0.9rem;
+        }
+        .combo-list div:hover { background: #e2e8f0; }
 
         .btn-row {
             display: flex;
@@ -148,7 +168,7 @@
 </head>
 <body>
     <header class="app-header">
-        <h1>QED-C Benchmark Runner</h1>
+        <h1>QED-C Application-Oriented Benchmarks</h1>
         <a href="/site/" target="_blank">Documentation</a>
     </header>
 
@@ -164,9 +184,12 @@
                     </select>
                 </label>
                 <label>Backend
-                    <select id="cfg-backend-select"></select>
-                    <input id="cfg-backend" type="text" value="qasm_simulator"
-                           style="display:none" placeholder="custom backend">
+                    <div class="combo-box">
+                        <input id="cfg-backend" type="text" value="qasm_simulator"
+                               placeholder="backend name" autocomplete="off">
+                        <button type="button" class="combo-arrow" onclick="toggleCombo()">&#9662;</button>
+                        <div id="cfg-backend-options" class="combo-list" style="display:none"></div>
+                    </div>
                 </label>
                 <label>Shots
                     <input id="cfg-shots" type="number" value="100" min="1" max="100000">
@@ -293,34 +316,30 @@
     };
 
     function updateBackendOptions(api) {
-        const sel = document.getElementById('cfg-backend-select');
+        const list = document.getElementById('cfg-backend-options');
         const input = document.getElementById('cfg-backend');
         const options = BACKEND_OPTIONS[api] || BACKEND_OPTIONS.qiskit;
-        sel.innerHTML = options.map(b => `<option value="${b}">${b}</option>`).join('')
-            + '<option value="__custom">Other...</option>';
-        sel.value = options[0];
+        list.innerHTML = options.map(b =>
+            `<div onclick="document.getElementById('cfg-backend').value='${b}'; this.parentNode.style.display='none'">${b}</div>`
+        ).join('');
         input.value = options[0];
-        input.style.display = 'none';
     }
 
-    function getBackendId() {
-        const sel = document.getElementById('cfg-backend-select');
-        const input = document.getElementById('cfg-backend');
-        return sel.value === '__custom' ? input.value : sel.value;
+    function toggleCombo() {
+        const list = document.getElementById('cfg-backend-options');
+        list.style.display = list.style.display === 'none' ? '' : 'none';
     }
 
-    document.getElementById('cfg-backend-select').addEventListener('change', () => {
-        const sel = document.getElementById('cfg-backend-select');
-        const input = document.getElementById('cfg-backend');
-        if (sel.value === '__custom') {
-            input.style.display = '';
-            input.value = '';
-            input.focus();
-        } else {
-            input.style.display = 'none';
-            input.value = sel.value;
+    // Close dropdown when clicking elsewhere
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.combo-box')) {
+            document.getElementById('cfg-backend-options').style.display = 'none';
         }
     });
+
+    function getBackendId() {
+        return document.getElementById('cfg-backend').value;
+    }
 
     document.getElementById('cfg-api').addEventListener('change', () => {
         const api = document.getElementById('cfg-api').value;

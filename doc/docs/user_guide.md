@@ -12,10 +12,13 @@ There are two ways to install and use the benchmarks:
 
 ```bash
 pip install qedcbench
+pip install qiskit qiskit-aer   # if you don't have Qiskit already
 python -m qedcbench.run_all
 ```
 
-This installs both **qedcbench** (the 17 benchmark applications) and **qedclib** (the execution engine). You can run the standard benchmark suite, customize parameters, run individual benchmarks, or import benchmark modules programmatically. See the [top-level README](https://github.com/SRI-International/QC-App-Oriented-Benchmarks#readme) for command-line examples.
+This installs both **qedcbench** (the 17 benchmark applications) and **qedclib** (the execution engine). A quantum SDK (Qiskit or CUDA-Q) must be installed separately, as these are not included as package dependencies. For CUDA-Q, add `-a cudaq` to the run command instead of installing the Qiskit packages.
+
+You can run the standard benchmark suite, customize parameters, run individual benchmarks, or import benchmark modules programmatically. See the [top-level README](https://github.com/SRI-International/QC-App-Oriented-Benchmarks#readme) for command-line examples.
 
 For standalone use of the execution engine without the benchmarks: `pip install qedclib`. See the [qedclib Guide](qedclib_guide.md) and [qedclib-examples](https://github.com/quantumcomputingdata/qedclib-examples) for usage.
 

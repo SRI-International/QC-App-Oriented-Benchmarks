@@ -173,7 +173,12 @@
 <h1 id="quick-start">Quick Start</h1>
 <p>This guide walks you through installing the <strong>QED-C Application-Oriented Benchmarks</strong> and running your first benchmark. By the end, you'll have executed a quantum algorithm benchmark and seen its performance metrics.</p>
 <blockquote>
-<p><strong>Tip:</strong> If you just want to run the standard benchmarks without cloning the repository, you can <code>pip install qedcbench</code> and then <code>python -m qedcbench.run_all</code>. See the <a href="../user_guide/">User Guide</a> for details on both installation options.</p>
+<p><strong>Tip:</strong> If you just want to run the standard benchmarks without cloning the repository:
+<code>bash
+pip install qedcbench
+pip install qiskit qiskit-aer   # if you don't have Qiskit already
+python -m qedcbench.run_all</code>
+For CUDA-Q instead of Qiskit, add <code>-a cudaq</code> to the run command. See the <a href="../user_guide/">User Guide</a> for details.</p>
 </blockquote>
 <h2 id="prerequisites">Prerequisites</h2>
 <ul>
@@ -289,6 +294,7 @@ ex.set_execution_target(&quot;qasm_simulator&quot;)
 
 qedclib.metrics.init_metrics()
 </code></pre>
+<p>For more complete examples — including batch execution, metrics collection, hardware backends, and result analysis — see the <a href="https://github.com/quantumcomputingdata/qedclib-examples">qedclib-examples</a> repository and the <a href="../qedclib_guide/">qedclib Guide</a>.</p>
 <h2 id="using-benchmarks-as-a-package">Using Benchmarks as a Package</h2>
 <p>You can import and run benchmarks programmatically:</p>
 <pre><code class="language-python">from qedcbench.hidden_shift import hs_benchmark
