@@ -109,6 +109,8 @@ ex.set_execution_target("qasm_simulator")
 qedclib.metrics.init_metrics()
 ```
 
+For more complete examples — including batch execution, metrics collection, hardware backends, and result analysis — see the [qedclib-examples](https://github.com/quantumcomputingdata/qedclib-examples) repository and the [qedclib Guide](./qedclib_guide.md).
+
 ## Using Benchmarks as a Package
 
 You can import and run benchmarks programmatically:
