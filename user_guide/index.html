@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>User Guide - QED-C Application-Oriented Benchmarks</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <link href="../css/custom.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="..">QED-C Application-Oriented Benchmarks</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href=".." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../quick_start/" class="nav-link">Quick Start</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="./" class="nav-link active" aria-current="page">User Guide</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../benchmarks/" class="nav-link">Benchmarks</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Setup</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../setup/" class="dropdown-item">Overview</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit/" class="dropdown-item">Qiskit</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cudaq/" class="dropdown-item">CUDA-Q</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cirq/" class="dropdown-item">Cirq</a>
+</li>
+                                    
+<li>
+    <a href="../setup/braket/" class="dropdown-item">Braket</a>
+</li>
+                                    
+<li>
+    <a href="../setup/ocean/" class="dropdown-item">Ocean</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qbraid/" class="dropdown-item">QBraid</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit-azure-quantum/" class="dropdown-item">Azure Quantum</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../release_notes/" class="nav-link">Releases</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../known_issues/" class="nav-link">PAL</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../about/" class="nav-link">About</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../quick_start/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../benchmarks/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#user-guide" class="nav-link">User Guide</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#installation" class="nav-link">Installation</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#repository-structure" class="nav-link">Repository Structure</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#running-benchmarks" class="nav-link">Running Benchmarks</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#understanding-results" class="nav-link">Understanding Results</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#supported-platforms" class="nav-link">Supported Platforms</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#available-benchmarks" class="nav-link">Available Benchmarks</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#enabling-compiler-optimizations" class="nav-link">Enabling Compiler Optimizations</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#architecture" class="nav-link">Architecture</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#the-qedclib-execution-engine" class="nav-link">The qedclib Execution Engine</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#upgrading-from-v1x" class="nav-link">Upgrading from v1.x</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#developer-notes" class="nav-link">Developer Notes</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="user-guide">User Guide</h1>
+<p>This guide covers installing, configuring, and running the <strong>QED-C Application-Oriented Benchmarks</strong> — a suite of 17 application-level quantum computing benchmarks with built-in performance metrics. It also describes <strong>qedclib</strong>, the execution engine that powers the benchmarks and can be used independently in your own projects.</p>
+<p>For a quick first run, see the <a href="../quick_start/">Quick Start</a>. This guide provides the complete reference.</p>
+<h2 id="installation">Installation</h2>
+<p>There are two ways to install and use the benchmarks:</p>
+<h3 id="option-1-pip-install-run-benchmarks-immediately">Option 1: pip install (run benchmarks immediately)</h3>
+<pre><code class="language-bash">pip install qedcbench
+pip install qiskit qiskit-aer   # if you don't have Qiskit already
+python -m qedcbench.run_all
+</code></pre>
+<p>This installs both <strong>qedcbench</strong> (the 17 benchmark applications) and <strong>qedclib</strong> (the execution engine). A quantum SDK (Qiskit or CUDA-Q) must be installed separately, as these are not included as package dependencies. For CUDA-Q, add <code>-a cudaq</code> to the run command instead of installing the Qiskit packages.</p>
+<p>You can run the standard benchmark suite, customize parameters, run individual benchmarks, or import benchmark modules programmatically. See the <a href="https://github.com/SRI-International/QC-App-Oriented-Benchmarks#readme">top-level README</a> for command-line examples.</p>
+<p>For standalone use of the execution engine without the benchmarks: <code>pip install qedclib</code>. See the <a href="../qedclib_guide/">qedclib Guide</a> and <a href="https://github.com/quantumcomputingdata/qedclib-examples">qedclib-examples</a> for usage.</p>
+<h3 id="option-2-clone-the-repository-full-source-notebooks-editable">Option 2: Clone the repository (full source, notebooks, editable)</h3>
+<pre><code class="language-bash">git clone https://github.com/SRI-International/QC-App-Oriented-Benchmarks.git
+cd QC-App-Oriented-Benchmarks
+pip install -e .
+</code></pre>
+<p>This gives you the full source code, Jupyter notebooks for interactive exploration, and the ability to modify benchmarks. Changes to <code>.py</code> files take effect immediately. The rest of this guide assumes this approach.</p>
+<h3 id="dependencies">Dependencies</h3>
+<p>Both options require <code>numpy</code>, <code>matplotlib</code>, and a quantum computing SDK:</p>
+<pre><code class="language-bash">pip install numpy matplotlib
+pip install qiskit qiskit-aer qiskit-ibm-runtime   # for Qiskit
+</code></pre>
+<p>For CUDA-Q, install <code>cuda-quantum</code> instead of the Qiskit packages. See the <a href="../setup/">Setup Guides</a> for platform-specific instructions.</p>
+<p>Some benchmarks have additional dependencies (e.g., <code>scipy</code> for Hamiltonian Simulation and HamLib). See individual benchmark directories for details.</p>
+<h2 id="repository-structure">Repository Structure</h2>
+<p>The repository installs two Python packages:</p>
+<pre><code>QC-App-Oriented-Benchmarks/
+├── qedclib/              # Execution and metrics library
+│   ├── qiskit/           # Qiskit execution backend
+│   ├── cudaq/            # CUDA-Q execution backend
+│   ├── cirq/             # Cirq execution backend (limited)
+│   ├── braket/           # Braket execution backend (limited)
+│   └── ocean/            # Ocean execution backend (MaxCut only)
+├── qedcbench/            # The 17 benchmark applications
+│   ├── hidden_shift/
+│   ├── quantum_fourier_transform/
+│   ├── hamlib/
+│   └── ...
+├── doc/                  # Documentation
+└── pyproject.toml        # Package configuration
+</code></pre>
+<h2 id="running-benchmarks">Running Benchmarks</h2>
+<p>After installation (see above), you can run benchmarks from within the repo or copy benchmark scripts and notebooks anywhere on your system and run them from there.</p>
+<h3 id="from-the-command-line">From the Command Line</h3>
+<p>Navigate to the <code>qedcbench</code> directory and run a benchmark as a module or script:</p>
+<pre><code class="language-bash">cd qedcbench
+python -m hidden_shift.hs_benchmark --api qiskit --min_qubits 2 --max_qubits 8 --num_shots 1000
+</code></pre>
+<p>Or navigate to the benchmark directory and run the script directly:</p>
+<pre><code class="language-bash">cd qedcbench/bernstein_vazirani
+python bv_benchmark.py --api qiskit --min_qubits 2 --max_qubits 10 --num_shots 1000
+</code></pre>
+<p>Use <code>--help</code> or <code>-h</code> for a full list of options:</p>
+<pre><code class="language-bash">python bv_benchmark.py -h
+</code></pre>
+<h3 id="common-arguments">Common Arguments</h3>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Short</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--api</code></td>
+<td><code>-a</code></td>
+<td>Quantum SDK (<code>qiskit</code>, <code>cudaq</code>)</td>
+<td><code>qiskit</code></td>
+</tr>
+<tr>
+<td><code>--min_qubits</code></td>
+<td></td>
+<td>Minimum circuit width</td>
+<td>varies</td>
+</tr>
+<tr>
+<td><code>--max_qubits</code></td>
+<td></td>
+<td>Maximum circuit width</td>
+<td>varies</td>
+</tr>
+<tr>
+<td><code>--num_shots</code></td>
+<td><code>-s</code></td>
+<td>Shots per circuit</td>
+<td>1000</td>
+</tr>
+<tr>
+<td><code>--num_circuits</code></td>
+<td><code>-c</code></td>
+<td>Circuits per qubit group</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>--backend_id</code></td>
+<td><code>-b</code></td>
+<td>Backend/simulator name</td>
+<td><code>qasm_simulator</code></td>
+</tr>
+<tr>
+<td><code>--method</code></td>
+<td><code>-m</code></td>
+<td>Algorithm variant (where applicable)</td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>--max_batch_size</code></td>
+<td><code>-mbs</code></td>
+<td>Max circuits to execute at a time (see below)</td>
+<td>None</td>
+</tr>
+</tbody>
+</table>
+<h3 id="batched-execution">Batched Execution</h3>
+<p>By default, <code>run()</code> creates all circuits up front and then executes them as a single batch. For large sweeps this can use excessive memory, particularly on GPU backends.</p>
+<p>When <code>--max_batch_size</code> (<code>-mbs</code>) is set, the benchmark alternates between circuit creation and execution: it creates all circuits for one qubit width at a time (up to <code>max_circuits</code>), accumulates widths until adding another would exceed the batch limit, then executes the accumulated batch before continuing. Batch boundaries always fall on qubit-width boundaries — a width's circuits are never split across batches.</p>
+<pre><code class="language-bash"># Execute at most 10 circuits at a time, creating one width at a time
+python qft_benchmark.py --min_qubits 2 --max_qubits 20 --max_circuits 3 --max_batch_size 10
+</code></pre>
+<p>Within each batch, <code>max_batch_size</code> also controls how many circuits are submitted to the backend in a single execution call. For example, if a batch contains 9 circuits and <code>max_batch_size</code> is 10, all 9 are submitted at once. If the batch contains 12 (because a single width produced 12 circuits), they are submitted in chunks of 10 and 2.</p>
+<h3 id="from-jupyter-notebooks">From Jupyter Notebooks</h3>
+<p>Suite notebooks are provided in <code>qedcbench/</code> for running multiple benchmarks with shared configuration:</p>
+<ol>
+<li>Start Jupyter: <code>jupyter notebook</code></li>
+<li>Open a suite notebook (e.g., <code>qedcbench/benchmarks-qiskit.ipynb</code>)</li>
+<li>Configure the first cell with your backend and execution options</li>
+<li>Run individual benchmark cells</li>
+</ol>
+<h4 id="modularized-notebooks">Modularized Notebooks</h4>
+<p>The modularized notebooks demonstrate the three-part API (get_circuits, run_circuits, plot_results) with explicit control over each step. A base notebook shows all three parts using QED-C defaults, and variant notebooks show how to substitute custom code for individual parts:</p>
+<table>
+<thead>
+<tr>
+<th>Notebook</th>
+<th>Customizes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>benchmarks-qiskit-modularized.ipynb</code></td>
+<td>Baseline — all parts use QED-C defaults</td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized-IBM.ipynb</code></td>
+<td><strong>Part 2</strong> — execution on IBM hardware</td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized-IQM.ipynb</code></td>
+<td><strong>Part 2</strong> — execution on IQM hardware</td>
+</tr>
+<tr>
+<td><code>benchmarks-qiskit-modularized-MQT.ipynb</code></td>
+<td><strong>Part 1</strong> — circuit generation from MQT Bench</td>
+</tr>
+</tbody>
+</table>
+<p>Each notebook defines an <strong>execution handler</strong> that processes results per circuit (computing fidelity, storing metrics). This is the recommended pattern for custom analysis — see Part 3 in any modularized notebook.</p>
+<h4 id="python-script-example">Python Script Example</h4>
+<p>A standalone script is also provided for running benchmarks programmatically:</p>
+<pre><code class="language-bash">python qedcbench/run_benchmark_example.py
+</code></pre>
+<p>This runs anywhere after <code>pip install -e .</code> and demonstrates the three-step API in minimal code.</p>
+<h3 id="execution-options">Execution Options</h3>
+<p>Additional execution options can be passed via <code>exec_options</code> dict in notebooks or as keyword arguments:</p>
+<pre><code class="language-python">exec_options = {
+    &quot;noise_model&quot;: &quot;default&quot;,      # Built-in depolarization noise
+    &quot;optimization_level&quot;: 1,       # Qiskit transpiler optimization (0-3)
+}
+
+benchmark.run(**app_args, **exec_options)
+</code></pre>
+<h3 id="running-on-hardware">Running on Hardware</h3>
+<p>By default, benchmarks run on local simulators. To run on real hardware:</p>
+<ol>
+<li>Configure your provider credentials (see <a href="../setup/">Setup Guides</a>)</li>
+<li>Set the <code>backend_id</code> to your hardware target</li>
+<li>Reduce <code>max_qubits</code> and <code>num_circuits</code> to avoid excessive costs</li>
+</ol>
+<pre><code class="language-bash">python bv_benchmark.py --backend_id ibm_fez --max_qubits 6 --num_circuits 1 --num_shots 1000
+</code></pre>
+<p><strong>Important:</strong> Hardware execution may incur billing costs. Start with small circuits and few shots.</p>
+<h2 id="understanding-results">Understanding Results</h2>
+<h3 id="metrics">Metrics</h3>
+<p>As benchmarks execute, the following metrics are collected and reported for each qubit-width group:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Creation Time</strong></td>
+<td>Time spent creating and transpiling circuits on the classical machine</td>
+</tr>
+<tr>
+<td><strong>Execution Time</strong></td>
+<td>Time spent running on the quantum backend (excludes queue wait)</td>
+</tr>
+<tr>
+<td><strong>Elapsed Time</strong></td>
+<td>Total wall-clock time including queue wait</td>
+</tr>
+<tr>
+<td><strong>Hellinger Fidelity</strong></td>
+<td>Similarity between measured and ideal output distributions (0 to 1)</td>
+</tr>
+<tr>
+<td><strong>Normalized Fidelity</strong></td>
+<td>Hellinger fidelity normalized to account for maximally noisy output</td>
+</tr>
+<tr>
+<td><strong>Circuit Depth</strong></td>
+<td>Number of gate layers in the algorithm</td>
+</tr>
+<tr>
+<td><strong>Transpiled Depth</strong></td>
+<td>Gate count after transpilation to a standard gate set (<code>rx</code>, <code>ry</code>, <code>rz</code>, <code>cx</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="output-files">Output Files</h3>
+<p>When benchmarks run, results are saved to the current working directory:</p>
+<ul>
+<li><code>__data/DATA-{backend_id}.json</code> — Metrics data in JSON format, keyed by benchmark name (e.g. <code>"Quantum Fourier Transform (1)"</code>).</li>
+<li><code>__images/{backend_id}/</code> — Generated plot images (JPG/PDF)</li>
+</ul>
+<h3 id="plotting">Plotting</h3>
+<p>After execution, <code>plot_results()</code> generates bar charts showing metrics across qubit widths. Plots are displayed inline in Jupyter or saved to <code>__images/</code>.</p>
+<h2 id="supported-platforms">Supported Platforms</h2>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Status</th>
+<th>Backends</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Qiskit</strong></td>
+<td>Fully supported</td>
+<td>Aer simulator, IBM hardware (via qiskit-ibm-runtime)</td>
+</tr>
+<tr>
+<td><strong>CUDA-Q</strong></td>
+<td>Fully supported</td>
+<td>Local GPU simulator, NVIDIA cloud (NVQC)</td>
+</tr>
+<tr>
+<td><strong>Cirq</strong></td>
+<td>Limited (out of date)</td>
+<td>Local simulator</td>
+</tr>
+<tr>
+<td><strong>Braket</strong></td>
+<td>Limited (out of date)</td>
+<td>AWS simulators and hardware</td>
+</tr>
+<tr>
+<td><strong>Ocean</strong></td>
+<td>MaxCut only</td>
+<td>D-Wave quantum annealer</td>
+</tr>
+</tbody>
+</table>
+<p>For platform-specific setup instructions, see the <a href="../setup/">Setup Guides</a>.</p>
+<h2 id="available-benchmarks">Available Benchmarks</h2>
+<p>The suite includes 17 benchmarks organized by complexity level. All benchmarks are located under <code>qedcbench/</code>.</p>
+<p>Each benchmark directory contains its own <code>README.md</code> with algorithm-specific documentation, including:
+- Algorithm description and motivation
+- Circuit construction approach
+- Expected results and interpretation
+- Benchmark-specific options</p>
+<p>To see the documentation for a specific benchmark:</p>
+<pre><code>qedcbench/{benchmark_name}/README.md
+</code></pre>
+<p>For example: <code>qedcbench/hidden_shift/README.md</code>, <code>qedcbench/hamlib/README.md</code>.</p>
+<h2 id="enabling-compiler-optimizations">Enabling Compiler Optimizations</h2>
+<p>The Qiskit benchmarks support compiler optimizations via <code>exec_options</code>:</p>
+<pre><code class="language-python">exec_options = {
+    &quot;optimization_level&quot;: 3,    # Qiskit transpiler optimization level
+}
+</code></pre>
+<p>Custom transformers (in <code>qedclib/transformers/</code>) and third-party tools can also be enabled. See the suite notebook's configuration cells for examples of available optimizations including:
+- <code>qiskit_passmgr</code> — custom Qiskit pass manager
+- <code>tket_optimiser</code> — Quantinuum t|ket⟩ optimization
+- <code>trueq_rc</code> — True-Q randomized compiling</p>
+<h2 id="architecture">Architecture</h2>
+<h3 id="three-function-benchmark-api">Three-Function Benchmark API</h3>
+<p>All benchmarks expose a standard interface:</p>
+<pre><code class="language-python">from qedcbench.hidden_shift import hs_benchmark
+
+# 1. Create circuits
+circuits = hs_benchmark.get_circuits(min_qubits=2, max_qubits=8, num_shots=1000, api=&quot;qiskit&quot;)
+
+# 2. Execute circuits
+hs_benchmark.run_circuits(circuits, backend_id=&quot;qasm_simulator&quot;)
+
+# 3. Plot results
+hs_benchmark.plot_results()
+</code></pre>
+<p>The convenience function <code>run(**kwargs)</code> calls all three and routes arguments automatically:</p>
+<pre><code class="language-python">hs_benchmark.run(min_qubits=2, max_qubits=8, num_shots=1000, api=&quot;qiskit&quot;, backend_id=&quot;qasm_simulator&quot;)
+</code></pre>
+<h3 id="dynamic-module-loading">Dynamic Module Loading</h3>
+<p>The benchmarks support multiple quantum computing APIs without hard-coding imports. When you specify <code>--api qiskit</code> (or pass <code>api="qiskit"</code>), the system dynamically loads the appropriate kernel implementation and execution backend. This is handled internally by <code>qedclib.initialize()</code> — you don't need to interact with it directly when running benchmarks normally.</p>
+<hr />
+<h2 id="the-qedclib-execution-engine">The qedclib Execution Engine</h2>
+<p>All of the benchmark code in this suite is built on top of <strong>qedclib</strong>, a quantum circuit execution engine that manages backend configuration, circuit submission, batched execution, per-circuit timing extraction, and automatic performance metrics collection. It supports both Qiskit and CUDA-Q, with multi-GPU parallelization via MPI.</p>
+<p>While qedclib was developed to power these benchmarks, it is also available as a <strong>standalone library</strong> for use in your own quantum computing projects — any application that needs to execute circuits at scale and collect performance data. It is published independently on <a href="https://pypi.org/project/qedclib/">PyPI</a> (<code>pip install qedclib</code>).</p>
+<p>For the full qedclib API reference, execution paths, metrics workflow, and backend configuration examples, see the <strong><a href="../qedclib_guide/">qedclib Guide</a></strong>.</p>
+<h2 id="upgrading-from-v1x">Upgrading from v1.x</h2>
+<p>If you have existing code that uses the previous repository structure, here is what changed and how to update:</p>
+<p><strong>Benchmarks have moved</strong> from the top level into <code>qedcbench/</code>:</p>
+<pre><code># Old:  cd hidden_shift &amp;&amp; python hs_benchmark.py
+# New:  cd qedcbench/hidden_shift &amp;&amp; python hs_benchmark.py
+</code></pre>
+<p><strong>Imports changed</strong> from <code>_common</code> to <code>qedclib</code>:</p>
+<pre><code class="language-python"># Old:
+from _common import metrics
+from _common import qcb_mpi as mpi
+
+# New:
+from qedclib import metrics
+from qedclib import qcb_mpi as mpi
+</code></pre>
+<p>The <code>_common</code> directory no longer exists. All imports must use <code>qedclib</code>.</p>
+<p><strong>Package imports</strong> now use the <code>qedcbench</code> prefix:</p>
+<pre><code class="language-python"># Old:
+from hidden_shift import hs_benchmark
+
+# New:
+from qedcbench.hidden_shift import hs_benchmark
+</code></pre>
+<p><strong>Installation</strong> is now done with <code>pip install -e .</code> at the repo root, replacing the old <code>setup.py</code>.</p>
+<p>For full compatibility with v1.x, use branch <a href="https://github.com/SRI-International/QC-App-Oriented-Benchmarks/tree/master-260411-v1.2.2">master-260411-v1.2.2</a>.</p>
+<h2 id="developer-notes">Developer Notes</h2>
+<p>This section is for developers working on the repository source code.</p>
+<h3 id="setup">Setup</h3>
+<p>After cloning the repository, install in editable mode from the repo root:</p>
+<pre><code class="language-bash">pip install -e .
+</code></pre>
+<p>This registers both <code>qedclib</code> and <code>qedcbench</code> as importable packages that point to your local source. Changes to <code>.py</code> files take effect immediately without re-installing. You only need to re-run <code>pip install -e .</code> if you modify <code>pyproject.toml</code>.</p>
+<h3 id="repository-layout">Repository Layout</h3>
+<pre><code>QC-App-Oriented-Benchmarks-master/
+├── pyproject.toml              # Package definition (provides qedclib + qedcbench)
+├── qedclib/                    # Execution library
+│   ├── __init__.py             # Public API
+│   ├── api.py                  # Dynamic loader, init, kernel discovery
+│   ├── metrics.py              # Metrics collection and plotting
+│   ├── batched.py              # Batched execution (batched_run)
+│   ├── qiskit/execute.py       # Qiskit execution backend
+│   └── cudaq/execute.py        # CUDA-Q execution backend
+├── qedcbench/                  # Benchmarks (17 benchmarks + notebooks)
+│   ├── __init__.py             # Registers benchmark root with qedclib
+│   ├── {benchmark}/            # Each benchmark has its own directory
+│   ├── benchmarks-*.ipynb      # Suite and modularized notebooks
+│   └── run_benchmark_example.py
+├── doc/                        # Documentation (mkdocs)
+│   ├── docs/                   # Source .md files (this user guide, etc.)
+│   ├── mkdocs.yml              # Navigation config
+│   └── site/                   # Generated HTML (python -m mkdocs build)
+└── server/app.py               # FastAPI doc server
+</code></pre>
+<h3 id="documentation">Documentation</h3>
+<p>Documentation source is in <code>doc/docs/</code>. To build:</p>
+<pre><code class="language-bash">cd doc
+python -m mkdocs build
+</code></pre>
+<p>To serve locally for preview:</p>
+<pre><code class="language-bash">cd doc
+python -m mkdocs serve
+</code></pre>
+<p>Or use the FastAPI server (serves the built site with additional features):</p>
+<pre><code class="language-bash">python server/app.py
+</code></pre>
+<h3 id="key-conventions">Key Conventions</h3>
+<ul>
+<li><strong>No <code>__init__.py</code> in API subdirectories</strong> (<code>qedclib/qiskit/</code>, <code>qedclib/cudaq/</code>, etc.) — this avoids namespace conflicts with vendor packages.</li>
+<li><strong>Benchmark directories keep <code>__init__.py</code></strong> — needed for <code>from qedcbench.{name} import ...</code> imports.</li>
+<li><strong><code>ex = qedclib.execute</code></strong> — after <code>initialize()</code> or <code>get_kernel()</code>, the execute module is available as <code>qedclib.execute</code>. Use <code>ex = qedclib.execute</code> for a short reference. Metrics are always available as <code>qedclib.metrics</code>.</li>
+<li><strong>Absolute paths</strong> — use <code>os.path.dirname(os.path.abspath(__file__))</code> in benchmark files, never relative paths.</li>
+<li><strong><code>sys.path.insert</code> lines</strong> — keep these in benchmark files; they're needed for benchmark-local imports (e.g., <code>hamlib/_common/</code>).</li>
+</ul>
+<p><br>
+&copy; 2025 Quantum Economic Development Consortium (QED-C). All Rights Reserved.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
