@@ -557,6 +557,29 @@ def set_execution_target(backend_id='qasm_simulator',
     global backend_exec_options
     backend_exec_options = exec_options
 
+    # Warmup here so the transpiler startup cost (~3-4s on first call) is not
+    # included in execution timing. If set_execution_target() is not called,
+    # warmup happens lazily on first execute_circuits() call instead.
+    _do_warmup()
+
+
+def _do_warmup():
+    """Run a small transpile+execute to prime Qiskit's transpiler and Aer backend.
+    Only runs once — subsequent calls are no-ops via the _warmup_done flag."""
+    global _warmup_done
+    if not auto_warmup or _warmup_done:
+        return
+    _warmup_done = True
+    try:
+        from qiskit import QuantumCircuit as QC
+        wc = QC(2, 2); wc.h(0); wc.cx(0, 1); wc.measure([0, 1], [0, 1])
+        wc = transpile(wc, backend)
+        backend.run([wc, wc], shots=100).result()
+        if verbose:
+            print("... warmup circuit executed")
+    except Exception:
+        pass  # warmup is best-effort
+
 
 # Set the state of the transpilation flags
 def set_transpilation_flags(do_transpile_metrics = True, do_transpile_for_execute = True):
@@ -1023,26 +1046,11 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         from execute_parallel import execute_circuits_parallel
         return execute_circuits_parallel(circuits, num_shots)
 
-    global _warmup_done
-
     if verbose:
         print(f"... execute_circuits({len(circuits)}, {num_shots}, wait={wait})")
 
-    # Auto-warmup: transpile and run a tiny circuit to prime both the
-    # transpiler and backend on first execution, so the first real circuit
-    # doesn't pay one-time initialization costs
-    if auto_warmup and not _warmup_done:
-        _warmup_done = True
-        try:
-            from qiskit import QuantumCircuit as QC
-            from qiskit import transpile as warmup_transpile
-            wc = QC(2, 2); wc.h(0); wc.cx(0, 1); wc.measure([0, 1], [0, 1])
-            wc = warmup_transpile(wc, backend)
-            backend.run([wc, wc], shots=100).result()
-            if verbose:
-                print("... warmup circuit executed")
-        except Exception:
-            pass  # warmup is best-effort
+    # Lazy warmup fallback — in case set_execution_target() was not called
+    _do_warmup()
 
     # Extract exec_options from the global set by set_execution_target()
     opts = copy.copy(backend_exec_options) if backend_exec_options else {}
@@ -1346,7 +1354,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
         try:
             result_dict = raw_result.to_dict()
 
-            if verbose:
+            if verbose_time:
                 print(f"... _extract_per_circuit_times: to_dict() path, {num_circuits} circuits")
                 top_keys = list(result_dict.keys())
                 print(f"... result_dict keys: {top_keys}")
@@ -1368,21 +1376,21 @@ def _extract_per_circuit_times(raw_result, num_circuits):
                     else:
                         break
                 if len(per_times) == num_circuits:
-                    if verbose:
+                    if verbose_time:
                         print(f"... per-experiment times: {per_times[:5]}{'...' if len(per_times) > 5 else ''}")
                     return per_times
 
             # Fall back to total time_taken divided evenly
             if "time_taken" in result_dict and result_dict["time_taken"] > 0:
                 avg = result_dict["time_taken"] / num_circuits
-                if verbose:
+                if verbose_time:
                     print(f"... using total time_taken / {num_circuits} = {avg}")
                 return [avg] * num_circuits
         except Exception as e:
-            if verbose:
+            if verbose_time:
                 print(f"... to_dict() extraction failed: {e}")
 
-        if verbose:
+        if verbose_time:
             print(f"... no timing extracted from to_dict() path")
         return None
 
@@ -1391,7 +1399,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
     # Now we submit batches, so we need per-pub metadata for individual circuit timing.
     if hasattr(raw_result, 'metadata'):
 
-        if verbose:
+        if verbose_time:
             print(f"... _extract_per_circuit_times: PrimitiveResult path, {num_circuits} circuits")
             print(f"... top-level metadata keys: {list(raw_result.metadata.keys()) if isinstance(raw_result.metadata, dict) else type(raw_result.metadata)}")
             try:
@@ -1424,16 +1432,16 @@ def _extract_per_circuit_times(raw_result, num_circuits):
                         per_times.append(pub_meta['time_taken'])
                         continue
                 # This pub has no timing — abort per-pub extraction
-                if verbose:
+                if verbose_time:
                     print(f"... pub has no timing info, aborting per-pub extraction")
                 per_times = []
                 break
             if len(per_times) == num_circuits:
-                if verbose:
+                if verbose_time:
                     print(f"... per-pub times extracted: {per_times}")
                 return per_times
         except (TypeError, IndexError) as e:
-            if verbose:
+            if verbose_time:
                 print(f"... per-pub iteration failed: {e}")
 
         # Fall back to top-level metadata (batch-level timing, divided evenly)
@@ -1444,7 +1452,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
             try:
                 if 'execution' in metadata:
                     spans = metadata['execution']['execution_spans']['__value__']['spans']
-                    if verbose:
+                    if verbose_time:
                         print(f"... top-level execution_spans: {len(spans)} spans")
                         for i, span in enumerate(spans[:3]):
                             print(f"...   span[{i}]: duration={span.duration}")
@@ -1452,7 +1460,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
                         return [span.duration for span in spans[:num_circuits]]
                     elif len(spans) == 1:
                         avg = spans[0].duration / num_circuits
-                        if verbose:
+                        if verbose_time:
                             print(f"... single span, dividing evenly: {avg}")
                         return [avg] * num_circuits
             except (KeyError, TypeError, AttributeError, IndexError):
@@ -1462,13 +1470,13 @@ def _extract_per_circuit_times(raw_result, num_circuits):
             if "time_taken" in metadata:
                 try:
                     avg = metadata["time_taken"] / num_circuits
-                    if verbose:
+                    if verbose_time:
                         print(f"... using top-level time_taken / {num_circuits} = {avg}")
                     return [avg] * num_circuits
                 except (TypeError, ZeroDivisionError):
                     pass
 
-        if verbose:
+        if verbose_time:
             print(f"... no timing extracted from PrimitiveResult")
 
     return None

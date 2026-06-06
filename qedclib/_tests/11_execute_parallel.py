@@ -21,7 +21,7 @@ args = parser.parse_args()
 api = args.api
 print(f"=== Parallel Execution Test (api={api}) ===\n")
 
-# Initialize
+# Initialize and configure backend (includes warmup to prime transpiler)
 import qedclib
 qedclib.initialize(api)
 import execute as ex
