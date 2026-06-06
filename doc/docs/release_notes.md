@@ -9,7 +9,7 @@ This version constitutes a major refactor of the entire benchmark repository. Fo
 
 ### Release 2.0.6 - 6 June 2026
 
-- **Parallel execution support (experimental)** — Added infrastructure for parallel circuit execution on Qiskit backends. When `execute.parallel_execution = True`, `execute_circuits()` routes to a parallel execution path that will map multiple circuits onto disjoint qubit regions of a single QPU for simultaneous execution. Currently a stub with sequential fallback; real implementation using Qiskit's parallel experiment capabilities is in development.
+- **Parallel execution support (experimental)** — Added infrastructure for parallel circuit execution on Qiskit backends at two levels. **Circuit-level**: when `execute.parallel_execution = True`, `execute_circuits()` maps multiple circuits onto disjoint qubit regions of a single QPU for simultaneous execution. **Group-level**: new `execute_circuit_groups()` function accepts groups of circuits with per-group shot counts, enabling parallel execution across groups (e.g., Pauli commuting groups in observable estimation). Includes qubit width validation — warns when the device is too small to parallelize, errors when circuits exceed device capacity. Both levels currently route to sequential stubs; real implementations using Qiskit's parallel experiment capabilities are in development.
 - **Improved benchmark timing accuracy** — Moved the Qiskit transpiler warmup from `execute_circuits()` to `set_execution_target()`, so the ~4s one-time transpiler initialization cost is no longer included in benchmark execution timing. Also improved the warmup circuit to fully prime Aer's batch execution path, eliminating a ~2ms first-circuit timing artifact.
 
 ### Release 2.0.5 - 27 May 2026
