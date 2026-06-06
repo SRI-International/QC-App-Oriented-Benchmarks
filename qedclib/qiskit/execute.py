@@ -1205,6 +1205,92 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     return (job_id, result)
 
 
+def execute_circuit_groups(circuit_groups, num_shots_list=None, num_shots=None):
+    """
+    Execute groups of circuits, each group with its own shot count.
+
+    Each group is a list of QuantumCircuits. Groups may have different numbers
+    of circuits and different shot counts. When parallel_execution is True,
+    routes to execute_circuit_groups_parallel() which will compose circuits
+    from multiple groups onto disjoint qubit regions for parallel execution.
+
+    Args:
+        circuit_groups: list of lists of QuantumCircuit objects
+        num_shots_list: list of ints, one per group (shot count for each group).
+                        If None, uses num_shots for all groups.
+        num_shots: default shot count if num_shots_list is not provided.
+                   Ignored if num_shots_list is given. Defaults to 100.
+
+    Returns:
+        (job_id, group_results) tuple:
+        - job_id: identifier for the job
+        - group_results: list of ExecutionResult, one per group
+    """
+    # Handle shot count args
+    if num_shots_list is None:
+        if num_shots is None:
+            num_shots = 100
+        num_shots_list = [num_shots] * len(circuit_groups)
+
+    if len(num_shots_list) != len(circuit_groups):
+        raise ValueError(f"num_shots_list length ({len(num_shots_list)}) must match "
+                         f"circuit_groups length ({len(circuit_groups)})")
+
+    if verbose:
+        group_sizes = [len(g) for g in circuit_groups]
+        print(f"... execute_circuit_groups: {len(circuit_groups)} groups, "
+              f"sizes={group_sizes}, shots={num_shots_list}")
+
+    # Determine max circuit width across all groups
+    max_width = 0
+    for group in circuit_groups:
+        for qc in group:
+            w = qc.num_qubits if hasattr(qc, 'num_qubits') else 0
+            if w > max_width:
+                max_width = w
+
+    # Check available qubits on the backend
+    available_qubits = None
+    try:
+        if backend is not None:
+            if hasattr(backend, 'num_qubits'):
+                available_qubits = backend.num_qubits
+            elif hasattr(backend, 'configuration'):
+                available_qubits = backend.configuration().n_qubits
+    except Exception:
+        pass
+
+    if available_qubits is not None and max_width > 0:
+        if available_qubits < max_width:
+            print(f"ERROR: circuit width ({max_width} qubits) exceeds device capacity "
+                  f"({available_qubits} qubits)")
+            pseudo_job = Job()
+            return (pseudo_job.job_id(), [ExecutionResult([{}] * len(g)) for g in circuit_groups])
+        elif available_qubits < 2 * max_width:
+            if verbose:
+                print(f"... WARNING: device has {available_qubits} qubits but parallel "
+                      f"requires >= {2 * max_width} (2x max circuit width {max_width}), "
+                      f"executing sequentially")
+
+    # Route to parallel execution if enabled
+    if parallel_execution and len(circuit_groups) > 1:
+        from execute_parallel import execute_circuit_groups_parallel
+        return execute_circuit_groups_parallel(circuit_groups, num_shots_list)
+
+    # Sequential: execute each group independently
+    group_results = []
+    last_job_id = None
+    for circuits, shots in zip(circuit_groups, num_shots_list):
+        job_id, result = execute_circuits(circuits, num_shots=shots)
+        last_job_id = job_id
+        group_results.append(result)
+
+    if verbose:
+        print(f"... execute_circuit_groups complete, {len(group_results)} groups")
+
+    return (last_job_id, group_results)
+
+
 def _execute_batch(circuits_info, num_shots, max_batch_size):
     """Internal: execute circuits_info in chunks of max_batch_size."""
     global cancel_requested
