@@ -129,7 +129,7 @@ result_handler = None
 use_normalized_depth = True
 
 # Auto-warmup: execute a tiny circuit on first call to execute_circuits() to prime the backend
-auto_warmup = False
+auto_warmup = True
 _warmup_done = False
 
 # Option to perform explicit transpile to collect depth metrics
@@ -1028,13 +1028,17 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     if verbose:
         print(f"... execute_circuits({len(circuits)}, {num_shots}, wait={wait})")
 
-    # Auto-warmup: run a tiny circuit to prime the backend on first execution
+    # Auto-warmup: transpile and run a tiny circuit to prime both the
+    # transpiler and backend on first execution, so the first real circuit
+    # doesn't pay one-time initialization costs
     if auto_warmup and not _warmup_done:
         _warmup_done = True
         try:
             from qiskit import QuantumCircuit as QC
-            wc = QC(1, 1); wc.h(0); wc.measure(0, 0)
-            backend.run(wc, shots=1).result()
+            from qiskit import transpile as warmup_transpile
+            wc = QC(2, 2); wc.h(0); wc.cx(0, 1); wc.measure([0, 1], [0, 1])
+            wc = warmup_transpile(wc, backend)
+            backend.run([wc, wc], shots=100).result()
             if verbose:
                 print("... warmup circuit executed")
         except Exception:
