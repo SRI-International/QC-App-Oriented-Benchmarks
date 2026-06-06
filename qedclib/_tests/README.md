@@ -17,7 +17,7 @@ From the repo root: `pip install -e .`
 | `04_batch_scaling.py` | Batch size and qubit count scaling, serial vs batch comparison | `python 04_batch_scaling.py` |
 | `05_submit_with_metrics.py` | submit_circuits with metrics collection | `python 05_submit_with_metrics.py` |
 | `11_execute_parallel.py` | Circuit-level parallel execution | See below |
-| `12_execute_circuit_groups.py` | Group-level parallel execution | `python 12_execute_circuit_groups.py` |
+| `12_execute_groups_parallel.py` | Group-level parallel execution | `python 12_execute_groups_parallel.py` |
 
 ## Parallel Execution Tests
 
@@ -42,13 +42,13 @@ mpiexec -np 2 python -m mpi4py 11_execute_parallel.py -a cudaq
 
 Without MPI, the parallel test is skipped and only sequential execution runs.
 
-### 12_execute_circuit_groups.py — Group-Level Parallel
+### 12_execute_groups_parallel.py — Group-Level Parallel
 
 Tests `execute_circuit_groups()` with groups of varying sizes, circuit widths,
 and shot counts. Currently Qiskit only.
 
 ```
-python 12_execute_circuit_groups.py -a qiskit
+python 12_execute_groups_parallel.py -a qiskit
 ```
 
 ## Parallel Execution Modes
