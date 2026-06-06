@@ -27,7 +27,7 @@ qedclib.initialize(api)
 import execute as ex
 
 ex.set_execution_target(backend_id="qasm_simulator" if api == "qiskit" else None)
-ex.verbose = True
+#ex.verbose = True
 
 # Build test circuits — 5 simple Hadamard circuits of different widths
 if api == "qiskit":

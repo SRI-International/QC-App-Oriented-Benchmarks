@@ -151,6 +151,11 @@
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
 <h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
 <p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
+<h3 id="release-206-6-june-2026">Release 2.0.6 - 6 June 2026</h3>
+<ul>
+<li><strong>Parallel execution support (experimental)</strong> — Added infrastructure for parallel circuit execution on Qiskit backends. When <code>execute.parallel_execution = True</code>, <code>execute_circuits()</code> routes to a parallel execution path that will map multiple circuits onto disjoint qubit regions of a single QPU for simultaneous execution. Currently a stub with sequential fallback; real implementation using Qiskit's parallel experiment capabilities is in development.</li>
+<li><strong>Improved benchmark timing accuracy</strong> — Moved the Qiskit transpiler warmup from <code>execute_circuits()</code> to <code>set_execution_target()</code>, so the ~4s one-time transpiler initialization cost is no longer included in benchmark execution timing. Also improved the warmup circuit to fully prime Aer's batch execution path, eliminating a ~2ms first-circuit timing artifact.</li>
+</ul>
 <h3 id="release-205-27-may-2026">Release 2.0.5 - 27 May 2026</h3>
 <ul>
 <li><strong>Bug fix: backend switching</strong> — Fixed stale IBM session/sampler state persisting when switching between backends (e.g., IBM → IonQ), causing gate validation errors. State is now fully reset on each call to <code>set_execution_target</code>.</li>
