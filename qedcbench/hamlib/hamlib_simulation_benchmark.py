@@ -413,6 +413,14 @@ def run(min_qubits: int = 2,
     def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # Determine fidelity of result set
         num_qubits = int(num_qubits)
+
+        # For method 2, restore the correct sparse_pauli_terms for this qubit width.
+        # Batch execution processes results after the creation loop, so the global
+        # sparse_pauli_terms may have been overwritten by a later qubit width.
+        global sparse_pauli_terms
+        if method == 2 and num_qubits in cached_sparse_pauli_terms:
+            sparse_pauli_terms = cached_sparse_pauli_terms[num_qubits]
+
         counts, expectation_a = analyze_and_print_result(
                     qc, result, num_qubits, num_shots,
                     type=circuit_id,
@@ -461,6 +469,11 @@ def run(min_qubits: int = 2,
     # metrics storage for observables, until we update the metrics module for use here
     metrics_array = []
 
+    # Cache sparse_pauli_terms per qubit width for use by the result handler.
+    # Needed because batch execution processes results after the creation loop,
+    # by which time the global sparse_pauli_terms has been overwritten.
+    cached_sparse_pauli_terms = {}
+
     for num_qubits in valid_qubits:
         global sparse_pauli_terms
     
@@ -482,6 +495,8 @@ def run(min_qubits: int = 2,
         else:    
             sparse_pauli_terms, dataset_name = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
                                                                 params=hamiltonian_params)
+        cached_sparse_pauli_terms[num_qubits] = sparse_pauli_terms
+
         print(f"... dataset_name = {dataset_name}")
         if verbose:
             print(f"... hamiltonian_params = \n{hamiltonian_params}")
