@@ -66,6 +66,11 @@ verbose = False
 # Cancel flag — set by request_cancel() to interrupt execution between batches/circuits
 cancel_requested = False
 
+# Parallel execution flag — when True, execute_circuits() will attempt to run
+# circuits in parallel by mapping them onto disjoint qubit regions of the QPU.
+# Set via: execute.parallel_execution = True (or via CLI --parallel_mode)
+parallel_execution = False
+
 def request_cancel():
     """Request cancellation of the current execution."""
     global cancel_requested
@@ -996,6 +1001,9 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     Uses the backend/sampler/noise configured by set_execution_target().
     Processes exec_options for noise_model, executor, and transpilation settings.
 
+    When parallel_execution is True, routes to execute_circuits_parallel()
+    in execute_parallel.py, which maps circuits onto disjoint qubit regions.
+
     Args:
         circuits: list of QuantumCircuit objects
         num_shots: shots per circuit
@@ -1009,6 +1017,11 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         - result: ExecutionResult with get_counts() → list of dicts,
           or None if wait=False
     """
+
+    # Route to parallel execution if enabled (implementation in execute_parallel.py)
+    if parallel_execution and circuits and len(circuits) > 1:
+        from execute_parallel import execute_circuits_parallel
+        return execute_circuits_parallel(circuits, num_shots)
 
     global _warmup_done
 
