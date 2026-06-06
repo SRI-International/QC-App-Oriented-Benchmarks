@@ -49,6 +49,12 @@ def request_cancel():
 auto_warmup = True
 _warmup_done = False
 
+# Parallel execution flag — when True, execute_circuits() will distribute
+# circuits across MPI ranks (equivalent to gpus_per_circuit=1).
+# Provides a consistent API with the Qiskit execute module.
+# Requires MPI with >1 rank to have any effect.
+parallel_execution = False
+
 # Parallel execution configuration (reserved for future use)
 _parallel_config = {
     "gpus_per_circuit": None,
@@ -967,9 +973,9 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     counts_array = None
     per_circuit_times = []
 
-    # MPI parallel execution (gpus_per_circuit support)
-    if gpus_per_circuit is not None and mpi.enabled() and mpi.size > 1:
-        if gpus_per_circuit == 1:
+    # MPI parallel execution (gpus_per_circuit or parallel_execution flag)
+    if (gpus_per_circuit is not None or parallel_execution) and mpi.enabled() and mpi.size > 1:
+        if gpus_per_circuit == 1 or (parallel_execution and gpus_per_circuit is None):
             # Mode 3: each GPU runs one circuit independently (max parallelism)
             counts_array = _execute_parallel_mpi(circuits, num_shots)
         elif gpus_per_circuit < mpi.size:

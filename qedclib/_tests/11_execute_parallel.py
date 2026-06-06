@@ -1,14 +1,18 @@
 """
-11_execute_parallel.py — Test parallel execution via execute_circuits.
+11_execute_parallel.py — Test circuit-level parallel execution.
 
-Tests that setting execute.parallel_execution = True causes execute_circuits()
-to route through execute_circuits_parallel(). Currently a stub that executes
-sequentially, but validates the plumbing end-to-end.
+Tests that execute.parallel_execution = True causes execute_circuits()
+to use parallel execution. For Qiskit this routes to execute_parallel.py
+(qubit-mapped parallel on one QPU). For CUDA-Q this triggers MPI-based
+distribution across GPUs (same as gpus_per_circuit=1).
 
 Usage:
-    python 11_execute_parallel.py              # qiskit (default)
+    python 11_execute_parallel.py                         # qiskit (default)
     python 11_execute_parallel.py -a qiskit
-    python 11_execute_parallel.py -a cudaq
+    mpiexec -np 2 python -m mpi4py 11_execute_parallel.py -a cudaq
+
+For CUDA-Q parallel, MPI with >= 2 ranks is required. Without MPI the
+parallel test is skipped. See _tests/README.md for details.
 """
 
 import argparse
@@ -80,13 +84,24 @@ for i, counts in enumerate(counts_list):
     print(f"  Circuit {i}: {len(counts)} outcomes, {total} shots")
 
 #############################################
-# Test 2: Parallel execution (Qiskit only)
+# Test 2: Parallel execution
 #
-# For cudaq, circuit-level parallel already works via gpus_per_circuit=1
-# with MPI — no new flag needed. The parallel_execution flag is Qiskit-only,
-# for qubit-mapped parallel on a single QPU.
+# Both backends use the same flag: execute.parallel_execution = True
+# - Qiskit: routes to execute_parallel.py (qubit mapping stub)
+# - CUDA-Q: triggers _execute_parallel_mpi (MPI distribution),
+#   requires MPI with >= 2 ranks
 #############################################
-if api == "qiskit":
+
+# Check if parallel is possible
+can_parallel = True
+if api == "cudaq":
+    from qedclib import qcb_mpi as mpi
+    if not mpi.enabled() or mpi.size < 2:
+        can_parallel = False
+        print(f"\n--- Test 2: Skipped (CUDA-Q parallel requires MPI with >= 2 ranks) ---")
+        print(f"... launch with: mpiexec -np 2 python -m mpi4py 11_execute_parallel.py -a cudaq")
+
+if can_parallel:
     print(f"\n--- Test 2: Parallel execution (parallel_execution=True) ---")
     ex.parallel_execution = True
 
@@ -108,7 +123,6 @@ if api == "qiskit":
     # Reset flag
     ex.parallel_execution = False
 else:
-    print(f"\n--- Test 2: Skipped (cudaq already has circuit-level parallel via -gpc 1) ---")
     counts_list_par = counts_list  # use same results for validation
 
 #############################################
