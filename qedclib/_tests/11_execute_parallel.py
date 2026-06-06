@@ -88,42 +88,31 @@ for i, counts in enumerate(counts_list):
 #
 # Both backends use the same flag: execute.parallel_execution = True
 # - Qiskit: routes to execute_parallel.py (qubit mapping stub)
-# - CUDA-Q: triggers _execute_parallel_mpi (MPI distribution),
-#   requires MPI with >= 2 ranks
+# - CUDA-Q: triggers _execute_parallel_mpi (MPI distribution)
+#
+# If parallel can't be done (no MPI, single rank), the execute module
+# prints a one-time warning and falls back to sequential automatically.
 #############################################
+print(f"\n--- Test 2: Parallel execution (parallel_execution=True) ---")
+ex.parallel_execution = True
 
-# Check if parallel is possible
-can_parallel = True
-if api == "cudaq":
-    from qedclib import qcb_mpi as mpi
-    if not mpi.enabled() or mpi.size < 2:
-        can_parallel = False
-        print(f"\n--- Test 2: Skipped (CUDA-Q parallel requires MPI with >= 2 ranks) ---")
-        print(f"... launch with: mpiexec -np 2 python -m mpi4py 11_execute_parallel.py -a cudaq")
+t0 = time.time()
+job_id, result = ex.execute_circuits(circuits, num_shots=num_shots)
+elapsed_par = time.time() - t0
 
-if can_parallel:
-    print(f"\n--- Test 2: Parallel execution (parallel_execution=True) ---")
-    ex.parallel_execution = True
+counts_list_par = result.get_counts()
+if not isinstance(counts_list_par, list):
+    counts_list_par = [counts_list_par]
 
-    t0 = time.time()
-    job_id, result = ex.execute_circuits(circuits, num_shots=num_shots)
-    elapsed_par = time.time() - t0
+print(f"Job ID: {job_id}")
+print(f"Elapsed: {elapsed_par:.3f}s")
+print(f"Results: {len(counts_list_par)} count dicts")
+for i, counts in enumerate(counts_list_par):
+    total = sum(counts.values())
+    print(f"  Circuit {i}: {len(counts)} outcomes, {total} shots")
 
-    counts_list_par = result.get_counts()
-    if not isinstance(counts_list_par, list):
-        counts_list_par = [counts_list_par]
-
-    print(f"Job ID: {job_id}")
-    print(f"Elapsed: {elapsed_par:.3f}s")
-    print(f"Results: {len(counts_list_par)} count dicts")
-    for i, counts in enumerate(counts_list_par):
-        total = sum(counts.values())
-        print(f"  Circuit {i}: {len(counts)} outcomes, {total} shots")
-
-    # Reset flag
-    ex.parallel_execution = False
-else:
-    counts_list_par = counts_list  # use same results for validation
+# Reset flag
+ex.parallel_execution = False
 
 #############################################
 # Validate: both paths should return same structure

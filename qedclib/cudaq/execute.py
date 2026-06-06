@@ -55,6 +55,8 @@ _warmup_done = False
 # Requires MPI with >1 rank to have any effect.
 parallel_execution = False
 
+_parallel_warning_shown = False
+
 # Parallel execution configuration (reserved for future use)
 _parallel_config = {
     "gpus_per_circuit": None,
@@ -973,6 +975,14 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     counts_array = None
     per_circuit_times = []
 
+    # Warn once if parallel requested but not available
+    global _parallel_warning_shown
+    if parallel_execution and (not mpi.enabled() or mpi.size < 2):
+        if not _parallel_warning_shown:
+            print(f"... WARNING: parallel_execution=True but only 1 GPU available (MPI not enabled or single rank)")
+            print(f"... executing sequentially. Launch with mpiexec -np N for parallel execution.")
+            _parallel_warning_shown = True
+
     # MPI parallel execution (gpus_per_circuit or parallel_execution flag)
     if (gpus_per_circuit is not None or parallel_execution) and mpi.enabled() and mpi.size > 1:
         if gpus_per_circuit == 1 or (parallel_execution and gpus_per_circuit is None):
@@ -1035,6 +1045,63 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         print(f"... execute_circuits complete, job_id={job_id}")
 
     return (job_id, results)
+
+
+def execute_circuit_groups(circuit_groups, num_shots_list=None, num_shots=None):
+    """
+    Execute groups of circuits, each group with its own shot count.
+
+    Each group is a list of [kernel, [args]] tuples. Groups may have different
+    numbers of circuits and different shot counts. When parallel_execution is
+    True and MPI is available with >1 rank, groups are distributed across ranks.
+
+    Args:
+        circuit_groups: list of lists of [kernel, [args]] tuples
+        num_shots_list: list of ints, one per group (shot count for each group).
+                        If None, uses num_shots for all groups.
+        num_shots: default shot count if num_shots_list is not provided.
+                   Ignored if num_shots_list is given. Defaults to 100.
+
+    Returns:
+        (job_id, group_results) tuple:
+        - job_id: identifier for the job
+        - group_results: list of ExecutionResult, one per group
+    """
+    # Handle shot count args
+    if num_shots_list is None:
+        if num_shots is None:
+            num_shots = 100
+        num_shots_list = [num_shots] * len(circuit_groups)
+
+    if len(num_shots_list) != len(circuit_groups):
+        raise ValueError(f"num_shots_list length ({len(num_shots_list)}) must match "
+                         f"circuit_groups length ({len(circuit_groups)})")
+
+    if verbose:
+        group_sizes = [len(g) for g in circuit_groups]
+        print(f"... execute_circuit_groups: {len(circuit_groups)} groups, "
+              f"sizes={group_sizes}, shots={num_shots_list}")
+
+    # TODO: when parallel_execution is True and MPI has >1 rank, distribute
+    # groups across ranks here (group-level MPI distribution). For now,
+    # execute sequentially — each group calls execute_circuits().
+
+    if parallel_execution and mpi.enabled() and mpi.size > 1:
+        print(f">>> execute_circuit_groups [cudaq]: {len(circuit_groups)} groups, parallel=True")
+        print(f"... [STUB] group-level MPI distribution not yet implemented, executing sequentially")
+
+    # Sequential: execute each group independently
+    group_results = []
+    last_job_id = None
+    for circuits, shots in zip(circuit_groups, num_shots_list):
+        job_id, result = execute_circuits(circuits, num_shots=shots)
+        last_job_id = job_id
+        group_results.append(result)
+
+    if verbose:
+        print(f"... execute_circuit_groups complete, {len(group_results)} groups")
+
+    return (last_job_id, group_results)
 
 
 def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=None, num_shots=None):
