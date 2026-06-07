@@ -1,6 +1,6 @@
-# Parallel and Cooperative Execution
+# Parallel and Distributed Statevector Execution
 
-When running quantum circuits on simulators or hardware, there are two ways to use multiple devices to your advantage: **parallel execution** for speed, and **cooperative execution** for scale.
+When running quantum circuits on simulators or hardware, there are two ways to use multiple devices to your advantage: **parallel execution** for speed, and **distributed statevector** execution for scale.
 
 ## Parallel Execution — Run Circuits Faster
 
@@ -60,30 +60,30 @@ For qubit-mapped parallel execution, the device must have enough qubits to hold 
 
 Within a group, the widest circuit determines the qubit allocation. Narrower circuits use a subset of the allocated region.
 
-## Cooperative Execution — Run Larger Circuits
+## Distributed Statevector Execution — Run Larger Circuits
 
-Cooperative execution uses multiple GPUs together to implement a single circuit that would be too large for any one device. The GPUs cooperate to hold and manipulate one expanded statevector.
+Distributed statevector execution partitions and distributes a single circuit's statevector across multiple GPUs, enabling simulation of circuits that are too large for any one device.
 
-This mode is available with **CUDA-Q only** and is enabled automatically when running under MPI. For example, 4 GPUs with 32GB each provide a combined 128GB of memory, adding approximately 2 qubits of capacity beyond what a single GPU can handle.
+This mode is available with **CUDA-Q only** and is enabled automatically when running under MPI. For example, 4 GPUs with 32GB each provide a combined 128GB of memory, adding approximately 2 qubits of capacity beyond what a single GPU can handle. This aligns with NVIDIA's `nvidia-mgpu` backend, which uses the cuStateVec library for multi-node, multi-GPU statevector distribution.
 
-**Important**: Cooperative execution is not parallelization. Only one circuit runs at a time — the GPUs are sharing the workload of a problem too large for a single device.
+**Important**: Distributed statevector execution is not parallelization. Only one circuit runs at a time — the statevector is partitioned across GPUs to fit a larger problem in memory.
 
-### Using Cooperative Execution
+### Using Distributed Statevector Execution
 
-Cooperative execution is the default mode when running CUDA-Q under MPI without the `--parallel` flag:
+Distributed statevector execution is the default mode when running CUDA-Q under MPI without the `--parallel` flag:
 
 ```bash
-# 4 GPUs cooperate on each circuit (default MPI behavior)
+# 4 GPUs distribute the statevector (default MPI behavior)
 mpirun -np 4 python -m mpi4py benchmark.py -a cudaq
 ```
 
-The `--gpus_per_circuit` (`-gpc`) flag provides fine-grained control over how many GPUs cooperate per circuit:
+The `--gpus_per_circuit` (`-gpc`) flag provides fine-grained control over how many GPUs participate per circuit:
 
 ```bash
-# All 4 GPUs cooperate per circuit (maximum statevector capacity)
+# All 4 GPUs distribute the statevector (maximum capacity)
 mpirun -np 4 python -m mpi4py benchmark.py -a cudaq -gpc 4
 
-# 2 GPUs cooperate per circuit, 2 circuits run in parallel
+# 2 GPUs per statevector, 2 circuits run in parallel
 mpirun -np 4 python -m mpi4py benchmark.py -a cudaq -gpc 2
 
 # 1 GPU per circuit, 4 circuits run in parallel (same as -p)
@@ -93,20 +93,60 @@ mpirun -np 4 python -m mpi4py benchmark.py -a cudaq -gpc 1
 ### Programmatic Control
 
 ```python
-# Cooperative: 4 GPUs share the workload for each circuit
+# Distributed statevector: 4 GPUs partition the statevector for each circuit
 job_id, result = ex.execute_circuits(circuits, num_shots=1000, gpus_per_circuit=4)
 
 # Parallel: each GPU runs a different circuit
 job_id, result = ex.execute_circuits(circuits, num_shots=1000, gpus_per_circuit=1)
 ```
 
+## CUDA-Q Execution Modes: Our Approach vs NVIDIA's Built-In Options
+
+NVIDIA's CUDA-Q provides two built-in multi-GPU backends that overlap with what qedclib provides. Understanding the differences helps clarify when to use which.
+
+### NVIDIA's mgpu — Distributed Statevector
+
+NVIDIA's `nvidia-mgpu` backend (now `nvidia` with `option="mgpu"`) partitions and distributes the statevector across GPUs using MPI. This is what qedclib uses by default when MPI is enabled — our `set_execution_target()` automatically sets the mgpu option. The `-gpc` flag controls this mode.
+
+### NVIDIA's mqpu — Multiple Virtual QPUs
+
+NVIDIA's `nvidia-mqpu` backend (now `nvidia` with `option="mqpu"`) treats each GPU as a separate virtual QPU. Circuits are dispatched to specific GPUs using `cudaq.sample_async(kernel, qpu_id=N)`, which returns a future. This mode does NOT require MPI — CUDA-Q detects available GPUs and manages them internally using threads.
+
+NVIDIA provides two use cases for mqpu:
+- **Parameter sweeps**: Run the same circuit with different parameters across GPUs
+- **Hamiltonian distribution**: `cudaq.observe()` with `execution=cudaq.parallel.mpi` automatically distributes Hamiltonian terms across GPUs
+
+### How qedclib's Parallel Execution Relates
+
+| | qedclib (`-p` / `gpc=1`) | NVIDIA mqpu |
+|---|---|---|
+| **Target** | `nvidia` with `fp32` per MPI rank | `nvidia` with `mqpu` |
+| **Distribution** | MPI rank assignment | `qpu_id` parameter or automatic |
+| **Execution** | Synchronous `cudaq.sample()` | Async `cudaq.sample_async()` |
+| **Who manages** | qedclib framework | User (explicit `qpu_id`) or cudaq (for `observe`) |
+| **Requires MPI** | Yes (`mpiexec -np N`) | No for single node (thread mode) |
+| **Multi-node** | Yes (MPI works across nodes) | Thread mode: no. MPI mode: yes. |
+| **What's distributed** | Array of arbitrary circuits | Same kernel with different params, or Hamiltonian terms |
+
+### What qedclib's Parallel Execution Provides
+
+qedclib's `--parallel` (`-p`) option goes beyond what NVIDIA's built-in mqpu offers:
+
+- **Multi-node and multi-GPU**: Distributes circuits across all available GPUs whether they are on the same node or spread across multiple nodes in a cluster. MPI handles cross-node communication transparently — the user calls `execute_circuits(circuit_array)` and the framework manages everything.
+
+- **Arbitrary circuit arrays**: Distributes arrays of different circuits, each potentially with different structure and qubit widths. NVIDIA's mqpu is designed primarily for parameter sweeps (same kernel, many parameter sets) and requires explicit `qpu_id` management from the user.
+
+- **Sampling-based observable estimation**: The `execute_circuit_groups()` function distributes groups of measurement circuits with per-group shot counts across GPUs. This enables sampling-based expectation value computation — measuring Pauli terms via circuit execution and classical post-processing — which models the behavior of real quantum hardware. NVIDIA's built-in `cudaq.observe()` with parallel distribution computes expectation values directly from the statevector, which is efficient for simulation but does not model the shot noise and measurement statistics of physical devices.
+
+- **Framework-level transparency**: The user's code doesn't change between sequential and parallel execution — just set a flag. No need to manage `qpu_id` assignments, futures, or async patterns.
+
 ## Summary
 
-| | Parallel (`-p`) | Cooperative (default MPI) |
+| | Parallel (`-p`) | Distributed Statevector (default MPI) |
 |---|---|---|
 | **Goal** | Speed — faster completion | Scale — larger circuits |
 | **Circuits running simultaneously** | Multiple | One |
 | **Devices per circuit** | One | Multiple |
 | **Qiskit** | Map onto disjoint qubit regions | N/A |
-| **CUDA-Q** | Distribute across GPUs | GPUs cooperate on statevector |
+| **CUDA-Q** | Distribute circuits across GPUs | Distribute statevector across GPUs |
 | **When to use** | Many circuits, moderate width | Few circuits, maximum width |
