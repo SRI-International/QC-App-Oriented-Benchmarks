@@ -447,9 +447,9 @@ def run(min_qubits: int = 2,
               f"(expectation values computed directly, not via circuit sampling)")
         ex.parallel_execution = False
 
-    # For CUDA-Q, cannot yet use method 1 as it uses Aer for simulation
-    # use method 2 instead
-    if api == "cudaq" and method == 1:
+    # For CUDA-Q fidelity benchmarks, cannot use method 1 as it uses Aer for simulation
+    # use method 2 instead (not applicable when doing observables)
+    if api == "cudaq" and method == 1 and not do_observables:
         print(f"WARNING: method 1 not supported for {api} API, use method 2 instead")
         method = 2
         
