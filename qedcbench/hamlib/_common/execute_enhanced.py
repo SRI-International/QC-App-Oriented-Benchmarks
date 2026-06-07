@@ -43,11 +43,48 @@ def execute_circuits_enhanced(
     from qedclib import qcb_mpi as mpi
     mpi.barrier()
 
-    # call api-specific function to execute circuits
+    import execute as ex
+
+    # Group-parallel path: when parallel_execution is True, use
+    # execute_circuit_groups() which distributes groups across GPUs/qubit regions.
+    # Each Pauli commuting group is one circuit with its own shot count.
+    if ex.parallel_execution:
+
+        # Compute per-group shot counts
+        if not distribute_shots:
+            shots_per_circuit = int(num_shots / len(circuits))
+            num_shots_list = [shots_per_circuit] * len(circuits)
+        else:
+            num_shots_list = get_distributed_shot_counts(
+                    num_shots, pauli_term_groups, ds_method)
+
+        # Wrap each circuit as a single-element group
+        circuit_groups = [[c] for c in circuits]
+
+        if verbose or debug:
+            print(f"... group-parallel execution: {len(circuit_groups)} groups, "
+                  f"shots={num_shots_list[:5]}{'...' if len(num_shots_list) > 5 else ''}")
+
+        # Execute groups (parallel distribution handled inside)
+        job_id, group_results = ex.execute_circuit_groups(
+                circuit_groups, num_shots_list=num_shots_list)
+
+        # Flatten group results into single ExecutionResult
+        counts_array = []
+        for result in group_results:
+            counts = result.get_counts()
+            if isinstance(counts, list):
+                counts_array.extend(counts)
+            else:
+                counts_array.append(counts)
+
+        results = ex.ExecutionResult(counts_array)
+        return results, pauli_term_groups
+
+    # Standard path: flat array or bucketed execution
     if not distribute_shots:
         #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
         # execute the entire list of circuits, same shots each
-        import execute as ex
         job_id, results = ex.execute_circuits(
                 circuits = circuits,
                 num_shots = int(num_shots / len(circuits)),

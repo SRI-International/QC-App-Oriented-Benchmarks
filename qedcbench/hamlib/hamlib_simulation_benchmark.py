@@ -440,7 +440,13 @@ def run(min_qubits: int = 2,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
     ex.parallel_execution = parallel
-    
+
+    # Warn if parallel is requested with a group method that doesn't use sampling
+    if parallel and group_method in ("estimator", "SpinOperator"):
+        print(f"WARNING: --parallel has no effect with group_method='{group_method}' "
+              f"(expectation values computed directly, not via circuit sampling)")
+        ex.parallel_execution = False
+
     # For CUDA-Q, cannot yet use method 1 as it uses Aer for simulation
     # use method 2 instead
     if api == "cudaq" and method == 1:
@@ -1108,6 +1114,7 @@ def get_args():
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
     parser.add_argument("--do_observables", "-obs", action="store_true", help="Compute observable values")
+    parser.add_argument("--distribute_shots", "-ds", action="store_true", help="Distribute shots weighted by Pauli term coefficients")
     parser.add_argument("--group_method", "-gm", default=None, help="Method for creating commuting groups, e.g. 'simple','1','2', 'N'")   
     parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
@@ -1157,6 +1164,7 @@ def do_run(args):
         hamiltonian=args.hamiltonian,
         hamiltonian_params=hamiltonian_params,
         do_observables=args.do_observables,
+        distribute_shots=args.distribute_shots,
         group_method=args.group_method,
         random_pauli_flag=args.random_pauli_flag,
         random_init_flag=args.random_init_flag,
