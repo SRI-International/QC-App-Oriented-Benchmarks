@@ -287,7 +287,8 @@ def run(min_qubits: int = 2,
         api = None,
         get_circuits = False,
         max_batch_size = None,
-        gpus_per_circuit: int = None):
+        gpus_per_circuit: int = None,
+        parallel: bool = False):
     """
     Execute program with default parameters.
 
@@ -438,6 +439,7 @@ def run(min_qubits: int = 2,
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
+    ex.parallel_execution = parallel
     
     # For CUDA-Q, cannot yet use method 1 as it uses Aer for simulation
     # use method 2 instead
@@ -1120,7 +1122,8 @@ def get_args():
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Suffix appended to data file name", type=str)
     parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")
     parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
-    parser.add_argument("--gpus_per_circuit", "-gpc", default=None, help="Number of GPUs to pool per circuit (None=all available, 1=max parallelism, M=M GPUs per circuit)", type=int)
+    parser.add_argument("--gpus_per_circuit", "-gpc", default=None, help="Number of GPUs for distributed statevector per circuit (None=all available, 1=max parallelism)", type=int)
+    parser.add_argument("--parallel", "-pm", action="store_true", help="Enable parallel circuit execution")
     return parser.parse_args()
     
 def parse_name_value_pairs(input_string: str) -> Dict[str, str]:
@@ -1169,7 +1172,8 @@ def do_run(args):
         exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
         api=args.api,
         max_batch_size=args.max_batch_size,
-        gpus_per_circuit=args.gpus_per_circuit
+        gpus_per_circuit=args.gpus_per_circuit,
+        parallel=args.parallel
         )
 
 import cProfile
