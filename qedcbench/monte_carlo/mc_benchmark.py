@@ -151,7 +151,7 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots,
         exact = 0.5
 
     counts = result.get_counts(qc)
-    correct_dist = a_to_bitstring(exact, num_counting_qubits)
+    correct_dist = a_to_bitstring(exact, num_counting_qubits, method, c_star)
     thermal_dist = metrics.uniform_dist(num_counting_qubits)
 
     if verbose:
@@ -164,7 +164,9 @@ def analyze_and_print_result(qc, result, num_counting_qubits, mu, num_shots,
     if verbose: print(f"  ... fidelity: {fidelity}")
     return counts, fidelity
 
-def a_to_bitstring(a, num_counting_qubits):
+def a_to_bitstring(a, num_counting_qubits, method=2, c_star=1.0):
+    if method == 1:
+        a = ((a - 0.5) * c_star) + 0.5
     m = num_counting_qubits
     num1 = round(np.arcsin(np.sqrt(a)) / np.pi * 2**m)
     num2 = round((np.pi - np.arcsin(np.sqrt(a))) / np.pi * 2**m)
