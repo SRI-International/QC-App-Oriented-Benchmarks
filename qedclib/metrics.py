@@ -197,7 +197,8 @@ def init_metrics ():
     
     # store the start of execution for the current app
     start_time = time.time()
-    print(f'... execution starting at {get_timestr()}')
+    if mpi.is_leader():
+        print(f'... execution starting at {get_timestr()}')
 
 # End metrics collection for an application
 def end_metrics():
@@ -205,8 +206,9 @@ def end_metrics():
 
     end_time = time.time()
     total_run_time = round(end_time - start_time, 3)
-    print(f'... execution complete at {get_timestr()} in {total_run_time} secs')
-    print("")
+    if mpi.is_leader():
+        print(f'... execution complete at {get_timestr()} in {total_run_time} secs')
+        print("")
 
 def finalize_all_groups():
     """Finalize all groups that have completed execution."""
