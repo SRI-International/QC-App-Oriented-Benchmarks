@@ -166,6 +166,9 @@
 <h4 id="execution">Execution</h4>
 <ul>
 <li>
+<p><strong>CUDA-Q multi-GPU (mgpu) fails on certain circuit structures.</strong> When running Hamiltonian observable estimation with distributed statevector execution on real multi-GPU hardware (e.g., 4x A100 on Perlmutter), circuits containing multi-qubit Pauli basis rotation gates (YY, XXX, YYXXX, etc.) fail with <code>requested size is too big</code> or gate-grouping errors in <code>cusvsim</code>. Single-qubit X/Z terms and simpler Hamiltonians like TFIM work fine. This is a CUDA-Q 0.13.0 runtime issue, not a qedclib bug. <strong>Workaround</strong>: use <code>--parallel</code> (<code>-pm</code>) to run in single-GPU-per-rank mode instead of distributed statevector mode. See <a href="../issues_cudaq_mgpu/">CUDA-Q Multi-GPU Issues</a> for detailed analysis and reproduction steps.</p>
+</li>
+<li>
 <p><strong>CUDA-Q execution may fail with multiple circuits per group.</strong> When using <code>-c 2</code> or higher (multiple circuit repetitions per qubit width), execution on CUDA-Q can fail once the total number of circuits across all groups exceeds some threshold. The root cause is under investigation. Workaround: use <code>-c 1</code> or reduce the qubit range.</p>
 </li>
 <li>
