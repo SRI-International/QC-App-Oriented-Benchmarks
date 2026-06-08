@@ -14,6 +14,8 @@ These are fundamental limitations in the current implementation. Some may be rel
 
 #### Execution
 
+- **CUDA-Q multi-GPU (mgpu) fails on certain circuit structures.** When running Hamiltonian observable estimation with distributed statevector execution on real multi-GPU hardware (e.g., 4x A100 on Perlmutter), circuits containing multi-qubit Pauli basis rotation gates (YY, XXX, YYXXX, etc.) fail with `requested size is too big` or gate-grouping errors in `cusvsim`. Single-qubit X/Z terms and simpler Hamiltonians like TFIM work fine. This is a CUDA-Q 0.13.0 runtime issue, not a qedclib bug. **Workaround**: use `--parallel` (`-pm`) to run in single-GPU-per-rank mode instead of distributed statevector mode. See [CUDA-Q Multi-GPU Issues](issues_cudaq_mgpu.md) for detailed analysis and reproduction steps.
+
 - **CUDA-Q execution may fail with multiple circuits per group.** When using `-c 2` or higher (multiple circuit repetitions per qubit width), execution on CUDA-Q can fail once the total number of circuits across all groups exceeds some threshold. The root cause is under investigation. Workaround: use `-c 1` or reduce the qubit range.
 
 - **Resumable job persistence is not implemented.** If a hardware job completes after the Python process exits, results cannot currently be recovered and matched to expected distributions for fidelity computation. This feature is deferred pending a group discussion on design.
