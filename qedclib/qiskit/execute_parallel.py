@@ -60,7 +60,7 @@ def _remove_measurements(circuit):
 
     return clean
 
-def _run_qiskit_parallel_experiment(circuits, num_shots):
+def _submit_qiskit_parallel_experiment(circuits, num_shots):
     """
     Execute a batch of QED-C generated Qiskit circuits using Qiskit's
     ParallelExperiment framework.
@@ -150,7 +150,7 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     backend = ex.backend
     backend_name = ex.get_backend_name(backend)
 
-    print(f"... parallel experiment using backend = {backend_name}")
+    print(f"... building ParallelExperiment using backend = {backend_name}")
 
     if backend_name == "qasm_simulator":
         hardware = IBMQHardwareArchitecture("ibmq_manhattan")
@@ -264,16 +264,24 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     parallel.set_transpile_options(optimization_level=0)
 
     # Execute the combined experiment once.
+    print("... submitting ParallelExperiment job handle")
     expdata = parallel.run(backend=run_backend, shots=num_shots)
+    return expdata
+
+def _collect_qiskit_parallel_experiment(expdata):
+    """
+    Wait for a submitted ParallelExperiment to finish and extract one counts
+    dictionary per child/component circuit.
+    """
+    print("... waiting for ParallelExperiment results")
     expdata.block_for_results()
 
-    # Extract one counts dictionary per child/component experiment.
-    # These counts may still need bitstring localization/normalization by the
-    # caller before constructing QED-C's ExecutionResult.
     counts_list = []
     for child in expdata.child_data():
         datum = child.data(0)
         counts_list.append(datum.get("counts", datum))
+    
+    print(f"... collected {len(counts_list)} child result(s)")
 
     return counts_list
 
@@ -305,41 +313,34 @@ def _localize_counts(counts, num_qubits):
 
     return local
 
-def _run_parallel_batch_with_retry(batch, num_shots):
+def _submit_parallel_batch_with_retry(batch, num_shots):
     """
-    Try to execute a batch in parallel. If the partitioner rejects the full
-    batch, recursively split it into smaller batches.
+    Submit one batch of circuits for execution.
 
-    This prevents one bad batch from forcing the entire benchmark to fall back
-    to sequential execution.
+    If the batch contains multiple circuits, try to submit it as a Qiskit
+    ParallelExperiment. If partitioning/mapping fails, split the batch into
+    smaller batches and retry recursively.
+
+    If the batch contains only one circuit, run it through QED-C's normal
+    sequential execution path, because there is nothing to parallelize.
+
+    Returns:
+        A list of batch records. Each record is either:
+            - kind == "expdata": a submitted ParallelExperiment to collect later
+            - kind == "counts": already-computed counts from sequential execution
     """
-    if len(batch) == 1:
-        return _run_qiskit_parallel_experiment(batch, num_shots)
-
-    try:
-        return _run_qiskit_parallel_experiment(batch, num_shots)
-
-    except Exception as err:
-        print(f"... batch of {len(batch)} circuits failed: {err}")
-        print("... splitting batch into smaller parallel batches")
-
-        mid = len(batch) // 2
-
-        left_counts = _run_parallel_batch_with_retry(batch[:mid], num_shots)
-        right_counts = _run_parallel_batch_with_retry(batch[mid:], num_shots)
-
-        return left_counts + right_counts
-    
-def _run_parallel_batch_with_retry(batch, num_shots):
     import execute as ex
 
+    # Single-circuit batches cannot benefit from ParallelExperiment.
+    # Run them immediately using QED-C's normal execution path.
     if len(batch) == 1:
         print(
-            "... single-circuit batch:",
+            "... batch is single circuit; using QED-C sequential fallback:",
             [c.num_qubits for c in batch],
-            "running sequentially",
         )
 
+        # Temporarily disable parallel_execution so execute_circuits() does not
+        # recursively call execute_circuits_parallel().
         ex.parallel_execution = False
         try:
             _, result = ex.execute_circuits(batch, num_shots)
@@ -348,30 +349,49 @@ def _run_parallel_batch_with_retry(batch, num_shots):
 
         counts = result.get_counts()
 
+        # Normalize QED-C's single-circuit result into list form so the later
+        # merge path can treat sequential and parallel batches uniformly.
         if isinstance(counts, dict):
-            return [counts]
+            counts = [counts]
 
-        return counts
+        return [{
+            "kind": "counts",
+            "batch": batch,
+            "counts": counts,
+        }]
 
     try:
+        # Try to submit this multi-circuit batch as one ParallelExperiment.
         print(
-            "... running parallel batch:",
+            "... submitting ParallelExperiment batch:",
             [c.num_qubits for c in batch],
             "total_qubits =",
             sum(c.num_qubits for c in batch),
         )
 
-        return _run_qiskit_parallel_experiment(batch, num_shots)
+        expdata = _submit_qiskit_parallel_experiment(batch, num_shots)
+
+        # Store the submitted experiment data. Results are collected later so
+        # multiple batches can be submitted before blocking for completion.
+        return [{
+            "kind": "expdata",
+            "batch": batch,
+            "expdata": expdata,
+        }]
 
     except Exception as err:
-        print(f"... batch failed: {err}")
-        print("... splitting batch")
+        # If the partitioner cannot place this batch, split it into two smaller
+        # batches and retry. This avoids falling back the entire benchmark just
+        # because one batch was too difficult to map.
+        print(f"... ParallelExperiment batch submission failed: {err}")
+        print("... splitting this batch and retrying smaller parallel batches")
 
         mid = len(batch) // 2
-        left_counts = _run_parallel_batch_with_retry(batch[:mid], num_shots)
-        right_counts = _run_parallel_batch_with_retry(batch[mid:], num_shots)
 
-        return left_counts + right_counts
+        return (
+            _submit_parallel_batch_with_retry(batch[:mid], num_shots)
+            + _submit_parallel_batch_with_retry(batch[mid:], num_shots)
+        )
 
 def execute_circuits_parallel(circuits, num_shots):
     """
@@ -379,22 +399,30 @@ def execute_circuits_parallel(circuits, num_shots):
     ParallelExperiment path.
 
     This function is the QED-C entry point for parallel circuit execution.
-    Instead of calling QED-C's normal sequential execute_circuits() path, it
-    attempts to run the input circuits together as one parallel experiment.
+    It groups the input circuits into qubit-limited batches, submits each
+    multi-circuit batch as a Qiskit ParallelExperiment, and then merges the
+    per-circuit counts back into QED-C's standard ExecutionResult format.
 
     The flow is:
 
         1. Receive a list of QED-C generated QuantumCircuit objects.
-        2. Call _run_qiskit_parallel_experiment(), which:
-             - removes final measurements,
-             - partitions the hardware into disjoint qubit regions,
-             - maps each circuit to one region,
-             - wraps each circuit as a Qiskit Experiment,
-             - runs them together with ParallelExperiment.
-        3. Convert the returned counts into QED-C's expected per-circuit
+        2. Greedily group circuits into batches whose total logical qubits do
+           not exceed MAX_PARALLEL_QUBITS.
+        3. For each batch:
+             - if it has multiple circuits, try to submit it as a
+               ParallelExperiment;
+             - if partitioning fails, split the batch into smaller batches and
+               retry;
+             - if it has only one circuit, run it immediately through QED-C's
+               normal sequential path.
+        4. Store submitted ParallelExperiment handles and already-computed
+           sequential counts in submitted_batches.
+        5. Collect results from submitted ParallelExperiments.
+        6. Convert all returned counts into QED-C's expected per-circuit
            bitstring format.
-        4. Wrap the counts in QED-C's ExecutionResult object.
-        5. If anything fails, fall back to QED-C's original sequential execution.
+        7. Wrap the merged counts in QED-C's ExecutionResult object.
+        8. If the overall parallel path fails unexpectedly, fall back to QED-C's
+           original sequential execution path.
 
     Args:
         circuits:
@@ -408,45 +436,44 @@ def execute_circuits_parallel(circuits, num_shots):
 
             ("parallel_experiment", ExecutionResult)
 
-        on successful parallel execution, or the normal execute_circuits()
-        return value if the parallel path fails.
+        on successful batched parallel execution, or the normal
+        execute_circuits() return value if the parallel path fails.
     """
     import execute as ex
 
     if ex.verbose:
         print(f"... execute_circuits_parallel: {len(circuits)} circuits, {num_shots} shots")
 
-    print(f">>> execute_circuits_parallel [qiskit]: {len(circuits)} circuits, {num_shots} shots")
+    print(f">>> parallel execution [qiskit]: received {len(circuits)} circuits, {num_shots} shots")
 
     try:
         # Maximum total logical qubits allowed in one ParallelExperiment batch.
-        # This prevents trying to place too many circuits on the hardware at once.
+        # This is a batching limit, not necessarily the full hardware size. It
+        # prevents trying to place too many circuits into one parallel job.
         MAX_PARALLEL_QUBITS = 15
+        print(f"... batching circuits with MAX_PARALLEL_QUBITS = {MAX_PARALLEL_QUBITS}")
 
-        all_counts = []
+        # Stores batch records in original circuit order.
+        #
+        # Each record is either:
+        #   {"kind": "expdata", ...}  -> submitted ParallelExperiment, collect later
+        #   {"kind": "counts", ...}   -> single-circuit sequential counts already available
+        submitted_batches = []
 
-        # Current batch of circuits to run together.
+        # Build greedy qubit-limited batches from the input circuit list.
         batch = []
         batch_qubits = 0
 
         for circuit in circuits:
             circuit_qubits = circuit.num_qubits
 
-            # If adding this circuit would exceed the batch capacity, run the current
-            # batch first, then start a new batch.
+            # If adding this circuit would exceed the batch qubit budget,
+            # submit the current batch first, then start a new batch.
             if batch and batch_qubits + circuit_qubits > MAX_PARALLEL_QUBITS:
-                batch_counts = _run_parallel_batch_with_retry(batch, num_shots)
+                submitted_batches.extend(
+                    _submit_parallel_batch_with_retry(batch, num_shots)
+                )
 
-                # Convert each batch result back to QED-C's expected local bit width.
-                batch_counts = [
-                    _localize_counts(batch_counts[i], batch[i].num_qubits)
-                    for i in range(len(batch_counts))
-                ]
-
-                # Preserve original circuit order by appending this batch's results.
-                all_counts.extend(batch_counts)
-
-                # Start a fresh batch.
                 batch = []
                 batch_qubits = 0
 
@@ -454,31 +481,57 @@ def execute_circuits_parallel(circuits, num_shots):
             batch.append(circuit)
             batch_qubits += circuit_qubits
 
-        # Run the final partially filled batch.
+        # Submit the final partially filled batch, if any.
         if batch:
-            batch_counts = _run_parallel_batch_with_retry(batch, num_shots)
+            submitted_batches.extend(
+                _submit_parallel_batch_with_retry(batch, num_shots)
+            )
 
+        print(f"... prepared {len(submitted_batches)} batch record(s); now collecting results")
+        # Collect and normalize results from all batch records.
+        counts_list = []
+
+        for batch_index, item in enumerate(submitted_batches, start=1):
+            print(
+                f"... collecting batch {batch_index}/{len(submitted_batches)} "
+                f"kind={item['kind']} widths={[c.num_qubits for c in item['batch']]}"
+            )
+            if item["kind"] == "counts":
+                # Single-circuit sequential fallback results were already
+                # computed during submission.
+                batch_counts = item["counts"]
+            else:
+                # ParallelExperiment results are collected here. This is where
+                # we block for submitted parallel jobs to finish.
+                batch_counts = _collect_qiskit_parallel_experiment(
+                    item["expdata"]
+                )
+
+            # Convert each count dictionary back to the local bit width of the
+            # original circuit in this batch.
             batch_counts = [
-                _localize_counts(batch_counts[i], batch[i].num_qubits)
+                _localize_counts(
+                    batch_counts[i],
+                    item["batch"][i].num_qubits,
+                )
                 for i in range(len(batch_counts))
             ]
 
-            all_counts.extend(batch_counts)
+            # Preserve original circuit order by appending each batch's counts
+            # in the same order the batch was created.
+            counts_list.extend(batch_counts)
 
-        # This list now has one counts dictionary per original input circuit.
-        counts_list = all_counts
-
-        # Convert the raw counts list into QED-C's standard result object so the
-        # rest of the benchmark framework does not need to know that the circuits
-        # were executed through ParallelExperiment.
+        # Convert the merged counts into QED-C's standard result object so the
+        # rest of the benchmark framework does not need to know that batched
+        # ParallelExperiment execution was used.
         result = ex.ExecutionResult(counts_list)
 
         return "parallel_experiment", result
 
     except Exception as err:
-        # If partitioning, mapping, Qiskit Experiments, or backend execution
-        # fails, preserve QED-C behavior by falling back to the original
-        # sequential execution path.
+        # If partitioning, mapping, Qiskit Experiments, backend execution, or
+        # result conversion fails unexpectedly, preserve QED-C behavior by
+        # falling back to the original sequential execution path.
         print(f"... parallel experiment failed: {err}")
         print("... falling back to normal QED-C execution")
 
