@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="33f3cc00-a37b-49c1-b718-5112c77ba8fd" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/4gt13_92.qasm" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mod5d2_64.qasm" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../crosstalk/srb_hardware.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../crosstalk/srb_hardware.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../hardware/architectures_saved_data/ibmq_16_melbourne.archdata" beforeDir="false" afterPath="$PROJECT_DIR$/../../hardware/architectures_saved_data/ibmq_16_melbourne.archdata" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../hardware/architectures_saved_data/ibmq_toronto.archdata" beforeDir="false" afterPath="$PROJECT_DIR$/../../hardware/architectures_saved_data/ibmq_toronto.archdata" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../hardware/architectures_saved_data/save_architecture.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../hardware/architectures_saved_data/save_architecture.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../mapping/initial_mapping_construct.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../mapping/initial_mapping_construct.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../mapping/mapping_transition.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../mapping/mapping_transition.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../tools/IBMQSubmitter.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../tools/IBMQSubmitter.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../tools/post_process.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../tools/post_process.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../tree/sub_tree/construct.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../tree/sub_tree/construct.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../tree/sub_tree/partition.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../tree/sub_tree/partition.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../../.." />
+  </component>
+  <component name="JupyterTrust" id="eb8bf135-c746-42ef-8300-1d70513921d6" />
+  <component name="ProjectId" id="1jqREMNHWWnVe2DO0zBwYssjDEB" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../../../HelloWorld" />
+    <property name="settings.editor.selected.configurable" value="vcs.Git" />
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="33f3cc00-a37b-49c1-b718-5112c77ba8fd" name="Default Changelist" comment="" />
+      <created>1604529522255</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1604529522255</updated>
+      <workItem from="1604529523361" duration="23000" />
+    </task>
+    <servers />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="313" y="310" width="424" height="484" key="FileChooserDialogImpl" timestamp="1604529544507">
+      <screen x="67" y="27" width="1853" height="1053" />
+    </state>
+    <state x="313" y="310" width="424" height="484" key="FileChooserDialogImpl/67.27.1853.1053@67.27.1853.1053" timestamp="1604529544507" />
+  </component>
+</project>
