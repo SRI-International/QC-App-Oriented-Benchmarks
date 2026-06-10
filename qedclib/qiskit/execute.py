@@ -1404,6 +1404,11 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
         # Call the benchmark's result handler (computes fidelity etc.)
         # Skip if counts are empty (cancelled/failed job) to avoid division-by-zero in handlers
         if result_handler and counts:
+            # DEBUG: show counts reaching result_handler
+            sample = dict(list(counts.items())[:3])
+            print(f"... [debug pcr] circuit {ci['group']}/{ci['circuit']}: "
+                  f"counts_type={type(counts).__name__}, "
+                  f"sample={sample}")
             try:
                 result_handler(ci["qc"], circuit_result,
                               ci["group"], ci["circuit"], ci["shots"])

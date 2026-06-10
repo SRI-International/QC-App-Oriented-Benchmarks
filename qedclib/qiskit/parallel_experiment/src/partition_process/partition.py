@@ -68,7 +68,7 @@ class Partition:
             readout_error_rate += readout_list[i]
         readout_error_average = readout_error_rate / len(self.value) if len(self.value) != 0 else 0
 
-        circuit_qubit_num = circuit.cregs[0].size
+        circuit_qubit_num = circuit.num_qubits
         circuit_cnot_num = circuit.count_ops().get("cx", 0)
 
         self.longest_path = longest_shortest_distance
@@ -115,7 +115,7 @@ class Partition:
             readout_error_rate += readout_list[i]
         readout_error_average = readout_error_rate / len(self.value) if len(self.value) != 0 else 0
 
-        circuit_qubit_num = circuit.cregs[0].size
+        circuit_qubit_num = circuit.num_qubits
         circuit_cnot_num = circuit.count_ops().get("cx", 0)
 
         self.cnot_error = cnot_error_average * circuit_cnot_num

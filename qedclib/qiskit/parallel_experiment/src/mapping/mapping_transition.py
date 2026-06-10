@@ -202,7 +202,7 @@ def circuits_schedule(circuits: ty.List[QuantumCircuit],
     circuit_list = []
     qubit_circuit_sum = 0
     for circuit in circuits:
-        qubit_circuit_sum += circuit.cregs[0].size
+        qubit_circuit_sum += circuit.num_qubits
         if qubit_circuit_sum <= hardware.qubit_number:
             circuit_list.append(circuit)
         else:

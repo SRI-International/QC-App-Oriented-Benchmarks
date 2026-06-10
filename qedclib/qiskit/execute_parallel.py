@@ -26,77 +26,189 @@
 
 def _remove_measurements(circuit):
     """
-    Return a copy of `circuit` with measurement/barrier operations removed.
+    Return a copy of `circuit` with measurement/barrier operations removed,
+    plus a list of which qubit indices were originally measured.
 
-    This is needed before passing QED-C circuits into the parallel-experiment
-    mapper, because the mapper may call circuit.inverse(). Qiskit cannot invert
-    measurement operations, since measurements are non-unitary.
-
-    We still create a classical register with the same size as the quantum
-    register because some of the original parallel-experiment code assumes
-    circuit.cregs[0].size exists and uses it as the logical circuit size.
-    Final measurements are added back later by CircuitExperiment.measure_all().
+    The measured_qubits list is stored on the returned circuit as
+    circuit._measured_qubits so CircuitExperiment can restore the
+    original measurement pattern instead of using measure_all().
     """
     from qiskit import QuantumCircuit
 
-    # Keep both quantum and classical registers.
-    # The circuit is measurement-free, but the classical register preserves
-    # compatibility with legacy code that reads circuit.cregs[0].size.
-    clean = QuantumCircuit(circuit.num_qubits, circuit.num_qubits, name=circuit.name)
+    clean = QuantumCircuit(circuit.num_qubits, name=circuit.name)
 
+    # Track which qubits had measurements in the original circuit
+    measured_qubits = []
     for inst in circuit.data:
         op = inst.operation
-
-        # Measurements cannot be inverted; barriers are scheduling/visual markers
-        # and are not needed for partitioning or mapping.
-        if op.name in ("measure", "barrier"):
+        if op.name == "measure":
+            qi = circuit.find_bit(inst.qubits[0]).index
+            if qi not in measured_qubits:
+                measured_qubits.append(qi)
+            continue
+        if op.name == "barrier":
             continue
 
         # Re-map the original instruction's qubits onto the new clean circuit.
         qargs = [clean.qubits[circuit.find_bit(q).index] for q in inst.qubits]
-
-        # Copy the operation so the new circuit is independent of the original.
         clean.append(op.copy(), qargs)
+
+    # Store the original measurement pattern for later restoration
+    clean._measured_qubits = measured_qubits if measured_qubits else list(range(circuit.num_qubits))
 
     return clean
 
 def _run_qiskit_parallel_experiment(circuits, num_shots):
     """
-    Execute a batch of QED-C generated Qiskit circuits using Qiskit's
-    ParallelExperiment framework.
+    Execute a batch of circuits using Qiskit's ParallelExperiment with simple
+    sequential qubit allocation. Qiskit's transpiler handles layout/routing.
 
-    QED-C normally executes a list of circuits sequentially or through its own
-    batching path. This function replaces that execution step with the custom
-    multiprogramming flow:
+    Each circuit is assigned a disjoint range of physical qubits:
+        circuit 0 → qubits [0, w0)
+        circuit 1 → qubits [w0 + spacing, w0 + spacing + w1)
+        ...
 
-        QED-C circuits
-            -> remove measurements
-            -> partition hardware
-            -> compute logical-to-physical mappings
-            -> wrap each circuit as a Qiskit Experiment
-            -> combine them with ParallelExperiment
-            -> run once on the selected backend
-            -> return per-circuit counts
+    The returned value is a list of count dictionaries, one per input circuit.
+    """
+    import time
+    from qiskit_experiments.framework import ParallelExperiment, BaseExperiment, BaseAnalysis
 
-    The returned value is a list of count dictionaries, one dictionary per input
-    circuit. The caller later converts this list into QED-C's ExecutionResult.
+    import execute as ex
+
+    backend = ex.backend
+    backend_name = ex.get_backend_name(backend)
+    print(f"... parallel experiment using backend = {backend_name}")
+
+    t0 = time.time()
+
+    # For noisy simulator: wrap in AerSimulator with noise model so
+    # ParallelExperiment's internal SamplerV2 picks up the noise.
+    # For real hardware: use backend directly.
+    if backend_name.endswith("qasm_simulator") and ex.noise is not None:
+        from qiskit_aer import AerSimulator
+        run_backend = AerSimulator(noise_model=ex.noise)
+    else:
+        run_backend = backend
+
+    # Determine total qubit budget
+    if hasattr(run_backend, 'num_qubits'):
+        device_qubits = run_backend.num_qubits
+    else:
+        device_qubits = 1000  # simulator fallback
+
+    # Sequential qubit allocation with spacing
+    spacing = 2
+    physical_qubits_per_circuit = []
+    offset = 0
+    for circ in circuits:
+        w = circ.num_qubits
+        if offset + w > device_qubits:
+            raise RuntimeError(
+                f"Circuits do not fit: need {offset + w} qubits, "
+                f"device has {device_qubits}")
+        physical_qubits_per_circuit.append(tuple(range(offset, offset + w)))
+        offset += w + spacing
+
+    t1 = time.time()
+    print(f"... [timing] qubit allocation: {t1-t0:.3f}s "
+          f"({len(circuits)} circuits, {offset - spacing} qubits used / {device_qubits})")
+
+    # Minimal CircuitExperiment wrapper — no analysis needed
+    class _NoAnalysis(BaseAnalysis):
+        def _run_analysis(self, experiment_data):
+            return [], []
+
+    class _CircuitExperiment(BaseExperiment):
+        def __init__(self, circuit, physical_qubits, label):
+            super().__init__(
+                physical_qubits=physical_qubits,
+                analysis=_NoAnalysis(),
+                backend=None,
+            )
+            # Keep the original circuit as-is, including its measurements.
+            # No need to remove/re-add measurements — ParallelExperiment
+            # handles the qubit remapping.
+            self._circuit = circuit
+            self._label = label
+
+        def circuits(self):
+            qc = self._circuit.copy()
+            qc.name = self._label
+            qc.metadata = {
+                "component": self._label,
+                "physical_qubits": self.physical_qubits,
+            }
+            return [qc]
+
+    # Build experiments
+    experiments = [
+        _CircuitExperiment(
+            circuit=circuits[i],
+            physical_qubits=physical_qubits_per_circuit[i],
+            label=getattr(circuits[i], "name", f"circuit_{i}"),
+        )
+        for i in range(len(circuits))
+    ]
+
+    # Combine into one ParallelExperiment
+    parallel = ParallelExperiment(
+        experiments=experiments,
+        backend=run_backend,
+        flatten_results=False,
+    )
+
+    # Let Qiskit transpiler handle layout within each partition
+    parallel.set_transpile_options(optimization_level=1)
+
+    t2 = time.time()
+    print(f"... [timing] experiment setup: {t2-t1:.3f}s")
+
+    # Execute
+    expdata = parallel.run(backend=run_backend, shots=num_shots)
+    expdata.block_for_results()
+
+    t3 = time.time()
+    print(f"... [timing] parallel.run + block_for_results: {t3-t2:.1f}s")
+
+    # Extract per-circuit counts
+    counts_list = []
+    for i, child in enumerate(expdata.child_data()):
+        datum = child.data(0)
+        counts = datum.get("counts", datum)
+        counts_list.append(counts)
+        # Debug: show raw counts for first few circuits
+        if i < 3:
+            sample_keys = list(counts.keys())[:4] if isinstance(counts, dict) else str(type(counts))
+            print(f"... [debug] child {i}: {len(counts)} entries, "
+                  f"key_len={len(sample_keys[0]) if sample_keys else '?'}, "
+                  f"samples={sample_keys}, "
+                  f"expected_qubits={circuits[i].num_qubits}")
+
+    print(f"... [timing] total _run_qiskit_parallel_experiment: {t3-t0:.1f}s")
+
+    return counts_list
+
+
+# ---- ORIGINAL VERSION (uses parallel_experiment/src/ for error-aware partitioning) ----
+# Kept for reference — this was 125s hardware init + 58s mapping on ibm_fez (156 qubits).
+# The src/ code does fidelity-aware partitioning (picks best qubit regions based on
+# error rates), but the overhead is prohibitive for routine use.
+# To re-enable, rename this to _run_qiskit_parallel_experiment and remove the one above.
+
+def _run_qiskit_parallel_experiment_with_custom_partitioning(circuits, num_shots):
+    """
+    ORIGINAL: Execute circuits using custom partitioning from parallel_experiment/src/.
+    Uses IBMQHardwareArchitecture, Floyd-Warshall distance matrices, heuristic
+    partitioning, and SABRE-based initial mapping. Produces optimal qubit placement
+    but takes ~180s on 156-qubit backends.
     """
     import os
     import sys
+    import time
     import networkx as nx
 
     import execute as ex
 
-    # Locate the embedded parallel_experiment package inside qedclib/qiskit/.
-    # The original parallel-experiment code was copied in as:
-    #
-    #   qedclib/qiskit/parallel_experiment/
-    #       HA/
-    #       src/
-    #
-    # These paths are inserted into sys.path so that the original imports inside
-    # the parallel-experiment source continue to work without rewriting that
-    # entire codebase into a Python package.
     this_dir = os.path.dirname(os.path.abspath(__file__))
     pe_root = os.path.join(this_dir, "parallel_experiment")
     pe_src = os.path.join(pe_root, "src")
@@ -106,19 +218,9 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     if pe_src not in sys.path:
         sys.path.insert(0, pe_src)
 
-    # Qiskit Experiments is used to combine multiple component experiments into
-    # one composite experiment. Each component gets its own physical qubit set.
     from qiskit_experiments.framework import ParallelExperiment
-
-    # When QED-C is using qasm_simulator, use ibmq_manhattan as the
-    # hardware model for partitioning/mapping, but run the experiment on
-    # an unconstrained GenericBackendV2 simulator.
     from qiskit.providers.fake_provider import GenericBackendV2
 
-
-    # Imports from the existing parallel_experiment/src code.
-    # These provide the hardware model, error matrices, hardware partitioning,
-    # initial mapping, idle-qubit cleanup, and experiment wrapper.
     from hardware.IBMQHardwareArchitecture import IBMQHardwareArchitecture
     from hardware.distance_matrx import (
         get_distance_matrix_cnot_error_cost,
@@ -139,22 +241,15 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
         extract_physical_qubits,
     )
 
-    # Get the backend selected by QED-C.
-    # If QED-C is using qasm_simulator, it does not provide a real coupling map,
-    # so we use the existing ibmq_manhattan model for mapping and a compatible
-    # fake BackendV2 for running the ParallelExperiment.
-    #
-    # If QED-C is using a real/fake backend with topology, we use that backend
-    # directly so the partitioning/mapping code sees the backend's actual
-    # coupling map.
     backend = ex.backend
     backend_name = ex.get_backend_name(backend)
 
     print(f"... parallel experiment using backend = {backend_name}")
 
+    t0 = time.time()
+
     if backend_name == "qasm_simulator":
         hardware = IBMQHardwareArchitecture("ibmq_manhattan")
-
         run_backend = GenericBackendV2(
             num_qubits=hardware.qubit_number,
             coupling_map=None,
@@ -165,30 +260,22 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
         hardware = IBMQHardwareArchitecture(backend)
         run_backend = backend
 
-    # Convert the hardware coupling graph into the directed graph format
-    # expected by the partitioning code.
-    hardware_graph = nx.DiGraph(hardware._coupling_graph)
+    t1 = time.time()
+    print(f"... [timing] hardware init: {t1-t0:.1f}s ({hardware.qubit_number} qubits)")
 
-    # Error/readout information is used by the partitioner to prefer better
-    # physical qubit regions.
+    hardware_graph = nx.DiGraph(hardware._coupling_graph)
     cnot_error_matrix = get_distance_matrix_cnot_error_cost(hardware)
     readout_error = get_qubit_readout_error(hardware)
 
-    # Quick capacity check: the requested circuits must fit on the available
-    # hardware qubits if they are to be run simultaneously.
+    t2 = time.time()
+    print(f"... [timing] floyd_warshall + error matrices: {t2-t1:.1f}s")
+
     total_qubits = sum(c.num_qubits for c in circuits)
     if total_qubits > hardware.qubit_number:
         raise RuntimeError("Circuits do not fit on the selected hardware model.")
 
-    # QED-C circuits usually already contain final measurements. The mapping code
-    # may invert circuits internally, and measurements cannot be inverted, so we
-    # remove measurements before partitioning/mapping. CircuitExperiment adds
-    # final measurements back later.
     circuit_list = [_remove_measurements(c) for c in circuits]
 
-    # Compute physical-qubit connectivity information and logical-qubit degree
-    # information. These are used to match highly connected logical circuits to
-    # suitable physical qubit regions.
     qubit_physical_degree, largest_physical_degree = hardware_qubit_physical_degree(
         hardware
     )
@@ -196,51 +283,33 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
         largest_circuit_logical_degree(c) for c in circuit_list
     ]
 
-    # Select disjoint hardware partitions for all circuits.
-    # Each accepted circuit should receive a physical subgraph where it can run
-    # without overlapping another circuit's qubits.
     accepted_circuits, multiple_partition = get_simultaneous_partition(
-        circuit_list,
-        hardware_graph,
-        hardware,
-        cnot_error_matrix,
-        readout_error,
-        qubit_physical_degree,
-        largest_physical_degree,
+        circuit_list, hardware_graph, hardware,
+        cnot_error_matrix, readout_error,
+        qubit_physical_degree, largest_physical_degree,
         largest_logical_degrees,
-        2,                          # weight_lambda from original experiment
-        partition_hardware_heuristic,
-        0.1,                        # epsilon from original experiment
+        2, partition_hardware_heuristic, 0.1,
     )
 
-    # If the partitioner cannot place all circuits, this function fails and the
-    # caller can fall back to normal QED-C execution.
+    t3 = time.time()
+    print(f"... [timing] partitioning: {t3-t2:.1f}s")
+
     if multiple_partition is None or len(accepted_circuits) != len(circuit_list):
         raise RuntimeError("Parallel partition failed or rejected some circuits.")
 
-    # Compute the logical-qubit -> physical-qubit mapping for each accepted
-    # circuit inside its assigned partition.
     circuit_partitions, per_circuit_mappings, _ = compute_initial_mapping(
-        accepted_circuits,
-        hardware,
-        multiple_partition,
+        accepted_circuits, hardware, multiple_partition,
     )
 
-    # Convert mapping dictionaries into ordered physical-qubit tuples required
-    # by Qiskit Experiments.
+    t4 = time.time()
+    print(f"... [timing] initial mapping: {t4-t3:.1f}s")
+
     physical_qubits_per_circuit = extract_physical_qubits(
-        accepted_circuits,
-        circuit_partitions,
-        per_circuit_mappings,
+        accepted_circuits, circuit_partitions, per_circuit_mappings,
     )
 
-    # Remove unused qubits from each circuit before wrapping it as a component
-    # experiment. This keeps the component circuit size consistent with its
-    # assigned physical qubit tuple.
     compact_circuits = [strip_idle_qubits(c) for c in accepted_circuits]
 
-    # Wrap every circuit as a Qiskit BaseExperiment-compatible object. Each
-    # CircuitExperiment knows which physical qubits it is allowed to use.
     experiments = [
         CircuitExperiment(
             circuit=compact_circuits[i],
@@ -250,30 +319,35 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
         for i in range(len(accepted_circuits))
     ]
 
-    # Combine all component experiments into one ParallelExperiment. This creates
-    # a single composite circuit where each original circuit runs on a disjoint
-    # physical-qubit subset.
     parallel = ParallelExperiment(
         experiments=experiments,
         backend=run_backend,
         flatten_results=False,
     )
-
-    # Keep transpilation minimal so Qiskit is less likely to remap a component
-    # circuit outside its assigned physical-qubit subset.
     parallel.set_transpile_options(optimization_level=0)
 
-    # Execute the combined experiment once.
+    t5 = time.time()
+    print(f"... [timing] experiment setup: {t5-t4:.1f}s")
+
     expdata = parallel.run(backend=run_backend, shots=num_shots)
     expdata.block_for_results()
 
-    # Extract one counts dictionary per child/component experiment.
-    # These counts may still need bitstring localization/normalization by the
-    # caller before constructing QED-C's ExecutionResult.
+    t6 = time.time()
+    print(f"... [timing] parallel.run + block_for_results: {t6-t5:.1f}s")
+
     counts_list = []
-    for child in expdata.child_data():
+    for i, child in enumerate(expdata.child_data()):
         datum = child.data(0)
-        counts_list.append(datum.get("counts", datum))
+        counts = datum.get("counts", datum)
+        counts_list.append(counts)
+        if i < 3:
+            sample_keys = list(counts.keys())[:4] if isinstance(counts, dict) else str(type(counts))
+            print(f"... [debug] child {i}: {len(counts)} entries, "
+                  f"key_len={len(sample_keys[0]) if sample_keys else '?'}, "
+                  f"samples={sample_keys}, "
+                  f"expected_qubits={circuits[i].num_qubits}")
+
+    print(f"... [timing] total: {t6-t0:.1f}s")
 
     return counts_list
 
@@ -356,6 +430,14 @@ def execute_circuits_parallel(circuits, num_shots):
         print("Uses the integrated Qiskit ParallelExperiment workflow. If the parallel path fails, execution automatically falls back to the standard QED-C execution path.")
         counts_list = _run_qiskit_parallel_experiment(circuits, num_shots)
 
+        # Debug: show counts before and after localization
+        for i in range(min(3, len(counts_list))):
+            raw = counts_list[i]
+            localized = _localize_counts(raw, circuits[i].num_qubits)
+            print(f"... [debug] circuit {i} ({circuits[i].num_qubits}q): "
+                  f"raw={dict(list(raw.items())[:3])}, "
+                  f"localized={dict(list(localized.items())[:3])}")
+
         # ParallelExperiment may return each child result with extra classical
         # bits from the full combined circuit. Convert each result back to the
         # local bitstring width expected by QED-C.
@@ -375,7 +457,9 @@ def execute_circuits_parallel(circuits, num_shots):
         # If partitioning, mapping, Qiskit Experiments, or backend execution
         # fails, preserve QED-C behavior by falling back to the original
         # sequential execution path.
+        import traceback
         print(f"... parallel experiment failed: {err}")
+        traceback.print_exc()
         print("... falling back to normal QED-C execution")
 
         # Disable parallel_execution temporarily so execute_circuits() does not

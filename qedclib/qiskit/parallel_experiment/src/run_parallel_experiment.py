@@ -124,7 +124,7 @@ if __name__ == "__main__":
     # sort by descending CNOT density (same ordering as circuits_schedule)
     circuits = sorted(
         circuits,
-        key=lambda x: x.count_ops().get("cx", 0) / x.cregs[0].size,
+        key=lambda x: x.count_ops().get("cx", 0) / x.num_qubits,
         reverse=True,
     )
 

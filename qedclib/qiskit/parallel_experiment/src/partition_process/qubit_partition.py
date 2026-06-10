@@ -122,7 +122,7 @@ def partition_hardware_heuristic(
     :param crosstalk_properties: CNOT pairs with strong crosstalk effect
     :return: A list of partition candidates
     """
-    circuit_qubit_num = circuit.cregs[0].size
+    circuit_qubit_num = circuit.num_qubits
     sub_partitions = []
     for i in starting_point:
         sub_graph = []
@@ -182,7 +182,7 @@ def partition_hardware(hardware: IBMQHardwareArchitecture,
     Greedy sub-graph partition algorithm.
     """
 
-    qubit_num = circuit.cregs[0].size
+    qubit_num = circuit.num_qubits
     sub_partition = []
     for sub_graph in itertools.combinations(hardware_graph.nodes, qubit_num):
         G_sub = hardware_graph.subgraph(sub_graph)
