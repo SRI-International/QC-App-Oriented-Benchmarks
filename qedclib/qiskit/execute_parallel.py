@@ -59,11 +59,15 @@ def _remove_measurements(circuit):
     return clean
 
 def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2,
-                              backend_target=None):
+                              backend_target=None, routing_buffer=0):
     """
-    Find disjoint connected subgraphs of size `circuit_width` on the device
-    coupling map, separated by at least `gap` hops. Scores candidates by
-    gate error rates when available, with compactness as tiebreaker.
+    Find disjoint connected subgraphs on the device coupling map, separated
+    by at least `gap` hops. Each partition has `circuit_width + routing_buffer`
+    qubits — the extra qubits give the transpiler room to insert SWAP gates
+    without escaping the partition.
+
+    Scores candidates by gate error rates when available, with diameter and
+    internal edge count as tiebreakers (favors compact, well-connected regions).
 
     Algorithm:
       1. Build undirected graph from the coupling map
@@ -75,15 +79,17 @@ def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2
 
     Args:
         coupling_map: Qiskit CouplingMap or list of edges
-        circuit_width: number of qubits per partition
+        circuit_width: number of qubits the circuit uses
         num_partitions: how many partitions to find
         gap: minimum graph distance between any qubit in different partitions
         backend_target: optional Qiskit Target object (from backend.target)
             for error-rate scoring
+        routing_buffer: extra qubits per partition for transpiler SWAP routing
 
     Returns:
         List of tuples, each tuple is a set of physical qubit indices forming
-        one partition. Length <= num_partitions (may be fewer if device is small).
+        one partition (size = circuit_width + routing_buffer).
+        Length <= num_partitions (may be fewer if device is small).
         Returns empty list if coupling_map is None.
     """
     import networkx as nx
@@ -91,12 +97,15 @@ def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2
     if coupling_map is None:
         return []
 
+    # Total qubits per partition: circuit qubits + routing buffer
+    partition_size = circuit_width + routing_buffer
+
     # Build undirected graph from coupling map edges
     edges = coupling_map.get_edges() if hasattr(coupling_map, 'get_edges') else coupling_map
     G = nx.Graph()
     G.add_edges_from(edges)
 
-    if circuit_width == 1:
+    if partition_size == 1:
         # Trivial case: each partition is a single qubit
         nodes = sorted(G.nodes(), key=lambda n: -G.degree(n))
         partitions = []
@@ -154,21 +163,16 @@ def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2
     seen = set()
     candidates = []
     for start in G.nodes():
-        sub = _grow(start, circuit_width)
+        sub = _grow(start, partition_size)
         if sub is not None and sub not in seen:
             seen.add(sub)
             sub_list = list(sub)
 
-            # Compactness score: average pairwise shortest path within subgraph
-            total_dist = 0
-            pairs = 0
+            # Connectivity analysis of the subgraph
             sub_G = G.subgraph(sub)
-            for i in range(len(sub_list)):
-                lengths = nx.single_source_shortest_path_length(sub_G, sub_list[i])
-                for j in range(i + 1, len(sub_list)):
-                    total_dist += lengths.get(sub_list[j], circuit_width * 10)
-                    pairs += 1
-            compactness = total_dist / max(pairs, 1)
+            internal_edges = sub_G.number_of_edges()
+            # Diameter: max shortest path between any pair (lower = better routing)
+            diameter = nx.diameter(sub_G)
 
             # Error score: average 2-qubit gate error on edges within subgraph
             if edge_errors:
@@ -179,14 +183,17 @@ def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2
                             errs.append(edge_errors.get((u, v), 0.1))
                 error_score = sum(errs) / max(len(errs), 1)
             else:
-                error_score = 0  # no error data, rely on compactness alone
+                error_score = 0  # no error data, rely on connectivity alone
 
-            # Primary sort: error score (lower = better qubits)
-            # Secondary sort: compactness (lower = tighter cluster)
-            candidates.append((error_score, compactness, tuple(sorted(sub_list))))
+            # Sort priority:
+            # 1. error_score (lower = better qubit quality)
+            # 2. diameter (lower = shorter worst-case SWAP paths)
+            # 3. -internal_edges (more edges = more routing options)
+            candidates.append((error_score, diameter, -internal_edges,
+                               tuple(sorted(sub_list))))
 
-    # Sort by error score, then compactness
-    candidates.sort(key=lambda x: (x[0], x[1]))
+    # Sort by error, then diameter, then edge count (negated so more is better)
+    candidates.sort(key=lambda x: (x[0], x[1], x[2]))
 
     if candidates:
         scoring = "error+compactness" if edge_errors else "compactness-only"
@@ -195,12 +202,13 @@ def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2
     # Greedily pick non-overlapping partitions with gap separation
     selected = []
     excluded = set()
-    for _err, _compact, qubits in candidates:
+    for _err, _diam, _neg_edges, qubits in candidates:
         if any(q in excluded for q in qubits):
             continue
         selected.append(qubits)
         if edge_errors:
-            print(f"...   selected {qubits}: avg_gate_err={_err:.4f}, compactness={_compact:.2f}")
+            print(f"...   selected {qubits}: avg_gate_err={_err:.4f}, "
+                  f"diameter={_diam}, edges={-_neg_edges}")
         # Exclude all qubits within `gap` hops of this partition
         for q in qubits:
             for nbr, _dist in nx.single_source_shortest_path_length(G, q, cutoff=gap).items():
@@ -260,12 +268,14 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     backend_target = getattr(run_backend, 'target', None)
     partitions = []
     alloc_gap = spacing
+    routing_buffer = 0  # ParallelExperiment requires physical_qubits == circuit size
     if coupling_map is not None and len(set(widths)) == 1:
         # Try with decreasing gap until we find enough partitions
         for try_gap in [spacing, 1, 0]:
             partitions = _find_topology_partitions(
                 coupling_map, widths[0], len(circuits), gap=try_gap,
-                backend_target=backend_target
+                backend_target=backend_target,
+                routing_buffer=routing_buffer
             )
             alloc_gap = try_gap
             if len(partitions) >= len(circuits):
@@ -309,11 +319,14 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
 
     t1 = time.time()
     qubits_used = max(max(p) for p in physical_qubits_per_circuit) + 1 if physical_qubits_per_circuit else 0
+    partition_size = len(physical_qubits_per_circuit[0]) if physical_qubits_per_circuit else 0
+    buf_msg = f", routing_buffer={routing_buffer}" if routing_buffer > 0 and coupling_map is not None else ""
     print(f"... [timing] qubit allocation ({alloc_method}): {t1-t0:.3f}s "
-          f"({len(circuits)} circuits, {qubits_used} qubits used / {device_qubits})")
+          f"({len(circuits)} circuits, {partition_size}q partitions{buf_msg}, "
+          f"{qubits_used} qubits used / {device_qubits})")
     if alloc_method.startswith("topology") and len(circuits) <= 6:
         for i, p in enumerate(physical_qubits_per_circuit):
-            print(f"...   circuit {i} ({widths[i]}q) → qubits {p}")
+            print(f"...   circuit {i} ({widths[i]}q) → {partition_size}q region {p}")
 
     # Minimal CircuitExperiment wrapper — no analysis needed
     class _NoAnalysis(BaseAnalysis):
@@ -342,7 +355,7 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
             }
             return [qc]
 
-    # Build experiments
+    # Build experiments with original circuits.
     experiments = [
         _CircuitExperiment(
             circuit=circuits[i],
@@ -352,22 +365,67 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
         for i in range(len(circuits))
     ]
 
-    # Combine into one ParallelExperiment
     parallel = ParallelExperiment(
         experiments=experiments,
         backend=run_backend,
         flatten_results=False,
     )
-
-    # Let Qiskit transpiler handle layout within each partition
     parallel.set_transpile_options(optimization_level=1)
 
     t2 = time.time()
     print(f"... [timing] experiment setup: {t2-t1:.3f}s")
 
-    # Execute
-    expdata = parallel.run(backend=run_backend, shots=num_shots)
-    expdata.block_for_results()
+    # Try full-backend transpilation first (best fidelity). If the transpiler
+    # routes through qubits outside our partitions (happens with deeper/wider
+    # circuits), retry with pre-transpilation onto restricted coupling maps.
+    try:
+        expdata = parallel.run(backend=run_backend, shots=num_shots)
+        expdata.block_for_results()
+    except Exception as first_err:
+        if "transpiled outside" not in str(first_err):
+            raise
+
+        print(f"... transpiler escaped partition bounds, retrying with restricted coupling maps")
+
+        from qiskit.transpiler import CouplingMap
+        from qiskit import transpile
+
+        full_edges = coupling_map.get_edges() if coupling_map is not None else []
+        transpiled_circuits = []
+        for i, (circ, partition) in enumerate(zip(circuits, physical_qubits_per_circuit)):
+            partition_set = set(partition)
+            phys_to_local = {p: idx for idx, p in enumerate(partition)}
+            local_edges = [
+                (phys_to_local[u], phys_to_local[v])
+                for u, v in full_edges
+                if u in partition_set and v in partition_set
+            ]
+            local_coupling = CouplingMap(local_edges) if local_edges else None
+            transpiled = transpile(
+                circ, coupling_map=local_coupling, optimization_level=1
+            )
+            transpiled_circuits.append(transpiled)
+
+        t_retry = time.time()
+        print(f"... [timing] pre-transpile onto restricted maps: {t_retry-t2:.3f}s")
+
+        experiments = [
+            _CircuitExperiment(
+                circuit=transpiled_circuits[i],
+                physical_qubits=physical_qubits_per_circuit[i],
+                label=getattr(circuits[i], "name", f"circuit_{i}"),
+            )
+            for i in range(len(circuits))
+        ]
+        parallel = ParallelExperiment(
+            experiments=experiments,
+            backend=run_backend,
+            flatten_results=False,
+        )
+        parallel.set_transpile_options(optimization_level=0)
+
+        expdata = parallel.run(backend=run_backend, shots=num_shots)
+        expdata.block_for_results()
 
     t3 = time.time()
     print(f"... [timing] parallel.run + block_for_results: {t3-t2:.1f}s")

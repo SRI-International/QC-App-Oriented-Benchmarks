@@ -77,16 +77,21 @@ When mapping multiple circuits onto disjoint qubit regions of a single QPU, the 
 
 This approach runs in under 1 second (vs. 183s for full partitioning) because it avoids the expensive operations: no Floyd-Warshall (O(N³)), no SABRE mapping iterations, and no custom hardware initialization. The error rate data is read directly from the backend object, which is already loaded. The Qiskit transpiler handles routing within each partition at `optimization_level=1`.
 
-**Results on ibm_fez (156 qubits, QFT benchmark at 4 qubits, 3 circuits):**
+**Results on ibm_fez (156 qubits):**
 
-| Approach | Partition Time | Qubits Selected | Fidelity |
-|----------|---------------|-----------------|----------|
-| Non-parallel (transpiler free choice) | — | transpiler picks best | 0.943 |
-| Parallel + lightweight error scoring | 0.6s | (91,92,93,98), (130,131,132,133), (140,141,142,143) | 0.920 |
-| Parallel + sequential allocation | instant | (0,1,2,3), (6,7,8,17), (11,18,31,32) | 0.32–0.56 |
-| Parallel + full error-aware partitioning | 183s | noise-optimal regions | not tested with measurement fix |
+| Benchmark | Qubits | Non-Parallel Fidelity | Parallel Fidelity | % of Baseline |
+|-----------|--------|----------------------|-------------------|--------------|
+| QFT | 4 (3 circuits) | 0.943 | 0.920 | 97.6% |
+| QFT | 4 (2 circuits, deeper) | 0.877 | 0.78–0.82 | ~90% |
+| QFT | 8 (3 circuits) | 0.815 | 0.738 | 91% |
+| Hamlib TFIM | 6 (3 circuits) | 0.816 | 0.735 | 90% |
+| Hamlib TFIM | 8 (3 circuits) | 0.546 | 0.453 | 83% |
 
-The lightweight approach achieves within 2% of free-transpiler fidelity at negligible computational cost. The key insight is that reading 2-qubit gate error rates from the backend target is essentially free, and even a simple scoring pass using this data dramatically improves partition quality — the difference between selecting low-error qubit neighborhoods (avg gate error ~0.002) versus blindly using edge-of-chip qubits with potentially much higher error rates.
+For comparison, sequential allocation (qubits starting from 0) produced 0.32–0.56 fidelity, and the full error-aware partitioning approach took 183 seconds per run.
+
+The lightweight approach achieves 83–98% of free-transpiler fidelity at negligible computational cost (~1-2 seconds). The key insight is that reading 2-qubit gate error rates from the backend target is essentially free, and even a simple scoring pass using this data dramatically improves partition quality. Scoring also considers subgraph diameter (lower = shorter SWAP paths) and internal edge count (more edges = better routing options), which helps avoid chain-shaped partitions on heavy-hex topologies.
+
+For wider or deeper circuits where the transpiler may route through qubits outside the assigned partition, the system automatically falls back to pre-transpilation onto restricted coupling maps, trading some fidelity for guaranteed execution. See `doc/_design/parallel_partition_mapping_tech_note.md` for full technical details.
 
 ## Distributed Statevector Execution — Run Larger Circuits
 
