@@ -458,36 +458,40 @@ def execute_circuits_parallel(circuits, num_shots):
         # Each record is either:
         #   {"kind": "expdata", ...}  -> submitted ParallelExperiment, collect later
         #   {"kind": "counts", ...}   -> single-circuit sequential counts already available
-        submitted_batches = []
+        # Phase 1: create all batches first, without submitting anything.
+        planned_batches = []
 
-        # Build greedy qubit-limited batches from the input circuit list.
         batch = []
         batch_qubits = 0
 
         for circuit in circuits:
             circuit_qubits = circuit.num_qubits
 
-            # If adding this circuit would exceed the batch qubit budget,
-            # submit the current batch first, then start a new batch.
             if batch and batch_qubits + circuit_qubits > MAX_PARALLEL_QUBITS:
-                submitted_batches.extend(
-                    _submit_parallel_batch_with_retry(batch, num_shots)
-                )
-
+                planned_batches.append(batch)
                 batch = []
                 batch_qubits = 0
 
-            # Add the current circuit to the active batch.
             batch.append(circuit)
             batch_qubits += circuit_qubits
 
-        # Submit the final partially filled batch, if any.
         if batch:
+            planned_batches.append(batch)
+
+        print(
+            "... created planned batches:",
+            [[c.num_qubits for c in b] for b in planned_batches]
+        )
+
+        # Phase 2: submit all planned batches.
+        submitted_batches = []
+
+        for batch in planned_batches:
             submitted_batches.extend(
                 _submit_parallel_batch_with_retry(batch, num_shots)
             )
 
-        print(f"... prepared {len(submitted_batches)} batch record(s); now collecting results")
+        print(f"... submitted/prepared {len(submitted_batches)} batch record(s); now collecting results")
         # Collect and normalize results from all batch records.
         counts_list = []
 
