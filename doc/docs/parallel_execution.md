@@ -60,6 +60,34 @@ For qubit-mapped parallel execution, the device must have enough qubits to hold 
 
 Within a group, the widest circuit determines the qubit allocation. Narrower circuits use a subset of the allocated region.
 
+### Qubit Partition Mapping (Qiskit)
+
+When mapping multiple circuits onto disjoint qubit regions of a single QPU, the choice of which physical qubits to assign to each circuit has a significant impact on fidelity. We evaluated three approaches:
+
+**Sequential allocation** assigns circuits to qubits starting from qubit 0: circuit 0 gets qubits [0, W), circuit 1 gets [W+gap, 2W+gap), and so on. This is fast (instant) but produces poor fidelity because it forces circuits onto whatever qubits happen to be numbered lowest, which are often at the edge of the chip with poor connectivity and high error rates. On ibm_fez (156 qubits), QFT at 4 qubits produced fidelity of 0.32–0.56 with this approach, compared to 0.94 for non-parallel execution where the transpiler freely selects the best qubits.
+
+**Full error-aware partitioning** (using the `IBMQHardwareArchitecture` framework with Floyd-Warshall distance matrices, heuristic partition search, and SABRE-based initial mapping) achieves optimal qubit placement but takes approximately 183 seconds on ibm_fez (125s for hardware initialization + 58s for mapping). This overhead is prohibitive for routine use.
+
+**Lightweight topology + error scoring** is the approach we implemented. The algorithm:
+
+1. Builds an undirected graph from the backend's coupling map
+2. From every qubit, grows a connected subgraph of the target circuit width by greedily adding the frontier node with the most connections to the existing cluster (keeps partitions compact)
+3. Scores each candidate partition by average 2-qubit gate error rate (read directly from `backend.target`), with compactness as a tiebreaker
+4. Greedily selects non-overlapping partitions, excluding all qubits within a configurable gap (default 2 hops) of each selected partition to reduce crosstalk
+
+This approach runs in under 1 second (vs. 183s for full partitioning) because it avoids the expensive operations: no Floyd-Warshall (O(N³)), no SABRE mapping iterations, and no custom hardware initialization. The error rate data is read directly from the backend object, which is already loaded. The Qiskit transpiler handles routing within each partition at `optimization_level=1`.
+
+**Results on ibm_fez (156 qubits, QFT benchmark at 4 qubits, 3 circuits):**
+
+| Approach | Partition Time | Qubits Selected | Fidelity |
+|----------|---------------|-----------------|----------|
+| Non-parallel (transpiler free choice) | — | transpiler picks best | 0.943 |
+| Parallel + lightweight error scoring | 0.6s | (91,92,93,98), (130,131,132,133), (140,141,142,143) | 0.920 |
+| Parallel + sequential allocation | instant | (0,1,2,3), (6,7,8,17), (11,18,31,32) | 0.32–0.56 |
+| Parallel + full error-aware partitioning | 183s | noise-optimal regions | not tested with measurement fix |
+
+The lightweight approach achieves within 2% of free-transpiler fidelity at negligible computational cost. The key insight is that reading 2-qubit gate error rates from the backend target is essentially free, and even a simple scoring pass using this data dramatically improves partition quality — the difference between selecting low-error qubit neighborhoods (avg gate error ~0.002) versus blindly using edge-of-chip qubits with potentially much higher error rates.
+
 ## Distributed Statevector Execution — Run Larger Circuits
 
 Distributed statevector execution partitions and distributes a single circuit's statevector across multiple GPUs, enabling simulation of circuits that are too large for any one device.

@@ -58,6 +58,159 @@ def _remove_measurements(circuit):
 
     return clean
 
+def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2,
+                              backend_target=None):
+    """
+    Find disjoint connected subgraphs of size `circuit_width` on the device
+    coupling map, separated by at least `gap` hops. Scores candidates by
+    gate error rates when available, with compactness as tiebreaker.
+
+    Algorithm:
+      1. Build undirected graph from the coupling map
+      2. From each qubit, grow a connected subgraph of the target width,
+         preferring neighbors with most connections to existing cluster
+      3. Score each candidate by average 2-qubit gate error (from backend.target)
+         plus compactness; falls back to compactness-only if no error data
+      4. Greedily select non-overlapping partitions with gap separation
+
+    Args:
+        coupling_map: Qiskit CouplingMap or list of edges
+        circuit_width: number of qubits per partition
+        num_partitions: how many partitions to find
+        gap: minimum graph distance between any qubit in different partitions
+        backend_target: optional Qiskit Target object (from backend.target)
+            for error-rate scoring
+
+    Returns:
+        List of tuples, each tuple is a set of physical qubit indices forming
+        one partition. Length <= num_partitions (may be fewer if device is small).
+        Returns empty list if coupling_map is None.
+    """
+    import networkx as nx
+
+    if coupling_map is None:
+        return []
+
+    # Build undirected graph from coupling map edges
+    edges = coupling_map.get_edges() if hasattr(coupling_map, 'get_edges') else coupling_map
+    G = nx.Graph()
+    G.add_edges_from(edges)
+
+    if circuit_width == 1:
+        # Trivial case: each partition is a single qubit
+        nodes = sorted(G.nodes(), key=lambda n: -G.degree(n))
+        partitions = []
+        excluded = set()
+        for n in nodes:
+            if n not in excluded:
+                partitions.append((n,))
+                for nbr in nx.single_source_shortest_path_length(G, n, cutoff=gap):
+                    excluded.add(nbr)
+                if len(partitions) >= num_partitions:
+                    break
+        return partitions
+
+    # Grow a connected subgraph of `size` nodes from `start`, preferring
+    # the frontier node closest to the subgraph centroid (stays compact).
+    # Ties broken by degree (more routing options).
+    def _grow(start, size):
+        subgraph = [start]
+        sub_set = {start}
+        frontier = set(G.neighbors(start))
+        while len(subgraph) < size and frontier:
+            # Score each frontier node: average graph distance to current subgraph members
+            # (lower = closer to the cluster center)
+            best = None
+            best_score = float('inf')
+            for f in frontier:
+                avg_dist = sum(1 for s in subgraph if G.has_edge(f, s))
+                # More direct connections to existing subgraph = better (negate to minimize)
+                score = -avg_dist  # most connections first
+                if score < best_score or (score == best_score and G.degree(f) > G.degree(best)):
+                    best_score = score
+                    best = f
+            subgraph.append(best)
+            sub_set.add(best)
+            frontier.discard(best)
+            for nbr in G.neighbors(best):
+                if nbr not in sub_set:
+                    frontier.add(nbr)
+        return frozenset(sub_set) if len(sub_set) == size else None
+
+    # Build edge error map from backend target (if available)
+    edge_errors = {}
+    if backend_target is not None:
+        # Try common 2-qubit gate names
+        for gate_name in ['cx', 'ecr', 'cz']:
+            if gate_name in backend_target.operation_names:
+                for qargs in backend_target.qargs_for_operation_name(gate_name):
+                    props = backend_target[gate_name].get(qargs)
+                    if props and props.error is not None:
+                        edge_errors[qargs] = props.error
+                        edge_errors[(qargs[1], qargs[0])] = props.error
+                break  # use whichever 2q gate we find first
+
+    # Generate candidate partitions from every starting node
+    seen = set()
+    candidates = []
+    for start in G.nodes():
+        sub = _grow(start, circuit_width)
+        if sub is not None and sub not in seen:
+            seen.add(sub)
+            sub_list = list(sub)
+
+            # Compactness score: average pairwise shortest path within subgraph
+            total_dist = 0
+            pairs = 0
+            sub_G = G.subgraph(sub)
+            for i in range(len(sub_list)):
+                lengths = nx.single_source_shortest_path_length(sub_G, sub_list[i])
+                for j in range(i + 1, len(sub_list)):
+                    total_dist += lengths.get(sub_list[j], circuit_width * 10)
+                    pairs += 1
+            compactness = total_dist / max(pairs, 1)
+
+            # Error score: average 2-qubit gate error on edges within subgraph
+            if edge_errors:
+                errs = []
+                for u in sub_list:
+                    for v in sub_list:
+                        if u < v and G.has_edge(u, v):
+                            errs.append(edge_errors.get((u, v), 0.1))
+                error_score = sum(errs) / max(len(errs), 1)
+            else:
+                error_score = 0  # no error data, rely on compactness alone
+
+            # Primary sort: error score (lower = better qubits)
+            # Secondary sort: compactness (lower = tighter cluster)
+            candidates.append((error_score, compactness, tuple(sorted(sub_list))))
+
+    # Sort by error score, then compactness
+    candidates.sort(key=lambda x: (x[0], x[1]))
+
+    if candidates:
+        scoring = "error+compactness" if edge_errors else "compactness-only"
+        print(f"... partition candidates: {len(candidates)} found, scoring={scoring}")
+
+    # Greedily pick non-overlapping partitions with gap separation
+    selected = []
+    excluded = set()
+    for _err, _compact, qubits in candidates:
+        if any(q in excluded for q in qubits):
+            continue
+        selected.append(qubits)
+        if edge_errors:
+            print(f"...   selected {qubits}: avg_gate_err={_err:.4f}, compactness={_compact:.2f}")
+        # Exclude all qubits within `gap` hops of this partition
+        for q in qubits:
+            for nbr, _dist in nx.single_source_shortest_path_length(G, q, cutoff=gap).items():
+                excluded.add(nbr)
+        if len(selected) >= num_partitions:
+            break
+
+    return selected
+
+
 def _run_qiskit_parallel_experiment(circuits, num_shots):
     """
     Execute a batch of circuits using Qiskit's ParallelExperiment with simple
@@ -96,22 +249,71 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     else:
         device_qubits = 1000  # simulator fallback
 
-    # Sequential qubit allocation with spacing
+    # Qubit allocation: try topology-aware partitioning, retry with smaller gap,
+    # fall back to sequential only for simulators (sequential is broken on
+    # real hardware where consecutive qubits aren't necessarily connected)
     spacing = 2
-    physical_qubits_per_circuit = []
-    offset = 0
-    for circ in circuits:
-        w = circ.num_qubits
-        if offset + w > device_qubits:
-            raise RuntimeError(
-                f"Circuits do not fit: need {offset + w} qubits, "
-                f"device has {device_qubits}")
-        physical_qubits_per_circuit.append(tuple(range(offset, offset + w)))
-        offset += w + spacing
+    coupling_map = getattr(run_backend, 'coupling_map', None)
+
+    # For same-width circuits, use topology partitioning if coupling map available
+    widths = [c.num_qubits for c in circuits]
+    backend_target = getattr(run_backend, 'target', None)
+    partitions = []
+    alloc_gap = spacing
+    if coupling_map is not None and len(set(widths)) == 1:
+        # Try with decreasing gap until we find enough partitions
+        for try_gap in [spacing, 1, 0]:
+            partitions = _find_topology_partitions(
+                coupling_map, widths[0], len(circuits), gap=try_gap,
+                backend_target=backend_target
+            )
+            alloc_gap = try_gap
+            if len(partitions) >= len(circuits):
+                break
+            if try_gap > 0:
+                print(f"... topology with gap={try_gap} found {len(partitions)} of "
+                      f"{len(circuits)} needed, retrying with gap={max(try_gap-1, 0)}")
+
+    if len(partitions) >= len(circuits):
+        # Use topology-aware partitions
+        physical_qubits_per_circuit = partitions[:len(circuits)]
+        alloc_method = f"topology(gap={alloc_gap})"
+    elif coupling_map is not None and partitions:
+        # Hardware backend but not enough partitions even at gap=0:
+        # use what we found and raise to trigger fallback to non-parallel
+        print(f"... topology partitioning found only {len(partitions)} of "
+              f"{len(circuits)} needed even at gap=0")
+        print(f"... running {len(partitions)} circuits in parallel, "
+              f"remaining {len(circuits) - len(partitions)} will use fallback")
+        raise RuntimeError(
+            f"Cannot fit {len(circuits)} circuits: only {len(partitions)} "
+            f"partitions available on {device_qubits}-qubit device")
+    elif coupling_map is None:
+        # Simulator: sequential allocation is safe (all-to-all connectivity)
+        physical_qubits_per_circuit = []
+        offset = 0
+        for circ in circuits:
+            w = circ.num_qubits
+            if offset + w > device_qubits:
+                raise RuntimeError(
+                    f"Circuits do not fit: need {offset + w} qubits, "
+                    f"device has {device_qubits}")
+            physical_qubits_per_circuit.append(tuple(range(offset, offset + w)))
+            offset += w + spacing
+        alloc_method = "sequential"
+    else:
+        # Hardware backend, no partitions found at all
+        raise RuntimeError(
+            f"Cannot find any {widths[0]}-qubit connected subgraphs "
+            f"on {device_qubits}-qubit device")
 
     t1 = time.time()
-    print(f"... [timing] qubit allocation: {t1-t0:.3f}s "
-          f"({len(circuits)} circuits, {offset - spacing} qubits used / {device_qubits})")
+    qubits_used = max(max(p) for p in physical_qubits_per_circuit) + 1 if physical_qubits_per_circuit else 0
+    print(f"... [timing] qubit allocation ({alloc_method}): {t1-t0:.3f}s "
+          f"({len(circuits)} circuits, {qubits_used} qubits used / {device_qubits})")
+    if alloc_method.startswith("topology") and len(circuits) <= 6:
+        for i, p in enumerate(physical_qubits_per_circuit):
+            print(f"...   circuit {i} ({widths[i]}q) → qubits {p}")
 
     # Minimal CircuitExperiment wrapper — no analysis needed
     class _NoAnalysis(BaseAnalysis):
