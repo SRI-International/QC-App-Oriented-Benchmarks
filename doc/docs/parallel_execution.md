@@ -107,6 +107,23 @@ For example, 30 circuits of width 8 on ibm_fez (11 partitions at gap=0):
 
 This is significantly more efficient than submitting 30 individual jobs or even 3 separate parallel batches. In testing, Hamlib TFIM with 30 circuits of 8 qubits achieved comparable fidelity to sequential execution while using approximately **3x less billed execution time** (3 seconds vs 10 seconds on IBM Quantum).
 
+### Mixed-Width Circuits
+
+When the input contains circuits of different widths (common in benchmarks that sweep qubit counts), the system groups them by width and finds partitions for each width on the device:
+
+1. **Group by width**, sorted largest-first (e.g., 5x8q, 5x7q, 5x6q)
+2. **Find partitions** using round-robin across widths: one partition for the largest width, one for the next, etc., repeating until the device is full. Larger widths get the best qubit regions.
+3. **Exact match or pad**: circuits whose width matches a partition go directly. Circuits with no exact-match partition are padded with idle qubits into the smallest available larger partition.
+4. **One job**: all partitions (mixed widths) go into a single `ParallelExperiment`. Results are automatically decomposed and reordered to match the original circuit order.
+
+For simulators, the `parallel_simulator_max_qubits` setting (default 16) controls the qubit budget. With max=16 and circuits of width 8, 7, and 6: two 8-qubit partitions are allocated, and the 7q and 6q circuits are padded into the 8q partitions.
+
+```python
+# Adjust simulator qubit budget if needed
+import execute_parallel as ep
+ep.parallel_simulator_max_qubits = 24  # allow wider parallel simulation
+```
+
 ## Distributed Statevector Execution — Run Larger Circuits
 
 Distributed statevector execution partitions and distributes a single circuit's statevector across multiple GPUs, enabling simulation of circuits that are too large for any one device.

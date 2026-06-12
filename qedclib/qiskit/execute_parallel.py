@@ -24,6 +24,14 @@
 # "import execute as ex".
 ###############################################################################
 
+# Maximum total qubits for simulator parallel execution.
+# Controls how many partitions can run simultaneously: e.g., with max=16,
+# two 8q circuits or three 5q circuits can run in parallel.
+# Set higher (e.g., 24) if willing to wait for larger simulations.
+# For hardware backends this is ignored — device size is used instead.
+parallel_simulator_max_qubits = 16
+
+
 def _remove_measurements(circuit):
     """
     Return a copy of `circuit` with measurement/barrier operations removed,
@@ -219,6 +227,185 @@ def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2
     return selected
 
 
+def _find_multi_width_partitions(coupling_map, width_requests, gap=2,
+                                  backend_target=None):
+    """
+    Find partitions for multiple circuit widths on the same device.
+
+    Builds the device graph and error map once, generates candidate subgraphs
+    for each requested width, then selects partitions using round-robin across
+    widths: one partition for the largest width, one for the next largest, etc.,
+    then back to the largest for a second partition, and so on until the device
+    is full or all quotas are met. This ensures every width gets served before
+    any width gets extra partitions.
+
+    Args:
+        coupling_map: Qiskit CouplingMap or list of edges
+        width_requests: list of (width, num_partitions_wanted), sorted
+            largest-first by caller
+        gap: minimum graph distance between any qubit in different partitions
+        backend_target: optional Qiskit Target for error-rate scoring
+
+    Returns:
+        dict: {width: [partition_tuples...]}
+        Empty dict if coupling_map is None.
+    """
+    import networkx as nx
+
+    if coupling_map is None:
+        return {}
+
+    # Build undirected graph from coupling map edges (once)
+    edges = coupling_map.get_edges() if hasattr(coupling_map, 'get_edges') else coupling_map
+    G = nx.Graph()
+    G.add_edges_from(edges)
+
+    # Build edge error map from backend target (once)
+    edge_errors = {}
+    if backend_target is not None:
+        for gate_name in ['cx', 'ecr', 'cz']:
+            if gate_name in backend_target.operation_names:
+                for qargs in backend_target.qargs_for_operation_name(gate_name):
+                    props = backend_target[gate_name].get(qargs)
+                    if props and props.error is not None:
+                        edge_errors[qargs] = props.error
+                        edge_errors[(qargs[1], qargs[0])] = props.error
+                break
+
+    # Grow a connected subgraph of `size` nodes from `start`
+    def _grow(start, size):
+        subgraph = [start]
+        sub_set = {start}
+        frontier = set(G.neighbors(start))
+        while len(subgraph) < size and frontier:
+            best = None
+            best_score = float('inf')
+            for f in frontier:
+                avg_dist = sum(1 for s in subgraph if G.has_edge(f, s))
+                score = -avg_dist
+                if score < best_score or (score == best_score and G.degree(f) > G.degree(best)):
+                    best_score = score
+                    best = f
+            subgraph.append(best)
+            sub_set.add(best)
+            frontier.discard(best)
+            for nbr in G.neighbors(best):
+                if nbr not in sub_set:
+                    frontier.add(nbr)
+        return frozenset(sub_set) if len(sub_set) == size else None
+
+    # Generate and score candidates for each width separately.
+    # Each width gets its own sorted candidate list (best-first by error).
+    candidates_by_width = {}
+    for width, _count in width_requests:
+        if width == 0:
+            continue
+        candidates = []
+        seen = set()
+        for start in G.nodes():
+            sub = _grow(start, width)
+            if sub is not None and sub not in seen:
+                seen.add(sub)
+                sub_list = list(sub)
+                sub_G = G.subgraph(sub)
+                internal_edges = sub_G.number_of_edges()
+                diameter = nx.diameter(sub_G) if width > 1 else 0
+
+                if edge_errors:
+                    errs = []
+                    for u in sub_list:
+                        for v in sub_list:
+                            if u < v and G.has_edge(u, v):
+                                errs.append(edge_errors.get((u, v), 0.1))
+                    error_score = sum(errs) / max(len(errs), 1)
+                else:
+                    error_score = 0
+
+                candidates.append((error_score, diameter, -internal_edges,
+                                   tuple(sorted(sub_list))))
+
+        candidates.sort()  # best error first
+        candidates_by_width[width] = candidates
+
+    scoring = "error+compactness" if edge_errors else "compactness-only"
+    cand_str = ", ".join(f"{w}q:{len(candidates_by_width.get(w, []))}"
+                         for w, _ in width_requests)
+    print(f"... partition candidates per width: [{cand_str}], scoring={scoring}")
+
+    # Round-robin selection: cycle through widths (largest first per round),
+    # picking one partition per width per round, until device is full or
+    # all quotas met.
+    quota = {width: count for width, count in width_requests}
+    selected = {width: [] for width, _ in width_requests}
+    excluded = set()
+    pos = {width: 0 for width, _ in width_requests}  # scan position per width
+
+    made_progress = True
+    while made_progress:
+        made_progress = False
+        for width, _ in width_requests:  # largest-first order
+            if quota[width] <= 0:
+                continue
+            # Scan this width's candidates for the next non-overlapping one
+            cands = candidates_by_width.get(width, [])
+            while pos[width] < len(cands):
+                _err, _diam, _neg_edges, qubits = cands[pos[width]]
+                pos[width] += 1
+                if any(q in excluded for q in qubits):
+                    continue
+                # Found a valid partition for this width
+                selected[width].append(qubits)
+                quota[width] -= 1
+                if edge_errors:
+                    print(f"...   selected {width}q {qubits}: "
+                          f"avg_gate_err={_err:.4f}, diameter={_diam}, "
+                          f"edges={-_neg_edges}")
+                for q in qubits:
+                    for nbr in nx.single_source_shortest_path_length(
+                            G, q, cutoff=gap):
+                        excluded.add(nbr)
+                made_progress = True
+                break  # move to next width in this round
+
+    total = sum(len(v) for v in selected.values())
+    sel_str = ", ".join(f"{w}q:{len(selected[w])}" for w, _ in width_requests)
+    print(f"... partitions selected: [{sel_str}], total={total}")
+
+    return selected
+
+
+def _pad_circuit(circuit, target_width):
+    """
+    Pad a circuit to target_width by adding idle qubits.
+
+    The original circuit's gates and measurements stay on qubits 0..N-1.
+    Extra qubits (N..target_width-1) are idle — no gates, no measurements.
+    This allows a smaller circuit to run on a larger partition.
+    """
+    if circuit.num_qubits >= target_width:
+        return circuit
+    from qiskit import QuantumCircuit
+    padded = QuantumCircuit(target_width, circuit.num_clbits, name=circuit.name)
+    padded.compose(circuit, qubits=range(circuit.num_qubits),
+                   clbits=range(circuit.num_clbits), inplace=True)
+    return padded
+
+
+def _group_circuits_by_width(circuits):
+    """
+    Group circuits by qubit width, preserving original indices.
+
+    Returns:
+        List of (width, [(orig_idx, circuit), ...]) sorted by width
+        descending (largest first, so they get the best qubit regions).
+    """
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for idx, circ in enumerate(circuits):
+        groups[circ.num_qubits].append((idx, circ))
+    return sorted(groups.items(), key=lambda x: -x[0])
+
+
 def _assign_to_partitions(circuits, num_partitions):
     """
     Distribute circuits round-robin across partitions.
@@ -242,16 +429,23 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     """
     Execute circuits using Qiskit's ParallelExperiment with array batching.
 
-    Circuits are distributed round-robin across available hardware partitions.
-    Each partition holds an array of circuits, and ParallelExperiment composes
-    one wide circuit per "round" (zipping the i-th circuit from each partition).
-    All rounds are submitted as a single job.
+    Supports both same-width and mixed-width circuit arrays. Circuits are
+    grouped by width, partitions are found for each width (largest first),
+    and circuits are distributed round-robin within each width group.
+    ParallelExperiment composes one wide circuit per "round" (zipping the
+    i-th circuit from each partition). All rounds submitted as a single job.
 
-    Example: 12 circuits, 3 partitions →
-        Partition A: [c0, c3, c6, c9]
-        Partition B: [c1, c4, c7, c10]
-        Partition C: [c2, c5, c8, c11]
-        → 4 composite circuits, 1 job submission, 12 results
+    Same-width example: 12 circuits of 5q, 3 partitions →
+        Partition A (5q): [c0, c3, c6, c9]
+        Partition B (5q): [c1, c4, c7, c10]
+        Partition C (5q): [c2, c5, c8, c11]
+        → 4 composite circuits, 1 job, 12 results
+
+    Mixed-width example: 4x8q + 6x4q, device fits 2 partitions of 8q + 3 of 4q →
+        Partition A (8q): [c0, c2]     Partition D (4q): [c4, c7]
+        Partition B (8q): [c1, c3]     Partition E (4q): [c5, c8]
+                                       Partition F (4q): [c6, c9]
+        → 2 composite circuits, 1 job, 10 results
 
     The returned value is a list of count dictionaries, one per input circuit,
     in the original input order.
@@ -282,74 +476,222 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     else:
         device_qubits = 1000  # simulator fallback
 
-    # Qubit allocation: try topology-aware partitioning, retry with smaller gap,
-    # fall back to sequential only for simulators (sequential is broken on
-    # real hardware where consecutive qubits aren't necessarily connected)
+    # For simulators, cap to parallel_simulator_max_qubits to avoid
+    # prohibitively slow simulation of wide composite circuits.
+    coupling_map_check = getattr(run_backend, 'coupling_map', None)
+    if coupling_map_check is None:
+        device_qubits = min(device_qubits, parallel_simulator_max_qubits)
+        print(f"... simulator qubit budget capped to {device_qubits} "
+              f"(parallel_simulator_max_qubits={parallel_simulator_max_qubits})")
+
+    # Qubit allocation: group circuits by width, find partitions for each width,
+    # distribute circuits round-robin across partitions.
+    # Works for both same-width and mixed-width input.
     spacing = 2
     coupling_map = getattr(run_backend, 'coupling_map', None)
-
-    # For same-width circuits, use topology partitioning if coupling map available
-    widths = [c.num_qubits for c in circuits]
-    circuit_width = widths[0]  # Phase 2 assumes same-width input
     backend_target = getattr(run_backend, 'target', None)
-    partitions = []
-    alloc_gap = spacing
+
+    # Group circuits by width (largest first for best qubit regions)
+    width_groups = _group_circuits_by_width(circuits)
+    unique_widths = len(width_groups)
+    width_summary = ", ".join(f"{len(g)}x{w}q" for w, g in width_groups)
+    mixed_label = "mixed-width" if unique_widths > 1 else "same-width"
+    print(f"... {len(circuits)} circuits ({mixed_label}): {width_summary}")
+
+    # Flat lists built up across all width groups
+    partitions = []        # qubit tuples, one per partition
+    partition_arrays = []  # circuit arrays, one per partition
+    assignment_map = []    # original index arrays, one per partition
 
     if coupling_map is not None:
-        # Hardware: topology-aware partitioning with gap retry.
-        # We no longer require partitions >= circuits — array batching
-        # distributes circuits across however many partitions we find.
+        print(f"... hardware path: topology-aware partitioning on {device_qubits}-qubit device")
+
+        # Greedy fill: find as many partitions as will fit on the device,
+        # largest width first. Each width gets at least 1 partition (it must
+        # fit since we go largest-first and the device is bigger than any
+        # single circuit). Remaining capacity goes to more partitions of
+        # any width, which reduces the number of rounds.
+        #
+        # Request a generous count per width — the function will return
+        # however many actually fit. We ask for len(group) per width
+        # (one partition per circuit = maximum parallelism) and let the
+        # device constraint limit us naturally.
+        width_requests = [(width, len(group)) for width, group in width_groups]
+
+        req_str = ", ".join(f"{w}q:{c}" for w, c in width_requests)
+        print(f"... partition requests (greedy fill): [{req_str}]")
+
+        # Try with decreasing gap until every width has at least one partition
+        alloc_gap = spacing
+        width_partitions = {}
         for try_gap in [spacing, 1, 0]:
-            partitions = _find_topology_partitions(
-                coupling_map, circuit_width, len(circuits), gap=try_gap,
-                backend_target=backend_target,
-                routing_buffer=0
+            width_partitions = _find_multi_width_partitions(
+                coupling_map, width_requests, gap=try_gap,
+                backend_target=backend_target
             )
             alloc_gap = try_gap
-            if len(partitions) >= len(circuits):
+            # Need at least one partition, and ideally one per unique width.
+            # With padding, we just need the largest width to have a partition
+            # (smaller circuits can pad into it). But prefer all widths covered.
+            total_found = sum(len(v) for v in width_partitions.values())
+            all_covered = all(
+                len(width_partitions.get(w, [])) > 0 for w, _ in width_groups
+            )
+            if all_covered or total_found > 0:
                 break
             if try_gap > 0:
-                print(f"... topology with gap={try_gap} found {len(partitions)} of "
-                      f"{len(circuits)} needed, retrying with gap={max(try_gap-1, 0)}")
-        if not partitions:
+                missing = [f"{w}q" for w, _ in width_groups
+                           if not width_partitions.get(w, [])]
+                total_found = sum(len(v) for v in width_partitions.values())
+                print(f"... gap={try_gap} found {total_found} partitions, "
+                      f"missing widths={missing}, "
+                      f"retrying with gap={max(try_gap-1, 0)}")
+
+        # Check we found at least one partition overall
+        if not any(width_partitions.values()):
+            widths_str = ",".join(str(w) for w, _ in width_groups)
             raise RuntimeError(
-                f"Cannot find any {circuit_width}-qubit connected subgraphs "
-                f"on {device_qubits}-qubit device")
+                f"Cannot find any partitions for widths [{widths_str}] "
+                f"on {device_qubits}-qubit device (gap={alloc_gap})")
+
         alloc_method = f"topology(gap={alloc_gap})"
+
+        # Assign circuits to partitions:
+        # 1. Exact-match: circuit width == partition width
+        # 2. Closest-fit: circuit goes to smallest partition >= its width (padded)
+        available_widths_asc = sorted(width_partitions.keys())
+
+        # Map each circuit to its target partition width
+        from collections import defaultdict
+        target_groups = defaultdict(list)  # target_width -> [(orig_idx, circuit)]
+
+        for width, group in width_groups:
+            if width in width_partitions and width_partitions[width]:
+                target_w = width  # exact match
+            else:
+                # Find smallest partition width >= circuit width
+                target_w = None
+                for aw in available_widths_asc:
+                    if aw >= width:
+                        target_w = aw
+                        break
+                if target_w is None:
+                    raise RuntimeError(
+                        f"No partition large enough for {width}q circuits "
+                        f"(largest available: {available_widths_asc[-1]}q)")
+
+            if target_w != width:
+                print(f"... {len(group)} circuits of {width}q → padded into "
+                      f"{target_w}q partitions")
+
+            for orig_idx, circ in group:
+                if target_w != width:
+                    circ = _pad_circuit(circ, target_w)
+                target_groups[target_w].append((orig_idx, circ))
+
+        # Distribute within each target width group
+        for target_w in sorted(target_groups.keys(), reverse=True):
+            entries = target_groups[target_w]
+            w_partitions = width_partitions[target_w]
+            group_circuits = [circ for _, circ in entries]
+            group_orig_indices = [idx for idx, _ in entries]
+            w_arrays, w_map = _assign_to_partitions(group_circuits, len(w_partitions))
+            for p_idx in range(len(w_partitions)):
+                partitions.append(w_partitions[p_idx])
+                partition_arrays.append(w_arrays[p_idx])
+                assignment_map.append([group_orig_indices[i] for i in w_map[p_idx]])
+
     else:
-        # Simulator: sequential allocation (all-to-all connectivity)
-        max_seq = device_qubits // (circuit_width + spacing) if circuit_width + spacing > 0 else 1
-        num_partitions = min(max_seq, len(circuits))
-        if num_partitions == 0:
-            raise RuntimeError(
-                f"Circuit width {circuit_width} + spacing {spacing} exceeds "
-                f"device size {device_qubits}")
+        # Simulator: no spacing needed (all-to-all connectivity, no crosstalk).
+        # Allocate partitions for each width that fits, largest first.
+        # Smaller circuits that don't get their own partitions are padded
+        # into larger ones (same logic as hardware path).
+        print(f"... simulator path: sequential allocation on {device_qubits}-qubit device "
+              f"(spacing=0)")
         offset = 0
-        for _ in range(num_partitions):
-            partitions.append(tuple(range(offset, offset + circuit_width)))
-            offset += circuit_width + spacing
+        sim_width_partitions = {}  # width -> [partition_tuples]
+        for width, group in width_groups:
+            remaining = device_qubits - offset
+            max_seq = remaining // max(width, 1)
+            num_p = min(max(1, max_seq), len(group))
+            if max_seq == 0:
+                # No room for this width — will be padded into a larger partition
+                print(f"... no room for {width}q partitions "
+                      f"(offset={offset}), will pad into larger")
+                continue
+
+            w_partitions = []
+            for _ in range(num_p):
+                w_partitions.append(tuple(range(offset, offset + width)))
+                offset += width
+            sim_width_partitions[width] = w_partitions
+
+        if not sim_width_partitions:
+            raise RuntimeError(
+                f"Cannot fit any circuits on {device_qubits}-qubit simulator")
+
+        # Target-width mapping with padding (same as hardware path)
+        from collections import defaultdict
+        available_widths_asc = sorted(sim_width_partitions.keys())
+        target_groups = defaultdict(list)
+
+        for width, group in width_groups:
+            if width in sim_width_partitions and sim_width_partitions[width]:
+                target_w = width
+            else:
+                target_w = None
+                for aw in available_widths_asc:
+                    if aw >= width:
+                        target_w = aw
+                        break
+                if target_w is None:
+                    raise RuntimeError(
+                        f"No partition large enough for {width}q circuits "
+                        f"on simulator (largest: {available_widths_asc[-1]}q)")
+
+            if target_w != width:
+                print(f"... {len(group)} circuits of {width}q -> padded into "
+                      f"{target_w}q partitions")
+
+            for orig_idx, circ in group:
+                if target_w != width:
+                    circ = _pad_circuit(circ, target_w)
+                target_groups[target_w].append((orig_idx, circ))
+
+        for target_w in sorted(target_groups.keys(), reverse=True):
+            entries = target_groups[target_w]
+            w_partitions = sim_width_partitions[target_w]
+            group_circuits = [circ for _, circ in entries]
+            group_orig_indices = [idx for idx, _ in entries]
+            w_arrays, w_map = _assign_to_partitions(group_circuits, len(w_partitions))
+            for p_idx in range(len(w_partitions)):
+                partitions.append(w_partitions[p_idx])
+                partition_arrays.append(w_arrays[p_idx])
+                assignment_map.append([group_orig_indices[i] for i in w_map[p_idx]])
+
         alloc_method = "sequential"
 
-    # Distribute circuits round-robin across the available partitions.
-    # If we have more circuits than partitions, each partition gets an array
-    # of circuits — ParallelExperiment zips them into composite circuits.
-    partition_arrays, assignment_map = _assign_to_partitions(circuits, len(partitions))
+    if not partitions:
+        raise RuntimeError("No partitions allocated for any circuit width")
 
     t1 = time.time()
-    qubits_used = max(max(p) for p in partitions) + 1 if partitions else 0
+    qubits_used = max(max(p) for p in partitions) + 1
     rounds = max(len(arr) for arr in partition_arrays)
-    circuits_per_partition = [len(arr) for arr in partition_arrays]
     print(f"... [timing] qubit allocation ({alloc_method}): {t1-t0:.3f}s "
           f"({len(circuits)} circuits across {len(partitions)} partitions, "
-          f"{rounds} rounds, {circuit_width}q each, "
-          f"{qubits_used} qubits used / {device_qubits})")
-    print(f"...   circuits per partition: {circuits_per_partition}")
-    if len(partitions) <= 8:
+          f"{rounds} rounds max, {qubits_used} qubits used / {device_qubits})")
+    # Per-width summary
+    for width, group in width_groups:
+        w_parts = [i for i, p in enumerate(partitions) if len(p) == width]
+        w_circs = sum(len(partition_arrays[i]) for i in w_parts)
+        w_rounds = max((len(partition_arrays[i]) for i in w_parts), default=0)
+        print(f"...   width {width}q: {len(w_parts)} partitions, "
+              f"{w_circs} circuits, {w_rounds} rounds")
+    if len(partitions) <= 10:
         for p_idx, partition in enumerate(partitions):
-            orig_indices = assignment_map[p_idx]
-            print(f"...   partition {p_idx}: qubits={partition}, "
+            print(f"...   partition {p_idx} ({len(partition)}q): qubits={partition}, "
                   f"{len(partition_arrays[p_idx])} circuits "
-                  f"(original indices {orig_indices})")
+                  f"(original indices {assignment_map[p_idx]})")
 
     # Minimal experiment wrapper — no analysis needed.
     # _CircuitArrayExperiment holds an array of circuits per partition.
