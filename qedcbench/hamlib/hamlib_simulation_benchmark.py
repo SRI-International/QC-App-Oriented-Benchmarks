@@ -825,12 +825,15 @@ def run(min_qubits: int = 2,
         ex.compute_all_circuit_metrics(all_qcs)
         ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
         metrics.finalize_all_groups()
-    
+        metrics.save_app_metrics(benchmark_name, method=method)
+
     # we want to write file every time we have new data.
     # but if file is busy, we get error, do it at end for now
     app_name = f"HamLib-obs-{hamiltonian_name}"
     if mpi.leader():
         store_app_metrics(app_name, backend_id, metrics_array)
+
+    metrics.end_metrics()
 
     ########################
     # Display Sample Circuit
