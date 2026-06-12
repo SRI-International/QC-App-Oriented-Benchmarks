@@ -332,40 +332,60 @@ def _find_multi_width_partitions(coupling_map, width_requests, gap=2,
                          for w, _ in width_requests)
     print(f"... partition candidates per width: [{cand_str}], scoring={scoring}")
 
-    # Round-robin selection: cycle through widths (largest first per round),
-    # picking one partition per width per round, until device is full or
-    # all quotas met.
+    # Two-phase selection:
+    # Phase 1: One partition per unique width, largest-first. This ensures
+    #   the largest circuits get the best qubit regions. Small widths that
+    #   don't fit after large ones consume the device will be padded into
+    #   larger partitions later — they don't need their own.
+    # Phase 2: Give additional partitions to widths that already have one,
+    #   largest-first, to reduce the number of rounds. Continue until device
+    #   is full or all quotas are met.
     quota = {width: count for width, count in width_requests}
     selected = {width: [] for width, _ in width_requests}
     excluded = set()
     pos = {width: 0 for width, _ in width_requests}  # scan position per width
 
+    def _try_select(width):
+        """Try to find one non-overlapping partition for this width.
+        Returns True if found."""
+        cands = candidates_by_width.get(width, [])
+        while pos[width] < len(cands):
+            _err, _diam, _neg_edges, qubits = cands[pos[width]]
+            pos[width] += 1
+            if any(q in excluded for q in qubits):
+                continue
+            selected[width].append(qubits)
+            quota[width] -= 1
+            if edge_errors:
+                print(f"...   selected {width}q {qubits}: "
+                      f"avg_gate_err={_err:.4f}, diameter={_diam}, "
+                      f"edges={-_neg_edges}")
+            for q in qubits:
+                for nbr in nx.single_source_shortest_path_length(
+                        G, q, cutoff=gap):
+                    excluded.add(nbr)
+            return True
+        return False
+
+    # Phase 1: one partition per unique width, largest-first.
+    # Stop as soon as a width fails — remaining smaller widths will be
+    # padded into larger partitions. Don't waste device gaps on tiny
+    # partitions that force many circuits into one overloaded partition.
+    for width, _ in width_requests:
+        if not _try_select(width):
+            print(f"... no room for {width}q partition, "
+                  f"stopping Phase 1 (smaller widths will be padded)")
+            break
+
+    # Phase 2: additional partitions for widths that already have one
     made_progress = True
     while made_progress:
         made_progress = False
-        for width, _ in width_requests:  # largest-first order
-            if quota[width] <= 0:
-                continue
-            # Scan this width's candidates for the next non-overlapping one
-            cands = candidates_by_width.get(width, [])
-            while pos[width] < len(cands):
-                _err, _diam, _neg_edges, qubits = cands[pos[width]]
-                pos[width] += 1
-                if any(q in excluded for q in qubits):
-                    continue
-                # Found a valid partition for this width
-                selected[width].append(qubits)
-                quota[width] -= 1
-                if edge_errors:
-                    print(f"...   selected {width}q {qubits}: "
-                          f"avg_gate_err={_err:.4f}, diameter={_diam}, "
-                          f"edges={-_neg_edges}")
-                for q in qubits:
-                    for nbr in nx.single_source_shortest_path_length(
-                            G, q, cutoff=gap):
-                        excluded.add(nbr)
+        for width, _ in width_requests:
+            if quota[width] <= 0 or not selected[width]:
+                continue  # skip widths with no partition (they'll be padded)
+            if _try_select(width):
                 made_progress = True
-                break  # move to next width in this round
 
     total = sum(len(v) for v in selected.values())
     sel_str = ", ".join(f"{w}q:{len(selected[w])}" for w, _ in width_requests)
@@ -557,49 +577,64 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
         alloc_method = f"topology(gap={alloc_gap})"
 
         # Assign circuits to partitions:
-        # 1. Exact-match: circuit width == partition width
-        # 2. Closest-fit: circuit goes to smallest partition >= its width (padded)
-        available_widths_asc = sorted(width_partitions.keys())
+        # 1. Exact-match circuits go directly to their width's partitions
+        # 2. Unmatched circuits are spread round-robin across ALL partitions
+        #    (padded to match each partition's width), balancing the load
 
-        # Map each circuit to its target partition width
-        from collections import defaultdict
-        target_groups = defaultdict(list)  # target_width -> [(orig_idx, circuit)]
+        # Build flat list of all partitions with their widths
+        all_partitions = []  # [(partition_qubits, partition_width)]
+        for width, _ in width_requests:
+            for p in width_partitions.get(width, []):
+                all_partitions.append((p, width))
 
+        # Initialize per-partition storage
+        n_parts = len(all_partitions)
+        partition_circuits = [[] for _ in range(n_parts)]   # circuits per partition
+        partition_orig_idx = [[] for _ in range(n_parts)]   # original indices per partition
+
+        # Pass 1: assign exact-match circuits to their partitions
+        exact_assigned = set()
         for width, group in width_groups:
-            if width in width_partitions and width_partitions[width]:
-                target_w = width  # exact match
-            else:
-                # Find smallest partition width >= circuit width
-                target_w = None
-                for aw in available_widths_asc:
-                    if aw >= width:
-                        target_w = aw
-                        break
-                if target_w is None:
-                    raise RuntimeError(
-                        f"No partition large enough for {width}q circuits "
-                        f"(largest available: {available_widths_asc[-1]}q)")
+            w_parts = width_partitions.get(width, [])
+            if not w_parts:
+                continue
+            # Find which flat indices correspond to this width's partitions
+            w_flat_indices = [i for i, (_, pw) in enumerate(all_partitions) if pw == width]
+            group_circuits = [circ for _, circ in group]
+            group_orig_indices = [idx for idx, _ in group]
+            w_arrays, w_map = _assign_to_partitions(group_circuits, len(w_flat_indices))
+            for local_p, flat_p in enumerate(w_flat_indices):
+                partition_circuits[flat_p].extend(w_arrays[local_p])
+                partition_orig_idx[flat_p].extend(
+                    [group_orig_indices[i] for i in w_map[local_p]])
+            for idx, _ in group:
+                exact_assigned.add(idx)
 
-            if target_w != width:
-                print(f"... {len(group)} circuits of {width}q → padded into "
-                      f"{target_w}q partitions")
-
+        # Pass 2: collect unmatched circuits, distribute round-robin across
+        # ALL partitions (padded to each partition's width)
+        unmatched = []  # [(orig_idx, circuit)]
+        for width, group in width_groups:
             for orig_idx, circ in group:
-                if target_w != width:
-                    circ = _pad_circuit(circ, target_w)
-                target_groups[target_w].append((orig_idx, circ))
+                if orig_idx not in exact_assigned:
+                    unmatched.append((orig_idx, circ))
 
-        # Distribute within each target width group
-        for target_w in sorted(target_groups.keys(), reverse=True):
-            entries = target_groups[target_w]
-            w_partitions = width_partitions[target_w]
-            group_circuits = [circ for _, circ in entries]
-            group_orig_indices = [idx for idx, _ in entries]
-            w_arrays, w_map = _assign_to_partitions(group_circuits, len(w_partitions))
-            for p_idx in range(len(w_partitions)):
-                partitions.append(w_partitions[p_idx])
-                partition_arrays.append(w_arrays[p_idx])
-                assignment_map.append([group_orig_indices[i] for i in w_map[p_idx]])
+        if unmatched:
+            unmatched_widths = set(c.num_qubits for _, c in unmatched)
+            print(f"... distributing {len(unmatched)} unmatched circuits "
+                  f"(widths {sorted(unmatched_widths, reverse=True)}) "
+                  f"across all {n_parts} partitions")
+            for i, (orig_idx, circ) in enumerate(unmatched):
+                target_p = i % n_parts
+                target_width = all_partitions[target_p][1]
+                padded = _pad_circuit(circ, target_width)
+                partition_circuits[target_p].append(padded)
+                partition_orig_idx[target_p].append(orig_idx)
+
+        # Build the flat output lists
+        for p_idx in range(n_parts):
+            partitions.append(all_partitions[p_idx][0])
+            partition_arrays.append(partition_circuits[p_idx])
+            assignment_map.append(partition_orig_idx[p_idx])
 
     else:
         # Simulator: no spacing needed (all-to-all connectivity, no crosstalk).
@@ -632,7 +667,7 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
 
         # Target-width mapping with padding (same as hardware path)
         from collections import defaultdict
-        available_widths_asc = sorted(sim_width_partitions.keys())
+        available_widths_asc = sorted(w for w, p in sim_width_partitions.items() if p)
         target_groups = defaultdict(list)
 
         for width, group in width_groups:
@@ -748,7 +783,7 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     # routes through qubits outside our partitions (happens with deeper/wider
     # circuits), retry with pre-transpilation onto restricted coupling maps.
     try:
-        expdata = parallel.run(backend=run_backend, sampler=getattr(ex, 'sampler', None), shots=num_shots)
+        expdata = parallel.run(backend=run_backend, shots=num_shots)
         expdata.block_for_results()
     except Exception as first_err:
         if "transpiled outside" not in str(first_err):
@@ -796,7 +831,7 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
         )
         parallel.set_transpile_options(optimization_level=0)
 
-        expdata = parallel.run(backend=run_backend, sampler=getattr(ex, 'sampler', None), shots=num_shots)
+        expdata = parallel.run(backend=run_backend, shots=num_shots)
         expdata.block_for_results()
 
     t3 = time.time()
