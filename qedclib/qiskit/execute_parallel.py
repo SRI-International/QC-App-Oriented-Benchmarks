@@ -219,17 +219,42 @@ def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2
     return selected
 
 
+def _assign_to_partitions(circuits, num_partitions):
+    """
+    Distribute circuits round-robin across partitions.
+
+    Returns:
+        partition_arrays: list of lists — partition_arrays[p] contains the
+            circuits assigned to partition p.
+        assignment_map: list of lists — assignment_map[p][i] is the original
+            index (in the input circuits list) of the i-th circuit in partition p.
+    """
+    partition_arrays = [[] for _ in range(num_partitions)]
+    assignment_map = [[] for _ in range(num_partitions)]
+    for orig_idx, circ in enumerate(circuits):
+        p = orig_idx % num_partitions
+        assignment_map[p].append(orig_idx)
+        partition_arrays[p].append(circ)
+    return partition_arrays, assignment_map
+
+
 def _run_qiskit_parallel_experiment(circuits, num_shots):
     """
-    Execute a batch of circuits using Qiskit's ParallelExperiment with simple
-    sequential qubit allocation. Qiskit's transpiler handles layout/routing.
+    Execute circuits using Qiskit's ParallelExperiment with array batching.
 
-    Each circuit is assigned a disjoint range of physical qubits:
-        circuit 0 → qubits [0, w0)
-        circuit 1 → qubits [w0 + spacing, w0 + spacing + w1)
-        ...
+    Circuits are distributed round-robin across available hardware partitions.
+    Each partition holds an array of circuits, and ParallelExperiment composes
+    one wide circuit per "round" (zipping the i-th circuit from each partition).
+    All rounds are submitted as a single job.
 
-    The returned value is a list of count dictionaries, one per input circuit.
+    Example: 12 circuits, 3 partitions →
+        Partition A: [c0, c3, c6, c9]
+        Partition B: [c1, c4, c7, c10]
+        Partition C: [c2, c5, c8, c11]
+        → 4 composite circuits, 1 job submission, 12 results
+
+    The returned value is a list of count dictionaries, one per input circuit,
+    in the original input order.
     """
     import time
     from qiskit_experiments.framework import ParallelExperiment, BaseExperiment, BaseAnalysis
@@ -265,17 +290,20 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
 
     # For same-width circuits, use topology partitioning if coupling map available
     widths = [c.num_qubits for c in circuits]
+    circuit_width = widths[0]  # Phase 2 assumes same-width input
     backend_target = getattr(run_backend, 'target', None)
     partitions = []
     alloc_gap = spacing
-    routing_buffer = 0  # ParallelExperiment requires physical_qubits == circuit size
-    if coupling_map is not None and len(set(widths)) == 1:
-        # Try with decreasing gap until we find enough partitions
+
+    if coupling_map is not None:
+        # Hardware: topology-aware partitioning with gap retry.
+        # We no longer require partitions >= circuits — array batching
+        # distributes circuits across however many partitions we find.
         for try_gap in [spacing, 1, 0]:
             partitions = _find_topology_partitions(
-                coupling_map, widths[0], len(circuits), gap=try_gap,
+                coupling_map, circuit_width, len(circuits), gap=try_gap,
                 backend_target=backend_target,
-                routing_buffer=routing_buffer
+                routing_buffer=0
             )
             alloc_gap = try_gap
             if len(partitions) >= len(circuits):
@@ -283,86 +311,81 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
             if try_gap > 0:
                 print(f"... topology with gap={try_gap} found {len(partitions)} of "
                       f"{len(circuits)} needed, retrying with gap={max(try_gap-1, 0)}")
-
-    if len(partitions) >= len(circuits):
-        # Use topology-aware partitions
-        physical_qubits_per_circuit = partitions[:len(circuits)]
+        if not partitions:
+            raise RuntimeError(
+                f"Cannot find any {circuit_width}-qubit connected subgraphs "
+                f"on {device_qubits}-qubit device")
         alloc_method = f"topology(gap={alloc_gap})"
-    elif coupling_map is not None and partitions:
-        # Hardware backend but not enough partitions even at gap=0:
-        # use what we found and raise to trigger fallback to non-parallel
-        print(f"... topology partitioning found only {len(partitions)} of "
-              f"{len(circuits)} needed even at gap=0")
-        print(f"... running {len(partitions)} circuits in parallel, "
-              f"remaining {len(circuits) - len(partitions)} will use fallback")
-        raise RuntimeError(
-            f"Cannot fit {len(circuits)} circuits: only {len(partitions)} "
-            f"partitions available on {device_qubits}-qubit device")
-    elif coupling_map is None:
-        # Simulator: sequential allocation is safe (all-to-all connectivity)
-        physical_qubits_per_circuit = []
-        offset = 0
-        for circ in circuits:
-            w = circ.num_qubits
-            if offset + w > device_qubits:
-                raise RuntimeError(
-                    f"Circuits do not fit: need {offset + w} qubits, "
-                    f"device has {device_qubits}")
-            physical_qubits_per_circuit.append(tuple(range(offset, offset + w)))
-            offset += w + spacing
-        alloc_method = "sequential"
     else:
-        # Hardware backend, no partitions found at all
-        raise RuntimeError(
-            f"Cannot find any {widths[0]}-qubit connected subgraphs "
-            f"on {device_qubits}-qubit device")
+        # Simulator: sequential allocation (all-to-all connectivity)
+        max_seq = device_qubits // (circuit_width + spacing) if circuit_width + spacing > 0 else 1
+        num_partitions = min(max_seq, len(circuits))
+        if num_partitions == 0:
+            raise RuntimeError(
+                f"Circuit width {circuit_width} + spacing {spacing} exceeds "
+                f"device size {device_qubits}")
+        offset = 0
+        for _ in range(num_partitions):
+            partitions.append(tuple(range(offset, offset + circuit_width)))
+            offset += circuit_width + spacing
+        alloc_method = "sequential"
+
+    # Distribute circuits round-robin across the available partitions.
+    # If we have more circuits than partitions, each partition gets an array
+    # of circuits — ParallelExperiment zips them into composite circuits.
+    partition_arrays, assignment_map = _assign_to_partitions(circuits, len(partitions))
 
     t1 = time.time()
-    qubits_used = max(max(p) for p in physical_qubits_per_circuit) + 1 if physical_qubits_per_circuit else 0
-    partition_size = len(physical_qubits_per_circuit[0]) if physical_qubits_per_circuit else 0
-    buf_msg = f", routing_buffer={routing_buffer}" if routing_buffer > 0 and coupling_map is not None else ""
+    qubits_used = max(max(p) for p in partitions) + 1 if partitions else 0
+    rounds = max(len(arr) for arr in partition_arrays)
     print(f"... [timing] qubit allocation ({alloc_method}): {t1-t0:.3f}s "
-          f"({len(circuits)} circuits, {partition_size}q partitions{buf_msg}, "
+          f"({len(circuits)} circuits across {len(partitions)} partitions, "
+          f"{rounds} rounds, {circuit_width}q each, "
           f"{qubits_used} qubits used / {device_qubits})")
-    if alloc_method.startswith("topology") and len(circuits) <= 6:
-        for i, p in enumerate(physical_qubits_per_circuit):
-            print(f"...   circuit {i} ({widths[i]}q) → {partition_size}q region {p}")
+    if len(partitions) <= 6:
+        for p_idx, partition in enumerate(partitions):
+            print(f"...   partition {p_idx}: {partition} "
+                  f"({len(partition_arrays[p_idx])} circuits)")
 
-    # Minimal CircuitExperiment wrapper — no analysis needed
+    # Minimal experiment wrapper — no analysis needed.
+    # _CircuitArrayExperiment holds an array of circuits per partition.
+    # ParallelExperiment zips by index: composite[i] runs the i-th circuit
+    # from each partition simultaneously. All composites submit as one job.
     class _NoAnalysis(BaseAnalysis):
         def _run_analysis(self, experiment_data):
             return [], []
 
-    class _CircuitExperiment(BaseExperiment):
-        def __init__(self, circuit, physical_qubits, label):
+    class _CircuitArrayExperiment(BaseExperiment):
+        def __init__(self, circuits, physical_qubits, label):
             super().__init__(
                 physical_qubits=physical_qubits,
                 analysis=_NoAnalysis(),
                 backend=None,
             )
-            # Keep the original circuit as-is, including its measurements.
-            # No need to remove/re-add measurements — ParallelExperiment
-            # handles the qubit remapping.
-            self._circuit = circuit
+            self._circuits = circuits
             self._label = label
 
         def circuits(self):
-            qc = self._circuit.copy()
-            qc.name = self._label
-            qc.metadata = {
-                "component": self._label,
-                "physical_qubits": self.physical_qubits,
-            }
-            return [qc]
+            result = []
+            for i, circ in enumerate(self._circuits):
+                qc = circ.copy()
+                qc.name = f"{self._label}_{i}"
+                qc.metadata = {
+                    "component": self._label,
+                    "index": i,
+                    "physical_qubits": self.physical_qubits,
+                }
+                result.append(qc)
+            return result
 
-    # Build experiments with original circuits.
+    # Build one experiment per partition, each holding its array of circuits.
     experiments = [
-        _CircuitExperiment(
-            circuit=circuits[i],
-            physical_qubits=physical_qubits_per_circuit[i],
-            label=getattr(circuits[i], "name", f"circuit_{i}"),
+        _CircuitArrayExperiment(
+            circuits=partition_arrays[p],
+            physical_qubits=partitions[p],
+            label=f"partition_{p}",
         )
-        for i in range(len(circuits))
+        for p in range(len(partitions))
     ]
 
     parallel = ParallelExperiment(
@@ -391,31 +414,34 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
         from qiskit import transpile
 
         full_edges = coupling_map.get_edges() if coupling_map is not None else []
-        transpiled_circuits = []
-        for i, (circ, partition) in enumerate(zip(circuits, physical_qubits_per_circuit)):
+
+        # Pre-transpile each partition's circuit array onto restricted coupling maps
+        transpiled_partition_arrays = []
+        for p, partition in enumerate(partitions):
             partition_set = set(partition)
-            phys_to_local = {p: idx for idx, p in enumerate(partition)}
+            phys_to_local = {ph: idx for idx, ph in enumerate(partition)}
             local_edges = [
                 (phys_to_local[u], phys_to_local[v])
                 for u, v in full_edges
                 if u in partition_set and v in partition_set
             ]
             local_coupling = CouplingMap(local_edges) if local_edges else None
-            transpiled = transpile(
-                circ, coupling_map=local_coupling, optimization_level=1
-            )
-            transpiled_circuits.append(transpiled)
+            transpiled_array = [
+                transpile(circ, coupling_map=local_coupling, optimization_level=1)
+                for circ in partition_arrays[p]
+            ]
+            transpiled_partition_arrays.append(transpiled_array)
 
         t_retry = time.time()
         print(f"... [timing] pre-transpile onto restricted maps: {t_retry-t2:.3f}s")
 
         experiments = [
-            _CircuitExperiment(
-                circuit=transpiled_circuits[i],
-                physical_qubits=physical_qubits_per_circuit[i],
-                label=getattr(circuits[i], "name", f"circuit_{i}"),
+            _CircuitArrayExperiment(
+                circuits=transpiled_partition_arrays[p],
+                physical_qubits=partitions[p],
+                label=f"partition_{p}",
             )
-            for i in range(len(circuits))
+            for p in range(len(partitions))
         ]
         parallel = ParallelExperiment(
             experiments=experiments,
@@ -430,21 +456,27 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     t3 = time.time()
     print(f"... [timing] parallel.run + block_for_results: {t3-t2:.1f}s")
 
-    # Extract per-circuit counts
-    counts_list = []
-    for i, child in enumerate(expdata.child_data()):
-        datum = child.data(0)
-        counts = datum.get("counts", datum)
-        counts_list.append(counts)
-        # Debug: show raw counts for first few circuits
-        if i < 3:
-            sample_keys = list(counts.keys())[:4] if isinstance(counts, dict) else str(type(counts))
-            print(f"... [debug] child {i}: {len(counts)} entries, "
-                  f"key_len={len(sample_keys[0]) if sample_keys else '?'}, "
-                  f"samples={sample_keys}, "
-                  f"expected_qubits={circuits[i].num_qubits}")
+    # Extract per-circuit counts and reorder to original circuit order.
+    # child_data() returns one child per partition; each child has one data
+    # entry per circuit in that partition's array.
+    counts_list = [None] * len(circuits)
+    for partition_idx, child in enumerate(expdata.child_data()):
+        for circuit_idx in range(len(assignment_map[partition_idx])):
+            datum = child.data(circuit_idx)
+            counts = datum.get("counts", datum)
+            original_idx = assignment_map[partition_idx][circuit_idx]
+            counts_list[original_idx] = counts
 
-    print(f"... [timing] total _run_qiskit_parallel_experiment: {t3-t0:.1f}s")
+    # Debug: show first few results
+    for i in range(min(3, len(counts_list))):
+        counts = counts_list[i]
+        if counts is not None and isinstance(counts, dict):
+            sample_keys = list(counts.keys())[:4]
+            print(f"... [debug] circuit {i} ({circuits[i].num_qubits}q): "
+                  f"{len(counts)} entries, samples={sample_keys}")
+
+    print(f"... [timing] total _run_qiskit_parallel_experiment: {t3-t0:.1f}s "
+          f"({len(circuits)} circuits, {len(partitions)} partitions, {rounds} rounds)")
 
     return counts_list
 
@@ -641,22 +673,24 @@ def _localize_counts(counts, num_qubits):
 
 def execute_circuits_parallel(circuits, num_shots):
     """
-    Execute a list of QED-C circuits using the integrated Qiskit
-    ParallelExperiment path.
+    Execute a list of QED-C circuits using Qiskit ParallelExperiment with
+    array batching.
 
     This function is the QED-C entry point for parallel circuit execution.
-    Instead of calling QED-C's normal sequential execute_circuits() path, it
-    attempts to run the input circuits together as one parallel experiment.
+    It distributes the input circuits across available hardware partitions
+    using round-robin assignment, submits all circuits as a single
+    ParallelExperiment job, and returns results in the original circuit order.
 
     The flow is:
 
         1. Receive a list of QED-C generated QuantumCircuit objects.
         2. Call _run_qiskit_parallel_experiment(), which:
-             - removes final measurements,
-             - partitions the hardware into disjoint qubit regions,
-             - maps each circuit to one region,
-             - wraps each circuit as a Qiskit Experiment,
-             - runs them together with ParallelExperiment.
+             - finds disjoint qubit partitions (topology+error aware)
+             - distributes circuits round-robin across partitions
+             - wraps each partition as a _CircuitArrayExperiment
+             - ParallelExperiment zips arrays into composite circuits
+             - submits all composites as one job
+             - extracts and reorders results to original circuit order
         3. Convert the returned counts into QED-C's expected per-circuit
            bitstring format.
         4. Wrap the counts in QED-C's ExecutionResult object.
@@ -685,9 +719,6 @@ def execute_circuits_parallel(circuits, num_shots):
     print(f">>> execute_circuits_parallel [qiskit]: {len(circuits)} circuits, {num_shots} shots")
 
     try:
-        # Run the circuits through the custom multiprogramming +
-        # Qiskit ParallelExperiment pipeline.
-        print("Uses the integrated Qiskit ParallelExperiment workflow. If the parallel path fails, execution automatically falls back to the standard QED-C execution path.")
         counts_list = _run_qiskit_parallel_experiment(circuits, num_shots)
 
         # Debug: show counts before and after localization
