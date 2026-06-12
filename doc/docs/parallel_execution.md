@@ -84,14 +84,28 @@ This approach runs in under 1 second (vs. 183s for full partitioning) because it
 | QFT | 4 (3 circuits) | 0.943 | 0.920 | 97.6% |
 | QFT | 4 (2 circuits, deeper) | 0.877 | 0.78–0.82 | ~90% |
 | QFT | 8 (3 circuits) | 0.815 | 0.738 | 91% |
+| QFT | 8 (27 circuits) | — | 0.545 | — |
 | Hamlib TFIM | 6 (3 circuits) | 0.816 | 0.735 | 90% |
 | Hamlib TFIM | 8 (3 circuits) | 0.546 | 0.453 | 83% |
+| Hamlib TFIM | 8 (30 circuits) | comparable | comparable | ~100% |
 
 For comparison, sequential allocation (qubits starting from 0) produced 0.32–0.56 fidelity, and the full error-aware partitioning approach took 183 seconds per run.
 
 The lightweight approach achieves 83–98% of free-transpiler fidelity at negligible computational cost (~1-2 seconds). The key insight is that reading 2-qubit gate error rates from the backend target is essentially free, and even a simple scoring pass using this data dramatically improves partition quality. Scoring also considers subgraph diameter (lower = shorter SWAP paths) and internal edge count (more edges = better routing options), which helps avoid chain-shaped partitions on heavy-hex topologies.
 
 For wider or deeper circuits where the transpiler may route through qubits outside the assigned partition, the system automatically falls back to pre-transpilation onto restricted coupling maps, trading some fidelity for guaranteed execution. See `doc/_design/parallel_partition_mapping_tech_note.md` for full technical details.
+
+### Array Batching — Handling More Circuits Than Partitions
+
+When the number of circuits exceeds the number of available partitions, the system uses **array batching**: circuits are distributed round-robin across partitions, and Qiskit's `ParallelExperiment` composes one wide circuit per "round" — all submitted as a single job.
+
+For example, 30 circuits of width 8 on ibm_fez (11 partitions at gap=0):
+- Each partition receives 2-3 circuits
+- ParallelExperiment creates 3 composite circuits (one per round)
+- All 3 composites are submitted as **one job** — one queue wait, one initialization
+- Results are automatically decomposed back to 30 individual circuit results
+
+This is significantly more efficient than submitting 30 individual jobs or even 3 separate parallel batches. In testing, Hamlib TFIM with 30 circuits of 8 qubits achieved comparable fidelity to sequential execution while using approximately **3x less billed execution time** (3 seconds vs 10 seconds on IBM Quantum).
 
 ## Distributed Statevector Execution — Run Larger Circuits
 

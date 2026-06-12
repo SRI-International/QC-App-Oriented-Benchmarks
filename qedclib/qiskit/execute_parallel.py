@@ -338,14 +338,18 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     t1 = time.time()
     qubits_used = max(max(p) for p in partitions) + 1 if partitions else 0
     rounds = max(len(arr) for arr in partition_arrays)
+    circuits_per_partition = [len(arr) for arr in partition_arrays]
     print(f"... [timing] qubit allocation ({alloc_method}): {t1-t0:.3f}s "
           f"({len(circuits)} circuits across {len(partitions)} partitions, "
           f"{rounds} rounds, {circuit_width}q each, "
           f"{qubits_used} qubits used / {device_qubits})")
-    if len(partitions) <= 6:
+    print(f"...   circuits per partition: {circuits_per_partition}")
+    if len(partitions) <= 8:
         for p_idx, partition in enumerate(partitions):
-            print(f"...   partition {p_idx}: {partition} "
-                  f"({len(partition_arrays[p_idx])} circuits)")
+            orig_indices = assignment_map[p_idx]
+            print(f"...   partition {p_idx}: qubits={partition}, "
+                  f"{len(partition_arrays[p_idx])} circuits "
+                  f"(original indices {orig_indices})")
 
     # Minimal experiment wrapper — no analysis needed.
     # _CircuitArrayExperiment holds an array of circuits per partition.
