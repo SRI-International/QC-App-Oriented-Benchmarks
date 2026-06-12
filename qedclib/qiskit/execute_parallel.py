@@ -313,34 +313,22 @@ def _localize_counts(counts, num_qubits):
 
     return local
 
-def _submit_parallel_batch_with_retry(batch, num_shots):
+def _submit_parallel_batch(batch, num_shots):
     """
     Submit one batch of circuits for execution.
 
-    If the batch contains multiple circuits, try to submit it as a Qiskit
-    ParallelExperiment. If partitioning/mapping fails, split the batch into
-    smaller batches and retry recursively.
-
-    If the batch contains only one circuit, run it through QED-C's normal
-    sequential execution path, because there is nothing to parallelize.
-
-    Returns:
-        A list of batch records. Each record is either:
-            - kind == "expdata": a submitted ParallelExperiment to collect later
-            - kind == "counts": already-computed counts from sequential execution
+    Multi-circuit batches are submitted as a Qiskit ParallelExperiment.
+    Single-circuit batches are run through QED-C's normal sequential path
+    because there is nothing to parallelize.
     """
     import execute as ex
 
-    # Single-circuit batches cannot benefit from ParallelExperiment.
-    # Run them immediately using QED-C's normal execution path.
     if len(batch) == 1:
         print(
             "... batch is single circuit; using QED-C sequential fallback:",
             [c.num_qubits for c in batch],
         )
 
-        # Temporarily disable parallel_execution so execute_circuits() does not
-        # recursively call execute_circuits_parallel().
         ex.parallel_execution = False
         try:
             _, result = ex.execute_circuits(batch, num_shots)
@@ -349,8 +337,6 @@ def _submit_parallel_batch_with_retry(batch, num_shots):
 
         counts = result.get_counts()
 
-        # Normalize QED-C's single-circuit result into list form so the later
-        # merge path can treat sequential and parallel batches uniformly.
         if isinstance(counts, dict):
             counts = [counts]
 
@@ -360,38 +346,20 @@ def _submit_parallel_batch_with_retry(batch, num_shots):
             "counts": counts,
         }]
 
-    try:
-        # Try to submit this multi-circuit batch as one ParallelExperiment.
-        print(
-            "... submitting ParallelExperiment batch:",
-            [c.num_qubits for c in batch],
-            "total_qubits =",
-            sum(c.num_qubits for c in batch),
-        )
+    print(
+        "... submitting ParallelExperiment batch:",
+        [c.num_qubits for c in batch],
+        "total_qubits =",
+        sum(c.num_qubits for c in batch),
+    )
 
-        expdata = _submit_qiskit_parallel_experiment(batch, num_shots)
+    expdata = _submit_qiskit_parallel_experiment(batch, num_shots)
 
-        # Store the submitted experiment data. Results are collected later so
-        # multiple batches can be submitted before blocking for completion.
-        return [{
-            "kind": "expdata",
-            "batch": batch,
-            "expdata": expdata,
-        }]
-
-    except Exception as err:
-        # If the partitioner cannot place this batch, split it into two smaller
-        # batches and retry. This avoids falling back the entire benchmark just
-        # because one batch was too difficult to map.
-        print(f"... ParallelExperiment batch submission failed: {err}")
-        print("... splitting this batch and retrying smaller parallel batches")
-
-        mid = len(batch) // 2
-
-        return (
-            _submit_parallel_batch_with_retry(batch[:mid], num_shots)
-            + _submit_parallel_batch_with_retry(batch[mid:], num_shots)
-        )
+    return [{
+        "kind": "expdata",
+        "batch": batch,
+        "expdata": expdata,
+    }]
 
 def execute_circuits_parallel(circuits, num_shots):
     """
@@ -488,7 +456,7 @@ def execute_circuits_parallel(circuits, num_shots):
 
         for batch in planned_batches:
             submitted_batches.extend(
-                _submit_parallel_batch_with_retry(batch, num_shots)
+                _submit_parallel_batch(batch, num_shots)
             )
 
         print(f"... submitted/prepared {len(submitted_batches)} batch record(s); now collecting results")
