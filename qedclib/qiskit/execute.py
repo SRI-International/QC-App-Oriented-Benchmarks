@@ -2762,20 +2762,3 @@ def process_step_times_old(job, result, active_circuit):
     #print("... time_per_step = ", str(time_per_step))
     if verbose:
         print(f"... computed exec times: queued = {exec_queued_time}, creating/transpiling = {exec_creating_time}, validating = {exec_validating_time}, running = {exec_running_time}")
-
-
-def execute_circuits_immed(
-        backend_id: str = None,
-        circuits: list = None,
-        num_shots: int = 100,
-        gpus_per_circuit: int = None
-    ) -> list:
-    """
-    DEPRECATED: Use execute_circuits() instead.
-    This function delegates to execute_circuits() and returns only the result.
-    """
-    print("WARNING: execute_circuits_immed() is deprecated and will be removed. Use execute_circuits() instead.")
-
-    job_id, results = execute_circuits(circuits, num_shots)
-
-    return results
