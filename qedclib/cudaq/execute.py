@@ -1344,25 +1344,3 @@ def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=No
             print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) — skipping')
 
 
-###########################################################################
-# DEPRECATED FUNCTIONS
-# These functions are kept for backward compatibility but will be removed
-# in a future release. They delegate to the new array-based execution path.
-###########################################################################
-
-
-def execute_circuits_immed(
-        backend_id: str = None,
-        circuits: list = None,
-        num_shots: int = 100,
-        gpus_per_circuit: int = None
-    ) -> list:
-    """
-    DEPRECATED: Use execute_circuits() instead.
-    This function delegates to execute_circuits() and returns only the result.
-    """
-    print("WARNING: execute_circuits_immed() is deprecated and will be removed. Use execute_circuits() instead.")
-
-    job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
-
-    return results

@@ -783,7 +783,10 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     # routes through qubits outside our partitions (happens with deeper/wider
     # circuits), retry with pre-transpilation onto restricted coupling maps.
     try:
-        expdata = parallel.run(backend=run_backend, shots=num_shots)
+        if ex.sampler is not None:
+            expdata = parallel.run(sampler=ex.sampler, shots=num_shots)
+        else:
+            expdata = parallel.run(backend=run_backend, shots=num_shots)
         expdata.block_for_results()
     except Exception as first_err:
         if "transpiled outside" not in str(first_err):
@@ -831,7 +834,10 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
         )
         parallel.set_transpile_options(optimization_level=0)
 
-        expdata = parallel.run(backend=run_backend, shots=num_shots)
+        if ex.sampler is not None:
+            expdata = parallel.run(sampler=ex.sampler, shots=num_shots)
+        else:
+            expdata = parallel.run(backend=run_backend, shots=num_shots)
         expdata.block_for_results()
 
     t3 = time.time()
