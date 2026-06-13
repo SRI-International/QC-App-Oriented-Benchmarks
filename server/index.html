@@ -118,11 +118,15 @@
             font-size: 0.8rem;
             padding: 0.75rem 1rem;
             border-radius: 6px;
-            max-height: 300px;
+            height: 300px;
+            min-height: 100px;
+            max-height: 80vh;
             overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-all;
-            display: none;
+            display: block;
+            resize: vertical;
+            overflow: auto;
         }
         .console-toggle {
             background: none;
@@ -203,6 +207,9 @@
                 <label>Circuits / Group
                     <input id="cfg-circuits" type="number" value="3" min="1" max="20">
                 </label>
+                <label style="display:flex; align-items:center; gap:6px; cursor:pointer">
+                    <input id="cfg-parallel" type="checkbox"> Parallel
+                </label>
             </div>
         </article>
 
@@ -246,7 +253,7 @@
 
             <div class="console-section">
                 <button class="console-toggle" onclick="toggleConsole()">
-                    <span id="console-arrow">&#9654;</span> Console Output
+                    <span id="console-arrow">&#9660;</span> Console Output
                 </button>
                 <pre id="console-output" class="console-output"></pre>
             </div>
@@ -364,6 +371,7 @@
             max_circuits: parseInt(document.getElementById('cfg-circuits').value),
             num_shots: parseInt(document.getElementById('cfg-shots').value),
             method: 1,
+            parallel: document.getElementById('cfg-parallel').checked,
             benchmarks: benchmarks,
         };
 
