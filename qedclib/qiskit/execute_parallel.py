@@ -874,7 +874,46 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     print(f"... [timing] total _run_qiskit_parallel_experiment: {t3-t0:.1f}s "
           f"({len(circuits)} circuits, {len(partitions)} partitions, {rounds} rounds)")
 
-    return counts_list
+    # Extract timing from the ParallelExperiment's underlying job(s).
+    # ParallelExperiment submits one composite job; its timing represents
+    # the total billed execution for all circuits running simultaneously.
+    timing_info = {
+        'wall_clock': t3 - t0,
+        'alloc_time': t1 - t0,
+        'setup_time': t2 - t1,
+        'run_time': t3 - t2,
+        'num_circuits': len(circuits),
+        'num_partitions': len(partitions),
+        'num_rounds': rounds,
+    }
+
+    # Try to extract job-level timing from expdata
+    try:
+        jobs = expdata.jobs() if hasattr(expdata, 'jobs') else []
+        if ex.verbose:
+            print(f"... [timing] expdata.jobs() returned {len(jobs)} jobs"
+                  f"{', type=' + type(jobs[0]).__name__ if jobs else ''}")
+        if jobs:
+            job = jobs[0]
+            # IBM Runtime jobs have metrics() with billed time
+            if hasattr(job, 'metrics'):
+                job_metrics = job.metrics()
+                if isinstance(job_metrics, dict):
+                    timing_info['job_metrics'] = job_metrics
+                    if ex.verbose:
+                        print(f"... [timing] job metrics: {job_metrics}")
+            # Also try result metadata for execution_spans
+            if hasattr(job, 'result'):
+                try:
+                    job_result = job.result()
+                    timing_info['job_result'] = job_result
+                except Exception:
+                    pass
+    except Exception as e:
+        if ex.verbose:
+            print(f"... [timing] could not extract job timing: {e}")
+
+    return counts_list, timing_info
 
 def _localize_counts(counts, num_qubits):
     """
@@ -952,7 +991,7 @@ def execute_circuits_parallel(circuits, num_shots):
     print(f">>> execute_circuits_parallel [qiskit]: {len(circuits)} circuits, {num_shots} shots")
 
     try:
-        counts_list = _run_qiskit_parallel_experiment(circuits, num_shots)
+        counts_list, timing_info = _run_qiskit_parallel_experiment(circuits, num_shots)
 
         # Debug: show counts before and after localization
         if ex.verbose:
@@ -975,6 +1014,56 @@ def execute_circuits_parallel(circuits, num_shots):
         # rest of the benchmark framework does not need to know that the circuits
         # were executed through ParallelExperiment.
         result = ex.ExecutionResult(counts_list)
+
+        # Attach timing info so process_circuit_results can compute accurate metrics.
+        # ParallelExperiment submits composite circuits (one per round) to the
+        # backend. The backend result has per-experiment time_taken (simulators)
+        # or execution_spans (IBM hardware) for each composite circuit.
+        # Total simulation/execution time divided by num_circuits gives the
+        # amortized per-circuit cost, showing the parallelism benefit.
+        num_rounds = timing_info.get('num_rounds', 1) or 1
+        num_circuits = len(circuits) if circuits else 1
+
+        job_result = timing_info.get('job_result')
+        if job_result is not None:
+            # _extract_per_circuit_times returns one time per composite circuit
+            # (i.e. per round), extracted from the backend result object
+            per_round_times = ex._extract_per_circuit_times(job_result, num_rounds)
+            if per_round_times:
+                total_exec = sum(per_round_times)
+                avg_per_circuit = total_exec / num_circuits
+                result._per_circuit_times = [avg_per_circuit] * num_circuits
+                print(f"... [timing] backend exec: total={total_exec:.3f}s, "
+                      f"per-circuit={avg_per_circuit:.3f}s "
+                      f"({num_rounds} rounds, {num_circuits} circuits)")
+            result._job = None  # no single job to attach
+
+        # Also try job_metrics for billed time (IBM-specific)
+        job_metrics = timing_info.get('job_metrics')
+        if job_metrics and not getattr(result, '_per_circuit_times', None):
+            usage = job_metrics.get('usage', {})
+            billed_seconds = usage.get('seconds', usage.get('quantum_seconds', 0))
+            if billed_seconds > 0:
+                avg_per_circuit = billed_seconds / num_circuits
+                result._per_circuit_times = [avg_per_circuit] * num_circuits
+                if ex.verbose:
+                    print(f"... [timing] billed={billed_seconds:.1f}s, "
+                          f"per-circuit={avg_per_circuit:.3f}s")
+
+        # Fallback: no backend timing available (e.g. simulator with no job object).
+        # Use run_time (just parallel.run, excludes allocation and setup)
+        # divided by num_circuits.
+        if not getattr(result, '_per_circuit_times', None):
+            run_time = timing_info.get('run_time', 0)
+            if run_time > 0:
+                avg_time = run_time / num_circuits
+                result._per_circuit_times = [avg_time] * num_circuits
+                if ex.verbose:
+                    print(f"... [timing] using wall-clock fallback: "
+                          f"run_time={run_time:.3f}s / {num_circuits} = {avg_time:.3f}s per circuit")
+
+        # Store wall-clock timing for elapsed_time computation
+        result._parallel_timing = timing_info
 
         return "parallel_experiment", result
 
