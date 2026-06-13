@@ -144,10 +144,11 @@ Within a group, the widest circuit determines the qubit allocation for that grou
 
 | Feature | Qiskit | CUDA-Q |
 |---|---|---|
-| Circuit-level parallel (`-p`) | Stub (sequential fallback) | Working via MPI |
-| Group-level parallel | Stub (sequential fallback) | Stub (circuit-level works within groups) |
+| Circuit-level parallel (`-p`) | Working (ParallelExperiment + partition mapping) | Working via MPI |
+| Group-level parallel | Working (each group → circuit-level parallel) | Working (each group → circuit-level parallel) |
 | Distributed statevector (`-gpc N`) | N/A | Working (default MPI behavior) |
 | `parallel_execution` flag | Yes | Yes |
 | `execute_circuit_groups()` | Yes | Yes |
+| `max_gate_error` filter | Yes (default 0.02) | N/A |
 
-Qiskit parallel implementation (qubit mapping via ParallelExperiment) is in development.
+Qiskit parallel uses topology+error-aware partition mapping to pack circuits onto disjoint qubit regions of a single QPU via `ParallelExperiment`. Groups with different shot counts execute sequentially, but circuits within each group are parallelized. Hardware-tested on ibm_fez with 2-3x cost reduction.

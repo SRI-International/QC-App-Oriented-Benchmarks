@@ -95,7 +95,7 @@ For simulators (no coupling map), sequential qubit allocation is used since simu
 
 *(H = Hellinger fidelity, NF = Normalized fidelity)*
 
-**Note on hamlib observable path:** The fidelity method above uses full Trotter evolution circuits (deep). The observable estimation path (`-obs`) uses much shallower Pauli measurement circuits (basis rotations + measurements) and sends circuit groups via `execute_circuit_groups`. This is the primary target for parallel execution of H2/LiH molecules but requires mixed-width group handling (not yet implemented — see Avimita's batching work).
+**Note on hamlib observable path:** The fidelity method above uses full Trotter evolution circuits (deep). The observable estimation path (`-obs`) uses much shallower Pauli measurement circuits (basis rotations + measurements). These circuits are all the same width for a given problem size, making them ideal for parallel packing. The observable path sends circuit arrays through `execute_circuits()` (non-distributed case) or bucketed groups through `execute_circuit_groups()` (distributed shots case). In both cases, `execute_circuits()` routes to `execute_circuits_parallel()` when parallel is enabled, so parallel execution benefits apply automatically without any special group-level handling.
 
 ### 3.3 Key Observations
 
@@ -210,7 +210,7 @@ qedclib/qiskit/execute_parallel.py
 │
 ├── _localize_counts()                  # Extract per-circuit bitstrings
 ├── execute_circuits_parallel()         # QED-C entry point
-└── execute_circuit_groups_parallel()   # Group-level stub
+└── execute_circuit_groups_parallel()   # Per-group parallel (each group → execute_circuits_parallel)
 ```
 
 ## 7. Dependencies

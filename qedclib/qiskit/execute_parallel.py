@@ -1087,23 +1087,18 @@ def execute_circuits_parallel(circuits, num_shots):
 
 def execute_circuit_groups_parallel(circuit_groups, num_shots_list):
     """
-    Execute circuit groups in parallel by mapping circuits from multiple groups
-    onto disjoint qubit regions of a single QPU.
+    Execute circuit groups with parallel enabled for each group's circuits.
 
-    When the real implementation is in place, this function will:
-    1. Determine qubit allocation per group (based on max circuit width in group)
-    2. For groups with the same shot count: compose one circuit from each group
-       onto disjoint qubit regions and submit as a single job
-    3. For groups with different shot counts: batch same-shot groups together,
-       execute each batch as above
-    4. Decompose combined results back to per-group, per-circuit counts
+    Each group has its own shot count, and ParallelExperiment requires the same
+    shot count for all circuits in a composite circuit. So groups with different
+    shot counts must be executed separately. Within each group, the circuits are
+    sent to execute_circuits() which routes to execute_circuits_parallel() for
+    partition mapping and array batching.
 
-    Qubit allocation uses the widest circuit in each group to determine that
-    group's region. Narrower circuits within a group use a subset of the
-    allocated qubits.
-
-    Currently a stub that calls back to execute_circuit_groups() sequentially.
-    Replace the stub section below with the real implementation.
+    This means the parallelism benefit comes from packing each group's circuits
+    onto disjoint qubit partitions — the same mechanism used for fidelity
+    benchmarks. Groups themselves execute sequentially since they have different
+    shot counts.
 
     Args:
         circuit_groups: list of lists of QuantumCircuit objects
@@ -1121,19 +1116,17 @@ def execute_circuit_groups_parallel(circuit_groups, num_shots_list):
         print(f"... execute_circuit_groups_parallel: {len(circuit_groups)} groups, "
               f"sizes={group_sizes}, shots={num_shots_list}")
 
-    #######################################################################
-    # STUB: replace this section with the real parallel implementation.
-    # The code below calls execute_circuit_groups() sequentially.
-    # It temporarily disables parallel_execution to avoid recursion
-    # back into this function.
-    #######################################################################
-    print(f">>> execute_circuit_groups_parallel [qiskit]: {len(circuit_groups)} groups")
-    print(f"... [STUB] parallel group execution not yet implemented, executing sequentially")
+    # Execute each group independently. parallel_execution remains True so
+    # each execute_circuits() call routes to execute_circuits_parallel() for
+    # partition mapping within the group.
+    group_results = []
+    last_job_id = None
+    for circuits, shots in zip(circuit_groups, num_shots_list):
+        job_id, result = ex.execute_circuits(circuits, num_shots=shots)
+        last_job_id = job_id
+        group_results.append(result)
 
-    ex.parallel_execution = False
-    try:
-        result = ex.execute_circuit_groups(circuit_groups, num_shots_list=num_shots_list)
-    finally:
-        ex.parallel_execution = True
+    if ex.verbose:
+        print(f"... execute_circuit_groups_parallel complete, {len(group_results)} groups")
 
-    return result
+    return (last_job_id, group_results)
