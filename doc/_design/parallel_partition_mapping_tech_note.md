@@ -153,11 +153,22 @@ Implemented `_CircuitArrayExperiment` which holds an array of circuits per parti
 **Results on ibm_fez:** 27 circuits of 8q across 11 partitions (gap=0), 3 rounds, 1 job, 45s total. Hamlib TFIM with 30 circuits of 8q: comparable fidelity to sequential, 3x less billed execution time (3s vs 10s).
 
 ### 5.5 Mixed-Width Array Batching (Phase 3) — DONE (June 12, 2026)
-Circuits of different widths are grouped by width, sorted largest-first. `_find_multi_width_partitions()` finds partitions for each width using round-robin selection (one per width per round, largest first, until device is full). Circuits without an exact-width partition are padded via `_pad_circuit()` into the smallest available larger partition. All partitions (mixed widths) go into one `ParallelExperiment` call.
+Circuits of different widths are handled in a single code path:
 
-**Simulator setting:** `parallel_simulator_max_qubits` (default 16) caps the qubit budget for simulators. Simulator spacing is 0 (no crosstalk). On hardware, device size is used directly with gap-based spacing.
+1. `_find_multi_width_partitions()` allocates partitions largest-first (Phase 1: one per unique width until device is full; Phase 2: additional partitions for widths that already have one)
+2. Exact-match circuits are assigned to their width's partitions
+3. Unmatched circuits are distributed round-robin across ALL partitions (not just the smallest), padded via `_pad_circuit()`, balancing the load evenly
 
-**Tested on simulator:** 15 circuits (5x8q + 5x7q + 5x6q), max=16 → 2 partitions of 8q, 7q and 6q padded into 8q, 8 rounds, 1 job. Fidelity comparable to sequential.
+Key design decisions:
+- Phase 1 **stops** at the first width that doesn't fit — avoids wasting gaps on tiny partitions that overload a single bucket
+- Unmatched circuits go to all partitions equally, not just the smallest-available — prevents one partition from being overloaded with 44 circuits while others have 3
+
+**Simulator setting:** `parallel_simulator_max_qubits` (default 16) caps the qubit budget. Spacing is 0 (no crosstalk). On hardware, device size is used with gap-based spacing.
+
+**Tested on ibm_fez:**
+- 53 circuits (BV, widths 3-20): 4 partitions (20q, 19q, 18q, 17q), 41 unmatched distributed evenly → 14 rounds, 4s billed
+- 42 circuits (Hamlib, widths 2-20): 4 partitions (20q, 18q, 16q, 14q), 30 unmatched distributed → 11 rounds, 43s total
+- 57 circuits (QFT, widths 2-20): 4 partitions, 15 rounds, 4s billed
 
 ### 5.6 Subgraph Diversity
 Current algorithm grows subgraphs from every starting node but the growth strategy is deterministic, so many starting nodes produce the same subgraph. Could try multiple growth strategies per starting node (random restarts, different heuristics) to find more diverse candidates.

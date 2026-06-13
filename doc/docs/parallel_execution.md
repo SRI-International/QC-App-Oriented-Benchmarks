@@ -109,14 +109,21 @@ This is significantly more efficient than submitting 30 individual jobs or even 
 
 ### Mixed-Width Circuits
 
-When the input contains circuits of different widths (common in benchmarks that sweep qubit counts), the system groups them by width and finds partitions for each width on the device:
+When the input contains circuits of different widths (common in benchmarks that sweep qubit counts, or any application that generates circuits of varying sizes), the system handles them in a single job:
 
-1. **Group by width**, sorted largest-first (e.g., 5x8q, 5x7q, 5x6q)
-2. **Find partitions** using round-robin across widths: one partition for the largest width, one for the next, etc., repeating until the device is full. Larger widths get the best qubit regions.
-3. **Exact match or pad**: circuits whose width matches a partition go directly. Circuits with no exact-match partition are padded with idle qubits into the smallest available larger partition.
-4. **One job**: all partitions (mixed widths) go into a single `ParallelExperiment`. Results are automatically decomposed and reordered to match the original circuit order.
+1. **Group by width**, sorted largest-first (e.g., 3x20q, 3x18q, 3x16q, ...)
+2. **Find partitions**, largest-first: one partition for the largest width, then the next largest, and so on until the device is full. Larger circuits get the best qubit regions.
+3. **Exact-match circuits** go directly to their width's partitions.
+4. **Unmatched circuits** (whose width has no partition) are padded with idle qubits and distributed round-robin across **all** available partitions, balancing the load evenly. A 3q circuit can run on a 20q partition — the extra qubits are idle.
+5. **One job**: all partitions go into a single `ParallelExperiment`. Results are automatically decomposed, localized to the correct bit width, and reordered to match the original circuit order.
 
-For simulators, the `parallel_simulator_max_qubits` setting (default 16) controls the qubit budget. With max=16 and circuits of width 8, 7, and 6: two 8-qubit partitions are allocated, and the 7q and 6q circuits are padded into the 8q partitions.
+For example, 42 Hamlib circuits (widths 2-20, 3 each) on ibm_fez:
+- 4 partitions found: 20q, 18q, 16q, 14q
+- 12 exact-match circuits assigned directly
+- 30 unmatched circuits (widths 2-12) distributed across all 4 partitions, padded
+- 11 rounds max, **one job**, 43 seconds total
+
+For simulators, the `parallel_simulator_max_qubits` setting (default 16) controls the qubit budget. Simulators use zero spacing between partitions (no crosstalk concerns).
 
 ```python
 # Adjust simulator qubit budget if needed
