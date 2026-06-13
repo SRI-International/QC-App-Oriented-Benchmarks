@@ -67,7 +67,8 @@ def _remove_measurements(circuit):
     return clean
 
 def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2,
-                              backend_target=None, routing_buffer=0):
+                              backend_target=None, routing_buffer=0,
+                              max_gate_error=0.02):
     """
     Find disjoint connected subgraphs on the device coupling map, separated
     by at least `gap` hops. Each partition has `circuit_width + routing_buffer`
@@ -213,6 +214,10 @@ def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2
     for _err, _diam, _neg_edges, qubits in candidates:
         if any(q in excluded for q in qubits):
             continue
+        if edge_errors and max_gate_error and _err > max_gate_error:
+            print(f"... WARNING: skipping {circuit_width}q partition {qubits}: "
+                  f"avg_gate_err={_err:.4f} exceeds threshold {max_gate_error}")
+            break  # candidates are sorted, all remaining are worse
         selected.append(qubits)
         if edge_errors:
             print(f"...   selected {qubits}: avg_gate_err={_err:.4f}, "
@@ -228,7 +233,7 @@ def _find_topology_partitions(coupling_map, circuit_width, num_partitions, gap=2
 
 
 def _find_multi_width_partitions(coupling_map, width_requests, gap=2,
-                                  backend_target=None):
+                                  backend_target=None, max_gate_error=0.02):
     """
     Find partitions for multiple circuit widths on the same device.
 
@@ -354,6 +359,10 @@ def _find_multi_width_partitions(coupling_map, width_requests, gap=2,
             pos[width] += 1
             if any(q in excluded for q in qubits):
                 continue
+            if edge_errors and max_gate_error and _err > max_gate_error:
+                print(f"... WARNING: skipping {width}q partition: "
+                      f"avg_gate_err={_err:.4f} exceeds threshold {max_gate_error}")
+                return False  # candidates are sorted, all remaining are worse
             selected[width].append(qubits)
             quota[width] -= 1
             if edge_errors:
