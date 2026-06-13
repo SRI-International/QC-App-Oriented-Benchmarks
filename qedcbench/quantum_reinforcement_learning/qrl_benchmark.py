@@ -320,24 +320,25 @@ def calculate_gradients(num_qubits: int, num_layers: int, batch_obs: list, param
         grad = 0.0
         for init_state, td_target, action in zip(batch_obs, td_targets, actions):
             init_state_list = int_to_bitlist(init_state, num_qubits)
-            ex.max_jobs_active = 1
             params_p = copy.deepcopy(params)
             params_p[idx] += np.pi / 2
             qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params_p, n_measurements, data_reupload = data_reupload)
-            uid = "qrl_grad_calc_" + str(init_state) + "_plus" 
+            uid = "qrl_grad_calc_" + str(init_state) + "_plus"
             c_time = time.time()
-            ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
-            ex.finalize_execution(None, report_end = False)
+            ex.compute_and_store_circuit_info(qc, str(num_qubits), str(uid))
+            one_circuit = {str(num_qubits): {str(uid): qc}}
+            ex.submit_circuits(one_circuit, num_shots=num_shots)
             qrl_metrics.quantum_time += (time.time() - c_time)
             res_p = process_result(saved_result, n_measurements)
             qrl_metrics.circuit_evaluations += 1
 
-            params_p[idx] -= np.pi 
+            params_p[idx] -= np.pi
             qc = generate_pqc_circuit(num_qubits, num_layers, init_state_list, params_p, n_measurements, data_reupload = data_reupload)
             uid = "qrl_grad_calc_" + str(init_state) + "_minus"
             c_time = time.time()
-            ex.submit_circuit(qc, num_qubits, uid, shots = num_shots)
-            ex.finalize_execution(None, report_end = False)
+            ex.compute_and_store_circuit_info(qc, str(num_qubits), str(uid))
+            one_circuit = {str(num_qubits): {str(uid): qc}}
+            ex.submit_circuits(one_circuit, num_shots=num_shots)
             qrl_metrics.quantum_time += (time.time() - c_time)
             res_n = process_result(saved_result, n_measurements)
             qrl_metrics.circuit_evaluations += 1

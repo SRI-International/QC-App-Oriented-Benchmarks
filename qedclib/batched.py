@@ -21,6 +21,7 @@ def batched_run(get_circuits_fn, run_circuits_fn, plot_results_fn, **kwargs):
     min_qubits = kwargs.get('min_qubits', 2)
     max_qubits = kwargs.get('max_qubits', 8)
     skip_qubits = kwargs.get('skip_qubits', 1)
+    verbose = kwargs.get('verbose', False)
 
     # Partition incoming arguments to the function that accepts them
     def _for(func):
@@ -40,6 +41,7 @@ def batched_run(get_circuits_fn, run_circuits_fn, plot_results_fn, **kwargs):
     for w in range(min_qubits, max_qubits + 1, skip_qubits):
         # If next group would likely exceed batch, execute what we have first
         if accumulated_count > 0 and accumulated_count + max_circuits > max_batch_size:
+            #if verbose:
             print(f"... batched_run: executing widths {accumulated_widths} ({accumulated_count} circuits)")
             run_circuits_fn(accumulated_qcs, **rc_args)
             accumulated_qcs = {}

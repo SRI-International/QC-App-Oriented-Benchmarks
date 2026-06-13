@@ -250,8 +250,10 @@ async def start_run(req: RunRequest):
             "plot_results": False,
         }
 
-        # Use batch_size=1 for local simulators so cancel can take effect between circuits
-        # (don't apply to cloud simulators like ionq_simulator where batching matters)
+        # Use batch_size=1 for local simulators so that:
+        # 1. Cancel (Stop button) takes effect between qubit-width groups
+        # 2. Results appear progressively in the UI after each width completes
+        # Only for local simulators — cloud/hardware backends batch for cost efficiency.
         local_simulators = ["qasm_simulator", "statevector_simulator", "aer_sampler", "statevector_sampler", "nvidia"]
         if req.backend_id in local_simulators:
             run_args["max_batch_size"] = 1

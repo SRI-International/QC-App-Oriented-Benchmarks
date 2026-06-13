@@ -866,7 +866,7 @@ def _run_qiskit_parallel_experiment(circuits, num_shots):
     # Debug: show first few results
     for i in range(min(3, len(counts_list))):
         counts = counts_list[i]
-        if counts is not None and isinstance(counts, dict):
+        if counts is not None and isinstance(counts, dict) and ex.verbose:
             sample_keys = list(counts.keys())[:4]
             print(f"... [debug] circuit {i} ({circuits[i].num_qubits}q): "
                   f"{len(counts)} entries, samples={sample_keys}")
@@ -955,12 +955,13 @@ def execute_circuits_parallel(circuits, num_shots):
         counts_list = _run_qiskit_parallel_experiment(circuits, num_shots)
 
         # Debug: show counts before and after localization
-        for i in range(min(3, len(counts_list))):
-            raw = counts_list[i]
-            localized = _localize_counts(raw, circuits[i].num_qubits)
-            print(f"... [debug] circuit {i} ({circuits[i].num_qubits}q): "
-                  f"raw={dict(list(raw.items())[:3])}, "
-                  f"localized={dict(list(localized.items())[:3])}")
+        if ex.verbose:
+            for i in range(min(3, len(counts_list))):
+                raw = counts_list[i]
+                localized = _localize_counts(raw, circuits[i].num_qubits)
+                print(f"... [debug] circuit {i} ({circuits[i].num_qubits}q): "
+                      f"raw={dict(list(raw.items())[:3])}, "
+                      f"localized={dict(list(localized.items())[:3])}")
 
         # ParallelExperiment may return each child result with extra classical
         # bits from the full combined circuit. Convert each result back to the
