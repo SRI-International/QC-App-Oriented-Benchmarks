@@ -37,6 +37,12 @@ import cudaq
 
 verbose = False
 
+# Timing decomposition — set by execute_circuits after each call.
+# Callers (e.g. hamlib) can read these to report meaningful timing breakdowns.
+last_transpile_time = 0.0    # cudaq has minimal transpilation
+last_exec_time = 0.0         # wall-clock of cudaq.sample() calls
+last_elapsed_time = 0.0      # total wall-clock of the execute call
+
 # Cancel flag — set by request_cancel() to interrupt execution between circuits
 cancel_requested = False
 
@@ -1055,6 +1061,13 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         except Exception:
             pass  # warmup is best-effort
 
+    # Reset timing decomposition
+    global last_transpile_time, last_exec_time, last_elapsed_time
+    last_transpile_time = 0.0
+    last_exec_time = 0.0
+    last_elapsed_time = 0.0
+    ts_execute = time.time()
+
     # Handle empty case
     if not circuits or len(circuits) == 0:
         pseudo_job = Job()
@@ -1128,6 +1141,9 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     # Attach per-circuit timing if available (sequential execution only)
     if per_circuit_times:
         results._per_circuit_times = per_circuit_times
+        last_exec_time = sum(per_circuit_times)
+
+    last_elapsed_time = time.time() - ts_execute
 
     if verbose:
         print(f"... execute_circuits complete, job_id={job_id}")

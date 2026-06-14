@@ -1065,6 +1065,18 @@ def execute_circuits_parallel(circuits, num_shots):
         # Store wall-clock timing for elapsed_time computation
         result._parallel_timing = timing_info
 
+        # Set module-level timing variables for callers (e.g. hamlib)
+        ex.last_elapsed_time = timing_info.get('wall_clock', 0)
+        # For exec time, use execution_spans total (already computed above)
+        if getattr(result, '_per_circuit_times', None):
+            ex.last_exec_time = sum(result._per_circuit_times)
+        else:
+            ex.last_exec_time = 0.0
+        # Transpile time approximation: run_time includes transpile + queue + exec.
+        # Subtract exec to get upper bound on transpile + queue + overhead.
+        run_time = timing_info.get('run_time', 0)
+        ex.last_transpile_time = max(0, run_time - ex.last_exec_time) if run_time > 0 else 0.0
+
         return "parallel_experiment", result
 
     except Exception as err:

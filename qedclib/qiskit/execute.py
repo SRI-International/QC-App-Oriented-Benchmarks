@@ -73,6 +73,12 @@ def request_cancel():
 # Print additional time metrics for each stage of execution
 verbose_time = False
 
+# Timing decomposition — set by execute_circuits/execute_circuits_parallel after each call.
+# Callers (e.g. hamlib) can read these to report meaningful timing breakdowns.
+last_transpile_time = 0.0    # seconds spent in transpilation
+last_exec_time = 0.0         # QPU execution time (from execution_spans, or sampler wall-clock)
+last_elapsed_time = 0.0      # total wall-clock of the execute call
+
 #### the following variables are accessed only through functions ...
 
 # Specify whether to execute using sessions (and currently using Sampler only)
@@ -1091,14 +1097,22 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     ##########
     # Standard execution paths — always pass array
 
+    global last_transpile_time, last_exec_time, last_elapsed_time
+    last_transpile_time = 0.0
+    last_exec_time = 0.0
+    last_elapsed_time = 0.0
+    ts_execute = time.time()
+
     try:
         # Execute on appropriate path
         if sampler is not None:
             # Sampler path (IBM Runtime, StatevectorSampler, AerSampler)
+            ts_transpile = time.time()
             trans_qcs = transpile(circuits, backend,
                 optimization_level=optimization_level,
                 layout_method=layout_method,
                 routing_method=routing_method)
+            last_transpile_time = time.time() - ts_transpile
 
             # set job tags if SamplerV2 on IBM Quantum Platform (max 8 tags allowed)
             if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
@@ -1110,8 +1124,10 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         elif this_noise is not None and not sampler and backend_name.endswith("qasm_simulator"):
             # Noisy simulator path — transpile to noise model's basis gates only;
             # don't pass backend alongside basis_gates (Qiskit 2.x warning)
+            ts_transpile = time.time()
             trans_qcs = transpile(circuits,
                 basis_gates=this_noise.basis_gates)
+            last_transpile_time = time.time() - ts_transpile
 
             # Copy noise model QV to metrics if available
             if hasattr(this_noise, "QV"):
@@ -1126,10 +1142,12 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
 
         else:
             # All other backends and noiseless simulator
+            ts_transpile = time.time()
             trans_qcs = transpile(circuits, backend,
                 optimization_level=optimization_level,
                 layout_method=layout_method,
                 routing_method=routing_method)
+            last_transpile_time = time.time() - ts_transpile
 
             # Statevector simulator: remove final measurements
             if backend_name.lower() == "statevector_simulator":
@@ -1178,14 +1196,22 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         per_circuit_times = _extract_per_circuit_times(raw_result, len(circuits))
         if per_circuit_times:
             result._per_circuit_times = per_circuit_times
+            last_exec_time = sum(per_circuit_times)
     except Exception:
         pass  # timing extraction is best-effort
+
+    # If no execution_spans timing, fall back to 0 (unknown)
+    if last_exec_time == 0.0 and raw_result is not None:
+        # No execution_spans available (e.g. simulator) — leave as 0
+        pass
 
     # Attach job object for hardware step timing in process_circuit_results
     try:
         result._job = job
     except Exception:
         pass
+
+    last_elapsed_time = time.time() - ts_execute
 
     if verbose:
         print(f"... execute_circuits complete, job_id={job_id}")
@@ -1795,11 +1821,12 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
     result_holder = [None]       # [0] = raw_result when done
     error_holder = [None]        # [0] = exception if all retries failed
     done_event = threading.Event()
+    stop_event = threading.Event()   # signals worker to stop retrying
 
     def worker():
         """Background thread: call job.result() with retry logic."""
         try:
-            result_holder[0] = _wait_on_job_result(job, job_id)
+            result_holder[0] = _wait_on_job_result(job, job_id, stop_event)
         except Exception as e:
             error_holder[0] = e
         finally:
@@ -1822,6 +1849,7 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
         # Check if cancellation was requested
         if cancel_requested:
             print(f'\n... cancelling job {job_id}')
+            stop_event.set()  # stop background thread retries
             try:
                 job.cancel()
             except Exception:
@@ -1839,6 +1867,7 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
         # Error: don't wait for thread, return immediately
         if status == JobStatus.ERROR or status == 'ERROR':
             print(f'\nERROR: job execution failed: {job_id}')
+            stop_event.set()  # stop background thread retries
             if hasattr(job, 'error_message'):
                 print(f"... {job.error_message()}")
             else:
@@ -1853,6 +1882,8 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
         # Cancelled: don't wait for thread, return immediately
         if status == JobStatus.CANCELLED or status == 'CANCELLED':
             print(f'\nWARNING: Job {job_id} was cancelled')
+            stop_event.set()  # stop background thread retries
+            close_session()   # session is dead on IBM's side, clear local ref
             return None
 
         # Comfort dots showing job state (matches old check_jobs pattern)
@@ -1881,18 +1912,23 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
     return result_holder[0]
 
 
-def _wait_on_job_result(job, job_id):
+def _wait_on_job_result(job, job_id, stop_event=None):
     """
     Call job.result() with retry logic for network errors.
     Reuses the existing wait_on_job_result pattern (40 retries, 15s apart).
 
     This runs in the background thread for hardware, or directly for simulators.
+    If stop_event is provided and gets set, stops retrying immediately.
     """
     max_retries = 40
     retry_interval = 15
 
     result = None
     for retry_count in range(1, max_retries + 1):
+        # Check if we've been told to stop (e.g., job was cancelled)
+        if stop_event is not None and stop_event.is_set():
+            return None
+
         try:
             result = job.result()
             break
@@ -1900,16 +1936,21 @@ def _wait_on_job_result(job, job_id):
             raise
         except Exception as ex:
             ex_str = str(ex)
-            # Don't retry on fatal errors (bad backend, auth failure, invalid circuits)
+            # Don't retry on fatal errors (bad backend, auth failure, cancelled, etc.)
             fatal_keywords = ["403", "Forbidden", "not found", "authentication",
-                              "not supported by the target", "IBMInputValueError"]
+                              "not supported by the target", "IBMInputValueError",
+                              "cancelled", "canceled"]
             if any(kw.lower() in ex_str.lower() for kw in fatal_keywords):
                 print(f'ERROR: Fatal error for job {job_id} — {ex}')
                 raise
             print(f'... error during job.result() for job {job_id} — retry {retry_count}/{max_retries}')
             if verbose: print(traceback.format_exc())
             if retry_count < max_retries:
-                time.sleep(retry_interval)
+                # Sleep in short intervals so we can check stop_event
+                for _ in range(retry_interval):
+                    if stop_event is not None and stop_event.is_set():
+                        return None
+                    time.sleep(1)
 
     if result is None:
         print(f'ERROR: Failed to get result for job {job_id} after {max_retries} retries')

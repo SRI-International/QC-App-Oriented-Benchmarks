@@ -743,10 +743,20 @@ def run(min_qubits: int = 2,
                 computed_time = round((time.time() - ts), 3)
                 metrics_object["exp_time_computed"] = computed_time
 
-                total_energy = round(total_energy, 4)  
+                total_energy = round(total_energy, 4)
                 metrics_object["exp_value_computed"] = total_energy
 
-                print(f"... quantum execution time = {computed_time}")
+                print(f"... total elapsed execution time = {computed_time}")
+
+                # Report timing decomposition if available from execute module
+                try:
+                    import execute as _ex
+                    if _ex.last_exec_time > 0:
+                        print(f"... quantum execution time = {round(_ex.last_exec_time, 3)}")
+                    if _ex.last_transpile_time > 0:
+                        print(f"... transpile/overhead time = {round(_ex.last_transpile_time, 3)}")
+                except Exception:
+                    pass
                
                 
                 ##############################################
