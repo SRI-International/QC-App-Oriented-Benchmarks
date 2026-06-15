@@ -37,6 +37,12 @@ import cudaq
 
 verbose = False
 
+# Timing decomposition — set by execute_circuits after each call.
+# Callers (e.g. hamlib) can read these to report meaningful timing breakdowns.
+last_transpile_time = 0.0    # cudaq has minimal transpilation
+last_exec_time = 0.0         # wall-clock of cudaq.sample() calls
+last_elapsed_time = 0.0      # total wall-clock of the execute call
+
 # Cancel flag — set by request_cancel() to interrupt execution between circuits
 cancel_requested = False
 
@@ -48,6 +54,14 @@ def request_cancel():
 # Auto-warmup: execute a tiny circuit on first call to execute_circuits() to prime the JIT
 auto_warmup = True
 _warmup_done = False
+
+# Parallel execution flag — when True, execute_circuits() will distribute
+# circuits across MPI ranks (equivalent to gpus_per_circuit=1).
+# Provides a consistent API with the Qiskit execute module.
+# Requires MPI with >1 rank to have any effect.
+parallel_execution = False
+
+_parallel_warning_shown = False
 
 # Parallel execution configuration (reserved for future use)
 _parallel_config = {
@@ -112,13 +126,17 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
     size = mpi.size
 
     if size < 2:
-        if rank == 0:
+        if rank == 0 and verbose:
             print("... Only 1 MPI rank, using sequential")
         return None  # Signal to fall back to sequential
 
+    # Skip MPI distribution for single-circuit arrays (no benefit, just overhead)
+    if len(circuits) < 2:
+        return None  # Fall back to sequential
+
     # Override mgpu mode - each rank uses single GPU
     # This is critical: mgpu pools all GPUs for ONE circuit, we want the opposite
-    if rank == 0:
+    if rank == 0 and verbose:
         print(f"... MPI parallel: {size} ranks, {len(circuits)} circuits")
         print(f"... Setting single-GPU target (overriding mgpu)")
 
@@ -133,7 +151,7 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
     my_start, my_end = block_indices[rank]
     my_circuits = circuits[my_start:my_end]
 
-    if rank == 0:
+    if rank == 0 and verbose:
         print(f"... Distribution: {[(s, e-s) for s, e in block_indices]} circuits per rank")
 
     # Execute this rank's circuits
@@ -162,11 +180,95 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
         flattened = []
         for rank_results in all_results:
             flattened.extend(rank_results)
-        print(f"... Gathered {len(flattened)} results from {size} ranks")
+        if verbose:
+            print(f"... Gathered {len(flattened)} results from {size} ranks")
         return flattened
     else:
         # Non-leader ranks return empty - caller should check mpi.leader()
         return []
+
+def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
+    """
+    Distribute circuit groups across MPI ranks for parallel execution.
+
+    Each rank gets a contiguous block of groups and executes them sequentially.
+    Within each group, all circuits run with that group's shot count.
+    Results are gathered to rank 0 in original group order.
+
+    Args:
+        circuit_groups: list of lists of [kernel, [args]] tuples
+        num_shots_list: list of ints, one per group
+
+    Returns:
+        (job_id, group_results) tuple:
+        - job_id: identifier for the job
+        - group_results: list of ExecutionResult, one per group (on rank 0)
+                         empty list on non-leader ranks
+    """
+    rank = mpi.rank
+    size = mpi.size
+
+    # Override mgpu mode — each rank uses single GPU
+    if rank == 0 and verbose:
+        print(f"... MPI group-parallel: {size} ranks, {len(circuit_groups)} groups")
+
+    cudaq.set_target("nvidia", option="fp32")
+    mpi.barrier()
+
+    # Distribute groups across ranks
+    num_groups = len(circuit_groups)
+    block_indices = _get_block_indices(num_groups, size)
+    my_start, my_end = block_indices[rank]
+
+    if rank == 0 and verbose:
+        print(f"... Distribution: {[(s, e-s) for s, e in block_indices]} groups per rank")
+
+    # Execute this rank's groups
+    local_group_results = []
+    for g_idx in range(my_start, my_end):
+        circuits = circuit_groups[g_idx]
+        shots = num_shots_list[g_idx]
+
+        # Execute all circuits in this group
+        counts_array = []
+        for circuit in circuits:
+            try:
+                kernel, params = circuit[0], circuit[1]
+                if noise is None:
+                    result = cudaq.sample(kernel, *params, shots_count=shots)
+                else:
+                    result = cudaq.sample(kernel, *params, shots_count=shots, noise_model=noise)
+                counts_array.append({k: v for k, v in result.items()})
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                print(f'ERROR: Rank {rank} failed on group {g_idx}')
+                print(f"... exception = {e}")
+                counts_array.append({})
+
+        local_group_results.append(counts_array)
+
+    # Gather all group results to rank 0
+    all_group_results = mpi.gather(local_group_results)
+
+    pseudo_job = Job()
+
+    if rank == 0:
+        # Flatten: all_group_results is list-of-lists (one per rank), each containing
+        # that rank's group results. Reconstruct in original group order.
+        ordered_results = []
+        for rank_results in all_group_results:
+            for group_counts in rank_results:
+                ordered_results.append(ExecutionResult(group_counts))
+
+        if verbose:
+            print(f"... Gathered {len(ordered_results)} group results from {size} ranks")
+
+        return (pseudo_job.job_id(), ordered_results)
+    else:
+        # Non-leader ranks return empty results
+        return (pseudo_job.job_id(), [ExecutionResult([]) for _ in circuit_groups])
+
 
 #noise = 'DEFAULT'
 noise=None
@@ -959,6 +1061,13 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         except Exception:
             pass  # warmup is best-effort
 
+    # Reset timing decomposition
+    global last_transpile_time, last_exec_time, last_elapsed_time
+    last_transpile_time = 0.0
+    last_exec_time = 0.0
+    last_elapsed_time = 0.0
+    ts_execute = time.time()
+
     # Handle empty case
     if not circuits or len(circuits) == 0:
         pseudo_job = Job()
@@ -967,9 +1076,17 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     counts_array = None
     per_circuit_times = []
 
-    # MPI parallel execution (gpus_per_circuit support)
-    if gpus_per_circuit is not None and mpi.enabled() and mpi.size > 1:
-        if gpus_per_circuit == 1:
+    # Warn once if parallel requested but not available
+    global _parallel_warning_shown
+    if parallel_execution and (not mpi.enabled() or mpi.size < 2):
+        if not _parallel_warning_shown:
+            print(f"... WARNING: parallel_execution=True but only 1 GPU available (MPI not enabled or single rank)")
+            print(f"... executing sequentially. Launch with mpiexec -np N for parallel execution.")
+            _parallel_warning_shown = True
+
+    # MPI parallel execution (gpus_per_circuit or parallel_execution flag)
+    if (gpus_per_circuit is not None or parallel_execution) and mpi.enabled() and mpi.size > 1:
+        if gpus_per_circuit == 1 or (parallel_execution and gpus_per_circuit is None):
             # Mode 3: each GPU runs one circuit independently (max parallelism)
             counts_array = _execute_parallel_mpi(circuits, num_shots)
         elif gpus_per_circuit < mpi.size:
@@ -1024,11 +1141,67 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     # Attach per-circuit timing if available (sequential execution only)
     if per_circuit_times:
         results._per_circuit_times = per_circuit_times
+        last_exec_time = sum(per_circuit_times)
+
+    last_elapsed_time = time.time() - ts_execute
 
     if verbose:
         print(f"... execute_circuits complete, job_id={job_id}")
 
     return (job_id, results)
+
+
+def execute_circuit_groups(circuit_groups, num_shots_list=None, num_shots=None):
+    """
+    Execute groups of circuits, each group with its own shot count.
+
+    Each group is a list of [kernel, [args]] tuples. Groups may have different
+    numbers of circuits and different shot counts. When parallel_execution is
+    True and MPI is available with >1 rank, groups are distributed across ranks.
+
+    Args:
+        circuit_groups: list of lists of [kernel, [args]] tuples
+        num_shots_list: list of ints, one per group (shot count for each group).
+                        If None, uses num_shots for all groups.
+        num_shots: default shot count if num_shots_list is not provided.
+                   Ignored if num_shots_list is given. Defaults to 100.
+
+    Returns:
+        (job_id, group_results) tuple:
+        - job_id: identifier for the job
+        - group_results: list of ExecutionResult, one per group
+    """
+    # Handle shot count args
+    if num_shots_list is None:
+        if num_shots is None:
+            num_shots = 100
+        num_shots_list = [num_shots] * len(circuit_groups)
+
+    if len(num_shots_list) != len(circuit_groups):
+        raise ValueError(f"num_shots_list length ({len(num_shots_list)}) must match "
+                         f"circuit_groups length ({len(circuit_groups)})")
+
+    if verbose:
+        group_sizes = [len(g) for g in circuit_groups]
+        print(f"... execute_circuit_groups: {len(circuit_groups)} groups, "
+              f"sizes={group_sizes}, shots={num_shots_list}")
+
+    # MPI group-level distribution: distribute groups across ranks
+    if parallel_execution and mpi.enabled() and mpi.size > 1 and len(circuit_groups) > 1:
+        return _execute_groups_parallel_mpi(circuit_groups, num_shots_list)
+
+    # Sequential: execute each group independently
+    group_results = []
+    last_job_id = None
+    for circuits, shots in zip(circuit_groups, num_shots_list):
+        job_id, result = execute_circuits(circuits, num_shots=shots)
+        last_job_id = job_id
+        group_results.append(result)
+
+    if verbose:
+        print(f"... execute_circuit_groups complete, {len(group_results)} groups")
+
+    return (last_job_id, group_results)
 
 
 def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=None, num_shots=None):
@@ -1187,25 +1360,3 @@ def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=No
             print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) — skipping')
 
 
-###########################################################################
-# DEPRECATED FUNCTIONS
-# These functions are kept for backward compatibility but will be removed
-# in a future release. They delegate to the new array-based execution path.
-###########################################################################
-
-
-def execute_circuits_immed(
-        backend_id: str = None,
-        circuits: list = None,
-        num_shots: int = 100,
-        gpus_per_circuit: int = None
-    ) -> list:
-    """
-    DEPRECATED: Use execute_circuits() instead.
-    This function delegates to execute_circuits() and returns only the result.
-    """
-    print("WARNING: execute_circuits_immed() is deprecated and will be removed. Use execute_circuits() instead.")
-
-    job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
-
-    return results

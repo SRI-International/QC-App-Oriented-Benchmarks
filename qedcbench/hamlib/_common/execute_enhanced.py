@@ -43,11 +43,12 @@ def execute_circuits_enhanced(
     from qedclib import qcb_mpi as mpi
     mpi.barrier()
 
-    # call api-specific function to execute circuits
+    import execute as ex
+
+    # Standard path: flat array or bucketed execution
     if not distribute_shots:
         #print(f"... number of shots per circuit = {int(num_shots / len(circuits))}")
         # execute the entire list of circuits, same shots each
-        import execute as ex
         job_id, results = ex.execute_circuits(
                 circuits = circuits,
                 num_shots = int(num_shots / len(circuits)),
@@ -208,7 +209,30 @@ def execute_circuits_with_mixed_shots(
         gpus_per_circuit: int = None,
     ):
 
-    # Loop over the circuit lists associated with each bucket
+    import execute as ex
+
+    # Group-parallel path: distribute buckets across GPUs as groups
+    if ex.parallel_execution:
+
+        if debug:
+            print(f"... group-parallel: {len(circuits_list)} buckets, "
+                  f"sizes={[len(c) for c in circuits_list]}, shots={num_shots_list}")
+
+        job_id, group_results = ex.execute_circuit_groups(
+                circuits_list, num_shots_list=num_shots_list)
+
+        # Flatten group results into counts array
+        counts_array = []
+        for result in group_results:
+            counts = result.get_counts()
+            if isinstance(counts, list):
+                counts_array.extend(counts)
+            else:
+                counts_array.append(counts)
+
+        return ex.ExecutionResult(counts_array)
+
+    # Sequential path: loop over buckets, execute each
     counts_array = []
     for circuits, num_shots in zip(circuits_list, num_shots_list):
 
@@ -217,7 +241,6 @@ def execute_circuits_with_mixed_shots(
             print(f"... len circs = {len(circuits)}")
 
         # execute this list of circuits, with same shots for each circuit in list
-        import execute as ex
         job_id, results = ex.execute_circuits(
                 circuits = circuits,
                 num_shots = num_shots,

@@ -148,6 +148,7 @@ def run_circuits(all_qcs,
     backend_id=None, provider_backend=None,
     hub="ibm-q", group="open", project="main",
     exec_options=None, context=None, api=None,
+    parallel=False,
 ):
     """Execute benchmark circuits and collect metrics.
 
@@ -162,6 +163,7 @@ def run_circuits(all_qcs,
         exec_options: additional execution options dict (default None)
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
+        parallel: enable parallel circuit execution (default False)
     """
     get_kernel("pe_kernel", api=api)
     ex = qedclib.execute
@@ -184,6 +186,7 @@ def run_circuits(all_qcs,
             context=context)
 
     ex.compute_all_circuit_metrics(all_qcs)
+    ex.parallel_execution = parallel
     ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
     metrics.finalize_all_groups()
 
@@ -269,6 +272,7 @@ def get_args():
     parser.add_argument("--use_midcircuit_measurement", "-mid", action="store_true", help="Use dynamic circuit")
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
+    parser.add_argument("--parallel", "-pm", action="store_true", help="Enable parallel circuit execution")
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -283,4 +287,5 @@ if __name__ == '__main__':
         init_phase=args.init_phase, backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else None,
         api=args.api, max_batch_size=args.max_batch_size,
-        draw_circuits=not args.nodraw, plot_results=not args.noplot)
+        draw_circuits=not args.nodraw, plot_results=not args.noplot,
+        parallel=args.parallel)

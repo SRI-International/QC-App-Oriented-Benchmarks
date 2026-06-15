@@ -54,17 +54,16 @@ from qedclib import qcb_mpi as mpi
 
 #### these variables are currently accessed as globals from user code
 
-# maximum number of active jobs
-max_jobs_active = 10
-
-# job mode: False = wait, True = submit multiple jobs
-job_mode = False
-
 # Print progress of execution
 verbose = False
 
 # Cancel flag — set by request_cancel() to interrupt execution between batches/circuits
 cancel_requested = False
+
+# Parallel execution flag — when True, execute_circuits() will attempt to run
+# circuits in parallel by mapping them onto disjoint qubit regions of the QPU.
+# Set via: execute.parallel_execution = True (or via CLI --parallel_mode)
+parallel_execution = False
 
 def request_cancel():
     """Request cancellation of the current execution."""
@@ -73,6 +72,12 @@ def request_cancel():
 
 # Print additional time metrics for each stage of execution
 verbose_time = False
+
+# Timing decomposition — set by execute_circuits/execute_circuits_parallel after each call.
+# Callers (e.g. hamlib) can read these to report meaningful timing breakdowns.
+last_transpile_time = 0.0    # seconds spent in transpilation
+last_exec_time = 0.0         # QPU execution time (from execution_spans, or sampler wall-clock)
+last_elapsed_time = 0.0      # total wall-clock of the execute call
 
 #### the following variables are accessed only through functions ...
 
@@ -109,10 +114,6 @@ backend = Aer.get_backend("qasm_simulator")
 # Execution options, passed to transpile method
 backend_exec_options = None
 
-# Create array of batched circuits and a dict of active circuits
-batched_circuits = []
-active_circuits = {}
-
 # Cached transpiled circuit, used for parameterized execution
 cached_circuits = {}
 
@@ -124,7 +125,7 @@ result_handler = None
 use_normalized_depth = True
 
 # Auto-warmup: execute a tiny circuit on first call to execute_circuits() to prime the backend
-auto_warmup = False
+auto_warmup = True
 _warmup_done = False
 
 # Option to perform explicit transpile to collect depth metrics
@@ -285,9 +286,7 @@ noise = default_noise_model()
 
 # Initialize the execution module, with a custom result handler
 def init_execution(handler):
-    global batched_circuits, result_handler
-    batched_circuits.clear()
-    active_circuits.clear()
+    global result_handler
     result_handler = handler
     
     cached_circuits.clear()
@@ -551,6 +550,29 @@ def set_execution_target(backend_id='qasm_simulator',
     # save execute options with backend
     global backend_exec_options
     backend_exec_options = exec_options
+
+    # Warmup here so the transpiler startup cost (~3-4s on first call) is not
+    # included in execution timing. If set_execution_target() is not called,
+    # warmup happens lazily on first execute_circuits() call instead.
+    _do_warmup()
+
+
+def _do_warmup():
+    """Run a small transpile+execute to prime Qiskit's transpiler and Aer backend.
+    Only runs once — subsequent calls are no-ops via the _warmup_done flag."""
+    global _warmup_done
+    if not auto_warmup or _warmup_done:
+        return
+    _warmup_done = True
+    try:
+        from qiskit import QuantumCircuit as QC
+        wc = QC(2, 2); wc.h(0); wc.cx(0, 1); wc.measure([0, 1], [0, 1])
+        wc = transpile(wc, backend)
+        backend.run([wc, wc], shots=100).result()
+        if verbose:
+            print("... warmup circuit executed")
+    except Exception:
+        pass  # warmup is best-effort
 
 
 # Set the state of the transpilation flags
@@ -996,6 +1018,9 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     Uses the backend/sampler/noise configured by set_execution_target().
     Processes exec_options for noise_model, executor, and transpilation settings.
 
+    When parallel_execution is True, routes to execute_circuits_parallel()
+    in execute_parallel.py, which maps circuits onto disjoint qubit regions.
+
     Args:
         circuits: list of QuantumCircuit objects
         num_shots: shots per circuit
@@ -1010,22 +1035,16 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
           or None if wait=False
     """
 
-    global _warmup_done
+    # Route to parallel execution if enabled (implementation in execute_parallel.py)
+    if parallel_execution and circuits and len(circuits) > 1:
+        from execute_parallel import execute_circuits_parallel
+        return execute_circuits_parallel(circuits, num_shots)
 
     if verbose:
         print(f"... execute_circuits({len(circuits)}, {num_shots}, wait={wait})")
 
-    # Auto-warmup: run a tiny circuit to prime the backend on first execution
-    if auto_warmup and not _warmup_done:
-        _warmup_done = True
-        try:
-            from qiskit import QuantumCircuit as QC
-            wc = QC(1, 1); wc.h(0); wc.measure(0, 0)
-            backend.run(wc, shots=1).result()
-            if verbose:
-                print("... warmup circuit executed")
-        except Exception:
-            pass  # warmup is best-effort
+    # Lazy warmup fallback — in case set_execution_target() was not called
+    _do_warmup()
 
     # Extract exec_options from the global set by set_execution_target()
     opts = copy.copy(backend_exec_options) if backend_exec_options else {}
@@ -1078,14 +1097,22 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     ##########
     # Standard execution paths — always pass array
 
+    global last_transpile_time, last_exec_time, last_elapsed_time
+    last_transpile_time = 0.0
+    last_exec_time = 0.0
+    last_elapsed_time = 0.0
+    ts_execute = time.time()
+
     try:
         # Execute on appropriate path
         if sampler is not None:
             # Sampler path (IBM Runtime, StatevectorSampler, AerSampler)
+            ts_transpile = time.time()
             trans_qcs = transpile(circuits, backend,
                 optimization_level=optimization_level,
                 layout_method=layout_method,
                 routing_method=routing_method)
+            last_transpile_time = time.time() - ts_transpile
 
             # set job tags if SamplerV2 on IBM Quantum Platform (max 8 tags allowed)
             if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
@@ -1097,8 +1124,10 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         elif this_noise is not None and not sampler and backend_name.endswith("qasm_simulator"):
             # Noisy simulator path — transpile to noise model's basis gates only;
             # don't pass backend alongside basis_gates (Qiskit 2.x warning)
+            ts_transpile = time.time()
             trans_qcs = transpile(circuits,
                 basis_gates=this_noise.basis_gates)
+            last_transpile_time = time.time() - ts_transpile
 
             # Copy noise model QV to metrics if available
             if hasattr(this_noise, "QV"):
@@ -1113,10 +1142,12 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
 
         else:
             # All other backends and noiseless simulator
+            ts_transpile = time.time()
             trans_qcs = transpile(circuits, backend,
                 optimization_level=optimization_level,
                 layout_method=layout_method,
                 routing_method=routing_method)
+            last_transpile_time = time.time() - ts_transpile
 
             # Statevector simulator: remove final measurements
             if backend_name.lower() == "statevector_simulator":
@@ -1165,8 +1196,14 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         per_circuit_times = _extract_per_circuit_times(raw_result, len(circuits))
         if per_circuit_times:
             result._per_circuit_times = per_circuit_times
+            last_exec_time = sum(per_circuit_times)
     except Exception:
         pass  # timing extraction is best-effort
+
+    # If no execution_spans timing, fall back to 0 (unknown)
+    if last_exec_time == 0.0 and raw_result is not None:
+        # No execution_spans available (e.g. simulator) — leave as 0
+        pass
 
     # Attach job object for hardware step timing in process_circuit_results
     try:
@@ -1174,10 +1211,98 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
     except Exception:
         pass
 
+    last_elapsed_time = time.time() - ts_execute
+
     if verbose:
         print(f"... execute_circuits complete, job_id={job_id}")
 
     return (job_id, result)
+
+
+def execute_circuit_groups(circuit_groups, num_shots_list=None, num_shots=None):
+    """
+    Execute groups of circuits, each group with its own shot count.
+
+    Each group is a list of QuantumCircuits. Groups may have different numbers
+    of circuits and different shot counts. When parallel_execution is True,
+    routes to execute_circuit_groups_parallel() which will compose circuits
+    from multiple groups onto disjoint qubit regions for parallel execution.
+
+    Args:
+        circuit_groups: list of lists of QuantumCircuit objects
+        num_shots_list: list of ints, one per group (shot count for each group).
+                        If None, uses num_shots for all groups.
+        num_shots: default shot count if num_shots_list is not provided.
+                   Ignored if num_shots_list is given. Defaults to 100.
+
+    Returns:
+        (job_id, group_results) tuple:
+        - job_id: identifier for the job
+        - group_results: list of ExecutionResult, one per group
+    """
+    # Handle shot count args
+    if num_shots_list is None:
+        if num_shots is None:
+            num_shots = 100
+        num_shots_list = [num_shots] * len(circuit_groups)
+
+    if len(num_shots_list) != len(circuit_groups):
+        raise ValueError(f"num_shots_list length ({len(num_shots_list)}) must match "
+                         f"circuit_groups length ({len(circuit_groups)})")
+
+    if verbose:
+        group_sizes = [len(g) for g in circuit_groups]
+        print(f"... execute_circuit_groups: {len(circuit_groups)} groups, "
+              f"sizes={group_sizes}, shots={num_shots_list}")
+
+    # Determine max circuit width across all groups
+    max_width = 0
+    for group in circuit_groups:
+        for qc in group:
+            w = qc.num_qubits if hasattr(qc, 'num_qubits') else 0
+            if w > max_width:
+                max_width = w
+
+    # Check available qubits on the backend
+    available_qubits = None
+    try:
+        if backend is not None:
+            if hasattr(backend, 'num_qubits'):
+                available_qubits = backend.num_qubits
+            elif hasattr(backend, 'configuration'):
+                available_qubits = backend.configuration().n_qubits
+    except Exception:
+        pass
+
+    if available_qubits is not None and max_width > 0:
+        if available_qubits < max_width:
+            print(f"ERROR: circuit width ({max_width} qubits) exceeds device capacity "
+                  f"({available_qubits} qubits)")
+            pseudo_job = Job()
+            return (pseudo_job.job_id(), [ExecutionResult([{}] * len(g)) for g in circuit_groups])
+        elif available_qubits < 2 * max_width:
+            if verbose:
+                print(f"... WARNING: device has {available_qubits} qubits but parallel "
+                      f"requires >= {2 * max_width} (2x max circuit width {max_width}), "
+                      f"executing sequentially")
+
+    # Route to parallel execution if enabled
+    if parallel_execution and len(circuit_groups) > 1:
+        from execute_parallel import execute_circuit_groups_parallel
+        return execute_circuit_groups_parallel(circuit_groups, num_shots_list)
+
+    # Sequential: execute each group independently
+    group_results = []
+    last_job_id = None
+    for circuits, shots in zip(circuit_groups, num_shots_list):
+        job_id, result = execute_circuits(circuits, num_shots=shots)
+        last_job_id = job_id
+        group_results.append(result)
+
+    if verbose:
+        print(f"... execute_circuit_groups complete, {len(group_results)} groups")
+
+    return (last_job_id, group_results)
 
 
 def _execute_batch(circuits_info, num_shots, max_batch_size):
@@ -1293,6 +1418,11 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
         # Call the benchmark's result handler (computes fidelity etc.)
         # Skip if counts are empty (cancelled/failed job) to avoid division-by-zero in handlers
         if result_handler and counts:
+            if verbose:
+                sample = dict(list(counts.items())[:3])
+                print(f"... [debug pcr] circuit {ci['group']}/{ci['circuit']}: "
+                      f"counts_type={type(counts).__name__}, "
+                      f"sample={sample}")
             try:
                 result_handler(ci["qc"], circuit_result,
                               ci["group"], ci["circuit"], ci["shots"])
@@ -1329,7 +1459,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
         try:
             result_dict = raw_result.to_dict()
 
-            if verbose:
+            if verbose_time:
                 print(f"... _extract_per_circuit_times: to_dict() path, {num_circuits} circuits")
                 top_keys = list(result_dict.keys())
                 print(f"... result_dict keys: {top_keys}")
@@ -1351,21 +1481,21 @@ def _extract_per_circuit_times(raw_result, num_circuits):
                     else:
                         break
                 if len(per_times) == num_circuits:
-                    if verbose:
+                    if verbose_time:
                         print(f"... per-experiment times: {per_times[:5]}{'...' if len(per_times) > 5 else ''}")
                     return per_times
 
             # Fall back to total time_taken divided evenly
             if "time_taken" in result_dict and result_dict["time_taken"] > 0:
                 avg = result_dict["time_taken"] / num_circuits
-                if verbose:
+                if verbose_time:
                     print(f"... using total time_taken / {num_circuits} = {avg}")
                 return [avg] * num_circuits
         except Exception as e:
-            if verbose:
+            if verbose_time:
                 print(f"... to_dict() extraction failed: {e}")
 
-        if verbose:
+        if verbose_time:
             print(f"... no timing extracted from to_dict() path")
         return None
 
@@ -1374,7 +1504,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
     # Now we submit batches, so we need per-pub metadata for individual circuit timing.
     if hasattr(raw_result, 'metadata'):
 
-        if verbose:
+        if verbose_time:
             print(f"... _extract_per_circuit_times: PrimitiveResult path, {num_circuits} circuits")
             print(f"... top-level metadata keys: {list(raw_result.metadata.keys()) if isinstance(raw_result.metadata, dict) else type(raw_result.metadata)}")
             try:
@@ -1407,16 +1537,16 @@ def _extract_per_circuit_times(raw_result, num_circuits):
                         per_times.append(pub_meta['time_taken'])
                         continue
                 # This pub has no timing — abort per-pub extraction
-                if verbose:
+                if verbose_time:
                     print(f"... pub has no timing info, aborting per-pub extraction")
                 per_times = []
                 break
             if len(per_times) == num_circuits:
-                if verbose:
+                if verbose_time:
                     print(f"... per-pub times extracted: {per_times}")
                 return per_times
         except (TypeError, IndexError) as e:
-            if verbose:
+            if verbose_time:
                 print(f"... per-pub iteration failed: {e}")
 
         # Fall back to top-level metadata (batch-level timing, divided evenly)
@@ -1427,7 +1557,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
             try:
                 if 'execution' in metadata:
                     spans = metadata['execution']['execution_spans']['__value__']['spans']
-                    if verbose:
+                    if verbose_time:
                         print(f"... top-level execution_spans: {len(spans)} spans")
                         for i, span in enumerate(spans[:3]):
                             print(f"...   span[{i}]: duration={span.duration}")
@@ -1435,7 +1565,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
                         return [span.duration for span in spans[:num_circuits]]
                     elif len(spans) == 1:
                         avg = spans[0].duration / num_circuits
-                        if verbose:
+                        if verbose_time:
                             print(f"... single span, dividing evenly: {avg}")
                         return [avg] * num_circuits
             except (KeyError, TypeError, AttributeError, IndexError):
@@ -1445,13 +1575,13 @@ def _extract_per_circuit_times(raw_result, num_circuits):
             if "time_taken" in metadata:
                 try:
                     avg = metadata["time_taken"] / num_circuits
-                    if verbose:
+                    if verbose_time:
                         print(f"... using top-level time_taken / {num_circuits} = {avg}")
                     return [avg] * num_circuits
                 except (TypeError, ZeroDivisionError):
                     pass
 
-        if verbose:
+        if verbose_time:
             print(f"... no timing extracted from PrimitiveResult")
 
     return None
@@ -1691,11 +1821,12 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
     result_holder = [None]       # [0] = raw_result when done
     error_holder = [None]        # [0] = exception if all retries failed
     done_event = threading.Event()
+    stop_event = threading.Event()   # signals worker to stop retrying
 
     def worker():
         """Background thread: call job.result() with retry logic."""
         try:
-            result_holder[0] = _wait_on_job_result(job, job_id)
+            result_holder[0] = _wait_on_job_result(job, job_id, stop_event)
         except Exception as e:
             error_holder[0] = e
         finally:
@@ -1718,6 +1849,7 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
         # Check if cancellation was requested
         if cancel_requested:
             print(f'\n... cancelling job {job_id}')
+            stop_event.set()  # stop background thread retries
             try:
                 job.cancel()
             except Exception:
@@ -1735,6 +1867,7 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
         # Error: don't wait for thread, return immediately
         if status == JobStatus.ERROR or status == 'ERROR':
             print(f'\nERROR: job execution failed: {job_id}')
+            stop_event.set()  # stop background thread retries
             if hasattr(job, 'error_message'):
                 print(f"... {job.error_message()}")
             else:
@@ -1749,6 +1882,8 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
         # Cancelled: don't wait for thread, return immediately
         if status == JobStatus.CANCELLED or status == 'CANCELLED':
             print(f'\nWARNING: Job {job_id} was cancelled')
+            stop_event.set()  # stop background thread retries
+            close_session()   # session is dead on IBM's side, clear local ref
             return None
 
         # Comfort dots showing job state (matches old check_jobs pattern)
@@ -1777,18 +1912,23 @@ def wait_for_result_threaded(job, job_id, circuits, is_local_simulator=False):
     return result_holder[0]
 
 
-def _wait_on_job_result(job, job_id):
+def _wait_on_job_result(job, job_id, stop_event=None):
     """
     Call job.result() with retry logic for network errors.
     Reuses the existing wait_on_job_result pattern (40 retries, 15s apart).
 
     This runs in the background thread for hardware, or directly for simulators.
+    If stop_event is provided and gets set, stops retrying immediately.
     """
     max_retries = 40
     retry_interval = 15
 
     result = None
     for retry_count in range(1, max_retries + 1):
+        # Check if we've been told to stop (e.g., job was cancelled)
+        if stop_event is not None and stop_event.is_set():
+            return None
+
         try:
             result = job.result()
             break
@@ -1796,16 +1936,21 @@ def _wait_on_job_result(job, job_id):
             raise
         except Exception as ex:
             ex_str = str(ex)
-            # Don't retry on fatal errors (bad backend, auth failure, invalid circuits)
+            # Don't retry on fatal errors (bad backend, auth failure, cancelled, etc.)
             fatal_keywords = ["403", "Forbidden", "not found", "authentication",
-                              "not supported by the target", "IBMInputValueError"]
+                              "not supported by the target", "IBMInputValueError",
+                              "cancelled", "canceled"]
             if any(kw.lower() in ex_str.lower() for kw in fatal_keywords):
                 print(f'ERROR: Fatal error for job {job_id} — {ex}')
                 raise
             print(f'... error during job.result() for job {job_id} — retry {retry_count}/{max_retries}')
             if verbose: print(traceback.format_exc())
             if retry_count < max_retries:
-                time.sleep(retry_interval)
+                # Sleep in short intervals so we can check stop_event
+                for _ in range(retry_interval):
+                    if stop_event is not None and stop_event.is_set():
+                        return None
+                    time.sleep(1)
 
     if result is None:
         print(f'ERROR: Failed to get result for job {job_id} after {max_retries} retries')
@@ -1836,830 +1981,3 @@ def _get_job_status(job, job_id):
     # All retries failed — return None (caller decides what to do)
     print(f'ERROR: Failed to get status for job {job_id} after {max_retries} retries')
     return None
-
-
-###########################################################################
-# DEPRECATED FUNCTIONS
-# These functions are kept for backward compatibility but will be removed
-# in a future release. They delegate to the new array-based execution path.
-###########################################################################
-
-######################################################################
-# CIRCUIT EXECUTION METHODS
-
-# Submit circuit for execution
-# Execute immediately if possible or put into the list of batched circuits
-def submit_circuit(qc, group_id, circuit_id, shots=100, params=None):
-
-    # create circuit object with submission time and circuit info
-    circuit = { "qc": qc, "group": str(group_id), "circuit": str(circuit_id),
-            "submit_time": time.time(), "shots": shots, "params": params }
-            
-    if verbose:
-        print(f'... submit circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={circuit["params"]}')
-
-    '''
-    if params != None: 
-        for param in params.items(): print(f"{param}")
-        print([param[1] for param in params.items()])
-    '''
-    
-    # logger doesn't like unicode, so just log the array values for now
-    #logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={str(circuit["params"])}')
-    logger.info(f'Submitting circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]} params={[param[1] for param in params.items()] if params else None}')
-
-    # immediately post the circuit for execution if active jobs < max
-    if len(active_circuits) < max_jobs_active:
-        execute_circuit(circuit)
-    
-    # or just add it to the batch list for execution after others complete
-    else:
-        batched_circuits.append(circuit)
-        if verbose:
-            print("  ... added circuit to batch")
-
-
-# Launch execution of one job (circuit)
-def execute_circuit(circuit):
-    logging.info('Entering execute_circuit')
-
-    active_circuit = copy.copy(circuit)
-    active_circuit["launch_time"] = time.time()
-    active_circuit["pollcount"] = 0 
-    
-    shots = circuit["shots"]
-    
-    qc = circuit["qc"]
-    job_tags = [qc.name]
-    
-    # do the decompose before obtaining circuit metrics so we expand subcircuits to 2 levels
-    # Comment this out here; ideally we'd generalize it here, but it is intended only to 
-    # 'flatten out' circuits with subcircuits; we do it in the benchmark code for now so
-    # it only affects circuits with subcircuits (e.g. QFT, AE ...)
-    # qc = qc.decompose()
-    # qc = qc.decompose()
-    
-    # compute circuit metrics (algorithmic + optionally normalized depth)
-    circuit_metrics = compute_circuit_metrics(qc, do_transpile_metrics, use_normalized_depth)
-
-    # if normalized depth was computed, exclude that time from elapsed_time
-    if do_transpile_metrics and use_normalized_depth:
-        active_circuit["launch_time"] = time.time()
-
-    backend_name = get_backend_name(backend)
-
-    try:
-        # use noise model from execution options if given for simulator
-        this_noise = noise
-        
-        # make a clone of the backend options so we can remove elements that we use, then pass to .run()
-        global backend_exec_options
-        backend_exec_options_copy = copy.copy(backend_exec_options)
-        
-        # get noise model from options; used only in simulator for now
-        if backend_exec_options_copy != None and "noise_model" in backend_exec_options_copy:
-            this_noise = backend_exec_options_copy["noise_model"]
-            #print(f"... using custom noise model: {this_noise}")
-        
-        # extract execution options if set
-        if backend_exec_options_copy == None: backend_exec_options_copy = {}
-        
-        # used in Sampler setup, here remove it for execution
-        this_use_sessions = backend_exec_options_copy.pop("use_sessions", None)
-        resilience_level = backend_exec_options_copy.pop("resilience_level", None)
-        
-        # standard Qiskit transpiler options
-        optimization_level = backend_exec_options_copy.pop("optimization_level", None)
-        layout_method = backend_exec_options_copy.pop("layout_method", None)
-        routing_method = backend_exec_options_copy.pop("routing_method", None)
-        
-        # option to transpile multiple times to find best one
-        transpile_attempt_count = backend_exec_options_copy.pop("transpile_attempt_count", None)
-        
-        # gneeralized transformer method, custom to user
-        transformer = backend_exec_options_copy.pop("transformer", None)
-        
-        global result_processor, width_processor
-        postprocessors = backend_exec_options_copy.pop("postprocessor", None)
-        if postprocessors:
-            result_processor, width_processor = postprocessors
-        
-        ##############
-        # if 'executor' is provided, perform all execution there and return
-        # the executor returns a result object that implements get_counts(qc)
-        executor = None
-        if backend_exec_options_copy != None:
-            executor = backend_exec_options_copy.pop("executor", None) 
-        
-        # NOTE: the executor does not perform any other optional processing
-        # Also, the result_handler is called before elapsed_time processing which is not correct
-        if executor:
-            st = time.time()
-            
-            # invoke custom executor function with backend options
-            qc = circuit["qc"]
-            result = executor(qc, backend_name, backend, shots=shots, **backend_exec_options_copy)
-            
-            if verbose_time:
-                print(f"  *** executor() time = {round(time.time() - st,4)}")
-            
-            # create a pseudo-job to perform metrics processing upon return
-            job = Job()
-            
-            # store the result object on the job for processing in job_complete
-            job.executor_result = result  
-        
-        ##############        
-        # normal execution processing is performed here
-        else:       
-            logger.info(f"Executing on backend: {backend_name}")
-
-            #************************************************
-            # Initiate execution (with noise if specified and this is a simulator backend)
-            if this_noise is not None and not sampler and backend_name.endswith("qasm_simulator"):
-                logger.info(f"Performing noisy simulation, shots = {shots}")
-                
-                # if the noise model has associated QV value, copy it to metrics module for plotting
-                if hasattr(this_noise, "QV"):
-                    metrics.QV = this_noise.QV
-                       
-                simulation_circuits = circuit["qc"]
-
-                # we already have the noise model, just need to remove it from the options
-                # (only for simulator;  for other backends, it is treaded like keyword arg)
-                dummy = backend_exec_options_copy.pop("noise_model", None)
-                        
-                # transpile and bind circuit with parameters; use cache if flagged
-                # Pass basis_gates without backend to avoid Qiskit 2.x warning
-                trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], None, basis_gates=this_noise.basis_gates)
-                simulation_circuits = trans_qc
-                        
-                # apply transformer pass if provided
-                if transformer:
-                    logger.info("applying transformer to noisy simulator")
-                    simulation_circuits, shots = invoke_transformer(transformer,
-                                        trans_qc, backend=backend, shots=shots)
-
-                # Indicate number of qubits about to be executed
-                if width_processor:
-                    width_processor(qc)
-                
-                # for noisy simulator, use backend.run() which can take noise model; 
-                # no need for transpile above unless there are options like transformer
-                logger.info(f'Running circuit on noisy simulator, shots={shots}')
-                st = time.time()
-                
-                job = backend.run(simulation_circuits, shots=shots,
-                    noise_model=this_noise, basis_gates=this_noise.basis_gates,
-                    **backend_exec_options_copy)
-                    
-                logger.info(f'Finished Running on noisy simulator - {round(time.time() - st, 5)} (ms)')
-                if verbose_time: print(f"  *** qiskit.execute() time = {round(time.time() - st, 5)}")
-            
-            #************************************************
-            # Initiate execution for all other backends and noiseless simulator
-            else:
-     
-                # if set, transpile many times and pick shortest circuit
-                # DEVNOTE: this does not handle parameters yet, or optimizations
-                if transpile_attempt_count:
-                    trans_qc = transpile_multiple_times(circuit["qc"], circuit["params"], backend,
-                            transpile_attempt_count, 
-                            optimization_level=None, layout_method=None, routing_method=None)
-                            
-                # transpile and bind circuit with parameters; use cache if flagged                       
-                else:
-                    trans_qc = transpile_and_bind_circuit(circuit["qc"], circuit["params"], backend,
-                            optimization_level=optimization_level,
-                            layout_method=layout_method,
-                            routing_method=routing_method)
-                
-                # apply transformer pass if provided
-                if transformer:
-                    trans_qc, shots = invoke_transformer(transformer,
-                            trans_qc, backend=backend, shots=shots)
-                
-                # Indicate number of qubits about to be executed
-                if width_processor:
-                    width_processor(qc)
-
-                # to execute on Aer state vector simulator, need to remove measurements
-                if backend_name.lower() == "statevector_simulator":
-                    trans_qc = trans_qc.remove_final_measurements(inplace=False)
-                            
-                #*************************************
-                # perform circuit execution on backend
-                logger.info(f'Running trans_qc, shots={shots}')
-                st = time.time()
-                if use_m3:
-                    from mthree import M3Mitigation
-                    from mthree.utils import final_measurement_mapping
-                    mapping = final_measurement_mapping(trans_qc)
-                    qubits = tuple(mapping.values())
-                    sorted_qubits = tuple(sorted(set(qubits)))
-                    if sorted_qubits in m3_cache:
-                        mit = m3_cache[sorted_qubits]
-                        logger.info(f"Use cached M3 {sorted_qubits=}")
-                    else:
-                        mit = M3Mitigation(backend)
-                        mit.cals_from_system(sorted_qubits, runtime_mode=session)
-                        m3_cache[sorted_qubits] = mit
-                        logger.info(f"Calibrating M3 {sorted_qubits=}")
-
-                if sampler:
-                    # set job tags if SamplerV2 on IBM Quantum Platform
-                    if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
-                        sampler.options.environment.job_tags = job_tags
-
-                    # turn input into pub-like
-                    job = sampler.run([trans_qc], shots=shots)
-
-                else:
-                    job = backend.run(trans_qc, shots=shots, **backend_exec_options_copy)
-
-                if use_m3:
-                    m3_mitigation[job.job_id()] = (mit, qubits)
-
-                logger.info(f'Finished Running trans_qc - {round(time.time() - st, 5)} (ms)')
-                if verbose_time: print(f"  *** qiskit.run() time = {round(time.time() - st, 5)}")
-                
-    except Exception as e:
-        print(f'ERROR: Failed to execute circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-        print(f"... exception = {e}")
-        if verbose: print(traceback.format_exc())
-        return
-    
-    # print("Job status is ", job.status() )
-    
-    # put job into the active circuits with circuit info
-    active_circuits[job] = active_circuit
-    # print("... active_circuit = ", str(active_circuit))
-
-    # store circuit dimensional metrics (computed before execution)
-    store_circuit_metrics(active_circuit["group"], active_circuit["circuit"], circuit_metrics)
-
-    # also store the job_id for future reference
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'job_id', job.job_id())
-    
-    if verbose:
-        print(f"  ... executing job {job.job_id()}")
-    
-    # special handling when only runnng one job at a time: wait for result here
-    # so the status check called later immediately returns done and avoids polling
-    if max_jobs_active <= 1:
-        wait_on_job_result_old(job, active_circuit)
-
-    # return, so caller can do other things while waiting for jobs to complete   
-    
-# Process a completed job
-def job_complete(job):
-    active_circuit = active_circuits[job]
-    
-    if verbose:
-        print(f'\n... job complete - group={active_circuit["group"]} id={active_circuit["circuit"]} shots={active_circuit["shots"]}')
-
-    logger.info(f'job complete - group={active_circuit["group"]} id={active_circuit["circuit"]} shots={active_circuit["shots"]}')
-
-    # compute elapsed time for circuit; assume exec is same, unless obtained from result
-    elapsed_time = time.time() - active_circuit["launch_time"]
-    
-    # report exec time as 0 unless valid measure returned
-    exec_time = 0.0
-    
-    # store these initial time measures now, in case job had error
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'elapsed_time', elapsed_time)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
-
-    ###### executor completion
-    
-    # If job has the 'local_job' attr, execution was done by the executor, and all work is done
-    # we process it here, as the subsequent processing has too much time-specific detail
-    if hasattr(job, 'local_job'):
-    
-        # get the result object directly from the pseudo-job object
-        result = job.result()
-        
-        if hasattr(result, 'exec_time'):
-            exec_time = result.exec_time
-            
-        # assume the exec time is the elapsed time, since we don't have more detail
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
-        
-        # invoke the result handler with the result object
-        if result != None and result_handler:
-            try:
-                result_handler(active_circuit["qc"],
-                                result,
-                                active_circuit["group"],
-                                active_circuit["circuit"],
-                                active_circuit["shots"]
-                                )
-                            
-            except Exception as e:
-                print(f'ERROR: failed to execute result_handler for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-                print(f"... exception = {e}")
-                if verbose:
-                    print(traceback.format_exc()) 
-        
-        # remove from list of active circuits
-        del active_circuits[job]
-    
-        return      
-    
-    ###### normal completion
-    
-    # get job result (DEVNOTE: structure can be different for diff targets)
-    result = None
-        
-    if job.status() == JobStatus.DONE or job.status() == 'DONE':
-        result = job.result()
-        # print("... result = ", str(result))
-
-        # for Azure Quantum, need to obtain execution time from sessions object
-        # Since there may be multiple jobs, need to find the one that matches the current job_id
-        if azure_provider is not None and session is not None:
-            details = job._azure_job.details
-            
-            # print("... session_job.details = ", details)
-            exec_time = (details.end_execution_time - details.begin_execution_time).total_seconds()
-            
-            # DEVNOTE: startup time is not currently used or stored
-            # it seesm to include queue time, so it has no added value over the elapsed time we currently store
-            startup_time = (details.begin_execution_time - details.creation_time).total_seconds()
-            
-        # counts = result.get_counts(qc)
-        # print("Total counts are:", counts)
-        
-        # if we are using Sampler, structure of result object is different;
-        # wrap in ExecutionResult to normalize the get_counts() interface
-        if sampler:
-            # extract SDK-specific info before wrapping
-            qiskit_result = result
-            bitvals = next(iter(qiskit_result[0].data.values()))
-            actual_shots = bitvals.num_shots
-            result_obj = qiskit_result.metadata
-            results_obj = qiskit_result.metadata
-
-            # wrap in normalized result
-            result = ExecutionResult(qiskit_result)
-        else:
-            result_obj = result.to_dict()
-            results_obj = result.to_dict()['results'][0]
-            
-            # get the actual shots and convert to int if it is a string
-            # DEVNOTE: this summation currently applies only to randomized compiling 
-            # and may cause problems with other use cases (needs review)
-            actual_shots = 0
-            for experiment in result_obj["results"]:
-                actual_shots += experiment["shots"]
-
-        #print(f"result_obj = {result_obj}")
-        #print(f"results_obj = {results_obj}")
-        #print(f'shots = {results_obj["shots"]}')
-
-        # convert actual_shots to int if it is a string
-        if type(actual_shots) is str:
-            actual_shots = int(actual_shots)
-        
-        # check for mismatch of requested shots and actual shots
-        if actual_shots != active_circuit["shots"]:
-            print(f'WARNING: requested shots not equal to actual shots: {active_circuit["shots"]} != {actual_shots} ')
-            
-            # allow processing to continue, but use the requested shot count
-            actual_shots = active_circuit["shots"]
-        
-        try:        
-            # obtain timing info from the results object
-            # the data has been seen to come from both places below
-            if "time_taken" in result_obj:
-                exec_time = result_obj["time_taken"]
-            
-            elif "time_taken" in results_obj:
-                exec_time = results_obj["time_taken"]
-            
-            elif 'execution' in result_obj:        
-                #exec_time = result_obj['execution']['execution_spans'][0].duration
-                
-                # Get to the actual span object (python 3.11 does not find the duration attribute above
-                spans = result_obj['execution']['execution_spans']['__value__']['spans']
-                span = spans[0]  # The DoubleSliceSpan object
-                exec_time = span.duration
-                
-        except Exception as e:
-            exec_time = 0.0
-            print(f'ERROR: failed to get exec time for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-            print(f"... exception = {e}")
-            if verbose:
-                print(traceback.format_exc()) 
-            
-        # override the initial value with exec_time returned from successful execution
-        metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
-        
-        # process additional detailed step times, if they exist (this might override exec_time too)
-        process_step_times_old(job, result, active_circuit)
-    
-    # remove from list of active circuits
-    del active_circuits[job]
-
-    # If a result handler has been established, invoke it here with result object
-    if result != None and result_handler:
-    
-        # invoke a result processor if specified in exec_options
-        if result_processor:
-            logger.info('result_processor(...)')
-            result = result_processor(result)
-    
-        # The following assumes single circuit execution
-        # TODO: process multiple circuit results
-        result_counts = result.get_counts()
-        
-        # process M3 error mitigation if provided
-        job_id = job.job_id()
-        if job_id in m3_mitigation:
-            mit, qubits = m3_mitigation[job_id]
-            count = mit.apply_correction(result_counts, qubits).nearest_probability_distribution()
-            result.set_counts(count)
-           
-        # invoke user's result handler
-        try:
-            result_handler(active_circuit["qc"],
-                            result,
-                            active_circuit["group"],
-                            active_circuit["circuit"],
-                            active_circuit["shots"]
-                            )
-                        
-        except Exception as e:
-            print(f'ERROR: failed to execute result_handler for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-            print(f"... exception = {e}")
-            if verbose:
-                print(traceback.format_exc())
-
-# Process detailed step times, if they exist
-# Process a job, whose status cannot be obtained
-def job_status_failed(job):
-    active_circuit = active_circuits[job]
-    
-    if verbose:
-        print(f'\n... job status failed - group={active_circuit["group"]} id={active_circuit["circuit"]} shots={active_circuit["shots"]}')
-    
-    # compute elapsed time for circuit; assume exec is same, unless obtained from result
-    elapsed_time = time.time() - active_circuit["launch_time"]
-    
-    # report exec time as 0 unless valid measure returned
-    exec_time = 0.0
-           
-    # remove from list of active circuits
-    del active_circuits[job]
-
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'elapsed_time', elapsed_time)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
-
-        
-######################################################################
-# JOB MANAGEMENT METHODS
-
-# Job management involves coordinating the batching, queueing,
-# and completion processing of circuits that are submitted for execution. 
-
-# Throttle the execution of active and batched jobs.
-# Wait for active jobs to complete.  As each job completes,
-# check if there are any batched circuits waiting to be executed.
-# If so, execute them, removing them from the batch.
-# Execute the user-supplied completion handler to allow user to 
-# check if a group of circuits has been completed and report on results.
-# Then, if there are no more circuits remaining in batch, exit,
-# otherwise continue to wait for additional active circuits to complete.
-
-def throttle_execution(completion_handler=metrics.finalize_group):
-    logger.info('Entering throttle_execution')
-
-    #if verbose:
-        #print(f"... throttling execution, active={len(active_circuits)}, batched={len(batched_circuits)}")
-
-    # check and sleep if not complete
-    done = False
-    pollcount = 0
-    while not done:
-    
-        # check if any jobs complete
-        check_jobs(completion_handler)
-
-        # return only when all jobs complete
-        if len(batched_circuits) < 1:
-            break
-            
-        # delay a bit, increasing the delay periodically 
-        sleeptime = 0.25
-        if pollcount > 6: sleeptime = 0.5
-        if pollcount > 60: sleeptime = 1.0
-        time.sleep(sleeptime)
-        
-        pollcount += 1
-    
-    if verbose:
-        if pollcount > 0: print("") 
-        #print(f"... throttling execution(2), active={len(active_circuits)}, batched={len(batched_circuits)}")
-
-# Wait for all active and batched circuits to complete.
-# Execute the user-supplied completion handler to allow user to 
-# check if a group of circuits has been completed and report on results.
-# Return when there are no more active circuits.
-# This is used as a way to complete all groups of circuits and report results.
-
-def finalize_execution(completion_handler=metrics.finalize_group, report_end=True):
-
-    #if verbose:
-        #print("... finalize_execution")
-
-    # check and sleep if not complete
-    done = False
-    pollcount = 0
-    while not done:
-    
-        # check if any jobs complete
-        check_jobs(completion_handler)
-
-        # return only when all jobs complete
-        if len(active_circuits) < 1:
-            break
-            
-        # delay a bit, increasing the delay periodically 
-        sleeptime = 0.10                        # was 0.25
-        if pollcount > 6: sleeptime = 0.20      # 0.5
-        if pollcount > 60: sleeptime = 0.5      # 1.0
-        time.sleep(sleeptime)
-        
-        pollcount += 1
-    
-    if verbose:
-        if pollcount > 0: print("")
-    
-    # indicate we are done collecting metrics (called once at end of app)
-    if report_end:
-        metrics.end_metrics()
-        
-        # also, close any open session to avoid runaway cost
-        close_session()
-
-# Check if any active jobs are complete - process if so
-# Before returning, launch any batched jobs that will keep active circuits < max
-# When any job completes, aggregate and report group metrics if all circuits in group are done
-# then return, don't sleep
-
-def check_jobs(completion_handler=None):
-    
-    for job, circuit in active_circuits.items():
-
-        try:
-            #status = job.status()
-            status = get_job_status_old(job, circuit)   # use this version, robust to network failure
-            #print("Job status is ", status)
-            
-        except Exception as e:
-            print(f'ERROR: Unable to retrieve job status for circuit {circuit["group"]} {circuit["circuit"]}')
-            print(f"... job = {job.job_id()}  exception = {e}")
-            
-            # finish the job by removing from active list
-            job_status_failed(job)
-            
-            break
-
-        circuit["pollcount"] += 1
-        
-        # if job not complete, provide comfort ...
-        if status == JobStatus.QUEUED:
-            if verbose:
-                if circuit["pollcount"] < 32 or (circuit["pollcount"] % 15 == 0):
-                    print('.', end='')
-            continue
-
-        elif status == JobStatus.INITIALIZING:
-            if verbose: print('i', end='')
-            continue
-
-        elif status == JobStatus.VALIDATING:
-            if verbose: print('v', end='')
-            continue
-
-        elif status == JobStatus.RUNNING:
-            if verbose: print('r', end='')
-            continue
-
-        # when complete, canceled, or failed, process the job
-        if status == JobStatus.CANCELLED:
-            print("... circuit execution cancelled.")
-
-        if status == JobStatus.ERROR:
-            print("... circuit execution failed.")
-            if hasattr(job, "error_message"):
-                print(f"    job = {job.job_id()}  {job.error_message()}")
-            else:
-                try:
-                    _ = job.result()
-                except Exception as ex:
-                    print(f"    job = {job.job_id()}  '{ex}'")
-                    if verbose:
-                        print(traceback.format_exc())
-
-        if status == JobStatus.DONE or status == JobStatus.CANCELLED or status == JobStatus.ERROR or status == 'DONE' or status =='CANCELLED' or status == 'ERROR':
-            #if verbose: print("Job status is ", job.status() )
-            
-            active_circuit = active_circuits[job]
-            group = active_circuit["group"]
-            
-            # process the job and its result data
-            job_complete(job)
-            
-            # call completion handler with the group id
-            if completion_handler != None:
-                completion_handler(group)
-                
-            break
-
-    # if not at maximum jobs and there are jobs in batch, then execute another
-    if len(active_circuits) < max_jobs_active and len(batched_circuits) > 0:
-
-        # pop the first circuit in the batch and launch execution
-        circuit = batched_circuits.pop(0)
-        if verbose:
-            print(f'... pop and submit circuit - group={circuit["group"]} id={circuit["circuit"]} shots={circuit["shots"]}')
-            
-        execute_circuit(circuit)
-        
-# block and wait for the job result to be returned
-# handle network timeouts by doing up to 40 retries once every 15 seconds
-def wait_on_job_result_old(job, active_circuit):
-    retry_count = 0
-    result = None
-    while retry_count < 40:
-        try:
-            retry_count += 1
-            result = job.result()
-            break
-        except KeyboardInterrupt:
-            raise
-        except Exception:
-            print(f'... error occurred during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
-            if verbose: print(traceback.format_exc())
-            time.sleep(15)
-            continue
-
-    if result == None:
-        print(f'ERROR: during job.result() for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-        raise ValueError("Failed to execute job")
-    else:
-        #print(f"... job.result() is done, with result data, continuing")
-        pass
-
-# Check and return job_status
-# handle network timeouts by doing up to 40 retries once every 15 seconds
-def get_job_status_old(job, active_circuit):
-    retry_count = 0
-    status = None
-    while retry_count < 3:
-        try:
-            retry_count += 1
-            #print(f"... calling job.status()")
-            status = job.status()
-            break
-
-        except Exception:
-            print(f'... error occurred during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]} -- retry {retry_count}')
-            if verbose: print(traceback.format_exc())
-            time.sleep(15)
-            continue
-
-    if status == None:
-        print(f'ERROR: during job.status() for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-        raise ValueError("Failed to get job status")
-    else:
-        #print(f"... job.result() is done, with result data, continuing")
-        pass
-
-    return status
-
-###########################################################################
-
-def process_step_times_old(job, result, active_circuit):
-    #print("... processing step times")
-
-    exec_creating_time = 0
-    exec_validating_time = 0
-    exec_queued_time = 0
-    exec_running_time = 0
-
-    # get breakdown of execution time, if method exists
-    # this attribute not available for some providers and only for circuit-runner model;
-    if not use_sessions and "time_per_step" in dir(job) and callable(job.time_per_step):
-        time_per_step = job.time_per_step()
-        if verbose:
-            print(f"... job.time_per_step() = {time_per_step}")
-
-        creating_time = time_per_step.get("CREATING")
-        validating_time = time_per_step.get("VALIDATING")
-        queued_time = time_per_step.get("QUEUED")
-        running_time = time_per_step.get("RUNNING")
-        completed_time = time_per_step.get("COMPLETED")
-
-        # for testing, since hard to reproduce on some systems
-        #running_time = None
-
-        # make these all slightly non-zero so averaging code is triggered (> 0.001 required)
-        exec_creating_time = 0.001
-        exec_validating_time = 0.001
-        exec_queued_time = 0.001
-        exec_running_time = 0.001
-
-        # this is note used
-        exec_quantum_classical_time = 0.001
-
-        # compute the detailed time metrics
-        if validating_time and creating_time:
-            exec_creating_time = (validating_time - creating_time).total_seconds()
-        if queued_time and validating_time:
-            exec_validating_time = (queued_time - validating_time).total_seconds()
-        if running_time and queued_time:
-            exec_queued_time = (running_time - queued_time).total_seconds()
-        if completed_time and running_time:
-            exec_running_time = (completed_time - running_time).total_seconds()
-
-    # when sessions and sampler used, we obtain metrics differently
-    if use_sessions:
-        job_timestamps = job.metrics()['timestamps']
-        job_metrics = job.metrics()
-        # print(f"... usage = {job_metrics['usage']} {job_metrics['executions']}")
-
-        if verbose:
-            print(f"... job.metrics() = {job.metrics()}")
-            print(f"... job.result().metadata[0] = {result.metadata}")
-
-        # occasionally, these metrics come back as None, so try to use them
-        try:
-            created_time = datetime.strptime(job_timestamps['created'][11:-1],"%H:%M:%S.%f")
-            created_time_delta = timedelta(hours=created_time.hour, minutes=created_time.minute, seconds=created_time.second, microseconds = created_time.microsecond)
-            finished_time = datetime.strptime(job_timestamps['finished'][11:-1],"%H:%M:%S.%f")
-            finished_time_delta = timedelta(hours=finished_time.hour, minutes=finished_time.minute, seconds=finished_time.second, microseconds = finished_time.microsecond)
-            running_time = datetime.strptime(job_timestamps['running'][11:-1],"%H:%M:%S.%f")
-            running_time_delta = timedelta(hours=running_time.hour, minutes=running_time.minute, seconds=running_time.second, microseconds = running_time.microsecond)
-
-            # compute the total seconds for creating and running the circuit
-            exec_creating_time = (running_time_delta - created_time_delta).total_seconds()
-            exec_running_time = (finished_time_delta - running_time_delta).total_seconds()
-
-            # these do not seem to be avaiable
-            exec_validating_time = 0.001
-            exec_queued_time = 0.001
-
-            # when using sessions, the 'running_time' is the 'quantum exec time' - override it here.
-            metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_running_time)
-
-            # use the data in usage field if it is returned, usually by hardware
-            # here we use the executions field to indicate we are on hardware
-            if "usage" in job_metrics and "executions" in job_metrics:
-                if job_metrics['executions'] > 0:
-                    exec_time = job_metrics['usage']['quantum_seconds']
-
-                    # and use this one as it seems to be valid for this case
-                    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_time', exec_time)
-
-            # DEVNOTE: we do not compute this yet
-            # exec_quantum_classical_time = job.metrics()['bss']
-            # metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_quantum_classical_time', exec_quantum_classical_time)
-
-        except Exception as e:
-            if verbose:
-                print(f'WARNING: incomplete time metrics for circuit {active_circuit["group"]} {active_circuit["circuit"]}')
-                print(f"... job = {job.job_id()}  exception = {e}")
-
-    # In metrics, we use > 0.001 to indicate valid data; need to floor these values to 0.001
-    exec_creating_time = max(0.001, exec_creating_time)
-    exec_validating_time = max(0.001, exec_validating_time)
-    exec_queued_time = max(0.001, exec_queued_time)
-    exec_running_time = max(0.001, exec_running_time)
-
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_creating_time', exec_creating_time)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_validating_time', 0.001)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_queued_time', 0.001)
-    metrics.store_metric(active_circuit["group"], active_circuit["circuit"], 'exec_running_time', exec_running_time)
-
-    #print("... time_per_step = ", str(time_per_step))
-    if verbose:
-        print(f"... computed exec times: queued = {exec_queued_time}, creating/transpiling = {exec_creating_time}, validating = {exec_validating_time}, running = {exec_running_time}")
-
-
-def execute_circuits_immed(
-        backend_id: str = None,
-        circuits: list = None,
-        num_shots: int = 100,
-        gpus_per_circuit: int = None
-    ) -> list:
-    """
-    DEPRECATED: Use execute_circuits() instead.
-    This function delegates to execute_circuits() and returns only the result.
-    """
-    print("WARNING: execute_circuits_immed() is deprecated and will be removed. Use execute_circuits() instead.")
-
-    job_id, results = execute_circuits(circuits, num_shots)
-
-    return results

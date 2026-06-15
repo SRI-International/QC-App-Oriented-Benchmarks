@@ -188,6 +188,11 @@ conda activate qiskit
 <pre><code>pip install numpy matplotlib qiskit qiskit-ibm-runtime qiskit-aer notebook
 </code></pre>
 <p>You are now ready to run the benchmark programs.</p>
+<h3 id="optional-parallel-execution-support">Optional: Parallel Execution Support</h3>
+<p>To enable parallel circuit execution on Qiskit hardware backends (packing multiple circuits onto disjoint qubit regions of a single QPU), install these additional packages:</p>
+<pre><code>pip install qiskit-experiments networkx
+</code></pre>
+<p>These are not required for standard benchmark execution and are not included in the base install. Parallel execution is enabled with the <code>-p</code> flag or <code>execute.parallel_execution = True</code>. Currently tested on IBM quantum hardware (ibm_fez); may work on other Qiskit-compatible backends. See <a href="../../parallel_execution/">Parallel Execution</a> for details.</p>
 <h2 id="configuring-quantum-hardware">Configuring Quantum Hardware</h2>
 <p>The <code>qiskit</code> package allows quantum circuits to be executed on real quantum hardware hosted by <a href="https://quantum-computing.ibm.com/">IBM Quantum</a> and many other vendors.</p>
 <p>To use a hardware backend from a computer system provider other than IBM, you will need to install the "Qiskit Provider" module that is specific to that manufacturer. Please see the documentation provided by that provider.</p>

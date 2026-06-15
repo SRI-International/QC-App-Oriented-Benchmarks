@@ -33,7 +33,7 @@ from qedclib import job_store
 # Set after initialize() or get_kernel() loads the API-specific execute module
 execute = None
 
-__version__ = "2.0.5"
+__version__ = "2.0.6"
 
 # Benchmark root registration for dynamic kernel loading
 _benchmark_root = None

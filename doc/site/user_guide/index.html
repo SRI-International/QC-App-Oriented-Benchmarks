@@ -307,6 +307,20 @@ python bv_benchmark.py --api qiskit --min_qubits 2 --max_qubits 10 --num_shots 1
 python qft_benchmark.py --min_qubits 2 --max_qubits 20 --max_circuits 3 --max_batch_size 10
 </code></pre>
 <p>Within each batch, <code>max_batch_size</code> also controls how many circuits are submitted to the backend in a single execution call. For example, if a batch contains 9 circuits and <code>max_batch_size</code> is 10, all 9 are submitted at once. If the batch contains 12 (because a single width produced 12 circuits), they are submitted in chunks of 10 and 2.</p>
+<h3 id="parallel-execution">Parallel Execution</h3>
+<p>The <code>--parallel</code> (<code>-pm</code>) flag enables parallel circuit execution, distributing circuits across multiple execution targets for faster completion:</p>
+<pre><code class="language-bash"># Qiskit — maps circuits onto disjoint qubit regions of a large QPU
+python qft_benchmark.py -a qiskit -pm
+
+# CUDA-Q — distributes circuits across GPUs via MPI
+mpirun -np 4 python -m mpi4py qft_benchmark.py -a cudaq -pm
+</code></pre>
+<p>If parallel execution is not possible (device too small, no MPI, single GPU), circuits execute sequentially with an informational message.</p>
+<p>For CUDA-Q, the <code>--gpus_per_circuit</code> (<code>-gpc</code>) flag controls distributed statevector execution, where multiple GPUs cooperate to simulate circuits with larger qubit counts:</p>
+<pre><code class="language-bash"># All 4 GPUs share the statevector (maximum qubit capacity)
+mpirun -np 4 python -m mpi4py benchmark.py -a cudaq -gpc 4
+</code></pre>
+<p>For full details on parallel and distributed statevector execution modes, see <a href="../parallel_execution/">Parallel Execution</a>.</p>
 <h3 id="from-jupyter-notebooks">From Jupyter Notebooks</h3>
 <p>Suite notebooks are provided in <code>qedcbench/</code> for running multiple benchmarks with shared configuration:</p>
 <ol>

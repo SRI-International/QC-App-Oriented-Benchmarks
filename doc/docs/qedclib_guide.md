@@ -180,6 +180,12 @@ ex.set_execution_target(backend_id="nvidia")
 job_id, result = ex.execute_circuits(circuits, num_shots=1000)
 ```
 
+## Parallel Execution
+
+Set `ex.parallel_execution = True` to distribute circuits across multiple execution targets for faster completion. For group-level parallel execution with per-group shot counts, use `execute_circuit_groups()`.
+
+For full details on parallel and distributed statevector execution modes, see [Parallel Execution](parallel_execution.md).
+
 ## API Reference
 
 ### Top-Level Functions (`qedclib`)
@@ -199,6 +205,7 @@ job_id, result = ex.execute_circuits(circuits, num_shots=1000)
 | `set_execution_target(backend_id, ...)` | Configure the backend for execution |
 | `init_execution(handler)` | Register a result handler callback |
 | `execute_circuits(circuits, num_shots)` | Execute a list of circuits, return `(job_id, result)` |
+| `execute_circuit_groups(groups, num_shots_list)` | Execute groups of circuits with per-group shot counts |
 | `submit_circuits(circuits, num_shots, max_batch_size, batch_by_group)` | Execute a circuit dict with automatic metrics collection |
 | `process_circuit_results(circuits_info, results, ...)` | Map batch results back to individual circuits and store metrics |
 | `compute_all_circuit_metrics(circuits)` | Compute depth, gate count, and transpiled metrics for a circuit dict |

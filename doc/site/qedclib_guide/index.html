@@ -137,6 +137,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#parallel-execution" class="nav-link">Parallel Execution</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#api-reference" class="nav-link">API Reference</a>
               <ul class="nav flex-column">
               </ul>
@@ -288,6 +292,9 @@ import execute as ex
 ex.set_execution_target(backend_id=&quot;nvidia&quot;)
 job_id, result = ex.execute_circuits(circuits, num_shots=1000)
 </code></pre>
+<h2 id="parallel-execution">Parallel Execution</h2>
+<p>Set <code>ex.parallel_execution = True</code> to distribute circuits across multiple execution targets for faster completion. For group-level parallel execution with per-group shot counts, use <code>execute_circuit_groups()</code>.</p>
+<p>For full details on parallel and distributed statevector execution modes, see <a href="../parallel_execution/">Parallel Execution</a>.</p>
 <h2 id="api-reference">API Reference</h2>
 <h3 id="top-level-functions-qedclib">Top-Level Functions (<code>qedclib</code>)</h3>
 <table>
@@ -340,6 +347,10 @@ job_id, result = ex.execute_circuits(circuits, num_shots=1000)
 <tr>
 <td><code>execute_circuits(circuits, num_shots)</code></td>
 <td>Execute a list of circuits, return <code>(job_id, result)</code></td>
+</tr>
+<tr>
+<td><code>execute_circuit_groups(groups, num_shots_list)</code></td>
+<td>Execute groups of circuits with per-group shot counts</td>
 </tr>
 <tr>
 <td><code>submit_circuits(circuits, num_shots, max_batch_size, batch_by_group)</code></td>

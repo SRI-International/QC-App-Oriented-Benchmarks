@@ -24,6 +24,14 @@ Enter the following commands to install the latest version of Qiskit and the oth
 
 You are now ready to run the benchmark programs.
 
+### Optional: Parallel Execution Support
+
+To enable parallel circuit execution on Qiskit hardware backends (packing multiple circuits onto disjoint qubit regions of a single QPU), install these additional packages:
+
+    pip install qiskit-experiments networkx
+
+These are not required for standard benchmark execution and are not included in the base install. Parallel execution is enabled with the `-p` flag or `execute.parallel_execution = True`. Currently tested on IBM quantum hardware (ibm_fez); may work on other Qiskit-compatible backends. See [Parallel Execution](../../parallel_execution.md) for details.
+
 ## Configuring Quantum Hardware
 
 The `qiskit` package allows quantum circuits to be executed on real quantum hardware hosted by [IBM Quantum](https://quantum-computing.ibm.com/) and many other vendors.

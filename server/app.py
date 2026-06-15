@@ -65,6 +65,7 @@ class RunRequest(BaseModel):
     max_circuits: int = 3
     num_shots: int = 100
     method: int = 1
+    parallel: bool = False
     benchmarks: list[str] = []
 
 
@@ -246,14 +247,18 @@ async def start_run(req: RunRequest):
             "method": req.method,
             "api": req.api,
             "backend_id": req.backend_id,
+            "parallel": req.parallel,
             "draw_circuits": False,
             "plot_results": False,
         }
 
-        # Use batch_size=1 for local simulators so cancel can take effect between circuits
-        # (don't apply to cloud simulators like ionq_simulator where batching matters)
+        # Use batch_size=1 for local simulators so that:
+        # 1. Cancel (Stop button) takes effect between qubit-width groups
+        # 2. Results appear progressively in the UI after each width completes
+        # Only for local simulators — cloud/hardware backends batch for cost efficiency.
+        # Skip when parallel is enabled — parallel needs all circuits batched together.
         local_simulators = ["qasm_simulator", "statevector_simulator", "aer_sampler", "statevector_sampler", "nvidia"]
-        if req.backend_id in local_simulators:
+        if req.backend_id in local_simulators and not req.parallel:
             run_args["max_batch_size"] = 1
 
         # Configure hardware backend

@@ -287,7 +287,8 @@ def run(min_qubits: int = 2,
         api = None,
         get_circuits = False,
         max_batch_size = None,
-        gpus_per_circuit: int = None):
+        gpus_per_circuit: int = None,
+        parallel: bool = False):
     """
     Execute program with default parameters.
 
@@ -413,6 +414,14 @@ def run(min_qubits: int = 2,
     def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         # Determine fidelity of result set
         num_qubits = int(num_qubits)
+
+        # For method 2, restore the correct sparse_pauli_terms for this qubit width.
+        # Batch execution processes results after the creation loop, so the global
+        # sparse_pauli_terms may have been overwritten by a later qubit width.
+        global sparse_pauli_terms
+        if method == 2 and num_qubits in cached_sparse_pauli_terms:
+            sparse_pauli_terms = cached_sparse_pauli_terms[num_qubits]
+
         counts, expectation_a = analyze_and_print_result(
                     qc, result, num_qubits, num_shots,
                     type=circuit_id,
@@ -430,10 +439,17 @@ def run(min_qubits: int = 2,
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
             context=context)
-    
-    # For CUDA-Q, cannot yet use method 1 as it uses Aer for simulation
-    # use method 2 instead
-    if api == "cudaq" and method == 1:
+    ex.parallel_execution = parallel
+
+    # Warn if parallel is requested with a group method that doesn't use sampling
+    if parallel and group_method in ("estimator", "SpinOperator"):
+        print(f"WARNING: --parallel has no effect with group_method='{group_method}' "
+              f"(expectation values computed directly, not via circuit sampling)")
+        ex.parallel_execution = False
+
+    # For CUDA-Q fidelity benchmarks, cannot use method 1 as it uses Aer for simulation
+    # use method 2 instead (not applicable when doing observables)
+    if api == "cudaq" and method == 1 and not do_observables:
         print(f"WARNING: method 1 not supported for {api} API, use method 2 instead")
         method = 2
         
@@ -461,6 +477,11 @@ def run(min_qubits: int = 2,
     # metrics storage for observables, until we update the metrics module for use here
     metrics_array = []
 
+    # Cache sparse_pauli_terms per qubit width for use by the result handler.
+    # Needed because batch execution processes results after the creation loop,
+    # by which time the global sparse_pauli_terms has been overwritten.
+    cached_sparse_pauli_terms = {}
+
     for num_qubits in valid_qubits:
         global sparse_pauli_terms
     
@@ -482,6 +503,8 @@ def run(min_qubits: int = 2,
         else:    
             sparse_pauli_terms, dataset_name = hamlib_utils.get_hamlib_sparsepaulilist(num_qubits=num_qubits,
                                                                 params=hamiltonian_params)
+        cached_sparse_pauli_terms[num_qubits] = sparse_pauli_terms
+
         print(f"... dataset_name = {dataset_name}")
         if verbose:
             print(f"... hamiltonian_params = \n{hamiltonian_params}")
@@ -720,10 +743,20 @@ def run(min_qubits: int = 2,
                 computed_time = round((time.time() - ts), 3)
                 metrics_object["exp_time_computed"] = computed_time
 
-                total_energy = round(total_energy, 4)  
+                total_energy = round(total_energy, 4)
                 metrics_object["exp_value_computed"] = total_energy
 
-                print(f"... quantum execution time = {computed_time}")
+                print(f"... total elapsed execution time = {computed_time}")
+
+                # Report timing decomposition if available from execute module
+                try:
+                    import execute as _ex
+                    if _ex.last_exec_time > 0:
+                        print(f"... quantum execution time = {round(_ex.last_exec_time, 3)}")
+                    if _ex.last_transpile_time > 0:
+                        print(f"... transpile/overhead time = {round(_ex.last_transpile_time, 3)}")
+                except Exception:
+                    pass
                
                 
                 ##############################################
@@ -802,12 +835,15 @@ def run(min_qubits: int = 2,
         ex.compute_all_circuit_metrics(all_qcs)
         ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
         metrics.finalize_all_groups()
-    
+        metrics.save_app_metrics(benchmark_name, method=method)
+
     # we want to write file every time we have new data.
     # but if file is busy, we get error, do it at end for now
     app_name = f"HamLib-obs-{hamiltonian_name}"
     if mpi.leader():
         store_app_metrics(app_name, backend_id, metrics_array)
+
+    metrics.end_metrics()
 
     ########################
     # Display Sample Circuit
@@ -1091,6 +1127,7 @@ def get_args():
     parser.add_argument("--num_steps", "-steps", default=None, help="Number of Trotter steps", type=int)
     parser.add_argument("--time", "-time", default=None, help="Time of evolution", type=float)
     parser.add_argument("--do_observables", "-obs", action="store_true", help="Compute observable values")
+    parser.add_argument("--distribute_shots", "-ds", action="store_true", help="Distribute shots weighted by Pauli term coefficients")
     parser.add_argument("--group_method", "-gm", default=None, help="Method for creating commuting groups, e.g. 'simple','1','2', 'N'")   
     parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
@@ -1105,7 +1142,8 @@ def get_args():
     parser.add_argument("--data_suffix", "-suffix", default=None, help="Suffix appended to data file name", type=str)
     parser.add_argument("--profile", "-prof", action="store_true", help="Profile with cProfile")
     parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
-    parser.add_argument("--gpus_per_circuit", "-gpc", default=None, help="Number of GPUs to pool per circuit (None=all available, 1=max parallelism, M=M GPUs per circuit)", type=int)
+    parser.add_argument("--gpus_per_circuit", "-gpc", default=None, help="Number of GPUs for distributed statevector per circuit (None=all available, 1=max parallelism)", type=int)
+    parser.add_argument("--parallel", "-pm", action="store_true", help="Enable parallel circuit execution")
     return parser.parse_args()
     
 def parse_name_value_pairs(input_string: str) -> Dict[str, str]:
@@ -1139,6 +1177,7 @@ def do_run(args):
         hamiltonian=args.hamiltonian,
         hamiltonian_params=hamiltonian_params,
         do_observables=args.do_observables,
+        distribute_shots=args.distribute_shots,
         group_method=args.group_method,
         random_pauli_flag=args.random_pauli_flag,
         random_init_flag=args.random_init_flag,
@@ -1154,7 +1193,8 @@ def do_run(args):
         exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
         api=args.api,
         max_batch_size=args.max_batch_size,
-        gpus_per_circuit=args.gpus_per_circuit
+        gpus_per_circuit=args.gpus_per_circuit,
+        parallel=args.parallel
         )
 
 import cProfile

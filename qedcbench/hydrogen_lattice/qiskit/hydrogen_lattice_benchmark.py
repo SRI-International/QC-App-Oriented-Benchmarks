@@ -1216,6 +1216,7 @@ def run_circuits(all_qcs,
     backend_id=None, provider_backend=None,
     hub="ibm-q", group="open", project="main",
     exec_options=None, context=None, api=None,
+    parallel=False,
 ):
     """Execute benchmark circuits and collect metrics.
 
@@ -1230,6 +1231,7 @@ def run_circuits(all_qcs,
         exec_options: additional execution options dict (default None)
         context: context identifier for metrics (default None)
         api: programming API if not already initialized (default None)
+        parallel: enable parallel circuit execution (default False)
     """
     ex.verbose = verbose
 
@@ -1251,6 +1253,7 @@ def run_circuits(all_qcs,
         context=context)
 
     ex.compute_all_circuit_metrics(all_qcs)
+    ex.parallel_execution = parallel
     ex.submit_circuits(all_qcs, num_shots=num_shots, max_batch_size=max_batch_size)
     metrics.finalize_all_groups()
 

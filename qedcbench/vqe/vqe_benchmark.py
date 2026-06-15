@@ -44,6 +44,7 @@ def get_args():
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
+    parser.add_argument("--parallel", "-pm", action="store_true", help="Enable parallel circuit execution")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -57,4 +58,5 @@ if __name__ == "__main__":
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
         api=args.api, max_batch_size=args.max_batch_size,
-        draw_circuits=not args.nodraw, plot_results=not args.noplot)
+        draw_circuits=not args.nodraw, plot_results=not args.noplot,
+        parallel=args.parallel)
