@@ -36,3 +36,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["qedclib*", "qedcbench*"]
 exclude = ["__pycache__*"]
+
+[tool.setuptools.package-data]
+qedcbench = ["**/_common/**/*.json", "**/*.mplstyle"]
+qedclib = ["**/*.mplstyle"]
