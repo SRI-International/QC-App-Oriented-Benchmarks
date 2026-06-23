@@ -1680,14 +1680,14 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
                 continue
             if len(group_metrics["avg_depths"]) == 0:
                 continue
-                
+
             w_data = group_metrics["groups"]
             d_data = group_metrics["avg_depths"]
-            d_tr_data = group_metrics["avg_tr_depths"]    
-                   
+            d_tr_data = group_metrics["avg_tr_depths"]
+
             if "avg_tr_n2qs" not in group_metrics: continue
             n2q_tr_data = group_metrics["avg_tr_n2qs"]
-    
+
             filled = is_individual
             if aq_mode > 0:
                 if score_metric not in group_metrics: continue

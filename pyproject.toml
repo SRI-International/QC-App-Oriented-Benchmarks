@@ -38,5 +38,5 @@ include = ["qedclib*", "qedcbench*"]
 exclude = ["__pycache__*"]
 
 [tool.setuptools.package-data]
-qedcbench = ["**/_common/**/*.json", "**/*.mplstyle"]
+qedcbench = ["**/_common/**/*.json", "**/_common/**/*.txt", "**/_common/**/*.sol", "**/*.mplstyle"]
 qedclib = ["**/*.mplstyle"]
