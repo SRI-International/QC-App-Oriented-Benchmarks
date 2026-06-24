@@ -103,7 +103,11 @@ def get_options_effect_init():
 def plot_worst_best_init_conditions(worst_dict, best_dict):
 
     # Get 2 colors for QAOA, and one for uniform sampling
-    cmap = cm.get_cmap('RdYlGn')
+    try:
+        import matplotlib
+        cmap = matplotlib.colormaps['RdYlGn']
+    except AttributeError:
+        cmap = cm.get_cmap('RdYlGn')
     clr_random = 'pink'
     # colors = [cmap(0.1), cmap(0.4), cmap(0.8)]
     colors = np.linspace(0.05, 0.95, 2, endpoint=True)
