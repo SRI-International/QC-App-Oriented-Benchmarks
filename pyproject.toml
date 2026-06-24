@@ -1,6 +1,6 @@
 [project]
 name = "qedcbench"
-version = "2.0.6"
+version = "2.0.7"
 description = "QED-C Application-Oriented Quantum Computing Benchmarks and Execution Library"
 readme = "README.md"
 requires-python = ">=3.9"

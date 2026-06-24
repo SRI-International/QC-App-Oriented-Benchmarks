@@ -7,6 +7,11 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.7 - 23 June 2026
+
+- **Bug fix: missing package data** — MaxCut instance files (`.txt`, `.sol`) and Hydrogen Lattice solution files (`.sol`) were not included in pip-installed packages, causing "problem not found" errors. Added to `pyproject.toml` package-data patterns.
+- **Bug fix: image recognition** — Fixed undefined `benchmark_name` variable in the Qiskit implementation that caused `save_app_metrics` to fail.
+
 ### Release 2.0.6 - 14 June 2026
 
 - **Parallel execution support (experimental)** — Added infrastructure for parallel circuit execution across both Qiskit and CUDA-Q backends at two levels. **Circuit-level**: when `execute.parallel_execution = True`, `execute_circuits()` distributes circuits for simultaneous execution — on Qiskit by mapping onto disjoint qubit regions of a single QPU, on CUDA-Q by distributing across multiple GPUs via MPI (single-node and multi-node). **Group-level**: `execute_circuit_groups()` accepts groups of circuits with per-group shot counts; each group's circuits are parallelized via partition mapping while groups with different shot counts execute sequentially. This enables parallel execution of sampling-based observable estimation workflows (e.g., Pauli commuting groups with weighted shot distribution). Includes qubit width validation and graceful fallback to sequential when parallelization is not available. See [Parallel Execution](parallel_execution.md) for details.
