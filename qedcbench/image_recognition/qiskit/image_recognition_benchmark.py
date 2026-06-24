@@ -18,6 +18,8 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
+benchmark_name = "Image Recognition"
+
 from qiskit_aer import Aer
 from qiskit import QuantumCircuit
 from qiskit.circuit import ParameterVector
