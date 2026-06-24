@@ -151,6 +151,11 @@
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
 <h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
 <p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
+<h3 id="release-207-23-june-2026">Release 2.0.7 - 23 June 2026</h3>
+<ul>
+<li><strong>Bug fix: missing package data</strong> — MaxCut instance files (<code>.txt</code>, <code>.sol</code>) and Hydrogen Lattice solution files (<code>.sol</code>) were not included in pip-installed packages, causing "problem not found" errors. Added to <code>pyproject.toml</code> package-data patterns.</li>
+<li><strong>Bug fix: image recognition</strong> — Fixed undefined <code>benchmark_name</code> variable in the Qiskit implementation that caused <code>save_app_metrics</code> to fail.</li>
+</ul>
 <h3 id="release-206-14-june-2026">Release 2.0.6 - 14 June 2026</h3>
 <ul>
 <li><strong>Parallel execution support (experimental)</strong> — Added infrastructure for parallel circuit execution across both Qiskit and CUDA-Q backends at two levels. <strong>Circuit-level</strong>: when <code>execute.parallel_execution = True</code>, <code>execute_circuits()</code> distributes circuits for simultaneous execution — on Qiskit by mapping onto disjoint qubit regions of a single QPU, on CUDA-Q by distributing across multiple GPUs via MPI (single-node and multi-node). <strong>Group-level</strong>: <code>execute_circuit_groups()</code> accepts groups of circuits with per-group shot counts; each group's circuits are parallelized via partition mapping while groups with different shot counts execute sequentially. This enables parallel execution of sampling-based observable estimation workflows (e.g., Pauli commuting groups with weighted shot distribution). Includes qubit width validation and graceful fallback to sequential when parallelization is not available. See <a href="../parallel_execution/">Parallel Execution</a> for details.</li>
