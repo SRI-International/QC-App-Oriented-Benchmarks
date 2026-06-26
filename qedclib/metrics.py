@@ -35,7 +35,15 @@ from time import gmtime, strftime
 from datetime import datetime
 import traceback
 import matplotlib.cm as cm
+import matplotlib
 import copy
+
+# Compatibility shim for matplotlib < 3.9 (cm.get_cmap) vs >= 3.9 (colormaps[])
+def _get_cmap(name):
+    try:
+        return matplotlib.colormaps[name]
+    except AttributeError:
+        return cm.get_cmap(name)
 from qedclib import qcb_mpi as mpi
 # Raw and aggregate circuit metrics
 circuit_metrics = {  }
@@ -1680,14 +1688,14 @@ def plot_metrics_all_merged (shared_data, backend_id, suptitle=None,
                 continue
             if len(group_metrics["avg_depths"]) == 0:
                 continue
-                
+
             w_data = group_metrics["groups"]
             d_data = group_metrics["avg_depths"]
-            d_tr_data = group_metrics["avg_tr_depths"]    
-                   
+            d_tr_data = group_metrics["avg_tr_depths"]
+
             if "avg_tr_n2qs" not in group_metrics: continue
             n2q_tr_data = group_metrics["avg_tr_n2qs"]
-    
+
             filled = is_individual
             if aq_mode > 0:
                 if score_metric not in group_metrics: continue
@@ -2560,8 +2568,8 @@ def plot_angles_polar(suptitle = '', options=None, suffix = ''):
     rounds = len(angles_arr[0]) // 2
     
     fulltitle = get_full_title(suptitle=suptitle, options=options)
-    cmap_beta = cm.get_cmap('autumn')
-    cmap_gamma = cm.get_cmap('winter')
+    cmap_beta = _get_cmap('autumn')
+    cmap_gamma = _get_cmap('winter')
     colors = np.linspace(0.05,0.95, rounds)
     colors_beta = [cmap_beta(i) for i in colors]
     colors_gamma = [cmap_gamma(i) for i in colors]
@@ -2999,9 +3007,9 @@ from matplotlib.colors import ListedColormap, Normalize
 ############### Color Map functions
  
 # Create a selection of colormaps from which to choose; default to custom_spectral
-cmap_spectral = plt.get_cmap('Spectral')
-cmap_greys = plt.get_cmap('Greys')
-cmap_blues = plt.get_cmap('Blues')
+cmap_spectral = _get_cmap('Spectral')
+cmap_greys = _get_cmap('Greys')
+cmap_blues = _get_cmap('Blues')
 cmap_custom_spectral = None
 
 # the default colormap is the spectral map

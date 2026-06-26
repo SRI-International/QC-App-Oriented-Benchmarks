@@ -109,6 +109,18 @@ def import_benchmark(name):
     elif name == "hamiltonian_simulation":
         from qedcbench.hamiltonian_simulation import hamiltonian_simulation_benchmark
         return hamiltonian_simulation_benchmark
+    elif name == "hamlib":
+        from qedcbench.hamlib import hamlib_simulation_benchmark
+        return hamlib_simulation_benchmark
+    elif name == "maxcut":
+        from qedcbench.maxcut import maxcut_benchmark
+        return maxcut_benchmark
+    elif name == "hydrogen_lattice":
+        from qedcbench.hydrogen_lattice import hydrogen_lattice_benchmark
+        return hydrogen_lattice_benchmark
+    elif name == "image_recognition":
+        from qedcbench.image_recognition import image_recognition_benchmark
+        return image_recognition_benchmark
     else:
         print(f"ERROR: Unknown benchmark '{name}'")
         return None
