@@ -452,8 +452,7 @@ def create_circuits_for_pauli_terms(qc: list, num_qubits: int, pauli_str_list: l
 
     return circuits
 
-@cudaq.kernel
-def kernel_with_subkernel(qc: cudaq.kernel, params: list, num_qubits: int) -> cudaq.kernel:
+def kernel_with_subkernel(qc, params: list, num_qubits: int):
     """
     Creates a quantum circuit for a given Pauli term with necessary rotations and measurements.
     
@@ -472,8 +471,7 @@ def kernel_with_subkernel(qc: cudaq.kernel, params: list, num_qubits: int) -> cu
     
     qc.mz(qubits)  # Measure all qubits in the computational basis
 
-@cudaq.kernel
-def append_measurement_circuit_for_term(qc: cudaq.qview, num_qubits: int, term: str) -> cudaq.kernel:
+def append_measurement_circuit_for_term(qc: cudaq.qview, num_qubits: int, term: str):
     """
     Creates a quantum circuit for a given Pauli term with necessary rotations and measurements.
     
@@ -492,7 +490,6 @@ def append_measurement_circuit_for_term(qc: cudaq.qview, num_qubits: int, term: 
     
     qc.mz(qubits)  # Measure all qubits in the computational basis
 
-@cudaq.kernel
 def append_hamiltonian_term_to_circuit(qc: cudaq.qview, qubits, term):
     """
     Applies necessary rotations based on the given Pauli term.

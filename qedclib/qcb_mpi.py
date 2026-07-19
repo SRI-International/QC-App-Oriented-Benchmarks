@@ -28,6 +28,14 @@ rank = 0
 size = 1
 initialized = False
 
+# QPU group state — populated once by init_qpus()
+qpu_id = None          # which QPU group this rank belongs to
+qpu_rank = None        # rank within the QPU group
+num_qpus = None        # total number of QPU groups
+is_qpu_leader = False  # True if qpu_rank == 0
+_qpu_comm = None       # subcommunicator for this QPU group (internal — use get_qpu_handle())
+leaders_comm = None    # subcommunicator across QPU leaders (mpi4py Comm or None)
+
 ##########################################################################
 # MPI is enabled by adding by loading the mpi4py module
 # - This can be accomplished, for example, with
@@ -58,6 +66,14 @@ if "mpi4py" not in sys.modules:
     # Scatter data from root to all ranks (no-op without MPI)
     def scatter(data, root=0):
         return data[0] if isinstance(data, list) and len(data) > 0 else data
+
+    def init_qpus(gpus_per_circuit):
+        """No-op stub — hybrid QPU mode requires MPI."""
+        pass
+
+    def get_qpu_handle():
+        """No-op stub — returns None without MPI."""
+        return None
 
     # Initialize this module
     # -- stdout is redirected to null if not the leader
@@ -110,6 +126,52 @@ else:
         if initialized is False:
             raise Exception("MPI call before init")
         return MPI.COMM_WORLD.scatter(data, root=root)
+
+    def init_qpus(gpus_per_circuit):
+        """
+        Split COMM_WORLD into groups of `gpus_per_circuit` ranks (QPUs).
+
+        Called once after mpi.init(). Idempotent — subsequent calls with the
+        same gpus_per_circuit are no-ops. Raises ValueError on mismatch.
+        Does nothing when gpus_per_circuit is None or < 1.
+        """
+        global qpu_id, qpu_rank, num_qpus, is_qpu_leader, _qpu_comm, leaders_comm
+
+        if gpus_per_circuit is None or gpus_per_circuit < 1:
+            return
+
+        # Already initialized — validate consistency
+        if _qpu_comm is not None:
+            expected = MPI.COMM_WORLD.Get_size() // gpus_per_circuit
+            if num_qpus != expected:
+                raise ValueError(
+                    f"init_qpus called with gpus_per_circuit={gpus_per_circuit} "
+                    f"but was previously initialized for num_qpus={num_qpus}")
+            return
+
+        world_comm = MPI.COMM_WORLD
+        world_rank = world_comm.Get_rank()
+        world_size = world_comm.Get_size()
+
+        num_qpus = world_size // gpus_per_circuit
+        qpu_id = world_rank // gpus_per_circuit
+        _qpu_comm = world_comm.Split(color=qpu_id, key=world_rank)
+        qpu_rank = _qpu_comm.Get_rank()
+        is_qpu_leader = (qpu_rank == 0)
+
+        # key=qpu_id ensures leaders_comm.gather() returns blocks in QPU order
+        leaders_comm = world_comm.Split(
+            color=0 if is_qpu_leader else MPI.UNDEFINED,
+            key=qpu_id,
+        )
+
+        if world_rank == 0:
+            print(f"... init_qpus: {world_size} ranks → {num_qpus} QPUs "
+                  f"× {gpus_per_circuit} GPUs each", flush=True)
+
+    def get_qpu_handle():
+        """Return the raw C integer handle for the QPU subcommunicator."""
+        return MPI._addressof(_qpu_comm)
 
     def finalize():
         global rank, initialized
