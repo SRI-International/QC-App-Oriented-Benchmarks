@@ -361,6 +361,14 @@ def run(min_qubits: int = 2,
     from hamlib._common import hamlib_utils
     from hamlib._common import observables
 
+    # DEVNOTE: Direct qcb_mpi calls here are inconsistent with other benchmarks,
+    # which use qedclib.is_leader() and don't call mpi directly.
+    # Future cleanup: remove mpi.init() (handled by initialize()), expose init_qpus
+    # through qedclib top-level, and move gpus_per_circuit into exec_options.
+    mpi.init()
+    if do_observables:
+        mpi.init_qpus(gpus_per_circuit)
+
     ##########
 
     print(f"{benchmark_name} Benchmark Program - {api}")
@@ -438,7 +446,7 @@ def run(min_qubits: int = 2,
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
-            context=context)
+            context=context, gpus_per_circuit=gpus_per_circuit)
     ex.parallel_execution = parallel
 
     # Warn if parallel is requested with a group method that doesn't use sampling

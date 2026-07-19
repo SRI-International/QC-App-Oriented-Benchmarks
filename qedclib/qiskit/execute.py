@@ -299,7 +299,10 @@ def init_execution(handler):
 def set_execution_target(backend_id='qasm_simulator',
                 provider_module_name=None, provider_name=None, provider_backend=None,
                 hub=None, group=None, project=None, exec_options=None,
-                context=None):
+                context=None, gpus_per_circuit=None):
+    # DEVNOTE: gpus_per_circuit is accepted but ignored for Qiskit.
+    # It is a CUDA-Q concept (statevector sharing across GPUs).
+    # Remove this parameter when gpus_per_circuit moves into exec_options.
     """
     Set the backend execution target.
     :param backend_id:  device name. List of available devices depends on the provider
@@ -1458,6 +1461,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
     if hasattr(raw_result, 'to_dict'):
         try:
             result_dict = raw_result.to_dict()
+            #print(f"... in to_dict branch: {raw_result}", flush=True)
 
             if verbose_time:
                 print(f"... _extract_per_circuit_times: to_dict() path, {num_circuits} circuits")
@@ -1503,6 +1507,10 @@ def _extract_per_circuit_times(raw_result, num_circuits):
     # The old code submitted one circuit at a time, so top-level metadata was per-circuit.
     # Now we submit batches, so we need per-pub metadata for individual circuit timing.
     if hasattr(raw_result, 'metadata'):
+    
+        #print(f"... in metadata branch: {raw_result}", flush=True)
+        #execution_spans = raw_result.metadata['execution']['execution_spans']
+        #print(f"... exec info: {execution_spans}", flush=True)
 
         if verbose_time:
             print(f"... _extract_per_circuit_times: PrimitiveResult path, {num_circuits} circuits")
@@ -1528,8 +1536,11 @@ def _extract_per_circuit_times(raw_result, num_circuits):
                 if isinstance(pub_meta, dict):
                     if 'execution' in pub_meta:
                         try:
-                            spans = pub_meta['execution']['execution_spans']['__value__']['spans']
-                            per_times.append(spans[0].duration)
+                            # DEVNOTE: pre-2.5 code commented out (deprecate later)
+                            #spans = pub_meta['execution']['execution_spans']['__value__']['spans']
+                            #per_times.append(spans[0].duration)
+                            spans = pub_meta['execution']['execution_spans']
+                            per_times.append(spans.duration)
                             continue
                         except (KeyError, TypeError, AttributeError, IndexError):
                             pass
@@ -1555,19 +1566,25 @@ def _extract_per_circuit_times(raw_result, num_circuits):
 
             # Try execution_spans (IBM hardware)
             try:
-                if 'execution' in metadata:
-                    spans = metadata['execution']['execution_spans']['__value__']['spans']
+                if 'execution' in metadata:       
+                    spans = metadata['execution']['execution_spans']
+                    
+                    duration = 0.0
+                    if hasattr(spans, 'duration'):
+                        duration = spans.duration
+                        
+                    # DEVNOTE: handle pre-2.5 version of Qiskit (deprecate later)
+                    else:
+                        spans = spans['__value__']['spans']
+                        duration = spans[0].duration
+
+                    avg = duration / num_circuits
                     if verbose_time:
-                        print(f"... top-level execution_spans: {len(spans)} spans")
-                        for i, span in enumerate(spans[:3]):
-                            print(f"...   span[{i}]: duration={span.duration}")
-                    if len(spans) >= num_circuits:
-                        return [span.duration for span in spans[:num_circuits]]
-                    elif len(spans) == 1:
-                        avg = spans[0].duration / num_circuits
-                        if verbose_time:
-                            print(f"... single span, dividing evenly: {avg}")
-                        return [avg] * num_circuits
+                        print(f"... duration: {duration}", flush=True)
+                        print(f"... single span, dividing evenly: {avg}")
+                        
+                    return [avg] * num_circuits
+          
             except (KeyError, TypeError, AttributeError, IndexError):
                 pass
 

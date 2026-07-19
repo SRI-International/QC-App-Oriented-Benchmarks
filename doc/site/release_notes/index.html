@@ -151,6 +151,11 @@
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
 <h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
 <p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
+<h3 id="release-208-19-july-2026">Release 2.0.8 - 19 July 2026</h3>
+<ul>
+<li><strong>Hybrid parallel GPU execution (CUDA-Q)</strong> -- Added support for combining statevector expansion across multiple GPUs with parallel circuit execution. For example, with 32 GPUs and <code>gpus_per_circuit=4</code>, 8 circuits execute in parallel where each circuit uses 4 GPUs to expand the available state space by 2 qubits. Enabled by running with MPI, setting <code>parallel=True</code>, and <code>gpus_per_circuit</code> to an even divisor of total available GPUs. Currently supported in the Hamlib benchmark via the <code>-gpc</code> CLI flag.</li>
+<li><strong>Qiskit 2.5 compatibility</strong> -- Fixed execution timing extraction to work with both Qiskit 2.0 and 2.5. Qiskit 2.5 changed the <code>execution_spans</code> metadata structure, exposing <code>.duration</code> directly rather than requiring <code>['__value__']['spans'][0].duration</code>. The timing extraction code now handles both formats with a <code>hasattr</code> check. Pre-2.5 code paths are marked for future removal.</li>
+</ul>
 <h3 id="release-207-23-june-2026">Release 2.0.7 - 23 June 2026</h3>
 <ul>
 <li><strong>Bug fix: missing package data</strong> — MaxCut instance files (<code>.txt</code>, <code>.sol</code>) and Hydrogen Lattice solution files (<code>.sol</code>) were not included in pip-installed packages, causing "problem not found" errors. Added to <code>pyproject.toml</code> package-data patterns.</li>

@@ -7,6 +7,11 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.8 - 19 July 2026
+
+- **Hybrid parallel GPU execution (CUDA-Q)** -- Added support for combining statevector expansion across multiple GPUs with parallel circuit execution. For example, with 32 GPUs and `gpus_per_circuit=4`, 8 circuits execute in parallel where each circuit uses 4 GPUs to expand the available state space by 2 qubits. Enabled by running with MPI, setting `parallel=True`, and `gpus_per_circuit` to an even divisor of total available GPUs. Currently supported in the Hamlib benchmark via the `-gpc` CLI flag.
+- **Qiskit 2.5 compatibility** -- Fixed execution timing extraction to work with both Qiskit 2.0 and 2.5. Qiskit 2.5 changed the `execution_spans` metadata structure, exposing `.duration` directly rather than requiring `['__value__']['spans'][0].duration`. The timing extraction code now handles both formats with a `hasattr` check. Pre-2.5 code paths are marked for future removal.
+
 ### Release 2.0.7 - 23 June 2026
 
 - **Bug fix: missing package data** — MaxCut instance files (`.txt`, `.sol`) and Hydrogen Lattice solution files (`.sol`) were not included in pip-installed packages, causing "problem not found" errors. Added to `pyproject.toml` package-data patterns.

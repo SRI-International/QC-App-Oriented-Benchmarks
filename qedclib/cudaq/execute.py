@@ -63,11 +63,8 @@ parallel_execution = False
 
 _parallel_warning_shown = False
 
-# Parallel execution configuration (reserved for future use)
-_parallel_config = {
-    "gpus_per_circuit": None,
-    "initialized": False
-}
+# If we have performed setup for multi-QPU / parallel circuits.
+_hybrid_initialized = False
 
 
 ###################################################################
@@ -186,6 +183,62 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
     else:
         # Non-leader ranks return empty - caller should check mpi.leader()
         return []
+
+def _execute_parallel_hybrid(circuits: list, num_shots: int, gpus_per_circuit: int) -> list:
+    """
+    Execute circuits in parallel using MPI subcommunicators.
+
+    QPU topology (subcommunicators, GPU assignment) is initialized once by
+    mpi.init_qpus() at benchmark startup. This function only performs the
+    cudaq target setup on the first call, then dispatches circuits to QPU groups.
+
+    Requires: mpi.init_qpus(gpus_per_circuit) already called.
+    """
+    global _hybrid_initialized
+
+    world_rank = mpi.rank
+    qpu_id = mpi.qpu_id
+    num_qpus = mpi.num_qpus
+    is_leader = mpi.is_qpu_leader
+    leaders_comm = mpi.leaders_comm
+
+    # One-time: point cudaq at the QPU subcommunicator.
+    if not _hybrid_initialized:
+        qpu_handle = mpi.get_qpu_handle()
+        cudaq.set_target("nvidia", option="mgpu", comm=qpu_handle)
+        cudaq.mpi.set_communicator(qpu_handle)
+        _hybrid_initialized = True
+
+    mpi.barrier()
+
+    block_indices = _get_block_indices(len(circuits), num_qpus)
+    my_start, my_end = block_indices[qpu_id]
+    my_circuits = circuits[my_start:my_end]
+
+    if world_rank == 0:
+        print(f"... MPI hybrid: {mpi.size} ranks, "
+              f"{gpus_per_circuit} GPUs/circuit, {num_qpus} QPUs, "
+              f"{len(circuits)} circuits")
+        print(f"... Distribution: {[(s, e-s) for s, e in block_indices]} circuits per QPU")
+
+    local_results = []
+    for circuit in my_circuits:
+        kernel, params = circuit[0], circuit[1]
+        counts = (
+            cudaq.sample(kernel, *params, shots_count=num_shots) if noise is None
+            else cudaq.sample(kernel, *params, shots_count=num_shots, noise_model=noise))
+        local_results.append({k: v for k, v in counts.items()})
+
+    if is_leader:
+        all_results = leaders_comm.gather(local_results, root=0)
+    else:
+        all_results = None
+
+    if world_rank == 0:
+        flattened = [r for block in all_results for r in block]
+        print(f"... Gathered {len(flattened)} results from {num_qpus} QPU leaders")
+        return flattened
+    return []
 
 def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
     """
@@ -371,7 +424,7 @@ def init_execution (handler):
 # Set the backend for execution
 def set_execution_target(backend_id=None, provider_backend=None,
         hub=None, group=None, project=None, exec_options=None,
-        context=None):
+        context=None, gpus_per_circuit=None):
     """
     Set the backend execution target.
     :param backend_id:  device name. List of available devices depends on the provider
@@ -395,22 +448,24 @@ def set_execution_target(backend_id=None, provider_backend=None,
     if provider_backend != None:
         backend = provider_backend
     
-    # now set the execution target to the given backend_id
-    backend_options = {"option" : "fp32"}
-    if mpi.enabled():
-        backend_options = {"option" : "mgpu,fp32"}
-    elif exec_options is not None and isinstance(exec_options, str):
-        try:
-            backend_options = json.loads(exec_options)
-            for key, value in backend_options.items():
-                if not isinstance(key, str):
-                    raise ValueError("`exec_options` keys must be strings")
-                if not isinstance(value, (str, int, float, bool)):
-                    raise ValueError("`exec_options` values must be str, int, float, or bool")
-        except:
-            print(f"    ... Invalid `exec_options`; using default options.")
-            
-    cudaq.set_target(backend_id, **backend_options)
+    # When hybrid mode (gpus_per_circuit > 1) is used, skip cudaq.set_target here.
+    hybrid_mode = gpus_per_circuit is not None and gpus_per_circuit > 1
+    if not hybrid_mode:
+        backend_options = {"option" : "fp32"}
+        if mpi.enabled():
+            backend_options = {"option" : "mgpu,fp32"}
+        elif exec_options is not None and isinstance(exec_options, str):
+            try:
+                backend_options = json.loads(exec_options)
+                for key, value in backend_options.items():
+                    if not isinstance(key, str):
+                        raise ValueError("`exec_options` keys must be strings")
+                    if not isinstance(value, (str, int, float, bool)):
+                        raise ValueError("`exec_options` values must be str, int, float, or bool")
+            except:
+                print(f"    ... Invalid `exec_options`; using default options.")
+
+        cudaq.set_target(backend_id, **backend_options)
 
     # Handle noise_model in exec_options (same pattern as qiskit)
     # Values: None = no noise, "default" = built-in depolarization model, or a cudaq.NoiseModel object
@@ -1033,6 +1088,7 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         gpus_per_circuit: Number of GPUs to pool per circuit.
             None = use all available GPUs together (mgpu if MPI, single GPU if not).
             1 = each GPU runs one circuit independently (max parallelism, requires MPI).
+            M = M GPUs pool per circuit, P/M circuits in parallel (requires MPI, mpi.size % M == 0).
 
     Returns:
         (job_id, result) tuple:
@@ -1089,10 +1145,13 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         if gpus_per_circuit == 1 or (parallel_execution and gpus_per_circuit is None):
             # Mode 3: each GPU runs one circuit independently (max parallelism)
             counts_array = _execute_parallel_mpi(circuits, num_shots)
-        elif gpus_per_circuit < mpi.size:
-            # Mode 4: hybrid — not yet implemented
+        elif gpus_per_circuit > 1 and mpi.size % gpus_per_circuit == 0:
+            # Mode 4: hybrid — M GPUs pool per circuit, P/M circuits in parallel
+            counts_array = _execute_parallel_hybrid(circuits, num_shots, gpus_per_circuit)
+        elif gpus_per_circuit > 1:
             if mpi.rank == 0:
-                print(f"... WARNING: gpus_per_circuit={gpus_per_circuit} (hybrid mode) not yet implemented, using default execution")
+                print(f"... WARNING: mpi.size ({mpi.size}) not divisible by "
+                      f"gpus_per_circuit ({gpus_per_circuit}), using default execution")
 
     # Default: sequential execution (single GPU or mgpu mode)
     if counts_array is None:
