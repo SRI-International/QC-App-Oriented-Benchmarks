@@ -299,7 +299,10 @@ def init_execution(handler):
 def set_execution_target(backend_id='qasm_simulator',
                 provider_module_name=None, provider_name=None, provider_backend=None,
                 hub=None, group=None, project=None, exec_options=None,
-                context=None):
+                context=None, gpus_per_circuit=None):
+    # DEVNOTE: gpus_per_circuit is accepted but ignored for Qiskit.
+    # It is a CUDA-Q concept (statevector sharing across GPUs).
+    # Remove this parameter when gpus_per_circuit moves into exec_options.
     """
     Set the backend execution target.
     :param backend_id:  device name. List of available devices depends on the provider

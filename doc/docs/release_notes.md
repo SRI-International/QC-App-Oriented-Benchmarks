@@ -9,6 +9,7 @@ This version constitutes a major refactor of the entire benchmark repository. Fo
 
 ### Release 2.0.8 - 19 July 2026
 
+- **Hybrid parallel GPU execution (CUDA-Q)** -- Added support for combining statevector expansion across multiple GPUs with parallel circuit execution. For example, with 32 GPUs and `gpus_per_circuit=4`, 8 circuits execute in parallel where each circuit uses 4 GPUs to expand the available state space by 2 qubits. Enabled by running with MPI, setting `parallel=True`, and `gpus_per_circuit` to an even divisor of total available GPUs. Currently supported in the Hamlib benchmark via the `-gpc` CLI flag.
 - **Qiskit 2.5 compatibility** -- Fixed execution timing extraction to work with both Qiskit 2.0 and 2.5. Qiskit 2.5 changed the `execution_spans` metadata structure, exposing `.duration` directly rather than requiring `['__value__']['spans'][0].duration`. The timing extraction code now handles both formats with a `hasattr` check. Pre-2.5 code paths are marked for future removal.
 
 ### Release 2.0.7 - 23 June 2026
