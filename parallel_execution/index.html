@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>Parallel and Distributed Statevector Execution - QED-C Application-Oriented Benchmarks</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <link href="../css/custom.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="..">QED-C Application-Oriented Benchmarks</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href=".." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../quick_start/" class="nav-link">Quick Start</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../user_guide/" class="nav-link">User Guide</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../benchmarks/" class="nav-link">Benchmarks</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Setup</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../setup/" class="dropdown-item">Overview</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit/" class="dropdown-item">Qiskit</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cudaq/" class="dropdown-item">CUDA-Q</a>
+</li>
+                                    
+<li>
+    <a href="../setup/cirq/" class="dropdown-item">Cirq</a>
+</li>
+                                    
+<li>
+    <a href="../setup/braket/" class="dropdown-item">Braket</a>
+</li>
+                                    
+<li>
+    <a href="../setup/ocean/" class="dropdown-item">Ocean</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qbraid/" class="dropdown-item">QBraid</a>
+</li>
+                                    
+<li>
+    <a href="../setup/qiskit-azure-quantum/" class="dropdown-item">Azure Quantum</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../release_notes/" class="nav-link">Releases</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../known_issues/" class="nav-link">PAL</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../about/" class="nav-link">About</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#parallel-and-distributed-statevector-execution" class="nav-link">Parallel and Distributed Statevector Execution</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#parallel-execution-run-circuits-faster" class="nav-link">Parallel Execution — Run Circuits Faster</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#distributed-statevector-execution-run-larger-circuits" class="nav-link">Distributed Statevector Execution — Run Larger Circuits</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#cuda-q-execution-modes-our-approach-vs-nvidias-built-in-options" class="nav-link">CUDA-Q Execution Modes: Our Approach vs NVIDIA's Built-In Options</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#summary" class="nav-link">Summary</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="parallel-and-distributed-statevector-execution">Parallel and Distributed Statevector Execution</h1>
+<p>When running quantum circuits on simulators or hardware, there are two ways to use multiple devices to your advantage: <strong>parallel execution</strong> for speed, and <strong>distributed statevector</strong> execution for scale.</p>
+<h2 id="parallel-execution-run-circuits-faster">Parallel Execution — Run Circuits Faster</h2>
+<p>Parallel execution runs multiple circuits simultaneously on separate execution targets, reducing total wall-clock time.</p>
+<ul>
+<li><strong>Qiskit</strong>: Multiple circuits are mapped onto disjoint qubit regions of a single QPU and executed simultaneously. For example, a 156-qubit device running 20-qubit circuits can execute approximately 6 at once.</li>
+<li><strong>CUDA-Q</strong>: Circuits are distributed across multiple GPUs via MPI, with each GPU running a different circuit independently.</li>
+</ul>
+<h3 id="enabling-parallel-execution">Enabling Parallel Execution</h3>
+<p><strong>Command line:</strong></p>
+<pre><code class="language-bash"># Qiskit
+python benchmark.py -a qiskit -p
+
+# CUDA-Q (requires MPI)
+mpirun -np 4 python -m mpi4py benchmark.py -a cudaq -p
+</code></pre>
+<p><strong>Programmatic:</strong></p>
+<pre><code class="language-python">import execute as ex
+
+ex.parallel_execution = True
+job_id, result = ex.execute_circuits(circuits, num_shots=1000)
+</code></pre>
+<p>If the system cannot parallelize (device has insufficient qubits, MPI not available, or only one GPU), execution proceeds sequentially. This is not an error — an informational message is printed and circuits run one at a time.</p>
+<h3 id="group-level-parallel-execution">Group-Level Parallel Execution</h3>
+<p>For workflows like Hamiltonian observable estimation, circuits are organized into groups where each group may require a different number of measurement shots. <code>execute_circuit_groups()</code> preserves this structure while enabling parallel execution across groups:</p>
+<pre><code class="language-python">ex.parallel_execution = True
+
+circuit_groups = [group_a_circuits, group_b_circuits, group_c_circuits]
+num_shots_list = [1000, 500, 200]   # different shots per group
+
+job_id, group_results = ex.execute_circuit_groups(
+    circuit_groups, num_shots_list=num_shots_list)
+</code></pre>
+<p>When parallel execution is enabled:
+- <strong>CUDA-Q</strong>: Groups are distributed across GPUs. Each GPU processes its assigned groups sequentially, while multiple groups run simultaneously across GPUs.
+- <strong>Qiskit</strong>: Circuits from groups with the same shot count are composed onto disjoint qubit regions for simultaneous execution.</p>
+<h3 id="qubit-width-requirements-qiskit">Qubit Width Requirements (Qiskit)</h3>
+<p>For qubit-mapped parallel execution, the device must have enough qubits to hold multiple circuits:</p>
+<ul>
+<li><strong>&gt;= 2x max circuit width</strong>: Circuits can be parallelized</li>
+<li><strong>&gt;= 1x but &lt; 2x</strong>: Cannot parallelize — sequential execution with informational message</li>
+<li><strong>&lt; 1x max circuit width</strong>: Error — circuits are too wide for the device</li>
+</ul>
+<p>Within a group, the widest circuit determines the qubit allocation. Narrower circuits use a subset of the allocated region.</p>
+<h3 id="qubit-partition-mapping-qiskit">Qubit Partition Mapping (Qiskit)</h3>
+<p>When mapping multiple circuits onto disjoint qubit regions of a single QPU, the choice of which physical qubits to assign to each circuit has a significant impact on fidelity. We evaluated three approaches:</p>
+<p><strong>Sequential allocation</strong> assigns circuits to qubits starting from qubit 0: circuit 0 gets qubits [0, W), circuit 1 gets [W+gap, 2W+gap), and so on. This is fast (instant) but produces poor fidelity because it forces circuits onto whatever qubits happen to be numbered lowest, which are often at the edge of the chip with poor connectivity and high error rates. On ibm_fez (156 qubits), QFT at 4 qubits produced fidelity of 0.32–0.56 with this approach, compared to 0.94 for non-parallel execution where the transpiler freely selects the best qubits.</p>
+<p><strong>Full error-aware partitioning</strong> (using the <code>IBMQHardwareArchitecture</code> framework with Floyd-Warshall distance matrices, heuristic partition search, and SABRE-based initial mapping) achieves optimal qubit placement but takes approximately 183 seconds on ibm_fez (125s for hardware initialization + 58s for mapping). This overhead is prohibitive for routine use.</p>
+<p><strong>Lightweight topology + error scoring</strong> is the approach we implemented. The algorithm:</p>
+<ol>
+<li>Builds an undirected graph from the backend's coupling map</li>
+<li>From every qubit, grows a connected subgraph of the target circuit width by greedily adding the frontier node with the most connections to the existing cluster (keeps partitions compact)</li>
+<li>Scores each candidate partition by average 2-qubit gate error rate (read directly from <code>backend.target</code>), with compactness as a tiebreaker</li>
+<li>Greedily selects non-overlapping partitions, excluding all qubits within a configurable gap (default 2 hops) of each selected partition to reduce crosstalk</li>
+</ol>
+<p>This approach runs in under 1 second (vs. 183s for full partitioning) because it avoids the expensive operations: no Floyd-Warshall (O(N³)), no SABRE mapping iterations, and no custom hardware initialization. The error rate data is read directly from the backend object, which is already loaded. The Qiskit transpiler handles routing within each partition at <code>optimization_level=1</code>.</p>
+<p><strong>Results on ibm_fez (156 qubits):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>Qubits</th>
+<th>Non-Parallel Fidelity</th>
+<th>Parallel Fidelity</th>
+<th>% of Baseline</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>QFT</td>
+<td>4 (3 circuits)</td>
+<td>0.943</td>
+<td>0.920</td>
+<td>97.6%</td>
+</tr>
+<tr>
+<td>QFT</td>
+<td>4 (2 circuits, deeper)</td>
+<td>0.877</td>
+<td>0.78–0.82</td>
+<td>~90%</td>
+</tr>
+<tr>
+<td>QFT</td>
+<td>8 (3 circuits)</td>
+<td>0.815</td>
+<td>0.738</td>
+<td>91%</td>
+</tr>
+<tr>
+<td>QFT</td>
+<td>8 (27 circuits)</td>
+<td>—</td>
+<td>0.545</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Hamlib TFIM</td>
+<td>6 (3 circuits)</td>
+<td>0.816</td>
+<td>0.735</td>
+<td>90%</td>
+</tr>
+<tr>
+<td>Hamlib TFIM</td>
+<td>8 (3 circuits)</td>
+<td>0.546</td>
+<td>0.453</td>
+<td>83%</td>
+</tr>
+<tr>
+<td>Hamlib TFIM</td>
+<td>8 (30 circuits)</td>
+<td>comparable</td>
+<td>comparable</td>
+<td>~100%</td>
+</tr>
+</tbody>
+</table>
+<p>For comparison, sequential allocation (qubits starting from 0) produced 0.32–0.56 fidelity, and the full error-aware partitioning approach took 183 seconds per run.</p>
+<p>The lightweight approach achieves 83–98% of free-transpiler fidelity at negligible computational cost (~1-2 seconds). The key insight is that reading 2-qubit gate error rates from the backend target is essentially free, and even a simple scoring pass using this data dramatically improves partition quality. Scoring also considers subgraph diameter (lower = shorter SWAP paths) and internal edge count (more edges = better routing options), which helps avoid chain-shaped partitions on heavy-hex topologies.</p>
+<p>For wider or deeper circuits where the transpiler may route through qubits outside the assigned partition, the system automatically falls back to pre-transpilation onto restricted coupling maps, trading some fidelity for guaranteed execution. See <code>doc/_design/parallel_partition_mapping_tech_note.md</code> for full technical details.</p>
+<h3 id="array-batching-handling-more-circuits-than-partitions">Array Batching — Handling More Circuits Than Partitions</h3>
+<p>When the number of circuits exceeds the number of available partitions, the system uses <strong>array batching</strong>: circuits are distributed round-robin across partitions, and Qiskit's <code>ParallelExperiment</code> composes one wide circuit per "round" — all submitted as a single job.</p>
+<p>For example, 30 circuits of width 8 on ibm_fez (11 partitions at gap=0):
+- Each partition receives 2-3 circuits
+- ParallelExperiment creates 3 composite circuits (one per round)
+- All 3 composites are submitted as <strong>one job</strong> — one queue wait, one initialization
+- Results are automatically decomposed back to 30 individual circuit results</p>
+<p>This is significantly more efficient than submitting 30 individual jobs or even 3 separate parallel batches. In testing, Hamlib TFIM with 30 circuits of 8 qubits achieved comparable fidelity to sequential execution while using approximately <strong>3x less billed execution time</strong> (3 seconds vs 10 seconds on IBM Quantum).</p>
+<h3 id="mixed-width-circuits">Mixed-Width Circuits</h3>
+<p>When the input contains circuits of different widths (common in benchmarks that sweep qubit counts, or any application that generates circuits of varying sizes), the system handles them in a single job:</p>
+<ol>
+<li><strong>Group by width</strong>, sorted largest-first (e.g., 3x20q, 3x18q, 3x16q, ...)</li>
+<li><strong>Find partitions</strong>, largest-first: one partition for the largest width, then the next largest, and so on until the device is full. Larger circuits get the best qubit regions.</li>
+<li><strong>Exact-match circuits</strong> go directly to their width's partitions.</li>
+<li><strong>Unmatched circuits</strong> (whose width has no partition) are padded with idle qubits and distributed round-robin across <strong>all</strong> available partitions, balancing the load evenly. A 3q circuit can run on a 20q partition — the extra qubits are idle.</li>
+<li><strong>One job</strong>: all partitions go into a single <code>ParallelExperiment</code>. Results are automatically decomposed, localized to the correct bit width, and reordered to match the original circuit order.</li>
+</ol>
+<p>For example, 42 Hamlib circuits (widths 2-20, 3 each) on ibm_fez:
+- 4 partitions found: 20q, 18q, 16q, 14q
+- 12 exact-match circuits assigned directly
+- 30 unmatched circuits (widths 2-12) distributed across all 4 partitions, padded
+- 11 rounds max, <strong>one job</strong>, 43 seconds total</p>
+<p>For simulators, the <code>parallel_simulator_max_qubits</code> setting (default 16) controls the qubit budget. Simulators use zero spacing between partitions (no crosstalk concerns).</p>
+<pre><code class="language-python"># Adjust simulator qubit budget if needed
+import execute_parallel as ep
+ep.parallel_simulator_max_qubits = 24  # allow wider parallel simulation
+</code></pre>
+<h2 id="distributed-statevector-execution-run-larger-circuits">Distributed Statevector Execution — Run Larger Circuits</h2>
+<p>Distributed statevector execution partitions and distributes a single circuit's statevector across multiple GPUs, enabling simulation of circuits that are too large for any one device.</p>
+<p>This mode is available with <strong>CUDA-Q only</strong> and is enabled automatically when running under MPI. For example, 4 GPUs with 32GB each provide a combined 128GB of memory, adding approximately 2 qubits of capacity beyond what a single GPU can handle. This aligns with NVIDIA's <code>nvidia-mgpu</code> backend, which uses the cuStateVec library for multi-node, multi-GPU statevector distribution.</p>
+<p><strong>Important</strong>: Distributed statevector execution is not parallelization. Only one circuit runs at a time — the statevector is partitioned across GPUs to fit a larger problem in memory.</p>
+<h3 id="using-distributed-statevector-execution">Using Distributed Statevector Execution</h3>
+<p>Distributed statevector execution is the default mode when running CUDA-Q under MPI without the <code>--parallel</code> flag:</p>
+<pre><code class="language-bash"># 4 GPUs distribute the statevector (default MPI behavior)
+mpirun -np 4 python -m mpi4py benchmark.py -a cudaq
+</code></pre>
+<p>The <code>--gpus_per_circuit</code> (<code>-gpc</code>) flag provides fine-grained control over how many GPUs participate per circuit:</p>
+<pre><code class="language-bash"># All 4 GPUs distribute the statevector (maximum capacity)
+mpirun -np 4 python -m mpi4py benchmark.py -a cudaq -gpc 4
+
+# 2 GPUs per statevector, 2 circuits run in parallel
+mpirun -np 4 python -m mpi4py benchmark.py -a cudaq -gpc 2
+
+# 1 GPU per circuit, 4 circuits run in parallel (same as -p)
+mpirun -np 4 python -m mpi4py benchmark.py -a cudaq -gpc 1
+</code></pre>
+<h3 id="programmatic-control">Programmatic Control</h3>
+<pre><code class="language-python"># Distributed statevector: 4 GPUs partition the statevector for each circuit
+job_id, result = ex.execute_circuits(circuits, num_shots=1000, gpus_per_circuit=4)
+
+# Parallel: each GPU runs a different circuit
+job_id, result = ex.execute_circuits(circuits, num_shots=1000, gpus_per_circuit=1)
+</code></pre>
+<h2 id="cuda-q-execution-modes-our-approach-vs-nvidias-built-in-options">CUDA-Q Execution Modes: Our Approach vs NVIDIA's Built-In Options</h2>
+<p>NVIDIA's CUDA-Q provides two built-in multi-GPU backends that overlap with what qedclib provides. Understanding the differences helps clarify when to use which.</p>
+<h3 id="nvidias-mgpu-distributed-statevector">NVIDIA's mgpu — Distributed Statevector</h3>
+<p>NVIDIA's <code>nvidia-mgpu</code> backend (now <code>nvidia</code> with <code>option="mgpu"</code>) partitions and distributes the statevector across GPUs using MPI. This is what qedclib uses by default when MPI is enabled — our <code>set_execution_target()</code> automatically sets the mgpu option. The <code>-gpc</code> flag controls this mode.</p>
+<h3 id="nvidias-mqpu-multiple-virtual-qpus">NVIDIA's mqpu — Multiple Virtual QPUs</h3>
+<p>NVIDIA's <code>nvidia-mqpu</code> backend (now <code>nvidia</code> with <code>option="mqpu"</code>) treats each GPU as a separate virtual QPU. Circuits are dispatched to specific GPUs using <code>cudaq.sample_async(kernel, qpu_id=N)</code>, which returns a future. This mode does NOT require MPI — CUDA-Q detects available GPUs and manages them internally using threads.</p>
+<p>NVIDIA provides two use cases for mqpu:
+- <strong>Parameter sweeps</strong>: Run the same circuit with different parameters across GPUs
+- <strong>Hamiltonian distribution</strong>: <code>cudaq.observe()</code> with <code>execution=cudaq.parallel.mpi</code> automatically distributes Hamiltonian terms across GPUs</p>
+<h3 id="how-qedclibs-parallel-execution-relates">How qedclib's Parallel Execution Relates</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>qedclib (<code>-p</code> / <code>gpc=1</code>)</th>
+<th>NVIDIA mqpu</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Target</strong></td>
+<td><code>nvidia</code> with <code>fp32</code> per MPI rank</td>
+<td><code>nvidia</code> with <code>mqpu</code></td>
+</tr>
+<tr>
+<td><strong>Distribution</strong></td>
+<td>MPI rank assignment</td>
+<td><code>qpu_id</code> parameter or automatic</td>
+</tr>
+<tr>
+<td><strong>Execution</strong></td>
+<td>Synchronous <code>cudaq.sample()</code></td>
+<td>Async <code>cudaq.sample_async()</code></td>
+</tr>
+<tr>
+<td><strong>Who manages</strong></td>
+<td>qedclib framework</td>
+<td>User (explicit <code>qpu_id</code>) or cudaq (for <code>observe</code>)</td>
+</tr>
+<tr>
+<td><strong>Requires MPI</strong></td>
+<td>Yes (<code>mpiexec -np N</code>)</td>
+<td>No for single node (thread mode)</td>
+</tr>
+<tr>
+<td><strong>Multi-node</strong></td>
+<td>Yes (MPI works across nodes)</td>
+<td>Thread mode: no. MPI mode: yes.</td>
+</tr>
+<tr>
+<td><strong>What's distributed</strong></td>
+<td>Array of arbitrary circuits</td>
+<td>Same kernel with different params, or Hamiltonian terms</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-qedclibs-parallel-execution-provides">What qedclib's Parallel Execution Provides</h3>
+<p>qedclib's <code>--parallel</code> (<code>-p</code>) option goes beyond what NVIDIA's built-in mqpu offers:</p>
+<ul>
+<li>
+<p><strong>Multi-node and multi-GPU</strong>: Distributes circuits across all available GPUs whether they are on the same node or spread across multiple nodes in a cluster. MPI handles cross-node communication transparently — the user calls <code>execute_circuits(circuit_array)</code> and the framework manages everything.</p>
+</li>
+<li>
+<p><strong>Arbitrary circuit arrays</strong>: Distributes arrays of different circuits, each potentially with different structure and qubit widths. NVIDIA's mqpu is designed primarily for parameter sweeps (same kernel, many parameter sets) and requires explicit <code>qpu_id</code> management from the user.</p>
+</li>
+<li>
+<p><strong>Sampling-based observable estimation</strong>: The <code>execute_circuit_groups()</code> function distributes groups of measurement circuits with per-group shot counts across GPUs. This enables sampling-based expectation value computation — measuring Pauli terms via circuit execution and classical post-processing — which models the behavior of real quantum hardware. NVIDIA's built-in <code>cudaq.observe()</code> with parallel distribution computes expectation values directly from the statevector, which is efficient for simulation but does not model the shot noise and measurement statistics of physical devices.</p>
+</li>
+<li>
+<p><strong>Framework-level transparency</strong>: The user's code doesn't change between sequential and parallel execution — just set a flag. No need to manage <code>qpu_id</code> assignments, futures, or async patterns.</p>
+</li>
+</ul>
+<h2 id="summary">Summary</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Parallel (<code>-p</code>)</th>
+<th>Distributed Statevector (default MPI)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Goal</strong></td>
+<td>Speed — faster completion</td>
+<td>Scale — larger circuits</td>
+</tr>
+<tr>
+<td><strong>Circuits running simultaneously</strong></td>
+<td>Multiple</td>
+<td>One</td>
+</tr>
+<tr>
+<td><strong>Devices per circuit</strong></td>
+<td>One</td>
+<td>Multiple</td>
+</tr>
+<tr>
+<td><strong>Qiskit</strong></td>
+<td>Map onto disjoint qubit regions</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td><strong>CUDA-Q</strong></td>
+<td>Distribute circuits across GPUs</td>
+<td>Distribute statevector across GPUs</td>
+</tr>
+<tr>
+<td><strong>When to use</strong></td>
+<td>Many circuits, moderate width</td>
+<td>Few circuits, maximum width</td>
+</tr>
+</tbody>
+</table></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
