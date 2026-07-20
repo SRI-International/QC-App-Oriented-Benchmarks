@@ -1163,12 +1163,18 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, 
         # Execute on appropriate path
         if sampler is not None:
             # Sampler path (IBM Runtime, StatevectorSampler, AerSampler)
-            ts_transpile = time.time()
-            trans_qcs = transpile(circuits, backend,
-                optimization_level=optimization_level,
-                layout_method=layout_method,
-                routing_method=routing_method)
-            last_transpile_time = time.time() - ts_transpile
+            from qiskit.primitives import StatevectorSampler as _SvSampler
+            if isinstance(sampler, _SvSampler):
+                # StatevectorSampler is pure math — no device constraints, skip transpilation
+                trans_qcs = circuits if isinstance(circuits, list) else [circuits]
+                last_transpile_time = 0.0
+            else:
+                ts_transpile = time.time()
+                trans_qcs = transpile(circuits, backend,
+                    optimization_level=optimization_level,
+                    layout_method=layout_method,
+                    routing_method=routing_method)
+                last_transpile_time = time.time() - ts_transpile
 
             # set job tags if SamplerV2 on IBM Quantum Platform (max 8 tags allowed)
             if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
