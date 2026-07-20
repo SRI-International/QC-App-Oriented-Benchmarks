@@ -204,6 +204,30 @@ job_id, result = ex.execute_circuits(circuits, num_shots=1000)
 for i, counts in enumerate(result.get_counts()):
     print(f&quot;Circuit {i}: {counts}&quot;)
 </code></pre>
+<h3 id="parameterized-execution">Parameterized Execution</h3>
+<p>To execute a single circuit template with multiple parameter sets, pass the <code>params</code> argument. The execute module handles parameter binding internally for both Qiskit and CUDA-Q backends.</p>
+<pre><code class="language-python">from qiskit.circuit import QuantumCircuit, Parameter
+
+# Build a parameterized circuit
+theta = Parameter('theta')
+qc = QuantumCircuit(2)
+qc.ry(theta, 0)
+qc.cx(0, 1)
+qc.measure_all()
+
+# Execute with 5 different parameter values
+params = ([&quot;theta&quot;], [[0.0], [0.5], [1.0], [1.5], [3.14]])
+job_id, result = ex.execute_circuits([qc], num_shots=1000, params=params)
+
+for i, counts in enumerate(result.get_counts()):
+    print(f&quot;theta={params[1][i][0]:.2f}: {counts}&quot;)
+</code></pre>
+<p>The <code>params</code> argument accepts two formats:</p>
+<ul>
+<li><strong>List of dicts:</strong> <code>[{"theta": 0.5, "phi": 1.0}, {"theta": 0.7, "phi": 0.9}, ...]</code></li>
+<li><strong>Tuple of (names, values):</strong> <code>(["theta", "phi"], [[0.5, 1.0], [0.7, 0.9], ...])</code> -- more efficient when executing many parameter sets with the same parameter names.</li>
+</ul>
+<p>Parameter names are strings that match the names defined in the circuit. The execute module maps them to the appropriate framework objects (Qiskit <code>Parameter</code> objects or CUDA-Q kernel arguments).</p>
 <h3 id="path-2-metrics-integrated-execution">Path 2: Metrics-Integrated Execution</h3>
 <p>Use <code>submit_circuits()</code> for automatic metrics collection. Circuits are organized as a nested dict keyed by group (typically qubit width) and circuit ID. Timing, job IDs, and result processing are handled automatically.</p>
 <pre><code class="language-python">from qedclib import metrics
@@ -345,8 +369,8 @@ job_id, result = ex.execute_circuits(circuits, num_shots=1000)
 <td>Register a result handler callback</td>
 </tr>
 <tr>
-<td><code>execute_circuits(circuits, num_shots)</code></td>
-<td>Execute a list of circuits, return <code>(job_id, result)</code></td>
+<td><code>execute_circuits(circuits, num_shots, params=None)</code></td>
+<td>Execute circuits, return <code>(job_id, result)</code>. With <code>params</code>, execute a single template with multiple parameter sets.</td>
 </tr>
 <tr>
 <td><code>execute_circuit_groups(groups, num_shots_list)</code></td>
