@@ -957,7 +957,7 @@ def test_execution():
 #   Level 3 (benchmark): calls submit_circuits or Level 1 directly
 ###########################################################################
 
-def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group=False):
+def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group=False, params=None):
     """
     Execute a dict of circuit arrays and store execution metrics.
 
@@ -1006,15 +1006,59 @@ def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group
         from itertools import groupby
         for group_key, group_iter in groupby(circuits_info, key=lambda ci: ci["group"]):
             batch = list(group_iter)
-            _execute_batch(batch, num_shots, max_batch_size)
+            _execute_batch(batch, num_shots, max_batch_size, params=params)
     else:
         # Batch by max_batch_size regardless of group boundaries
-        _execute_batch(circuits_info, num_shots, max_batch_size)
+        _execute_batch(circuits_info, num_shots, max_batch_size, params=params)
 
 
-def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
+def _normalize_params(params):
+    """Convert params to list-of-dicts format.
+    Accepts: list of dicts, or tuple of (names_list, values_2d_array).
+    Returns: list of dicts mapping param names/objects to values.
     """
-    Execute an array of circuits. Pure execution — no metrics,
+    if params is None:
+        return None
+    if isinstance(params, tuple) and len(params) == 2:
+        names, values_list = params
+        return [dict(zip(names, vals)) for vals in values_list]
+    return params
+
+
+def _bind_params_to_circuits(circuit, params):
+    """Expand a single parameterized circuit into bound circuits using params.
+
+    Each entry in params is a dict mapping parameter identifiers to values.
+    Keys can be string names or native Parameter/ParameterVector objects.
+    String names are looked up from circuit.parameters by name.
+
+    Returns: list of fully-bound circuits.
+    """
+    param_dicts = _normalize_params(params)
+    if param_dicts is None:
+        return None
+
+    # Build lookup for string-name keys (skip if keys are already Parameter objects)
+    first_key = next(iter(param_dicts[0]))
+    if isinstance(first_key, str):
+        param_lookup = {p.name: p for p in circuit.parameters}
+    else:
+        param_lookup = None
+
+    bound_circuits = []
+    for pd in param_dicts:
+        if param_lookup is not None:
+            qiskit_dict = {param_lookup[name]: val for name, val in pd.items()}
+        else:
+            qiskit_dict = pd
+        bound_circuits.append(circuit.assign_parameters(qiskit_dict))
+
+    return bound_circuits
+
+
+def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, params=None):
+    """
+    Execute an array of circuits. Pure execution -- no metrics,
     no result_handler, no dict knowledge.
 
     Always takes an array. Always returns (job_id, result).
@@ -1030,13 +1074,22 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         wait: if True (default), block until results are ready.
               if False, return immediately with result=None.
         gpus_per_circuit: accepted for API compatibility with cudaq (ignored here)
+        params: parameter bindings for repeated execution of a single circuit.
+            None (default): circuits are already fully bound.
+            List of dicts: [{name: value, ...}, ...] one dict per execution.
+            Tuple of (names, values): (["name0", "name1"], [[v0, v1], ...])
+            Keys can be string names or native Parameter/ParameterVector objects.
 
     Returns:
         (job_id, result) tuple:
         - job_id: identifier for the job (serializable)
-        - result: ExecutionResult with get_counts() → list of dicts,
+        - result: ExecutionResult with get_counts() -> list of dicts,
           or None if wait=False
     """
+
+    # Expand parameterized circuit into bound circuits
+    if params is not None:
+        circuits = _bind_params_to_circuits(circuits[0], params)
 
     # Route to parallel execution if enabled (implementation in execute_parallel.py)
     if parallel_execution and circuits and len(circuits) > 1:
@@ -1308,7 +1361,7 @@ def execute_circuit_groups(circuit_groups, num_shots_list=None, num_shots=None):
     return (last_job_id, group_results)
 
 
-def _execute_batch(circuits_info, num_shots, max_batch_size):
+def _execute_batch(circuits_info, num_shots, max_batch_size, params=None):
     """Internal: execute circuits_info in chunks of max_batch_size."""
     global cancel_requested
     cancel_requested = False
@@ -1320,12 +1373,12 @@ def _execute_batch(circuits_info, num_shots, max_batch_size):
         batch = circuits_info[i:i + batch_size]
         circuits = [ci["qc"] for ci in batch]
         ts = time.time()
-        job_id, results = execute_circuits(circuits, num_shots)
+        job_id, results = execute_circuits(circuits, num_shots, params=params)
         elapsed_time = time.time() - ts
         if results is not None:
             process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
         else:
-            print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) — skipping')
+            print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) -- skipping')
 
 
 def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=None, num_shots=None):

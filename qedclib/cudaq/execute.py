@@ -1072,9 +1072,49 @@ def execute_circuit_immed (circuit: list, num_shots: int):
 ###########################################################################
 
 
-def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
+def _normalize_params(params):
+    """Convert params to list-of-dicts format.
+    Accepts: list of dicts, or tuple of (names_list, values_2d_array).
+    Returns: list of dicts mapping param names to values.
     """
-    Execute an array of circuits. Pure execution — no metrics,
+    if params is None:
+        return None
+    if isinstance(params, tuple) and len(params) == 2:
+        names, values_list = params
+        return [dict(zip(names, vals)) for vals in values_list]
+    return params
+
+
+def _bind_params_to_cudaq_circuits(circuit, params):
+    """Expand a single parameterized kernel into [kernel, args] tuples.
+
+    Each entry in params is a dict mapping parameter names to values.
+    Values are extracted and used as kernel arguments.
+
+    Returns: list of [kernel, args_list] tuples.
+    """
+    param_dicts = _normalize_params(params)
+    if param_dicts is None:
+        return None
+
+    kernel = circuit[0]  # circuits are [kernel, args] tuples
+    bound_circuits = []
+    for pd in param_dicts:
+        # Flatten all dict values into a single args list
+        args = []
+        for val in pd.values():
+            if isinstance(val, (list, tuple)):
+                args.extend(val)
+            else:
+                args.append(val)
+        bound_circuits.append([kernel, args])
+
+    return bound_circuits
+
+
+def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, params=None):
+    """
+    Execute an array of circuits. Pure execution -- no metrics,
     no result_handler, no dict knowledge.
 
     Always takes an array. Always returns (job_id, result).
@@ -1089,13 +1129,22 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
             None = use all available GPUs together (mgpu if MPI, single GPU if not).
             1 = each GPU runs one circuit independently (max parallelism, requires MPI).
             M = M GPUs pool per circuit, P/M circuits in parallel (requires MPI, mpi.size % M == 0).
+        params: parameter bindings for repeated execution of a single circuit.
+            None (default): circuits are already fully bound.
+            List of dicts: [{name: value, ...}, ...] one dict per execution.
+            Tuple of (names, values): (["name0", "name1"], [[v0, v1], ...])
+            Values are extracted and passed as kernel arguments.
 
     Returns:
         (job_id, result) tuple:
         - job_id: identifier for the job (serializable)
-        - result: ExecutionResult with get_counts() → list of dicts,
+        - result: ExecutionResult with get_counts() -> list of dicts,
           or None if wait=False
     """
+
+    # Expand parameterized circuit into bound circuits
+    if params is not None:
+        circuits = _bind_params_to_cudaq_circuits(circuits[0], params)
 
     global _warmup_done
 
@@ -1348,7 +1397,7 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
 
 
 def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group=False,
-                    gpus_per_circuit=None):
+                    gpus_per_circuit=None, params=None):
     """
     Execute a dict of circuit arrays and store execution metrics.
 
@@ -1398,20 +1447,20 @@ def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group
         from itertools import groupby
         for group_key, group_iter in groupby(circuits_info, key=lambda ci: ci["group"]):
             batch = list(group_iter)
-            _execute_batch(batch, num_shots, max_batch_size, gpus_per_circuit)
+            _execute_batch(batch, num_shots, max_batch_size, gpus_per_circuit, params=params)
     else:
         # Batch by max_batch_size regardless of group boundaries
-        _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit)
+        _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit, params=params)
 
 
-def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=None):
+def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=None, params=None):
     """Internal: execute circuits_info in chunks of max_batch_size."""
     batch_size = max_batch_size or len(circuits_info)
     for i in range(0, len(circuits_info), batch_size):
         batch = circuits_info[i:i + batch_size]
         circuits = [ci["qc"] for ci in batch]
         ts = time.time()
-        job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
+        job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit, params=params)
         elapsed_time = time.time() - ts
         if results is not None:
             process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)

@@ -65,6 +65,35 @@ for i, counts in enumerate(result.get_counts()):
     print(f"Circuit {i}: {counts}")
 ```
 
+### Parameterized Execution
+
+To execute a single circuit template with multiple parameter sets, pass the `params` argument. The execute module handles parameter binding internally for both Qiskit and CUDA-Q backends.
+
+```python
+from qiskit.circuit import QuantumCircuit, Parameter
+
+# Build a parameterized circuit
+theta = Parameter('theta')
+qc = QuantumCircuit(2)
+qc.ry(theta, 0)
+qc.cx(0, 1)
+qc.measure_all()
+
+# Execute with 5 different parameter values
+params = (["theta"], [[0.0], [0.5], [1.0], [1.5], [3.14]])
+job_id, result = ex.execute_circuits([qc], num_shots=1000, params=params)
+
+for i, counts in enumerate(result.get_counts()):
+    print(f"theta={params[1][i][0]:.2f}: {counts}")
+```
+
+The `params` argument accepts two formats:
+
+- **List of dicts:** `[{"theta": 0.5, "phi": 1.0}, {"theta": 0.7, "phi": 0.9}, ...]`
+- **Tuple of (names, values):** `(["theta", "phi"], [[0.5, 1.0], [0.7, 0.9], ...])` -- more efficient when executing many parameter sets with the same parameter names.
+
+Parameter names are strings that match the names defined in the circuit. The execute module maps them to the appropriate framework objects (Qiskit `Parameter` objects or CUDA-Q kernel arguments).
+
 ### Path 2: Metrics-Integrated Execution
 
 Use `submit_circuits()` for automatic metrics collection. Circuits are organized as a nested dict keyed by group (typically qubit width) and circuit ID. Timing, job IDs, and result processing are handled automatically.
@@ -204,7 +233,7 @@ For full details on parallel and distributed statevector execution modes, see [P
 |----------|-------------|
 | `set_execution_target(backend_id, ...)` | Configure the backend for execution |
 | `init_execution(handler)` | Register a result handler callback |
-| `execute_circuits(circuits, num_shots)` | Execute a list of circuits, return `(job_id, result)` |
+| `execute_circuits(circuits, num_shots, params=None)` | Execute circuits, return `(job_id, result)`. With `params`, execute a single template with multiple parameter sets. |
 | `execute_circuit_groups(groups, num_shots_list)` | Execute groups of circuits with per-group shot counts |
 | `submit_circuits(circuits, num_shots, max_batch_size, batch_by_group)` | Execute a circuit dict with automatic metrics collection |
 | `process_circuit_results(circuits_info, results, ...)` | Map batch results back to individual circuits and store metrics |
