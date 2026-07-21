@@ -4,7 +4,7 @@ version = "2.0.8"
 description = "Quantum program execution engine with built-in performance monitoring"
 readme = "qedclib/README.md"
 requires-python = ">=3.9"
-license = "Apache-2.0"
+license = {text = "Apache-2.0"}
 authors = [
     {name = "Thomas Lubinski"},
     {name = "Quantum Economic Development Consortium (QED-C) Standards TAC"},

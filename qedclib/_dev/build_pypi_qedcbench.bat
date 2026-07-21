@@ -16,7 +16,7 @@ if exist build rmdir /s /q build
 if exist qedcbench.egg-info rmdir /s /q qedcbench.egg-info
 
 REM Build
-python -m build
+python -m build --no-isolation
 set BUILD_RC=%errorlevel%
 
 if %BUILD_RC% neq 0 (
