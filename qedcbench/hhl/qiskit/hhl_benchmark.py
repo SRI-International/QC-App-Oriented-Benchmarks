@@ -598,27 +598,12 @@ def analyze_and_print_result (qc, result, num_qubits, num_shots, s_int=None):
     if verbose: 
         print(f'... ratio of counts with ancilla measured |1> : {round(rate, 4)}')
     
-    # compute true distribution from secret int
-    off_diag_index = 0
-    b = 0
-    
-    # remove instance index from s_int
-    s_int = s_int - 1000 * int(s_int/1000)
-    
-    # get off_diag_index and b
-    s_int_o = int(s_int)
-    s_int_b = int(s_int)   
-    
-    while (s_int_o % 2) == 0:
-        s_int_o = int(s_int_o/2)
-        off_diag_index += 1
-        
-    while (s_int_b % 3) == 0:
-        s_int_b = int(s_int_b/3)
-        b += 1
-    
+    # Decode the (i+1, odi, b) 24-bit packed fields written by the run loop.
+    b = s_int & 0xFFFFFF
+    off_diag_index = (s_int >> 24) & 0xFFFFFF
+
     if verbose:
-        print(f"... rem(s_int) = {s_int}, b = {b}, odi = {off_diag_index}")
+        print(f"... b = {b}, odi = {off_diag_index}")
         
     # temporarily fix diag and off-diag matrix elements
     diag_el = 0.5
@@ -743,9 +728,12 @@ def get_circuits(
             for i in range(num_circuits):
                 b = np.random.choice(range(1, N))
                 off_diag_index = np.random.choice(range(1, N))
-
-                # encode instance index, b, and off_diag_index into secret_int
-                s_int = 1000 * (i+1) + (2**off_diag_index) * (3**b)
+                
+                # define secret_int (include 'i' since b and off_diag_index don't need to be unique)
+                # Pack (i+1, odi, b) into 24-bit fields so the analyzer can
+                # recover them losslessly for any n_input up to 24.
+                s_int = ((i + 1) << 48) | (off_diag_index << 24) | b
+                #s_int = (2**off_diag_index)*(3**b)
                 circuit_id = s_int
 
                 if verbose:
