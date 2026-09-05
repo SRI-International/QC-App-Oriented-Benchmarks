@@ -23,10 +23,10 @@ from typing import Union, List, Tuple
 import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-# The QED-C initialization module
 import qedclib
 from qedclib import initialize, metrics
 from qedclib import qcb_mpi as mpi
+from qedclib.backend_utils import api_display_name, resolve_exec_options
 
 
 api_ = "qiskit" 
@@ -285,6 +285,7 @@ def run(min_qubits: int = 2,
         exec_options = None,
         context = None,
         api = None,
+        warmup: bool = False,
         get_circuits = False,
         max_batch_size = None,
         gpus_per_circuit: int = None,
@@ -363,7 +364,7 @@ def run(min_qubits: int = 2,
 
     ##########
 
-    print(f"{benchmark_name} Benchmark Program - {api}")
+    print(f"{benchmark_name} Benchmark Program - {api_display_name(api)}")
     
     # Create context identifier
     if context is None: context = f"{benchmark_name} Benchmark"
@@ -408,7 +409,7 @@ def run(min_qubits: int = 2,
     ################################
     
     # Initialize metrics module
-    metrics.init_metrics()
+    metrics.init_metrics(warmup)
 
     # Define custom result handler
     def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
@@ -878,7 +879,7 @@ def run(min_qubits: int = 2,
         #plot_results_from_data(**dict_of_inputs)
         
         ############## expectation value plot
-        suptitle = f"Benchmark Results - {benchmark_name} ({method}) - {api if api else 'Qiskit'}"
+        suptitle = f"Benchmark Results - {benchmark_name} ({method}) - {api_display_name(api)}"
         
         # should not be needed; needs investigation, saving image fails if command line invocation
         # and non-observable case works fine.
@@ -1132,6 +1133,7 @@ def get_args():
     parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
     parser.add_argument("--use_inverse_flag", "-inverse", action="store_true", help="Use inverse evolution")
     parser.add_argument("--do_sqrt_fidelity", "-sqrt", action="store_true", help="Return square root of fidelities")
     parser.add_argument("--random_pauli_flag", "-ranp", action="store_true", help="Gen random paulis")
@@ -1190,8 +1192,9 @@ def do_run(args):
         plot_results=not args.noplot,
         draw_circuits=not args.nodraw,
         backend_id=args.backend_id,
-        exec_options = {"noise_model" : None} if args.nonoise else args.exec_options,
+        exec_options = resolve_exec_options(args),
         api=args.api,
+        warmup=args.warmup,
         max_batch_size=args.max_batch_size,
         gpus_per_circuit=args.gpus_per_circuit,
         parallel=args.parallel
@@ -1222,4 +1225,3 @@ if __name__ == '__main__':
         do_run(args)
         
     
-
