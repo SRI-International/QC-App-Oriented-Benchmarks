@@ -31,12 +31,15 @@ def bv_kernel_m1(num_qubits: int, secret_int: int, hidden_bits: List[int]):
     # size of input is one less than available qubits
     input_size = num_qubits - 1
 
-    # Allocate the specified number of qubits - this
-    # corresponds to the length of the hidden bitstring.
-    qubits = cudaq.qvector(input_size)
+    # Allocate the input register and the auxillary qubit together: adding the
+    # auxillary qubit to an existing register grows the simulator state, and
+    # that reallocation fails at the maximum single-GPU width.
+    all_qubits = cudaq.qvector(num_qubits)
 
-    # Allocate an extra auxillary qubit.
-    auxillary_qubit = cudaq.qubit()
+    # The first `input_size` qubits correspond to the length of the hidden
+    # bitstring; the last one is the auxillary qubit.
+    qubits = all_qubits[0:input_size]
+    auxillary_qubit = all_qubits[input_size]
 
     # Prepare the auxillary qubit.
     h(auxillary_qubit)

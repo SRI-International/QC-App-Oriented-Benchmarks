@@ -160,10 +160,17 @@ def hhl_kernel(n_input: int, n_t: int,
                ry_angles_fwd: List[float],
                ctrl_idx_fwd: List[int]) -> int:
     M_PI = 3.141592653589793
-    qa = cudaq.qvector(n_input)
-    qb = cudaq.qvector(n_input)
-    qt = cudaq.qvector(n_t)
-    anc = cudaq.qubit()
+    # Allocate every register at once and slice it. Allocating them one at a
+    # time grows the simulator state repeatedly, and the last of those
+    # reallocations is rejected at the maximum single-GPU width.
+    qb_start = n_input
+    qt_start = 2 * n_input
+    anc_index = 2 * n_input + n_t
+    all_qubits = cudaq.qvector(anc_index + 1)
+    qa = all_qubits[0:qb_start]
+    qb = all_qubits[qb_start:qt_start]
+    qt = all_qubits[qt_start:anc_index]
+    anc = all_qubits[anc_index]
 
     # 1) State prep |b>
     hhl_initialize_state(qa, b_bits)

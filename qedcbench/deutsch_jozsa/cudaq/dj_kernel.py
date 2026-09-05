@@ -33,10 +33,14 @@ def balanced_oracle(register: cudaq.qview, auxillary_qubit: cudaq.qubit, input_s
 
 @cudaq.kernel
 def dj_kernel(num_qubits: int, oracle_type: int):
-    # Size of input is one less than available qubits
+    # Size of input is one less than available qubits. Allocate the input
+    # register and the ancilla together: adding the ancilla to an existing
+    # register grows the simulator state, and that reallocation fails at the
+    # maximum single-GPU width.
     input_size = num_qubits - 1
-    qubits = cudaq.qvector(input_size)
-    auxillary_qubit = cudaq.qubit()
+    all_qubits = cudaq.qvector(num_qubits)
+    qubits = all_qubits[0:input_size]
+    auxillary_qubit = all_qubits[input_size]
 
     h(qubits)
     x(auxillary_qubit)
