@@ -68,47 +68,45 @@ if "mpi4py" not in sys.modules:
 
         #print("Initializing MPI...No MPI Module Loaded",flush=True)
         rank = 0
-        size = 0
+        size = 1
         initialized = True
 
 else:
     from mpi4py import MPI
     import atexit
 
+    def _ensure_initialized():
+        if not initialized:
+            init()
+
     def enabled():
         return True
 
     def leader():
-        global initialized, rank
-        if initialized is False:
-            raise Exception("MPI call before init")
+        global rank
+        _ensure_initialized()
         if rank == 0:
             return True
         else:
             return False
 
     def barrier():
-        global initialized
-        if initialized is False:
-            raise Exception("MPI call before init")
+        _ensure_initialized()
         MPI.COMM_WORLD.barrier()
         return
 
     def bcast(data):
+        _ensure_initialized()
         return MPI.COMM_WORLD.bcast(data, root=0)
 
     def gather(data, root=0):
         """Gather data from all ranks to root."""
-        global initialized
-        if initialized is False:
-            raise Exception("MPI call before init")
+        _ensure_initialized()
         return MPI.COMM_WORLD.gather(data, root=root)
 
     def scatter(data, root=0):
         """Scatter data from root to all ranks."""
-        global initialized
-        if initialized is False:
-            raise Exception("MPI call before init")
+        _ensure_initialized()
         return MPI.COMM_WORLD.scatter(data, root=root)
 
     def finalize():

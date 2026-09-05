@@ -31,7 +31,7 @@ def batched_run(get_circuits_fn, run_circuits_fn, plot_results_fn, **kwargs):
     gc_args = _for(get_circuits_fn)
     rc_args = _for(run_circuits_fn)
 
-    metrics.init_metrics()
+    metrics.init_metrics(kwargs.get("warmup", False))
 
     max_circuits = kwargs.get('max_circuits', 3)
     accumulated_qcs = {}
