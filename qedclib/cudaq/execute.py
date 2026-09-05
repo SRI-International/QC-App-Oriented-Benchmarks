@@ -64,10 +64,34 @@ verbose = False
 #   reverse_bit_order — reverse each count key string before returning.
 #   counts_dict — convert the SampleResult to a plain dict (some analyzers
 #       depend on full dict APIs like .keys()).
+def _get_circuit_options(circuit):
+    if len(circuit) > 2 and isinstance(circuit[2], dict):
+        return circuit[2]
+    return {}
+
+
+def _bind_circuit_params(circuit, params=None):
+    if params is None:
+        return circuit
+
+    options = _get_circuit_options(circuit)
+    indices = options.get("parameterized_indices")
+    if not indices:
+        return circuit
+
+    bound_params = list(circuit[1])
+    for name, index in indices.items():
+        bound_params[index] = params[name]
+
+    if len(circuit) > 2:
+        return [circuit[0], bound_params, circuit[2]]
+    return [circuit[0], bound_params]
+
+
 def _sample_or_run(circuit, num_shots, noise=None):
     kernel = circuit[0]
     params = circuit[1]
-    options = circuit[2] if len(circuit) > 2 else {}
+    options = _get_circuit_options(circuit)
 
     sample_kwargs = {"shots_count": num_shots}
     if noise is not None:
@@ -112,7 +136,7 @@ def request_cancel():
     cancel_requested = True
 
 # Auto-warmup: execute a tiny circuit on first call to execute_circuits() to prime the JIT
-auto_warmup = True
+auto_warmup = False
 _warmup_done = False
 
 # Parallel execution flag — when True, execute_circuits() will distribute
@@ -195,12 +219,19 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
         return None  # Fall back to sequential
 
     # Override mgpu mode - each rank uses single GPU
-    # This is critical: mgpu pools all GPUs for ONE circuit, we want the opposite
-    if rank == 0 and verbose:
+    # This is critical: mgpu pools all GPUs for ONE circuit, we want the opposite.
+    # Preserve precision and any other user-supplied flags by stripping only
+    # mgpu/mqpu from the resolved options.
+    if rank == 0:
         print(f"... MPI parallel: {size} ranks, {len(circuits)} circuits")
         print(f"... Setting single-GPU target (overriding mgpu)")
 
-    cudaq.set_target("nvidia", option="fp32")
+    base_opt = _resolved_target_options.get("option", "fp32")
+    opt_parts = [p.strip() for p in base_opt.split(",")
+                 if p.strip() and p.strip() not in ("mgpu", "mqpu")]
+    if not opt_parts:
+        opt_parts.append("fp32")
+    cudaq.set_target("nvidia", option=",".join(opt_parts))
 
     # Synchronize before distribution
     mpi.barrier()
@@ -268,7 +299,12 @@ def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
     if rank == 0 and verbose:
         print(f"... MPI group-parallel: {size} ranks, {len(circuit_groups)} groups")
 
-    cudaq.set_target("nvidia", option="fp32")
+    base_opt = _resolved_target_options.get("option", "fp32")
+    opt_parts = [p.strip() for p in base_opt.split(",")
+                 if p.strip() and p.strip() not in ("mgpu", "mqpu")]
+    if not opt_parts:
+        opt_parts.append("fp32")
+    cudaq.set_target("nvidia", option=",".join(opt_parts))
     mpi.barrier()
 
     # Distribute groups across ranks
@@ -324,6 +360,11 @@ def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
 
 #noise = 'DEFAULT'
 noise=None
+
+# Tracks the most recent cudaq target options resolved by set_execution_target.
+# Read by _execute_parallel_mpi when it needs to strip mgpu while preserving
+# the user-requested precision and any other flags.
+_resolved_target_options = {"option": "fp32"}
 
 # Initialize circuit execution module
 # Create array of batched circuits and a dict of active circuits 
@@ -447,21 +488,34 @@ def set_execution_target(backend_id=None, provider_backend=None,
     if provider_backend != None:
         backend = provider_backend
     
-    # now set the execution target to the given backend_id
-    backend_options = {"option" : "fp32"}
-    if mpi.enabled():
-        backend_options = {"option" : "mgpu,fp32"}
-    elif exec_options is not None and isinstance(exec_options, str):
+    # Resolve target options: start from the user's `exec_options` (parsed as
+    # JSON) or fall back to fp32. Then, when MPI is enabled, add `mgpu` to the
+    # option list unless the user has already chosen a multi-GPU mode.
+    # This preserves any precision the user requested (e.g. fp64) under MPI.
+    backend_options = {"option": "fp32"}
+    if exec_options is not None and isinstance(exec_options, str):
         try:
-            backend_options = json.loads(exec_options)
-            for key, value in backend_options.items():
+            parsed = json.loads(exec_options)
+            for key, value in parsed.items():
                 if not isinstance(key, str):
                     raise ValueError("`exec_options` keys must be strings")
                 if not isinstance(value, (str, int, float, bool)):
                     raise ValueError("`exec_options` values must be str, int, float, or bool")
-        except:
+            backend_options = parsed
+        except Exception:
             print(f"    ... Invalid `exec_options`; using default options.")
-            
+
+    if mpi.enabled():
+        opt_parts = [p.strip() for p in backend_options.get("option", "").split(",") if p.strip()]
+        if "mgpu" not in opt_parts and "mqpu" not in opt_parts:
+            opt_parts.append("mgpu")
+        backend_options["option"] = ",".join(opt_parts)
+
+    # Remember the resolved options so MPI paths that strip mgpu can keep the
+    # user's precision and any other flags.
+    global _resolved_target_options
+    _resolved_target_options = dict(backend_options)
+
     cudaq.set_target(backend_id, **backend_options)
 
     # Handle noise_model in exec_options (same pattern as qiskit)
@@ -532,12 +586,16 @@ def set_noise_model(noise_model = None):
 
 # Submit circuit for execution
 # This version executes immediately and calls the result handler
-def submit_circuit (qc, group_id, circuit_id, shots=100):
+def submit_circuit (qc, group_id, circuit_id, shots=100, params=None):
+    if mpi.enabled():
+        mpi.barrier()
+
+    submit_time = time.time()
 
     # store circuit in array with submission time and circuit info
     batched_circuits.append(
         { "qc": qc, "group": str(group_id), "circuit": str(circuit_id),
-            "submit_time": time.time(), "shots": shots }
+            "submit_time": submit_time, "shots": shots, "params": params }
     )
     #print("... submit circuit - ", str(batched_circuits[len(batched_circuits)-1]))
     
@@ -557,12 +615,14 @@ def execute_circuit (batched_circuit):
         print(f'... execute_circuit({batched_circuit["group"]}, {batched_circuit["circuit"]})')
 
     active_circuit = copy.copy(batched_circuit)
-    active_circuit["launch_time"] = time.time()
     
     num_shots = batched_circuit["shots"]
     
     # Initiate execution 
-    circuit = batched_circuit["qc"]
+    circuit = _bind_circuit_params(
+        batched_circuit["qc"], batched_circuit.get("params")
+    )
+    active_circuit["qc"] = circuit
     
     ############
     
@@ -572,7 +632,11 @@ def execute_circuit (batched_circuit):
     # draw the circuit, but only for debugging
     # print(cudaq.draw(circuit[0], *circuit[1]))
     
+    if mpi.enabled():
+        mpi.barrier()
+
     ts = time.time()
+    active_circuit["launch_time"] = ts
     
     # call sample() on circuit with its list of arguments
     try:
@@ -591,23 +655,17 @@ def execute_circuit (batched_circuit):
     # control results print at benchmark level
     #if verbose: print(result)
 
+    if mpi.enabled():
+        mpi.barrier()
+
     exec_time = time.time() - ts
 
     # store the result object on the job for processing in job_complete
     job.executor_result = result
     job.exec_time = exec_time
-    
+
     if verbose:
         print(f"... result = {len(result)} {result}")
-        ''' for debugging, a better way to see the counts, as the type of result is something Quake
-        for key, val in result.items():
-            print(f"... {key}:{val}")
-        '''
-        print(f"... register names = {result.register_names}")
-        print(result.dump())
-        #print(f"... register dump = {result.get_register_counts('__global__').dump()}")
-        #result.get_register_counts("b1").dump()
-        #print(result.get_sequential_data())
         
     # put job into the active circuits with circuit info
     active_circuits[job] = active_circuit
@@ -643,14 +701,13 @@ def get_circuit_metrics(qc, qc_size):
         
         total_gates = resources.count()
         
+        controlled_gates = ['x', 'y', 'z', 'r1', 'rx', 'ry', 'rz']
         two_qubit_gates = 0
-        two_qubit_gates += resources.count_controls('x', 1)
-        two_qubit_gates += resources.count_controls('y', 1)
-        two_qubit_gates += resources.count_controls('z', 1)
-        two_qubit_gates += resources.count_controls('r1', 1)
-        two_qubit_gates += resources.count_controls('rx', 1)
-        two_qubit_gates += resources.count_controls('ry', 1)
-        two_qubit_gates += resources.count_controls('rz', 1)
+        for gate in controlled_gates:
+            for num_controls in range(1, qc_size):
+                two_qubit_gates += (
+                    num_controls * resources.count_controls(gate, num_controls)
+                )
         
         #print(f"... depth = {resources.count_depth()}") # doesn't exist yet
         #print(f"Total: {total_gates}, 2-qubit: {two_qubit_gates}")
@@ -844,6 +901,9 @@ def throttle_execution(completion_handler=metrics.finalize_group):
     global last_group
     group = last_group
     
+    if mpi.enabled():
+        mpi.barrier()
+
     # call completion handler with the group id
     if completion_handler != None:
         completion_handler(group)
@@ -913,6 +973,9 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
     if verbose:
         if pollcount > 0: print("")
     '''
+    if mpi.enabled():
+        mpi.barrier()
+
     # indicate we are done collecting metrics (called once at end of app)
     if report_end:
         metrics.end_metrics()
@@ -972,6 +1035,9 @@ def execute_circuit_immed (circuit: list, num_shots: int):
         # draw the circuit, but only for debugging
         # print(cudaq.draw(circuit[0], *circuit[1]))
         
+        if mpi.enabled():
+            mpi.barrier()
+
         ts = time.time()
         
         # call sample() on circuit with its list of arguments
@@ -981,6 +1047,9 @@ def execute_circuit_immed (circuit: list, num_shots: int):
         # control results print at benchmark level
         #if verbose: print(result)
             
+        if mpi.enabled():
+            mpi.barrier()
+
         exec_time = time.time() - ts
         
         # store the result object on the job for processing in job_complete
@@ -1397,4 +1466,3 @@ def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=No
             process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
         else:
             print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) — skipping')
-

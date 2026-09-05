@@ -158,11 +158,14 @@ def test_process_circuit_results_timing():
 
     ex.process_circuit_results(circuits_info, results, job_id=job_id, elapsed_time=2.5)
 
-    for ci in circuits_info:
+    per_circuit_times = results._per_circuit_times
+    for index, ci in enumerate(circuits_info):
         g, c = ci["group"], ci["circuit"]
         cm = metrics.circuit_metrics.get(g, {}).get(c, {})
         assert "elapsed_time" in cm, f"elapsed_time not stored for {g}/{c}"
-        assert cm["elapsed_time"] == 2.5, f"Expected elapsed_time 2.5, got {cm['elapsed_time']}"
+        assert cm["elapsed_time"] == round(per_circuit_times[index], 4), (
+            f"Expected elapsed_time {per_circuit_times[index]}, got {cm['elapsed_time']}"
+        )
         assert "job_id" in cm, f"job_id not stored for {g}/{c}"
         assert cm["job_id"] == job_id, f"Expected job_id {job_id}, got {cm['job_id']}"
 
