@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 import qedclib
 from qedclib import get_kernel, is_leader, metrics
+from qedclib.backend_utils import api_display_name, resolve_exec_options
 
 benchmark_name = "Quantum Fourier Transform"
 
@@ -67,41 +68,54 @@ def get_circuits(
         np.random.seed(0)
         num_qubits = input_size
 
-        # Compute how many circuits to create and select random input values
+        # Compute how many circuits to create.
         if method == 1 or method == 2:
             num_circuits = min(2 ** (input_size), max_circuits)
+        elif method == 3:
+            num_circuits = min(input_size, max_circuits)
+        else:
+            sys.exit("Invalid QFT method")
+
+        # Select unique random secret integers as circuit inputs. For method 3,
+        # valid domain is 1..n.
+        if method == 3:
+            if input_size <= max_circuits:
+                s_range = list(range(1, input_size + 1))
+            else:
+                s_range = np.random.choice(
+                    np.arange(1, input_size + 1),
+                    size=num_circuits,
+                    replace=False,
+                ).tolist()
+        else:
             if 2**(input_size) <= max_circuits:
                 s_range = list(range(num_circuits))
             else:
-                s_range = np.random.randint(0, 2**(input_size), num_circuits + 2)
-                s_range = list(set(s_range))[0:num_circuits]
-        elif method == 3:
-            num_circuits = min(input_size, max_circuits)
-            if input_size <= max_circuits:
-                s_range = list(range(num_circuits))
-            else:
-                s_range = np.random.randint(0, 2**(input_size), num_circuits + 2)
-                s_range = list(set(s_range))[0:num_circuits]
-        else:
-            sys.exit("Invalid QFT method")
+                s_range = np.random.randint(
+                    1, 2**(input_size), num_circuits + 2
+                )
+                s_range = list(dict.fromkeys(s_range))[0:max_circuits]
 
         print(f"************\nCreating [{num_circuits}] circuits with num_qubits = {num_qubits}")
         all_qcs[str(num_qubits)] = {}
 
-        # Select unique random secret integers as circuit inputs
-        if 2**(input_size) <= max_circuits:
-            s_range = list(range(num_circuits))
-        else:
-            s_range = np.random.randint(1, 2**(input_size), num_circuits + 2)
-            s_range = list(set(s_range))[0:max_circuits]
+        if (
+            method == 3
+            and input_value is not None
+            and not 1 <= int(input_value) <= num_qubits
+        ):
+            raise ValueError(
+                "QFT method 3 input_value must be between 1 and "
+                f"num_qubits ({num_qubits}), got {input_value}"
+            )
 
         # Create each circuit with a different input value and store in the dict
-        for s_int in s_range:
+        for repetition_index, s_int in enumerate(s_range):
             s_int = int(s_int)
             if input_value is not None:
                 s_int = input_value
 
-            circuit_id = s_int
+            circuit_id = f"{s_int}:{repetition_index}" if input_value is not None else s_int
             bitset = str_to_ivec(input_size, s_int)
             if verbose: print(f"... s_int={s_int} bitset={bitset}")
 
@@ -138,6 +152,11 @@ def analyze_and_print_result(qc, result, num_qubits, num_shots, s_int=None, meth
 
 def expected_dist(num_qubits, secret_int, counts):
     """Compute the expected measurement distribution for method 3 (partial superposition)."""
+    if not 1 <= secret_int <= num_qubits:
+        raise ValueError(
+            "QFT method 3 secret_int must be between 1 and "
+            f"num_qubits ({num_qubits}), got {secret_int}"
+        )
     dist = {}
     s = num_qubits - secret_int
     for key in counts.keys():
@@ -190,8 +209,9 @@ def run_circuits(all_qcs,
     # Result handler: called for each circuit after execution completes
     def execution_handler(qc, result, input_size, circuit_id, num_shots):
         num_qubits = int(input_size)
+        s_int = int(str(circuit_id).split(":")[0])
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
-                s_int=int(circuit_id), method=method)
+                s_int=s_int, method=method)
         metrics.store_metric(input_size, circuit_id, 'fidelity', fidelity)
 
     # Set up execution target and submit all circuits as a batch
@@ -234,7 +254,7 @@ def plot_results(
         if plot_results:
             options = {"method": method, "shots": num_shots, "reps": max_circuits}
             metrics.plot_metrics(
-                f"Benchmark Results - {benchmark_name} ({method}) - {api if api is not None else 'Qiskit'}",
+                f"Benchmark Results - {benchmark_name} ({method}) - {api_display_name(api)}",
                 options=options)
 
 
@@ -254,7 +274,7 @@ def run(**kwargs):
         return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
 
     # Step 1: Create the benchmark circuits
-    metrics.init_metrics()
+    metrics.init_metrics(kwargs.get("warmup", False))
     all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
 
     # Step 2: Execute circuits on the target backend
@@ -285,7 +305,9 @@ def get_args():
     parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
     parser.add_argument("--use_midcircuit_measurement", "-mid", action="store_true", help="Use dynamic circuit")
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
     parser.add_argument("--parallel", "-pm", action="store_true", help="Enable parallel circuit execution")
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
@@ -301,7 +323,8 @@ if __name__ == '__main__':
         num_shots=args.num_shots, method=args.method,
         use_midcircuit_measurement=args.use_midcircuit_measurement,
         input_value=args.input_value, backend_id=args.backend_id,
-        exec_options={"noise_model": None} if args.nonoise else None,
+        exec_options=resolve_exec_options(args),
         api=args.api, max_batch_size=args.max_batch_size,
+        warmup=args.warmup,
         parallel=args.parallel,
         draw_circuits=not args.nodraw, plot_results=not args.noplot)
