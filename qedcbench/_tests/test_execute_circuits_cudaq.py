@@ -28,6 +28,13 @@ def bell_kernel(num_qubits: int):
     mz(qubits)
 
 
+@cudaq.kernel
+def return_bit_kernel() -> bool:
+    qubit = cudaq.qubit()
+    x(qubit)
+    return mz(qubit)
+
+
 def create_circuit(num_qubits=2):
     """Create a cudaq circuit tuple [kernel, [args]]."""
     return [bell_kernel, [num_qubits]]
@@ -242,6 +249,102 @@ def test_submit_circuits_batch_by_group():
     print(f"  PASS: batch_by_group=True, groups processed separately")
 
 
+def test_default_noise_model_channels():
+    """Test: default model matches Qiskit rates and covers arbitrary qubits."""
+    print("\n=== test_default_noise_model_channels ===")
+
+    noise_model = ex.default_noise_model()
+
+    for gate in ("x", "y", "z", "h", "s", "t", "rx", "ry", "rz", "r1"):
+        channels = noise_model.get_channels(gate, [47])
+        assert len(channels) == 1, f"Expected one 1Q channel for {gate}"
+        assert channels[0].parameters == [0.0005], (
+            f"Wrong 1Q error rate for {gate}: {channels[0].parameters}"
+        )
+
+    for gate in ("x", "y", "z", "h", "rx", "ry", "rz", "r1"):
+        channels = noise_model.get_channels(gate, [47], [46])
+        assert len(channels) == 1, f"Expected one controlled channel for {gate}"
+        assert channels[0].parameters == [0.005], (
+            f"Wrong 2Q error rate for controlled {gate}: {channels[0].parameters}"
+        )
+
+    assert metrics.QV == 2048, f"Expected QV 2048, got {metrics.QV}"
+    print("  PASS: Qiskit-matched 1Q/2Q rates registered on all qubits")
+
+
+def test_noise_exec_options():
+    """Test: dict/JSON overrides resolve without leaking across targets."""
+    print("\n=== test_noise_exec_options ===")
+
+    ex.set_noise_model("default")
+    ex.set_execution_target(
+        "density-matrix-cpu",
+        exec_options='{"option": "fp64", "noise_model": "default"}',
+    )
+    assert isinstance(ex._resolve_noise_model(), cudaq.NoiseModel)
+    assert ex._resolved_target_options["option"] == "fp64"
+
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": None}
+    )
+    assert ex._resolve_noise_model() is None
+
+    custom_noise = cudaq.NoiseModel()
+    custom_noise.add_all_qubit_channel("x", cudaq.BitFlipChannel(1.0))
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": custom_noise}
+    )
+    assert ex._resolve_noise_model() is custom_noise
+
+    ex.set_execution_target("density-matrix-cpu")
+    assert ex._resolve_noise_model() is ex.noise
+    assert ex._resolve_noise_model() is not custom_noise
+    print("  PASS: default, disabled, custom, and JSON noise options resolve correctly")
+
+
+def test_default_noise_behavior():
+    """Test: matched default noise produces Bell-state leakage."""
+    print("\n=== test_default_noise_behavior ===")
+
+    cudaq.set_random_seed(1234)
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": None}
+    )
+    _, ideal_result = ex.execute_circuits([create_circuit()], num_shots=5000)
+    ideal_counts = ideal_result.get_counts()
+    assert set(ideal_counts).issubset({"00", "11"}), ideal_counts
+
+    cudaq.set_random_seed(1234)
+    ex.set_execution_target("density-matrix-cpu")
+    _, noisy_result = ex.execute_circuits([create_circuit()], num_shots=5000)
+    noisy_counts = noisy_result.get_counts()
+    leakage = noisy_counts.get("01", 0) + noisy_counts.get("10", 0)
+    assert leakage > 0, f"Default 2Q noise produced no Bell-state leakage: {noisy_counts}"
+    print(f"  PASS: default model produced {leakage}/5000 leakage shots")
+
+
+def test_run_path_noise():
+    """Test: cudaq.run receives custom noise for typed-return kernels."""
+    print("\n=== test_run_path_noise ===")
+
+    circuit = [return_bit_kernel, [], {"result_width": 1}]
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": None}
+    )
+    _, ideal_result = ex.execute_circuits([circuit], num_shots=100)
+    assert ideal_result.get_counts() == {"1": 100}
+
+    bit_flip = cudaq.NoiseModel()
+    bit_flip.add_all_qubit_channel("x", cudaq.BitFlipChannel(1.0))
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": bit_flip}
+    )
+    _, noisy_result = ex.execute_circuits([circuit], num_shots=100)
+    assert noisy_result.get_counts() == {"0": 100}
+    print("  PASS: typed-return run path applied the configured noise model")
+
+
 ###########################################################################
 
 if __name__ == '__main__':
@@ -257,6 +360,10 @@ if __name__ == '__main__':
         test_submit_circuits_end_to_end,
         test_submit_circuits_max_batch_size,
         test_submit_circuits_batch_by_group,
+        test_default_noise_model_channels,
+        test_noise_exec_options,
+        test_default_noise_behavior,
+        test_run_path_noise,
     ]
 
     passed = 0
