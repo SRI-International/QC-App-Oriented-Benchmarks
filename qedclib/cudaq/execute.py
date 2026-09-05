@@ -37,6 +37,66 @@ import cudaq
 
 verbose = False
 
+# Dispatch helper for cudaq.sample vs cudaq.run.
+#
+# cudaq.sample is the default and is much faster (it samples N shots from a
+# single statevector simulation). Its global register only retains the final
+# qubit state, so it cannot expose per-shot mid-circuit measurement values
+# back to the kernel or the caller. cudaq.run instead executes the kernel
+# once per shot and returns the kernel's typed return value per shot, which
+# is what mid-circuit-measurement and feedforward benchmarks need
+# (e.g., BV m=2, HHL with post-selection, Shor's m=1 and m=2).
+#
+# cudaq.run is selected when either:
+#   (a) the @cudaq.kernel declares a return type (detected via
+#       kernel.return_type), or
+#   (b) the circuit handle includes an options dict with run_result=True,
+#       e.g., circuit = [kernel, params, {"run_result": True,
+#                                         "result_width": N}].
+#
+# Per-shot return shapes handled:
+#   * list[bool] / tuple — joined into a bitstring with element 0 leftmost.
+#   * int — formatted as a binary string of width result_width (default 1).
+#
+# Additional options (all default False):
+#   explicit_measurements — pass through to cudaq.sample to capture sequential
+#       mid-circuit measurements into the count key.
+#   reverse_bit_order — reverse each count key string before returning.
+#   counts_dict — convert the SampleResult to a plain dict (some analyzers
+#       depend on full dict APIs like .keys()).
+def _sample_or_run(circuit, num_shots, noise=None):
+    kernel = circuit[0]
+    params = circuit[1]
+    options = circuit[2] if len(circuit) > 2 else {}
+
+    sample_kwargs = {"shots_count": num_shots}
+    if noise is not None:
+        sample_kwargs["noise_model"] = noise
+
+    use_run = options.get("run_result") or getattr(kernel, "return_type", None) is not None
+    if use_run:
+        run_results = cudaq.run(kernel, *params, **sample_kwargs)
+        counts = {}
+        width = options.get("result_width")
+        for shot in run_results:
+            if isinstance(shot, (list, tuple)):
+                key = "".join("1" if b else "0" for b in shot)
+            else:
+                bitlen = width if width is not None else 1
+                key = format(int(shot), f"0{bitlen}b")
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    if options.get("explicit_measurements"):
+        sample_kwargs["explicit_measurements"] = True
+
+    result = cudaq.sample(kernel, *params, **sample_kwargs)
+    if options.get("reverse_bit_order"):
+        return {bits[::-1]: count for bits, count in result.items()}
+    if options.get("counts_dict"):
+        return {bits: count for bits, count in result.items()}
+    return result
+
 # Timing decomposition — set by execute_circuits after each call.
 # Callers (e.g. hamlib) can read these to report meaningful timing breakdowns.
 last_transpile_time = 0.0    # cudaq has minimal transpilation
@@ -158,11 +218,7 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
     local_results = []
     for circuit in my_circuits:
         try:
-            kernel, params = circuit[0], circuit[1]
-            if noise is None:
-                counts = cudaq.sample(kernel, *params, shots_count=num_shots)
-            else:
-                counts = cudaq.sample(kernel, *params, shots_count=num_shots, noise_model=noise)
+            counts = _sample_or_run(circuit, num_shots, noise=noise)
             # Convert cudaq result to dict
             local_results.append({k: v for k, v in counts.items()})
         except KeyboardInterrupt:
@@ -233,11 +289,7 @@ def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
         counts_array = []
         for circuit in circuits:
             try:
-                kernel, params = circuit[0], circuit[1]
-                if noise is None:
-                    result = cudaq.sample(kernel, *params, shots_count=shots)
-                else:
-                    result = cudaq.sample(kernel, *params, shots_count=shots, noise_model=noise)
+                result = _sample_or_run(circuit, shots, noise=noise)
                 counts_array.append({k: v for k, v in result.items()})
             except KeyboardInterrupt:
                 raise
@@ -525,12 +577,7 @@ def execute_circuit (batched_circuit):
     # call sample() on circuit with its list of arguments
     try:
         if verbose: print(f"... during exec, noise model is: {noise}")
-        if noise is None:
-            if verbose: print("... executing without noise")
-            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
-        else:
-            if verbose: print("... executing WITH noise")
-            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+        result = _sample_or_run(circuit, num_shots, noise=noise)
     except KeyboardInterrupt:
         raise
     except Exception as e:
@@ -929,12 +976,7 @@ def execute_circuit_immed (circuit: list, num_shots: int):
         
         # call sample() on circuit with its list of arguments
         if verbose: print(f"... during exec, noise model is: {noise}")
-        if noise is None:
-            if verbose: print("... executing without noise")
-            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
-        else:
-            if verbose: print("... executing WITH noise")
-            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+        result = _sample_or_run(circuit, num_shots, noise=noise)
         
         # control results print at benchmark level
         #if verbose: print(result)
@@ -1106,10 +1148,7 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
                 break
             try:
                 ts_circ = time.time()
-                if noise is None:
-                    result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
-                else:
-                    result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+                result = _sample_or_run(circuit, num_shots, noise=noise)
                 per_circuit_times.append(time.time() - ts_circ)
 
                 # Convert cudaq SampleResult to dict for counts array
@@ -1358,5 +1397,4 @@ def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=No
             process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
         else:
             print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) — skipping')
-
 
