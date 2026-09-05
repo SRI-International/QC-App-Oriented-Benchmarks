@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 import qedclib
 from qedclib import get_kernel, is_leader, metrics
+from qedclib.backend_utils import api_display_name, is_simulator_backend, resolve_exec_options
 
 benchmark_name = "Amplitude Estimation"
 
@@ -36,7 +37,7 @@ def get_circuits(
     max_circuits=3,
     # App-specific args
     num_state_qubits=1,
-    api=None,
+    api=None, backend_id=None, provider_backend=None,
 ):
     """Create Amplitude Estimation benchmark circuits.
 
@@ -56,7 +57,7 @@ def get_circuits(
     # Load the API-specific circuit kernel for this benchmark
     kernel = get_kernel("ae_kernel", api=api)
 
-    if max_qubits > MAX_QUBITS:
+    if max_qubits > MAX_QUBITS and not is_simulator_backend(api, backend_id, provider_backend):
         print(f"INFO: {benchmark_name} benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
         max_qubits = MAX_QUBITS
 
@@ -93,10 +94,7 @@ def get_circuits(
             qc = kernel.AmplitudeEstimation(num_state_qubits, num_counting_qubits, a_)
             metrics.store_metric(num_qubits, circuit_id, 'create_time', time.time() - ts)
 
-            # collapse the 3 sub-circuit levels used in this benchmark (for qiskit)
-            qc2 = qc.decompose().decompose().decompose()
-
-            all_qcs[str(num_qubits)][str(circuit_id)] = qc2
+            all_qcs[str(num_qubits)][str(circuit_id)] = qc
 
     return all_qcs, metrics.circuit_metrics
 
@@ -112,14 +110,14 @@ def analyze_and_print_result(qc, result, num_qubits, num_shots, s_int=None, num_
     correct_dist = a_to_bitstring(a, num_counting_qubits)
     thermal_dist = metrics.uniform_dist(num_counting_qubits)
 
-    if verbose:
+    if verbose and is_leader():
         app_counts = bitstring_to_a(counts, num_counting_qubits)
         app_correct_dist = {a: 1.0}
         print(f"For amplitude {a}, expected: {correct_dist} measured: {counts}")
         print(f"For amplitude {a}, app expected: {app_correct_dist} measured: {app_counts}")
 
     fidelity = metrics.polarization_fidelity(counts, correct_dist, thermal_dist)
-    if verbose: print(f"  ... fidelity: {fidelity}")
+    if verbose and is_leader(): print(f"  ... fidelity: {fidelity}")
     return counts, fidelity
 
 def a_to_bitstring(a, num_counting_qubits):
@@ -226,7 +224,7 @@ def plot_results(
         if plot_results:
             options = {"shots": num_shots, "reps": max_circuits}
             metrics.plot_metrics(
-                f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}",
+                f"Benchmark Results - {benchmark_name} - {api_display_name(api)}",
                 options=options)
 
 
@@ -246,7 +244,7 @@ def run(**kwargs):
         return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
 
     # Step 1: Create the benchmark circuits
-    metrics.init_metrics()
+    metrics.init_metrics(kwargs.get("warmup", False))
     all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
 
     # Step 2: Execute circuits on the target backend
@@ -275,6 +273,8 @@ def get_args():
     parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     parser.add_argument("--parallel", "-pm", action="store_true", help="Enable parallel circuit execution")
@@ -289,7 +289,8 @@ if __name__ == '__main__':
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots=args.num_shots, num_state_qubits=args.num_state_qubits,
         backend_id=args.backend_id,
-        exec_options={"noise_model": None} if args.nonoise else {},
+        exec_options=resolve_exec_options(args),
         api=args.api, max_batch_size=args.max_batch_size,
+        warmup=args.warmup,
         draw_circuits=not args.nodraw, plot_results=not args.noplot,
         parallel=args.parallel)

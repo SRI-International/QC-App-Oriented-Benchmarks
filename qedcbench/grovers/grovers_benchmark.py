@@ -17,7 +17,8 @@ import sys; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 import qedclib
-from qedclib import get_kernel, is_leader, metrics
+from qedclib import get_kernel, is_leader, metrics, qcb_mpi
+from qedclib.backend_utils import api_display_name, is_simulator_backend, resolve_exec_options
 
 benchmark_name = "Grovers Search"
 
@@ -28,6 +29,16 @@ verbose = False
 MAX_QUBITS = 8
 
 
+def _check_cudaq_multi_gpu(api=None):
+    """Reject CUDA-Q multi-GPU execution, which Grover's does not support."""
+    qcb_mpi.init()
+    selected_api = api or qedclib.get_api()
+    if selected_api == "cudaq" and qcb_mpi.size > 1:
+        raise RuntimeError(
+            "CUDA-Q multi-GPU execution is currently not supported for Grover's benchmark."
+        )
+
+
 ############### Get Circuits
 
 def get_circuits(
@@ -36,7 +47,7 @@ def get_circuits(
     max_circuits=3,
     # App-specific args
     use_mcx_shim=False,
-    api=None,
+    api=None, backend_id=None, provider_backend=None,
 ):
     """Create Grovers Search benchmark circuits.
 
@@ -53,10 +64,11 @@ def get_circuits(
     Returns (all_qcs, circuit_metrics) — nested circuit dict and creation metrics.
     """
 
+    _check_cudaq_multi_gpu(api)
     # Load the API-specific circuit kernel for this benchmark (e.g. qiskit or cudaq)
     kernel = get_kernel("grovers_kernel", api=api)
 
-    if max_qubits > MAX_QUBITS:
+    if max_qubits > MAX_QUBITS and not is_simulator_backend(api, backend_id, provider_backend):
         print(f"INFO: {benchmark_name} benchmark is limited to a maximum of {MAX_QUBITS} qubits.")
         max_qubits = MAX_QUBITS
 
@@ -81,7 +93,7 @@ def get_circuits(
             s_range = list(range(num_circuits))
         else:
             s_range = np.random.randint(1, 2**(num_qubits), num_circuits + 10)
-            s_range = list(set(s_range))[0:max_circuits]
+            s_range = list(dict.fromkeys(s_range))[0:max_circuits]
 
         # Create each circuit with a different marked item and store in the dict
         for s_int in s_range:
@@ -131,7 +143,7 @@ def run_circuits(all_qcs,
     backend_id=None, provider_backend=None,
     hub="ibm-q", group="open", project="main",
     exec_options=None, context=None, api=None,
-    parallel=False,
+    parallel=False, do_fidelities=True,
 ):
     """Execute benchmark circuits and collect metrics.
 
@@ -147,6 +159,7 @@ def run_circuits(all_qcs,
         api: programming API if not already initialized (default None)
         parallel: enable parallel circuit execution (default False)
     """
+    _check_cudaq_multi_gpu(api)
     get_kernel("grovers_kernel", api=api)
     ex = qedclib.execute
     ex.verbose = verbose
@@ -157,6 +170,8 @@ def run_circuits(all_qcs,
     # Result handler: called for each circuit after execution completes
     def execution_handler(qc, result, num_qubits, circuit_id, num_shots):
         num_qubits = int(num_qubits)
+        if not do_fidelities:
+            return
         counts, fidelity = analyze_and_print_result(qc, result, num_qubits, num_shots,
                 marked_item=int(circuit_id))
         metrics.store_metric(num_qubits, circuit_id, 'fidelity', fidelity)
@@ -199,7 +214,7 @@ def plot_results(
         if plot_results:
             options = {"shots": num_shots, "reps": max_circuits}
             metrics.plot_metrics(
-                f"Benchmark Results - {benchmark_name} - {api if api is not None else 'Qiskit'}",
+                f"Benchmark Results - {benchmark_name} - {api_display_name(api)}",
                 options=options)
 
 
@@ -219,7 +234,7 @@ def run(**kwargs):
         return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
 
     # Step 1: Create the benchmark circuits
-    metrics.init_metrics()
+    metrics.init_metrics(kwargs.get("warmup", False))
     all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
 
     # Step 2: Execute circuits on the target backend
@@ -247,7 +262,10 @@ def get_args():
     parser.add_argument("--use_mcx_shim", action="store_true", help="Use MCX Shim")
     parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
+    parser.add_argument("--skip_fidelity", action="store_true", help="Skip fidelity calculation")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     parser.add_argument("--parallel", "-pm", action="store_true", help="Enable parallel circuit execution")
@@ -262,7 +280,8 @@ if __name__ == '__main__':
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
         num_shots=args.num_shots, use_mcx_shim=args.use_mcx_shim,
         backend_id=args.backend_id,
-        exec_options={"noise_model": None} if args.nonoise else {},
+        exec_options=resolve_exec_options(args),
         api=args.api, max_batch_size=args.max_batch_size,
+        warmup=args.warmup, do_fidelities=not args.skip_fidelity,
         draw_circuits=not args.nodraw, plot_results=not args.noplot,
         parallel=args.parallel)
