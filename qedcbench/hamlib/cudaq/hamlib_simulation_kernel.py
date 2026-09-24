@@ -201,12 +201,21 @@ Extract the coefficients and Pauli words from the provided Hamiltonian for use i
 """
 def extractCoefficients(hamiltonian: cudaq.SpinOperator) -> List[float]:
     result = []
-    hamiltonian.for_each_term(lambda term: result.append(term.get_coefficient().real))
+    if hasattr(hamiltonian, "for_each_term"):
+        hamiltonian.for_each_term(
+            lambda term: result.append(term.get_coefficient().real))
+    else:
+        result.extend(
+            term.evaluate_coefficient().real for term in hamiltonian)
     return result
 
 def extractWords(hamiltonian: cudaq.SpinOperator) -> List[str]:
     result = []
-    hamiltonian.for_each_term(lambda term: result.append(term.to_string(False)))
+    if hasattr(hamiltonian, "for_each_term"):
+        hamiltonian.for_each_term(
+            lambda term: result.append(term.to_string(False)))
+    else:
+        result.extend(term.get_pauli_word() for term in hamiltonian)
     return result
  
  
@@ -367,7 +376,8 @@ def get_expectation(
         ham_op: Union[
                 List[Tuple[str, complex]],
                 List[Tuple[Dict[int, str], complex]]
-            ] = None
+            ] = None,
+        observe_fn: Callable = None
         ):
 
     #print(f"... cudaq_kernel.get_expectation()")
@@ -376,7 +386,9 @@ def get_expectation(
     spin_op = convert_to_spin_op(num_qubits, ham_op)
     #print(f"... spin_op = {spin_op}")
     
-    result = cudaq.observe(qc[0], spin_op, *qc[1])       
+    if observe_fn is None:
+        observe_fn = cudaq.observe
+    result = observe_fn(qc[0], spin_op, *qc[1])
 
     exp = result.expectation()
     

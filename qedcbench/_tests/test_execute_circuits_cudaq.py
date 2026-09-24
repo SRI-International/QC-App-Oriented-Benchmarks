@@ -345,6 +345,35 @@ def test_run_path_noise():
     print("  PASS: typed-return run path applied the configured noise model")
 
 
+def test_hamlib_observe_noise():
+    """Test: HamLib SpinOperator execution uses the central observe wrapper."""
+    print("\n=== test_hamlib_observe_noise ===")
+
+    from qedcbench.hamlib.cudaq import hamlib_simulation_kernel as hamlib_kernel
+
+    circuit = [hamlib_kernel.get_initial_state, [1]]
+    pauli_terms = [({0: "Z"}, 1.0)]
+
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": None}
+    )
+    ideal = hamlib_kernel.get_expectation(
+        circuit, 1, pauli_terms, observe_fn=ex.observe
+    )
+
+    bit_flip = cudaq.NoiseModel()
+    bit_flip.add_all_qubit_channel("x", cudaq.BitFlipChannel(1.0))
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": bit_flip}
+    )
+    noisy = hamlib_kernel.get_expectation(
+        circuit, 1, pauli_terms, observe_fn=ex.observe
+    )
+
+    assert ideal != noisy, f"Expected observe noise to change energy, got {ideal}"
+    print(f"  PASS: HamLib expectation changed from {ideal} to {noisy}")
+
+
 ###########################################################################
 
 if __name__ == '__main__':
@@ -364,6 +393,7 @@ if __name__ == '__main__':
         test_noise_exec_options,
         test_default_noise_behavior,
         test_run_path_noise,
+        test_hamlib_observe_noise,
     ]
 
     passed = 0

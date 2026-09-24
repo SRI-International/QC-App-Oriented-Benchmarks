@@ -658,6 +658,14 @@ def set_noise_model(noise_model = None):
         print(f"... just set noise model to: {noise}")
 
 
+def observe(kernel, spin_operator, *args, **kwargs):
+    """Call cudaq.observe using the active execution noise configuration."""
+    this_noise = _resolve_noise_model()
+    if this_noise is not None:
+        kwargs["noise_model"] = this_noise
+    return cudaq.observe(kernel, spin_operator, *args, **kwargs)
+
+
 # Submit circuit for execution
 # This version executes immediately and calls the result handler
 def submit_circuit (qc, group_id, circuit_id, shots=100, params=None):

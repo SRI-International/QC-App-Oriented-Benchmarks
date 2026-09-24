@@ -707,7 +707,8 @@ def run(min_qubits: int = 2,
                     ## using CUDA-Q get_expectation method
                     if group_method == "SpinOperator":
                         total_energy = hamlib_simulation_kernel.get_expectation(
-                                qc, num_qubits, sparse_pauli_terms)
+                                qc, num_qubits, sparse_pauli_terms,
+                                observe_fn=ex.observe)
                                 
                         term_contributions = None
                     
