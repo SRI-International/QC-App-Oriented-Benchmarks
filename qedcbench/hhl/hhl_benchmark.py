@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 from qedclib import initialize
+from qedclib.backend_utils import (resolve_exec_options)
 
 benchmark_name = "HHL"
 
@@ -18,9 +19,13 @@ def run(**kwargs):
     """Create circuits, execute, and plot. Delegates to qiskit implementation.
     See hhl/qiskit/hhl_benchmark.py for detailed parameter documentation."""
 
-    initialize(kwargs.get('api', None) or "qiskit", "hhl", ["hhl_benchmark"])
+    selected_api = kwargs.get('api', None) or "qiskit"
+    initialize(selected_api, "hhl", ["hhl_benchmark"])
     import hhl_benchmark as hhl_impl
 
+    if selected_api == "cudaq":
+        kwargs.pop("max_batch_size", None)
+        kwargs.pop("parallel", None)
     return hhl_impl.run(**kwargs)
 
 # Backward-compatible alias for notebooks that call run2() with explicit qubit ranges
@@ -46,6 +51,8 @@ def get_args():
     parser.add_argument("--max_batch_size", "-mbs", default=None, help="Max circuits per execution batch", type=int)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     parser.add_argument("--parallel", "-pm", action="store_true", help="Enable parallel circuit execution")
@@ -59,9 +66,13 @@ if __name__ == "__main__":
 
     run(min_qubits=args.min_qubits, max_qubits=args.max_qubits,
         skip_qubits=args.skip_qubits, max_circuits=args.max_circuits,
-        num_shots=args.num_shots, method=args.method,
-        use_best_widths=args.use_best_widths, backend_id=args.backend_id,
-        exec_options={"noise_model": None} if args.nonoise else {},
-        api=args.api, max_batch_size=args.max_batch_size,
+        num_shots=args.num_shots,
+        method=args.method,
+        use_best_widths=args.use_best_widths,
+        backend_id=args.backend_id,
+        exec_options = resolve_exec_options(args),
+        api=args.api,
+        warmup=args.warmup,
+        max_batch_size=args.max_batch_size,
         draw_circuits=not args.nodraw, plot_results=not args.noplot,
         parallel=args.parallel)
