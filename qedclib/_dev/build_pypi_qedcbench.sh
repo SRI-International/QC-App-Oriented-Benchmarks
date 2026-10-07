@@ -15,7 +15,7 @@ echo "=== Building qedcbench package ==="
 rm -rf dist/ build/ qedcbench.egg-info/
 
 # Build
-python -m build
+python -m build --no-isolation
 
 echo ""
 echo "=== Build complete ==="

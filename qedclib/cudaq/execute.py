@@ -147,11 +147,8 @@ parallel_execution = False
 
 _parallel_warning_shown = False
 
-# Parallel execution configuration (reserved for future use)
-_parallel_config = {
-    "gpus_per_circuit": None,
-    "initialized": False
-}
+# If we have performed setup for multi-QPU / parallel circuits.
+_hybrid_initialized = False
 
 
 ###################################################################
@@ -274,6 +271,70 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
     else:
         # Non-leader ranks return empty - caller should check mpi.leader()
         return []
+
+def _execute_parallel_hybrid(circuits: list, num_shots: int, gpus_per_circuit: int) -> list:
+    """
+    Execute circuits in parallel using MPI subcommunicators.
+
+    QPU topology (subcommunicators, GPU assignment) is initialized once by
+    mpi.init_qpus() at benchmark startup. This function only performs the
+    cudaq target setup on the first call, then dispatches circuits to QPU groups.
+
+    Requires: mpi.init_qpus(gpus_per_circuit) already called.
+    """
+    global _hybrid_initialized
+
+    world_rank = mpi.rank
+    qpu_id = mpi.qpu_id
+    num_qpus = mpi.num_qpus
+    is_leader = mpi.is_qpu_leader
+    leaders_comm = mpi.leaders_comm
+
+    # One-time: point cudaq at the QPU subcommunicator.
+    if not _hybrid_initialized:
+        qpu_handle = mpi.get_qpu_handle()
+        target_options = dict(_resolved_target_options)
+        opt_parts = [
+            part.strip()
+            for part in target_options.get("option", "").split(",")
+            if part.strip() and part.strip() != "mqpu"
+        ]
+        if "mgpu" not in opt_parts:
+            opt_parts.append("mgpu")
+        target_options["option"] = ",".join(opt_parts)
+        target_options["comm"] = qpu_handle
+        cudaq.set_target(device or "nvidia", **target_options)
+        cudaq.mpi.set_communicator(qpu_handle)
+        _hybrid_initialized = True
+
+    mpi.barrier()
+
+    block_indices = _get_block_indices(len(circuits), num_qpus)
+    my_start, my_end = block_indices[qpu_id]
+    my_circuits = circuits[my_start:my_end]
+
+    if world_rank == 0:
+        print(f"... MPI hybrid: {mpi.size} ranks, "
+              f"{gpus_per_circuit} GPUs/circuit, {num_qpus} QPUs, "
+              f"{len(circuits)} circuits")
+        print(f"... Distribution: {[(s, e-s) for s, e in block_indices]} circuits per QPU")
+
+    local_results = []
+    this_noise = _resolve_noise_model()
+    for circuit in my_circuits:
+        counts = _sample_or_run(circuit, num_shots, noise=this_noise)
+        local_results.append({k: v for k, v in counts.items()})
+
+    if is_leader:
+        all_results = leaders_comm.gather(local_results, root=0)
+    else:
+        all_results = None
+
+    if world_rank == 0:
+        flattened = [r for block in all_results for r in block]
+        print(f"... Gathered {len(flattened)} results from {num_qpus} QPU leaders")
+        return flattened
+    return []
 
 def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
     """
@@ -477,7 +538,7 @@ def init_execution (handler):
 # Set the backend for execution
 def set_execution_target(backend_id=None, provider_backend=None,
         hub=None, group=None, project=None, exec_options=None,
-        context=None):
+        context=None, gpus_per_circuit=None):
     """
     Set the backend execution target.
     :param backend_id:  device name. List of available devices depends on the provider
@@ -521,13 +582,15 @@ def set_execution_target(backend_id=None, provider_backend=None,
             )
     backend_options.update(target_options)
 
-    if mpi.enabled():
+    hybrid_mode = gpus_per_circuit is not None and gpus_per_circuit > 1
+    if mpi.enabled() and not hybrid_mode:
         opt_parts = [p.strip() for p in backend_options.get("option", "").split(",") if p.strip()]
         if "mgpu" not in opt_parts and "mqpu" not in opt_parts:
             opt_parts.append("mgpu")
         backend_options["option"] = ",".join(opt_parts)
 
-    cudaq.set_target(backend_id, **backend_options)
+    if not hybrid_mode:
+        cudaq.set_target(backend_id, **backend_options)
     backend_exec_options = dict(normalized_options)
     _resolved_target_options = dict(backend_options)
     device = backend_id
@@ -1212,9 +1275,49 @@ def execute_circuit_immed (circuit: list, num_shots: int):
 ###########################################################################
 
 
-def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
+def _normalize_params(params):
+    """Convert params to list-of-dicts format.
+    Accepts: list of dicts, or tuple of (names_list, values_2d_array).
+    Returns: list of dicts mapping param names to values.
     """
-    Execute an array of circuits. Pure execution — no metrics,
+    if params is None:
+        return None
+    if isinstance(params, tuple) and len(params) == 2:
+        names, values_list = params
+        return [dict(zip(names, vals)) for vals in values_list]
+    return params
+
+
+def _bind_params_to_cudaq_circuits(circuit, params):
+    """Expand a single parameterized kernel into [kernel, args] tuples.
+
+    Each entry in params is a dict mapping parameter names to values.
+    Values are extracted and used as kernel arguments.
+
+    Returns: list of [kernel, args_list] tuples.
+    """
+    param_dicts = _normalize_params(params)
+    if param_dicts is None:
+        return None
+
+    kernel = circuit[0]  # circuits are [kernel, args] tuples
+    bound_circuits = []
+    for pd in param_dicts:
+        # Flatten all dict values into a single args list
+        args = []
+        for val in pd.values():
+            if isinstance(val, (list, tuple)):
+                args.extend(val)
+            else:
+                args.append(val)
+        bound_circuits.append([kernel, args])
+
+    return bound_circuits
+
+
+def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, params=None):
+    """
+    Execute an array of circuits. Pure execution -- no metrics,
     no result_handler, no dict knowledge.
 
     Always takes an array. Always returns (job_id, result).
@@ -1228,13 +1331,23 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         gpus_per_circuit: Number of GPUs to pool per circuit.
             None = use all available GPUs together (mgpu if MPI, single GPU if not).
             1 = each GPU runs one circuit independently (max parallelism, requires MPI).
+            M = M GPUs pool per circuit, P/M circuits in parallel (requires MPI, mpi.size % M == 0).
+        params: parameter bindings for repeated execution of a single circuit.
+            None (default): circuits are already fully bound.
+            List of dicts: [{name: value, ...}, ...] one dict per execution.
+            Tuple of (names, values): (["name0", "name1"], [[v0, v1], ...])
+            Values are extracted and passed as kernel arguments.
 
     Returns:
         (job_id, result) tuple:
         - job_id: identifier for the job (serializable)
-        - result: ExecutionResult with get_counts() → list of dicts,
+        - result: ExecutionResult with get_counts() -> list of dicts,
           or None if wait=False
     """
+
+    # Expand parameterized circuit into bound circuits
+    if params is not None:
+        circuits = _bind_params_to_cudaq_circuits(circuits[0], params)
 
     global _warmup_done
     this_noise = _resolve_noise_model()
@@ -1285,10 +1398,13 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         if gpus_per_circuit == 1 or (parallel_execution and gpus_per_circuit is None):
             # Mode 3: each GPU runs one circuit independently (max parallelism)
             counts_array = _execute_parallel_mpi(circuits, num_shots)
-        elif gpus_per_circuit < mpi.size:
-            # Mode 4: hybrid — not yet implemented
+        elif gpus_per_circuit > 1 and mpi.size % gpus_per_circuit == 0:
+            # Mode 4: hybrid — M GPUs pool per circuit, P/M circuits in parallel
+            counts_array = _execute_parallel_hybrid(circuits, num_shots, gpus_per_circuit)
+        elif gpus_per_circuit > 1:
             if mpi.rank == 0:
-                print(f"... WARNING: gpus_per_circuit={gpus_per_circuit} (hybrid mode) not yet implemented, using default execution")
+                print(f"... WARNING: mpi.size ({mpi.size}) not divisible by "
+                      f"gpus_per_circuit ({gpus_per_circuit}), using default execution")
 
     # Default: sequential execution (single GPU or mgpu mode)
     if counts_array is None:
@@ -1482,7 +1598,7 @@ def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=No
 
 
 def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group=False,
-                    gpus_per_circuit=None):
+                    gpus_per_circuit=None, params=None):
     """
     Execute a dict of circuit arrays and store execution metrics.
 
@@ -1532,20 +1648,20 @@ def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group
         from itertools import groupby
         for group_key, group_iter in groupby(circuits_info, key=lambda ci: ci["group"]):
             batch = list(group_iter)
-            _execute_batch(batch, num_shots, max_batch_size, gpus_per_circuit)
+            _execute_batch(batch, num_shots, max_batch_size, gpus_per_circuit, params=params)
     else:
         # Batch by max_batch_size regardless of group boundaries
-        _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit)
+        _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit, params=params)
 
 
-def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=None):
+def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=None, params=None):
     """Internal: execute circuits_info in chunks of max_batch_size."""
     batch_size = max_batch_size or len(circuits_info)
     for i in range(0, len(circuits_info), batch_size):
         batch = circuits_info[i:i + batch_size]
         circuits = [ci["qc"] for ci in batch]
         ts = time.time()
-        job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit)
+        job_id, results = execute_circuits(circuits, num_shots, gpus_per_circuit=gpus_per_circuit, params=params)
         elapsed_time = time.time() - ts
         if results is not None:
             process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)

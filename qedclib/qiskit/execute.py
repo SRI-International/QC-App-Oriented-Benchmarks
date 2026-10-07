@@ -299,7 +299,10 @@ def init_execution(handler):
 def set_execution_target(backend_id='qasm_simulator',
                 provider_module_name=None, provider_name=None, provider_backend=None,
                 hub=None, group=None, project=None, exec_options=None,
-                context=None):
+                context=None, gpus_per_circuit=None):
+    # DEVNOTE: gpus_per_circuit is accepted but ignored for Qiskit.
+    # It is a CUDA-Q concept (statevector sharing across GPUs).
+    # Remove this parameter when gpus_per_circuit moves into exec_options.
     """
     Set the backend execution target.
     :param backend_id:  device name. List of available devices depends on the provider
@@ -954,7 +957,7 @@ def test_execution():
 #   Level 3 (benchmark): calls submit_circuits or Level 1 directly
 ###########################################################################
 
-def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group=False):
+def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group=False, params=None):
     """
     Execute a dict of circuit arrays and store execution metrics.
 
@@ -1003,15 +1006,59 @@ def submit_circuits(circuits, num_shots=100, max_batch_size=None, batch_by_group
         from itertools import groupby
         for group_key, group_iter in groupby(circuits_info, key=lambda ci: ci["group"]):
             batch = list(group_iter)
-            _execute_batch(batch, num_shots, max_batch_size)
+            _execute_batch(batch, num_shots, max_batch_size, params=params)
     else:
         # Batch by max_batch_size regardless of group boundaries
-        _execute_batch(circuits_info, num_shots, max_batch_size)
+        _execute_batch(circuits_info, num_shots, max_batch_size, params=params)
 
 
-def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
+def _normalize_params(params):
+    """Convert params to list-of-dicts format.
+    Accepts: list of dicts, or tuple of (names_list, values_2d_array).
+    Returns: list of dicts mapping param names/objects to values.
     """
-    Execute an array of circuits. Pure execution — no metrics,
+    if params is None:
+        return None
+    if isinstance(params, tuple) and len(params) == 2:
+        names, values_list = params
+        return [dict(zip(names, vals)) for vals in values_list]
+    return params
+
+
+def _bind_params_to_circuits(circuit, params):
+    """Expand a single parameterized circuit into bound circuits using params.
+
+    Each entry in params is a dict mapping parameter identifiers to values.
+    Keys can be string names or native Parameter/ParameterVector objects.
+    String names are looked up from circuit.parameters by name.
+
+    Returns: list of fully-bound circuits.
+    """
+    param_dicts = _normalize_params(params)
+    if param_dicts is None:
+        return None
+
+    # Build lookup for string-name keys (skip if keys are already Parameter objects)
+    first_key = next(iter(param_dicts[0]))
+    if isinstance(first_key, str):
+        param_lookup = {p.name: p for p in circuit.parameters}
+    else:
+        param_lookup = None
+
+    bound_circuits = []
+    for pd in param_dicts:
+        if param_lookup is not None:
+            qiskit_dict = {param_lookup[name]: val for name, val in pd.items()}
+        else:
+            qiskit_dict = pd
+        bound_circuits.append(circuit.assign_parameters(qiskit_dict))
+
+    return bound_circuits
+
+
+def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, params=None):
+    """
+    Execute an array of circuits. Pure execution -- no metrics,
     no result_handler, no dict knowledge.
 
     Always takes an array. Always returns (job_id, result).
@@ -1027,13 +1074,22 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         wait: if True (default), block until results are ready.
               if False, return immediately with result=None.
         gpus_per_circuit: accepted for API compatibility with cudaq (ignored here)
+        params: parameter bindings for repeated execution of a single circuit.
+            None (default): circuits are already fully bound.
+            List of dicts: [{name: value, ...}, ...] one dict per execution.
+            Tuple of (names, values): (["name0", "name1"], [[v0, v1], ...])
+            Keys can be string names or native Parameter/ParameterVector objects.
 
     Returns:
         (job_id, result) tuple:
         - job_id: identifier for the job (serializable)
-        - result: ExecutionResult with get_counts() → list of dicts,
+        - result: ExecutionResult with get_counts() -> list of dicts,
           or None if wait=False
     """
+
+    # Expand parameterized circuit into bound circuits
+    if params is not None:
+        circuits = _bind_params_to_circuits(circuits[0], params)
 
     # Route to parallel execution if enabled (implementation in execute_parallel.py)
     if parallel_execution and circuits and len(circuits) > 1:
@@ -1107,12 +1163,18 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None):
         # Execute on appropriate path
         if sampler is not None:
             # Sampler path (IBM Runtime, StatevectorSampler, AerSampler)
-            ts_transpile = time.time()
-            trans_qcs = transpile(circuits, backend,
-                optimization_level=optimization_level,
-                layout_method=layout_method,
-                routing_method=routing_method)
-            last_transpile_time = time.time() - ts_transpile
+            from qiskit.primitives import StatevectorSampler as _SvSampler
+            if isinstance(sampler, _SvSampler):
+                # StatevectorSampler is pure math — no device constraints, skip transpilation
+                trans_qcs = circuits if isinstance(circuits, list) else [circuits]
+                last_transpile_time = 0.0
+            else:
+                ts_transpile = time.time()
+                trans_qcs = transpile(circuits, backend,
+                    optimization_level=optimization_level,
+                    layout_method=layout_method,
+                    routing_method=routing_method)
+                last_transpile_time = time.time() - ts_transpile
 
             # set job tags if SamplerV2 on IBM Quantum Platform (max 8 tags allowed)
             if hasattr(sampler, "options") and hasattr(sampler.options, "environment"):
@@ -1305,7 +1367,7 @@ def execute_circuit_groups(circuit_groups, num_shots_list=None, num_shots=None):
     return (last_job_id, group_results)
 
 
-def _execute_batch(circuits_info, num_shots, max_batch_size):
+def _execute_batch(circuits_info, num_shots, max_batch_size, params=None):
     """Internal: execute circuits_info in chunks of max_batch_size."""
     global cancel_requested
     cancel_requested = False
@@ -1317,12 +1379,12 @@ def _execute_batch(circuits_info, num_shots, max_batch_size):
         batch = circuits_info[i:i + batch_size]
         circuits = [ci["qc"] for ci in batch]
         ts = time.time()
-        job_id, results = execute_circuits(circuits, num_shots)
+        job_id, results = execute_circuits(circuits, num_shots, params=params)
         elapsed_time = time.time() - ts
         if results is not None:
             process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
         else:
-            print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) — skipping')
+            print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) -- skipping')
 
 
 def process_circuit_results(circuits_info, results, job_id=None, elapsed_time=None, num_shots=None):
@@ -1458,6 +1520,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
     if hasattr(raw_result, 'to_dict'):
         try:
             result_dict = raw_result.to_dict()
+            #print(f"... in to_dict branch: {raw_result}", flush=True)
 
             if verbose_time:
                 print(f"... _extract_per_circuit_times: to_dict() path, {num_circuits} circuits")
@@ -1504,6 +1567,10 @@ def _extract_per_circuit_times(raw_result, num_circuits):
     # Now we submit batches, so we need per-pub metadata for individual circuit timing.
     if hasattr(raw_result, 'metadata'):
 
+        #print(f"... in metadata branch: {raw_result}", flush=True)
+        #execution_spans = raw_result.metadata['execution']['execution_spans']
+        #print(f"... exec info: {execution_spans}", flush=True)
+
         if verbose_time:
             print(f"... _extract_per_circuit_times: PrimitiveResult path, {num_circuits} circuits")
             print(f"... top-level metadata keys: {list(raw_result.metadata.keys()) if isinstance(raw_result.metadata, dict) else type(raw_result.metadata)}")
@@ -1528,8 +1595,11 @@ def _extract_per_circuit_times(raw_result, num_circuits):
                 if isinstance(pub_meta, dict):
                     if 'execution' in pub_meta:
                         try:
-                            spans = pub_meta['execution']['execution_spans']['__value__']['spans']
-                            per_times.append(spans[0].duration)
+                            # DEVNOTE: pre-2.5 code commented out (deprecate later)
+                            #spans = pub_meta['execution']['execution_spans']['__value__']['spans']
+                            #per_times.append(spans[0].duration)
+                            spans = pub_meta['execution']['execution_spans']
+                            per_times.append(spans.duration)
                             continue
                         except (KeyError, TypeError, AttributeError, IndexError):
                             pass
@@ -1556,18 +1626,24 @@ def _extract_per_circuit_times(raw_result, num_circuits):
             # Try execution_spans (IBM hardware)
             try:
                 if 'execution' in metadata:
-                    spans = metadata['execution']['execution_spans']['__value__']['spans']
+                    spans = metadata['execution']['execution_spans']
+
+                    duration = 0.0
+                    if hasattr(spans, 'duration'):
+                        duration = spans.duration
+
+                    # DEVNOTE: handle pre-2.5 version of Qiskit (deprecate later)
+                    else:
+                        spans = spans['__value__']['spans']
+                        duration = spans[0].duration
+
+                    avg = duration / num_circuits
                     if verbose_time:
-                        print(f"... top-level execution_spans: {len(spans)} spans")
-                        for i, span in enumerate(spans[:3]):
-                            print(f"...   span[{i}]: duration={span.duration}")
-                    if len(spans) >= num_circuits:
-                        return [span.duration for span in spans[:num_circuits]]
-                    elif len(spans) == 1:
-                        avg = spans[0].duration / num_circuits
-                        if verbose_time:
-                            print(f"... single span, dividing evenly: {avg}")
-                        return [avg] * num_circuits
+                        print(f"... duration: {duration}", flush=True)
+                        print(f"... single span, dividing evenly: {avg}")
+
+                    return [avg] * num_circuits
+
             except (KeyError, TypeError, AttributeError, IndexError):
                 pass
 

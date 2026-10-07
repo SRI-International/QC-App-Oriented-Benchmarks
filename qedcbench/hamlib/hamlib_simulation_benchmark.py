@@ -362,6 +362,14 @@ def run(min_qubits: int = 2,
     from hamlib._common import hamlib_utils
     from hamlib._common import observables
 
+    # DEVNOTE: Direct qcb_mpi calls here are inconsistent with other benchmarks,
+    # which use qedclib.is_leader() and don't call mpi directly.
+    # Future cleanup: remove mpi.init() (handled by initialize()), expose init_qpus
+    # through qedclib top-level, and move gpus_per_circuit into exec_options.
+    mpi.init()
+    if do_observables:
+        mpi.init_qpus(gpus_per_circuit)
+
     ##########
 
     print(f"{benchmark_name} Benchmark Program - {api_display_name(api)}")
@@ -379,10 +387,20 @@ def run(min_qubits: int = 2,
     # print(f"... verbose = {verbose}")
     # print(f"... data_suffix = {data_suffix}")
     ex.verbose = verbose
-    metrics.data_suffix = data_suffix
     hamlib_simulation_kernel.verbose = verbose
     hamlib_utils.verbose = verbose
-    
+
+    # data_suffix set on metricc takes precedence
+    global data_suffix
+    if metrics.data_suffix != None and len(metrics.data_suffix) > 0:
+        data_suffix = metrics.data_suffix
+        # print(f"... set data_suffix to same as metrics <{data_suffix}>")
+
+    # otherwise, use value passed by env or cmd line argument
+    else:
+        metrics.data_suffix = data_suffix
+        # print(f"... set metrics.data_suffix to same as incoming <{data_suffix}>")
+
     ##########
     
     hamiltonian_name = hamiltonian
@@ -439,7 +457,7 @@ def run(min_qubits: int = 2,
     ex.init_execution(execution_handler)
     ex.set_execution_target(backend_id, provider_backend=provider_backend,
             hub=hub, group=group, project=project, exec_options=exec_options,
-            context=context)
+            context=context, gpus_per_circuit=gpus_per_circuit)
     ex.parallel_execution = parallel
 
     # Warn if parallel is requested with a group method that doesn't use sampling

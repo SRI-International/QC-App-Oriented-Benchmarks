@@ -21,7 +21,7 @@ copy pyproject.toml pyproject-main-save.toml >nul
 copy pyproject-qedclib.toml pyproject.toml >nul
 
 REM Build
-python -m build
+python -m build --no-isolation
 set BUILD_RC=%errorlevel%
 
 REM Restore main pyproject.toml (always, even if build failed)

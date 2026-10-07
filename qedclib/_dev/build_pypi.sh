@@ -26,7 +26,7 @@ restore_pyproject() {
 trap restore_pyproject EXIT
 
 # Build
-python -m build
+python -m build --no-isolation
 
 echo ""
 echo "=== Build complete ==="

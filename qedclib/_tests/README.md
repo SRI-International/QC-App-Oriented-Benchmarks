@@ -18,6 +18,7 @@ From the repo root: `pip install -e .`
 | `05_submit_with_metrics.py` | submit_circuits with metrics collection | `python 05_submit_with_metrics.py` |
 | `11_execute_parallel.py` | Circuit-level parallel execution | See below |
 | `12_execute_groups_parallel.py` | Group-level parallel execution | `python 12_execute_groups_parallel.py` |
+| `14_execute_parameterized.py` | Parameterized circuit execution via `params` arg | `python 14_execute_parameterized.py` |
 
 ## Parallel Execution Tests
 
