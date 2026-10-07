@@ -1,4 +1,4 @@
-name: Test Hydrogen-Lattice on Push
+name: Test Benchmarks on Push
 
 on:
   push:
@@ -7,8 +7,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.11', '3.12']
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -18,23 +19,18 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install hydrogen lattice dependencies
-      run: pip install -r hydrogen_lattice/qiskit/requirements.txt
-      working-directory: ./
+    - name: Install package and test dependencies
+      run: pip install -e . pytest scipy qiskit qiskit-aer
 
-    - name: Install hamiltonian simulation dependencies
-      run: pip install -r hamiltonian_simulation/qiskit/requirements.txt
-      working-directory: ./
-      
     - name: Check Qiskit version
       run: |
-        pip list | grep qiskit
+        pip list | grep -i qiskit || true
         python -c "import qiskit; print(f'Qiskit version: {qiskit.__version__}')"
 
     - name: Run hydrogen lattice tests
       run: pytest
-      working-directory: ./hydrogen_lattice/qiskit
+      working-directory: ./qedcbench/hydrogen_lattice/qiskit
 
     - name: Run hamiltonian simulation tests
       run: pytest
-      working-directory: ./hamiltonian_simulation/qiskit
+      working-directory: ./qedcbench/hamiltonian_simulation/qiskit
