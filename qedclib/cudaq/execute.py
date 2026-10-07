@@ -37,6 +37,90 @@ import cudaq
 
 verbose = False
 
+# Dispatch helper for cudaq.sample vs cudaq.run.
+#
+# cudaq.sample is the default and is much faster (it samples N shots from a
+# single statevector simulation). Its global register only retains the final
+# qubit state, so it cannot expose per-shot mid-circuit measurement values
+# back to the kernel or the caller. cudaq.run instead executes the kernel
+# once per shot and returns the kernel's typed return value per shot, which
+# is what mid-circuit-measurement and feedforward benchmarks need
+# (e.g., BV m=2, HHL with post-selection, Shor's m=1 and m=2).
+#
+# cudaq.run is selected when either:
+#   (a) the @cudaq.kernel declares a return type (detected via
+#       kernel.return_type), or
+#   (b) the circuit handle includes an options dict with run_result=True,
+#       e.g., circuit = [kernel, params, {"run_result": True,
+#                                         "result_width": N}].
+#
+# Per-shot return shapes handled:
+#   * list[bool] / tuple — joined into a bitstring with element 0 leftmost.
+#   * int — formatted as a binary string of width result_width (default 1).
+#
+# Additional options (all default False):
+#   explicit_measurements — pass through to cudaq.sample to capture sequential
+#       mid-circuit measurements into the count key.
+#   reverse_bit_order — reverse each count key string before returning.
+#   counts_dict — convert the SampleResult to a plain dict (some analyzers
+#       depend on full dict APIs like .keys()).
+def _get_circuit_options(circuit):
+    if len(circuit) > 2 and isinstance(circuit[2], dict):
+        return circuit[2]
+    return {}
+
+
+def _bind_circuit_params(circuit, params=None):
+    if params is None:
+        return circuit
+
+    options = _get_circuit_options(circuit)
+    indices = options.get("parameterized_indices")
+    if not indices:
+        return circuit
+
+    bound_params = list(circuit[1])
+    for name, index in indices.items():
+        bound_params[index] = params[name]
+
+    if len(circuit) > 2:
+        return [circuit[0], bound_params, circuit[2]]
+    return [circuit[0], bound_params]
+
+
+def _sample_or_run(circuit, num_shots, noise=None):
+    kernel = circuit[0]
+    params = circuit[1]
+    options = _get_circuit_options(circuit)
+
+    sample_kwargs = {"shots_count": num_shots}
+    if noise is not None:
+        sample_kwargs["noise_model"] = noise
+
+    use_run = options.get("run_result") or getattr(kernel, "return_type", None) is not None
+    if use_run:
+        run_results = cudaq.run(kernel, *params, **sample_kwargs)
+        counts = {}
+        width = options.get("result_width")
+        for shot in run_results:
+            if isinstance(shot, (list, tuple)):
+                key = "".join("1" if b else "0" for b in shot)
+            else:
+                bitlen = width if width is not None else 1
+                key = format(int(shot), f"0{bitlen}b")
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    if options.get("explicit_measurements"):
+        sample_kwargs["explicit_measurements"] = True
+
+    result = cudaq.sample(kernel, *params, **sample_kwargs)
+    if options.get("reverse_bit_order"):
+        return {bits[::-1]: count for bits, count in result.items()}
+    if options.get("counts_dict"):
+        return {bits: count for bits, count in result.items()}
+    return result
+
 # Timing decomposition — set by execute_circuits after each call.
 # Callers (e.g. hamlib) can read these to report meaningful timing breakdowns.
 last_transpile_time = 0.0    # cudaq has minimal transpilation
@@ -52,7 +136,7 @@ def request_cancel():
     cancel_requested = True
 
 # Auto-warmup: execute a tiny circuit on first call to execute_circuits() to prime the JIT
-auto_warmup = True
+auto_warmup = False
 _warmup_done = False
 
 # Parallel execution flag — when True, execute_circuits() will distribute
@@ -132,12 +216,19 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
         return None  # Fall back to sequential
 
     # Override mgpu mode - each rank uses single GPU
-    # This is critical: mgpu pools all GPUs for ONE circuit, we want the opposite
-    if rank == 0 and verbose:
+    # This is critical: mgpu pools all GPUs for ONE circuit, we want the opposite.
+    # Preserve precision and any other user-supplied flags by stripping only
+    # mgpu/mqpu from the resolved options.
+    if rank == 0:
         print(f"... MPI parallel: {size} ranks, {len(circuits)} circuits")
         print(f"... Setting single-GPU target (overriding mgpu)")
 
-    cudaq.set_target("nvidia", option="fp32")
+    base_opt = _resolved_target_options.get("option", "fp32")
+    opt_parts = [p.strip() for p in base_opt.split(",")
+                 if p.strip() and p.strip() not in ("mgpu", "mqpu")]
+    if not opt_parts:
+        opt_parts.append("fp32")
+    cudaq.set_target("nvidia", option=",".join(opt_parts))
 
     # Synchronize before distribution
     mpi.barrier()
@@ -153,13 +244,10 @@ def _execute_parallel_mpi(circuits: list, num_shots: int) -> list:
 
     # Execute this rank's circuits
     local_results = []
+    this_noise = _resolve_noise_model()
     for circuit in my_circuits:
         try:
-            kernel, params = circuit[0], circuit[1]
-            if noise is None:
-                counts = cudaq.sample(kernel, *params, shots_count=num_shots)
-            else:
-                counts = cudaq.sample(kernel, *params, shots_count=num_shots, noise_model=noise)
+            counts = _sample_or_run(circuit, num_shots, noise=this_noise)
             # Convert cudaq result to dict
             local_results.append({k: v for k, v in counts.items()})
         except KeyboardInterrupt:
@@ -205,7 +293,17 @@ def _execute_parallel_hybrid(circuits: list, num_shots: int, gpus_per_circuit: i
     # One-time: point cudaq at the QPU subcommunicator.
     if not _hybrid_initialized:
         qpu_handle = mpi.get_qpu_handle()
-        cudaq.set_target("nvidia", option="mgpu", comm=qpu_handle)
+        target_options = dict(_resolved_target_options)
+        opt_parts = [
+            part.strip()
+            for part in target_options.get("option", "").split(",")
+            if part.strip() and part.strip() != "mqpu"
+        ]
+        if "mgpu" not in opt_parts:
+            opt_parts.append("mgpu")
+        target_options["option"] = ",".join(opt_parts)
+        target_options["comm"] = qpu_handle
+        cudaq.set_target(device or "nvidia", **target_options)
         cudaq.mpi.set_communicator(qpu_handle)
         _hybrid_initialized = True
 
@@ -222,11 +320,9 @@ def _execute_parallel_hybrid(circuits: list, num_shots: int, gpus_per_circuit: i
         print(f"... Distribution: {[(s, e-s) for s, e in block_indices]} circuits per QPU")
 
     local_results = []
+    this_noise = _resolve_noise_model()
     for circuit in my_circuits:
-        kernel, params = circuit[0], circuit[1]
-        counts = (
-            cudaq.sample(kernel, *params, shots_count=num_shots) if noise is None
-            else cudaq.sample(kernel, *params, shots_count=num_shots, noise_model=noise))
+        counts = _sample_or_run(circuit, num_shots, noise=this_noise)
         local_results.append({k: v for k, v in counts.items()})
 
     if is_leader:
@@ -265,7 +361,12 @@ def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
     if rank == 0 and verbose:
         print(f"... MPI group-parallel: {size} ranks, {len(circuit_groups)} groups")
 
-    cudaq.set_target("nvidia", option="fp32")
+    base_opt = _resolved_target_options.get("option", "fp32")
+    opt_parts = [p.strip() for p in base_opt.split(",")
+                 if p.strip() and p.strip() not in ("mgpu", "mqpu")]
+    if not opt_parts:
+        opt_parts.append("fp32")
+    cudaq.set_target("nvidia", option=",".join(opt_parts))
     mpi.barrier()
 
     # Distribute groups across ranks
@@ -278,6 +379,7 @@ def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
 
     # Execute this rank's groups
     local_group_results = []
+    this_noise = _resolve_noise_model()
     for g_idx in range(my_start, my_end):
         circuits = circuit_groups[g_idx]
         shots = num_shots_list[g_idx]
@@ -286,11 +388,7 @@ def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
         counts_array = []
         for circuit in circuits:
             try:
-                kernel, params = circuit[0], circuit[1]
-                if noise is None:
-                    result = cudaq.sample(kernel, *params, shots_count=shots)
-                else:
-                    result = cudaq.sample(kernel, *params, shots_count=shots, noise_model=noise)
+                result = _sample_or_run(circuit, shots, noise=this_noise)
                 counts_array.append({k: v for k, v in result.items()})
             except KeyboardInterrupt:
                 raise
@@ -323,8 +421,20 @@ def _execute_groups_parallel_mpi(circuit_groups, num_shots_list):
         return (pseudo_job.job_id(), [ExecutionResult([]) for _ in circuit_groups])
 
 
-#noise = 'DEFAULT'
-noise=None
+# The module-level model is the fallback used when exec_options does not
+# override noise_model. It is initialized after default_noise_model() is
+# defined below.
+noise = None
+
+# Execution options for the active target. Keeping the per-target override
+# separate from the module-level model prevents one run's --nonoise setting
+# from leaking into the next target configuration.
+backend_exec_options = {}
+
+# Tracks the most recent cudaq target options resolved by set_execution_target.
+# Read by _execute_parallel_mpi when it needs to strip mgpu while preserving
+# the user-requested precision and any other flags.
+_resolved_target_options = {"option": "fp32"}
 
 # Initialize circuit execution module
 # Create array of batched circuits and a dict of active circuits 
@@ -334,8 +444,12 @@ batched_circuits = [ ]
 active_circuits = { }
 result_handler = None
 
-# save the executing device (backend_id) here
-device = None
+# Save the executing device (backend_id) here. Before set_execution_target()
+# is called, use CUDA-Q's actual process default.
+try:
+    device = cudaq.get_target().name
+except Exception:
+    device = None
 
 #######################
 # SUPPORTING CLASSES
@@ -434,7 +548,7 @@ def set_execution_target(backend_id=None, provider_backend=None,
     set_execution_target(backend_id='aqt_qasm_simulator', 
                         provider_backende=aqt.backends.aqt_qasm_simulator)
     """
-    global backend
+    global backend, backend_exec_options, device, _resolved_target_options
 
     # in case anyone uses a name similar to that used in other APIs
     if backend_id == "cudaq_simulator":
@@ -447,38 +561,46 @@ def set_execution_target(backend_id=None, provider_backend=None,
     # if a custom provider backend is given, set it; currently unused
     if provider_backend != None:
         backend = provider_backend
-    
-    # When hybrid mode (gpus_per_circuit > 1) is used, skip cudaq.set_target here.
+
+    normalized_options = _normalize_exec_options(exec_options)
+
+    # Resolve target options: start from the user's `exec_options` (parsed as
+    # JSON or supplied as a dict) or fall back to fp32. Execution-only keys
+    # such as noise_model are removed before calling cudaq.set_target().
+    # When MPI is enabled, add `mgpu` to the
+    # option list unless the user has already chosen a multi-GPU mode.
+    # This preserves any precision the user requested (e.g. fp64) under MPI.
+    backend_options = {"option": "fp32"}
+    target_options = {
+        key: value for key, value in normalized_options.items()
+        if key != "noise_model"
+    }
+    for key, value in target_options.items():
+        if not isinstance(value, (str, int, float, bool)):
+            raise ValueError(
+                f"`exec_options[{key!r}]` must be str, int, float, or bool"
+            )
+    backend_options.update(target_options)
+
     hybrid_mode = gpus_per_circuit is not None and gpus_per_circuit > 1
+    if mpi.enabled() and not hybrid_mode:
+        opt_parts = [p.strip() for p in backend_options.get("option", "").split(",") if p.strip()]
+        if "mgpu" not in opt_parts and "mqpu" not in opt_parts:
+            opt_parts.append("mgpu")
+        backend_options["option"] = ",".join(opt_parts)
+
     if not hybrid_mode:
-        backend_options = {"option" : "fp32"}
-        if mpi.enabled():
-            backend_options = {"option" : "mgpu,fp32"}
-        elif exec_options is not None and isinstance(exec_options, str):
-            try:
-                backend_options = json.loads(exec_options)
-                for key, value in backend_options.items():
-                    if not isinstance(key, str):
-                        raise ValueError("`exec_options` keys must be strings")
-                    if not isinstance(value, (str, int, float, bool)):
-                        raise ValueError("`exec_options` values must be str, int, float, or bool")
-            except:
-                print(f"    ... Invalid `exec_options`; using default options.")
-
         cudaq.set_target(backend_id, **backend_options)
+    backend_exec_options = dict(normalized_options)
+    _resolved_target_options = dict(backend_options)
+    device = backend_id
 
-    # Handle noise_model in exec_options (same pattern as qiskit)
-    # Values: None = no noise, "default" = built-in depolarization model, or a cudaq.NoiseModel object
-    global noise
-    if exec_options is not None and isinstance(exec_options, dict):
-        if "noise_model" in exec_options:
-            nm = exec_options["noise_model"]
-            if nm == "default":
-                set_default_noise_model()
-            else:
-                noise = nm
-            if verbose:
-                print(f"  ... noise model set from exec_options: {noise}")
+    # Resolve once during setup to validate the requested model and report it
+    # in verbose mode. Execution paths resolve again so set_noise_model()
+    # remains effective after target configuration.
+    this_noise = _resolve_noise_model()
+    if verbose:
+        print(f"  ... noise model set from exec_options: {this_noise}")
 
     # create an informative device name used by the metrics module
     device_name = backend_id
@@ -486,61 +608,139 @@ def set_execution_target(backend_id=None, provider_backend=None,
 
     print(f"... configure execution for target backend_id = {backend_id}")
 
-# CUDA-Q supports several different models of noise. In this default
-# case, we use the modeling of depolarization noise only. This
-# depolarization will result in the qubit state decaying into a mix
-# of the basis states, |0> and |1>, with a user provided probability.
-# DEVNOTE: there are no two qubit error settings here
+_NOISE_CAPABLE_TARGETS = {
+    "nvidia",
+    "tensornet",
+    "tensornet-mps",
+    "density-matrix-cpu",
+}
+_noise_warning_targets = set()
+
+
+def _normalize_exec_options(exec_options):
+    if exec_options is None:
+        return {}
+    if isinstance(exec_options, str):
+        try:
+            exec_options = json.loads(exec_options)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON in `exec_options`: {exc}") from exc
+    if not isinstance(exec_options, dict):
+        raise TypeError("`exec_options` must be a dict, JSON object string, or None")
+    if any(not isinstance(key, str) for key in exec_options):
+        raise ValueError("`exec_options` keys must be strings")
+    return dict(exec_options)
+
+
+def default_noise_model():
+    """Return the built-in CUDA-Q model corresponding to Qiskit's default."""
+    model = cudaq.NoiseModel()
+    depol_one_qb_error = cudaq.DepolarizationChannel(0.0005)
+    depol_two_qb_error = cudaq.Depolarization2(0.005)
+
+    # CUDA-Q kernels are not transpiled to Qiskit's rx/ry/rz/cx basis, so add
+    # the same one-qubit rate to every primitive used by the benchmark kernels.
+    for gate in ("x", "y", "z", "h", "s", "t", "rx", "ry", "rz", "r1"):
+        model.add_all_qubit_channel(gate, depol_one_qb_error)
+
+    # Controlled CUDA-Q operations are registered by base operator plus the
+    # number of controls. This covers cx/cy/cz and controlled rotations.
+    for gate in ("x", "y", "z", "h", "rx", "ry", "rz", "r1"):
+        model.add_all_qubit_channel(
+            gate, depol_two_qb_error, num_controls=1
+        )
+
+    # Qiskit's configured readout probabilities are both zero, so no CUDA-Q
+    # measurement channel is required. CUDA-Q does not directly support
+    # attaching quantum errors to mz in the current API. The current API also
+    # rejects channels on reset and swap operations.
+    metrics.QV = 2048
+    return model
+
+
 def set_default_noise_model():
     global noise
-    
-    # We will begin by defining an empty noise model that we will add
-    # our depolarization channel to.
-    noise = cudaq.NoiseModel()
-
-    # We define a depolarization channel setting the probability
-    # of the qubit state being scrambled to `1.0`.
-    depolarization = cudaq.DepolarizationChannel(0.04)
-    
-    phase_flip = cudaq.PhaseFlipChannel(0.2)
-
-    for i in range(30):
-        noise.add_channel('x', [i], depolarization)
-        noise.add_channel('y', [i], depolarization)
-        noise.add_channel('z', [i], depolarization)
-        
-        noise.add_channel('h', [i], depolarization)
-        
-        # consider adding this
-        #noise.add_channel('x', [i], phase_flip)
-        #noise.add_channel('y', [i], phase_flip)
-        #noise.add_channel('z', [i], phase_flip)
-        
-        noise.add_channel('rx', [i], depolarization)
-        noise.add_channel('ry', [i], depolarization)
-        noise.add_channel('rz', [i], depolarization)
-    
+    noise = default_noise_model()
     if verbose:
         print(f"  ... just set DEFAULT noise model to: {noise}")
+    return noise
+
+
+def _target_supports_noise(backend_id):
+    return (backend_id or "").lower() in _NOISE_CAPABLE_TARGETS
+
+
+def _resolve_noise_model():
+    requested = backend_exec_options.get("noise_model", noise)
+    if isinstance(requested, str):
+        if requested != "default":
+            raise ValueError(
+                '`noise_model` must be None, "default", or a cudaq.NoiseModel'
+            )
+        requested = default_noise_model()
+    elif requested is not None and not isinstance(requested, cudaq.NoiseModel):
+        raise TypeError(
+            '`noise_model` must be None, "default", or a cudaq.NoiseModel'
+        )
+
+    if requested is None or _target_supports_noise(device):
+        return requested
+
+    # Match Qiskit's simulator-only behavior. Default noise is silently omitted
+    # on unsupported targets; explicitly requested noise gets one clear warning.
+    if "noise_model" in backend_exec_options and device not in _noise_warning_targets:
+        print(
+            f"... WARNING: noise_model requested for target {device!r}, "
+            "which does not support CUDA-Q noisy simulation; running noiseless"
+        )
+        _noise_warning_targets.add(device)
+    return None
+
+
+# Qiskit initializes its qasm simulator with the built-in model. Keep the same
+# fallback policy for CUDA-Q noise-capable simulators.
+noise = default_noise_model()
 
 # Configure execution to use the given noise model
 def set_noise_model(noise_model = None):
-    
     global noise
-    noise = noise_model
+    if isinstance(noise_model, str):
+        if noise_model != "default":
+            raise ValueError(
+                '`noise_model` must be None, "default", or a cudaq.NoiseModel'
+            )
+        noise = default_noise_model()
+    elif noise_model is None or isinstance(noise_model, cudaq.NoiseModel):
+        noise = noise_model
+    else:
+        raise TypeError(
+            '`noise_model` must be None, "default", or a cudaq.NoiseModel'
+        )
     
     if verbose:
         print(f"... just set noise model to: {noise}")
 
 
+def observe(kernel, spin_operator, *args, **kwargs):
+    """Call cudaq.observe using the active execution noise configuration."""
+    this_noise = _resolve_noise_model()
+    if this_noise is not None:
+        kwargs["noise_model"] = this_noise
+    return cudaq.observe(kernel, spin_operator, *args, **kwargs)
+
+
 # Submit circuit for execution
 # This version executes immediately and calls the result handler
-def submit_circuit (qc, group_id, circuit_id, shots=100):
+def submit_circuit (qc, group_id, circuit_id, shots=100, params=None):
+    if mpi.enabled():
+        mpi.barrier()
+
+    submit_time = time.time()
 
     # store circuit in array with submission time and circuit info
     batched_circuits.append(
         { "qc": qc, "group": str(group_id), "circuit": str(circuit_id),
-            "submit_time": time.time(), "shots": shots }
+            "submit_time": submit_time, "shots": shots, "params": params }
     )
     #print("... submit circuit - ", str(batched_circuits[len(batched_circuits)-1]))
     
@@ -560,12 +760,14 @@ def execute_circuit (batched_circuit):
         print(f'... execute_circuit({batched_circuit["group"]}, {batched_circuit["circuit"]})')
 
     active_circuit = copy.copy(batched_circuit)
-    active_circuit["launch_time"] = time.time()
     
     num_shots = batched_circuit["shots"]
     
     # Initiate execution 
-    circuit = batched_circuit["qc"]
+    circuit = _bind_circuit_params(
+        batched_circuit["qc"], batched_circuit.get("params")
+    )
+    active_circuit["qc"] = circuit
     
     ############
     
@@ -575,17 +777,17 @@ def execute_circuit (batched_circuit):
     # draw the circuit, but only for debugging
     # print(cudaq.draw(circuit[0], *circuit[1]))
     
+    if mpi.enabled():
+        mpi.barrier()
+
     ts = time.time()
+    active_circuit["launch_time"] = ts
     
     # call sample() on circuit with its list of arguments
     try:
-        if verbose: print(f"... during exec, noise model is: {noise}")
-        if noise is None:
-            if verbose: print("... executing without noise")
-            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
-        else:
-            if verbose: print("... executing WITH noise")
-            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+        this_noise = _resolve_noise_model()
+        if verbose: print(f"... during exec, noise model is: {this_noise}")
+        result = _sample_or_run(circuit, num_shots, noise=this_noise)
     except KeyboardInterrupt:
         raise
     except Exception as e:
@@ -599,23 +801,17 @@ def execute_circuit (batched_circuit):
     # control results print at benchmark level
     #if verbose: print(result)
 
+    if mpi.enabled():
+        mpi.barrier()
+
     exec_time = time.time() - ts
 
     # store the result object on the job for processing in job_complete
     job.executor_result = result
     job.exec_time = exec_time
-    
+
     if verbose:
         print(f"... result = {len(result)} {result}")
-        ''' for debugging, a better way to see the counts, as the type of result is something Quake
-        for key, val in result.items():
-            print(f"... {key}:{val}")
-        '''
-        print(f"... register names = {result.register_names}")
-        print(result.dump())
-        #print(f"... register dump = {result.get_register_counts('__global__').dump()}")
-        #result.get_register_counts("b1").dump()
-        #print(result.get_sequential_data())
         
     # put job into the active circuits with circuit info
     active_circuits[job] = active_circuit
@@ -651,14 +847,13 @@ def get_circuit_metrics(qc, qc_size):
         
         total_gates = resources.count()
         
+        controlled_gates = ['x', 'y', 'z', 'r1', 'rx', 'ry', 'rz']
         two_qubit_gates = 0
-        two_qubit_gates += resources.count_controls('x', 1)
-        two_qubit_gates += resources.count_controls('y', 1)
-        two_qubit_gates += resources.count_controls('z', 1)
-        two_qubit_gates += resources.count_controls('r1', 1)
-        two_qubit_gates += resources.count_controls('rx', 1)
-        two_qubit_gates += resources.count_controls('ry', 1)
-        two_qubit_gates += resources.count_controls('rz', 1)
+        for gate in controlled_gates:
+            for num_controls in range(1, qc_size):
+                two_qubit_gates += (
+                    num_controls * resources.count_controls(gate, num_controls)
+                )
         
         #print(f"... depth = {resources.count_depth()}") # doesn't exist yet
         #print(f"Total: {total_gates}, 2-qubit: {two_qubit_gates}")
@@ -852,6 +1047,9 @@ def throttle_execution(completion_handler=metrics.finalize_group):
     global last_group
     group = last_group
     
+    if mpi.enabled():
+        mpi.barrier()
+
     # call completion handler with the group id
     if completion_handler != None:
         completion_handler(group)
@@ -921,6 +1119,9 @@ def finalize_execution(completion_handler=metrics.finalize_group, report_end=Tru
     if verbose:
         if pollcount > 0: print("")
     '''
+    if mpi.enabled():
+        mpi.barrier()
+
     # indicate we are done collecting metrics (called once at end of app)
     if report_end:
         metrics.end_metrics()
@@ -980,20 +1181,22 @@ def execute_circuit_immed (circuit: list, num_shots: int):
         # draw the circuit, but only for debugging
         # print(cudaq.draw(circuit[0], *circuit[1]))
         
+        if mpi.enabled():
+            mpi.barrier()
+
         ts = time.time()
         
         # call sample() on circuit with its list of arguments
-        if verbose: print(f"... during exec, noise model is: {noise}")
-        if noise is None:
-            if verbose: print("... executing without noise")
-            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
-        else:
-            if verbose: print("... executing WITH noise")
-            result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+        this_noise = _resolve_noise_model()
+        if verbose: print(f"... during exec, noise model is: {this_noise}")
+        result = _sample_or_run(circuit, num_shots, noise=this_noise)
         
         # control results print at benchmark level
         #if verbose: print(result)
             
+        if mpi.enabled():
+            mpi.barrier()
+
         exec_time = time.time() - ts
         
         # store the result object on the job for processing in job_complete
@@ -1147,6 +1350,7 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, 
         circuits = _bind_params_to_cudaq_circuits(circuits[0], params)
 
     global _warmup_done
+    this_noise = _resolve_noise_model()
 
     if verbose:
         print(f"... execute_circuits({len(circuits)}, {num_shots}, wait={wait}, gpus_per_circuit={gpus_per_circuit})")
@@ -1160,7 +1364,7 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, 
                 q = cudaq.qubit()
                 h(q)
                 mz(q)
-            cudaq.sample(_warmup_kernel, shots_count=1)
+            _sample_or_run([_warmup_kernel, []], 1, noise=this_noise)
             if verbose:
                 print("... warmup circuit executed")
         except Exception:
@@ -1214,10 +1418,7 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, 
                 break
             try:
                 ts_circ = time.time()
-                if noise is None:
-                    result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots)
-                else:
-                    result = cudaq.sample(circuit[0], *circuit[1], shots_count=num_shots, noise_model=noise)
+                result = _sample_or_run(circuit, num_shots, noise=this_noise)
                 per_circuit_times.append(time.time() - ts_circ)
 
                 # Convert cudaq SampleResult to dict for counts array
@@ -1466,5 +1667,3 @@ def _execute_batch(circuits_info, num_shots, max_batch_size, gpus_per_circuit=No
             process_circuit_results(batch, results, job_id=job_id, elapsed_time=elapsed_time)
         else:
             print(f'WARNING: No results for batch of {len(batch)} circuits (job {job_id}) — skipping')
-
-

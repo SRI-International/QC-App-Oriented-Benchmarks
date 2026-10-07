@@ -74,6 +74,8 @@ end_time = 0
 # Print more detailed metrics info
 verbose = False
 
+use_warmup_run = False
+
 # Option to save metrics to data file
 save_metrics = True
 
@@ -168,8 +170,10 @@ def set_properties ( properties=None ):
 # DATA ANALYSIS - METRICS COLLECTION AND REPORTING
       
 # Initialize the metrics module, creating an empty table of metrics
-def init_metrics ():
-    global start_time
+def init_metrics (warmup = False):
+    global start_time, use_warmup_run
+
+    use_warmup_run = warmup
     # create empty dictionary for circuit metrics
     circuit_metrics.clear()
     circuit_metrics_detail.clear()
@@ -205,7 +209,7 @@ def init_metrics ():
     
     # store the start of execution for the current app
     start_time = time.time()
-    if not mpi.initialized or mpi.rank == 0:
+    if mpi.leader():
         print(f'... execution starting at {get_timestr()}')
 
 # End metrics collection for an application
@@ -214,7 +218,7 @@ def end_metrics():
 
     end_time = time.time()
     total_run_time = round(end_time - start_time, 3)
-    if not mpi.initialized or mpi.rank == 0:
+    if mpi.leader():
         print(f'... execution complete at {get_timestr()} in {total_run_time} secs')
         print("")
 
@@ -328,6 +332,7 @@ def get_group_metrics():
 
 # Aggregate metrics for a specific group, creating average across circuits in group
 def aggregate_metrics_for_group (group):
+    global use_warmup_run
     group = str(group)
 
     # skip if already aggregated
@@ -372,13 +377,13 @@ def aggregate_metrics_for_group (group):
         group_metrics["avg_tr_n2qs"].append(avg)
         
         # aggregate time metrics
-        avg, std = get_circuit_stats_for_metric(group, "create_time", 3)
+        avg, std = get_circuit_stats_for_metric(group, "create_time", 3, use_warmup_run)
         group_metrics["avg_create_times"].append(avg)
         group_metrics["std_create_times"].append(std)
-        avg, std = get_circuit_stats_for_metric(group, "elapsed_time", 3)
+        avg, std = get_circuit_stats_for_metric(group, "elapsed_time", 3, use_warmup_run)
         group_metrics["avg_elapsed_times"].append(avg)
         group_metrics["std_elapsed_times"].append(std)
-        avg, std = get_circuit_stats_for_metric(group, "exec_time", 3)
+        avg, std = get_circuit_stats_for_metric(group, "exec_time", 3, use_warmup_run)
         group_metrics["avg_exec_times"].append(avg)
         group_metrics["std_exec_times"].append(std)
 
@@ -405,10 +410,13 @@ def aggregate_metrics_for_group (group):
         
 # Compute average and stddev for a metric in a given circuit group
 # DEVNOTE: this creates new array every time; could be more efficient if multiple metrics done at once
-def get_circuit_stats_for_metric(group, metric, precision):
+def get_circuit_stats_for_metric(group, metric, precision, warmup = False):
     metric_array = []
     for circuit in circuit_metrics[group]:
         if metric in circuit_metrics[group][circuit]:
+            if warmup:
+                warmup = False
+                continue
             metric_array.append(circuit_metrics[group][circuit][metric])
         else:
             metric_array.append(None)
@@ -439,7 +447,7 @@ def report_metrics_for_group (group):
             if len(group_metrics["avg_depths"]) > 0:
                 avg_depth = group_metrics["avg_depths"][group_index]
                 if avg_depth > 0:
-                    print(f"Average Circuit Algorithmic Depth, xi for the {group} qubit group = {int(avg_depth)}, {avg_xi}")
+                    print(f"Average Circuit Algorithmic Depth, \u03BE (xi) for the {group} qubit group = {int(avg_depth)}, {avg_xi}")
             
             avg_tr_xi = 0
             if len(group_metrics["avg_tr_xis"]) > 0:
@@ -945,6 +953,8 @@ maxcut_style = os.path.join(dir_path,'maxcut.mplstyle')
     
 # Plot bar charts for each metric over all groups
 def plot_metrics (suptitle="Circuit Width (Number of Qubits)", transform_qubit_group = False, new_qubit_group = None, filters=None, suffix="", options=None):
+    if not mpi.leader():
+        return
     
     # get backend id for this set of circuits
     backend_id = get_backend_id()
@@ -1945,6 +1955,8 @@ def plot_metrics_for_app(backend_id, appname, apiname="Qiskit", filters=None, op
 
 # save plot as image
 def save_plot_image(plt, imagename, backend_id):
+    if not mpi.leader():
+        return
 
     # don't leave slashes in the filename
     backend_id = backend_id.replace("/", "_")
@@ -2870,13 +2882,17 @@ def plot_metrics_optgaps (suptitle="",
      
 # Save the application metrics data to a shared file for the current device
 def store_app_metrics (backend_id, circuit_metrics, group_metrics, app, api=None, start_time=None, end_time=None):
+    if not mpi.leader():
+        return
+
     # print(f"... storing {title} {group_metrics}")
     
     # don't leave slashes in the filename
     backend_id = backend_id.replace("/", "_")
     
     # load the current data file of all apps
-    api = "qiskit"
+    if api is None:
+        api = "qiskit"
     shared_data = load_app_metrics(api, backend_id)
     
     # if there are no previous data for this app, init empty dict 

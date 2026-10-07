@@ -3,10 +3,8 @@ Quantum Fourier Transform Benchmark Program - CUDA Quantum Kernel
 (C) Quantum Economic Development Consortium (QED-C) 2024.
 '''
 
-# DEVNOTE: Method 2 of this benchmark does not work correctly due to limitations in the ability
-# for the Python version of cudaq to collect and return an array of measured values (Issue #????).
-# Only the final measurements are returned, meaning the fidelity is not determined correctly.
 import cudaq
+import math
 
 from typing import List
 
@@ -67,72 +65,105 @@ def qft(register: cudaq.qview):
 
 
 @cudaq.kernel
-def qft_kernel(num_qubits: int, secret_int: int, init_phases: List[float], method: int = 1, use_midcircuit_measurement: bool = False):
+def qft_kernel(num_qubits: int, secret_int: int, init_phases: List[float],
+               method: int = 1, use_midcircuit_measurement: bool = False):
 	M_PI = 3.1415926536
-	
-	# Allocate the specified number of qubits - this
-	# corresponds to the length of the hidden bitstring.
 	qubits = cudaq.qvector(num_qubits)
-	
-	# method 1 is the mirror circuit version of QFT followed by IQFT
-	if method == 1:
 
-		# Rotate each qubit into its initial state, 0 or 1
+	if method == 1:
 		for index, phase in enumerate(init_phases):
 			if phase > 0:
-				x(qubits[num_qubits - index - 1])	
-		
-		input_size = qubits.size()
-		
-		# perform quantum fourier transform on the input phases to convert to fourier basis
+				x(qubits[num_qubits - index - 1])
+
 		qft(qubits)
-			
-		# some compilers recognize the QFT and IQFT in series and collapse them to identity;
-		# perform a set of rotations to add one to the secret_int to avoid this collapse
+
 		for i_q in range(0, num_qubits):
 			ri_q = num_qubits - i_q - 1
-			divisor = 2 ** (i_q)
-			rz( 1 * M_PI / divisor , qubits[ri_q])
-		"""
-		# note: Dynamic circuits are only supported for monolithic kernels, therefore, we
-		# cannot do a function call to a circuit containing dynamic circuits as of July 16, 2025.
-		if use_midcircuit_measurement:
-			# Apply inverse quantum Fourier transform
-			for i_qubit in range(input_size):
-				ri_qubit = input_size - i_qubit - 1				# map to cudaq qubits
-				
-				# precede with an H gate (applied to all qubits)
-				h(qubits[ri_qubit])
-				
-				# number of controlled Z rotations to perform at this level
-				num_crzs = input_size - i_qubit - 1
+			divisor = 2 ** i_q
+			rz(M_PI / divisor, qubits[ri_q])
 
-				# perform measurement of the given qubit and store it in meas variable
-				meas = mz(qubits[ri_qubit])
-				#reset(qubits[ri_qubit]) #reset is depreciated in the new cudaq version
-				
-				# if not the highest order qubit, add multiple controlled RZs of decreasing angle
-				if meas:
-					if i_qubit < input_size - 1:   
-						for j in range(0, num_crzs):
-							divisor = 2 ** (j + 1)
-							rz( -M_PI / divisor , qubits[ri_qubit - j - 1])	
-		else:
-		"""
-		
-		# perform inverse quantum fourier transform to convert back to computational basis
 		iqft(qubits)
+		mz(qubits)
 
-		# Measure to gather sampling statistics
-		mz(qubits)
-		
-	# method 2 is just the IQFT
 	elif method == 2:
-	
-		# Measure to gather sampling statistics
+		for i_q in range(num_qubits):
+			h(qubits[i_q])
+
+		for i_q in range(num_qubits):
+			ri_q = num_qubits - i_q - 1
+			rz(init_phases[i_q], qubits[ri_q])
+
+		iqft(qubits)
 		mz(qubits)
-		
-	pass
+
+	elif method == 3:
+		safe_secret_int = secret_int
+		if safe_secret_int > num_qubits:
+			safe_secret_int = num_qubits
+
+		for i_q in range(safe_secret_int):
+			h(qubits[num_qubits - i_q - 1])
+
+		for i_q in range(safe_secret_int, num_qubits):
+			x(qubits[num_qubits - i_q - 1])
+
+		iqft(qubits)
+		mz(qubits)
+
+
+@cudaq.kernel
+def qft_midcircuit_kernel(num_qubits: int, secret_int: int,
+                          init_phases: List[float], method: int = 1) -> int:
+	M_PI = 3.1415926536
+	qubits = cudaq.qvector(num_qubits)
+
+	if method == 1:
+		for index, phase in enumerate(init_phases):
+			if phase > 0:
+				x(qubits[num_qubits - index - 1])
+
+		qft(qubits)
+
+		for i_q in range(0, num_qubits):
+			ri_q = num_qubits - i_q - 1
+			divisor = 2 ** i_q
+			rz(M_PI / divisor, qubits[ri_q])
+
+	elif method == 2:
+		for i_q in range(num_qubits):
+			h(qubits[i_q])
+
+		for i_q in range(num_qubits):
+			ri_q = num_qubits - i_q - 1
+			rz(init_phases[i_q], qubits[ri_q])
+
+	elif method == 3:
+		safe_secret_int = secret_int
+		if safe_secret_int > num_qubits:
+			safe_secret_int = num_qubits
+
+		for i_q in range(safe_secret_int):
+			h(qubits[num_qubits - i_q - 1])
+
+		for i_q in range(safe_secret_int, num_qubits):
+			x(qubits[num_qubits - i_q - 1])
+
+	data = 0
+	input_size = qubits.size()
+	for i_qubit in range(input_size):
+		ri_qubit = input_size - i_qubit - 1
+		h(qubits[ri_qubit])
+
+		meas = mz(qubits[ri_qubit])
+		if meas:
+			data = data + (1 << i_qubit)
+			if i_qubit < input_size - 1:
+				num_crzs = input_size - i_qubit - 1
+				for j in range(0, num_crzs):
+					divisor = 2 ** (j + 1)
+					rz(-M_PI / divisor, qubits[ri_qubit - j - 1])
+
+	return data
 
 
 #DEVNOTE: use this as a barrier when drawing circuit; comment out otherwise
@@ -145,8 +176,20 @@ def barrier(qubits: cudaq.qview, num_qubits: int):
 			
 def QuantumFourierTransform (num_qubits: int, secret_int: int, init_phase: List[float], method: int = 1, use_midcircuit_measurement: bool = False):
 
-	
-	qc = [qft_kernel, [num_qubits, secret_int, init_phase, method, use_midcircuit_measurement]]
+	if method == 2:
+		init_phase = [
+			(secret_int % (2 ** (i_q + 1))) * math.pi / (2 ** i_q)
+			for i_q in range(num_qubits)
+		]
+
+	if use_midcircuit_measurement:
+		qc = [qft_midcircuit_kernel, [num_qubits, secret_int, init_phase, method],
+		      {"result_width": num_qubits}]
+	elif method == 3:
+		qc = [qft_kernel, [num_qubits, secret_int, init_phase, method, use_midcircuit_measurement],
+		      {"counts_dict": True}]
+	else:
+		qc = [qft_kernel, [num_qubits, secret_int, init_phase, method, use_midcircuit_measurement]]
 
 	global QC_
 	if num_qubits <= 6:

@@ -1566,7 +1566,7 @@ def _extract_per_circuit_times(raw_result, num_circuits):
     # The old code submitted one circuit at a time, so top-level metadata was per-circuit.
     # Now we submit batches, so we need per-pub metadata for individual circuit timing.
     if hasattr(raw_result, 'metadata'):
-    
+
         #print(f"... in metadata branch: {raw_result}", flush=True)
         #execution_spans = raw_result.metadata['execution']['execution_spans']
         #print(f"... exec info: {execution_spans}", flush=True)
@@ -1625,13 +1625,13 @@ def _extract_per_circuit_times(raw_result, num_circuits):
 
             # Try execution_spans (IBM hardware)
             try:
-                if 'execution' in metadata:       
+                if 'execution' in metadata:
                     spans = metadata['execution']['execution_spans']
-                    
+
                     duration = 0.0
                     if hasattr(spans, 'duration'):
                         duration = spans.duration
-                        
+
                     # DEVNOTE: handle pre-2.5 version of Qiskit (deprecate later)
                     else:
                         spans = spans['__value__']['spans']
@@ -1641,9 +1641,9 @@ def _extract_per_circuit_times(raw_result, num_circuits):
                     if verbose_time:
                         print(f"... duration: {duration}", flush=True)
                         print(f"... single span, dividing evenly: {avg}")
-                        
+
                     return [avg] * num_circuits
-          
+
             except (KeyError, TypeError, AttributeError, IndexError):
                 pass
 
