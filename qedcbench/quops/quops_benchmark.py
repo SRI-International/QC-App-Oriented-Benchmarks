@@ -28,7 +28,11 @@ from dataclasses import asdict, dataclass
 from typing import Callable
 
 import numpy as np
-import pandas as pd
+
+try:
+    import pandas as pd
+except ImportError:
+    raise ImportError("QUOPS needs pandas, which is not part of the base install: pip install pandas") from None
 
 QUOPS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(QUOPS_DIR, "_common"))  # quops_fctns.py

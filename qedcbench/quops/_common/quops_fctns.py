@@ -15,7 +15,11 @@ from dataclasses import dataclass, field
 from statistics import NormalDist
 
 import numpy as np
-import pandas as pd
+
+try:
+    import pandas as pd
+except ImportError:
+    raise ImportError("QUOPS needs pandas, which is not part of the base install: pip install pandas") from None
 
 
 # ===========================================================================
