@@ -48,6 +48,7 @@ Each benchmark application includes its own documentation describing the algorit
 | Benchmark | Description |
 |-----------|-------------|
 | [Quantum Reinforcement Learning](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/blob/master/qedcbench/quantum_reinforcement_learning/README.md) | Reinforcement learning with parameterized quantum circuits |
+| [QUOPS](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/blob/master/qedcbench/quops/README.md) | Largest reliable random circuit (Q) and operation rate, from mirror circuits (preview, simulators only) |
 
 ## Programming Examples
 

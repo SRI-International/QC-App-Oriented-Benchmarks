@@ -151,6 +151,13 @@
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
 <h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
 <p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
+<h3 id="release-209-15-november-2026">Release 2.0.9 - 15 November 2026</h3>
+<ul>
+<li><strong>New benchmark: QUOPS (preview)</strong> -- Added <code>qedcbench/quops</code>, an implementation of the QUOPS benchmark from <em>Benchmarking the computational power of quantum computers</em> (arXiv:2609.12146), following the PRAQTICE reference code. QUOPS scans random circuit shapes (width and size) in increasing size, estimates each shape's process polarization with mirror circuit fidelity estimation (BR, RR and REF ensembles), and reports Q, the size of the largest passing shape, and the rate Omega. Runs on Qiskit (Aer) and CUDA-Q (CPU or GPU) from the command line, from <code>quops_benchmark.run()</code>, or from its notebook; results are saved to <code>__data/&lt;backend_id&gt;/QUOPS-results.json</code> and plots to <code>__images/&lt;backend_id&gt;/</code>. This preview runs on simulators only; execution on hardware is planned. QUOPS is not part of the suite notebooks or <code>run_all.py</code>. See the <a href="https://github.com/SRI-International/QC-App-Oriented-Benchmarks/blob/master/qedcbench/quops/README.md">QUOPS README</a>.</li>
+<li><strong>QUOPS requires pandas</strong> -- pandas is not added to the base install; QUOPS reports <code>pip install pandas</code> if it is missing.</li>
+<li><strong>Bug fix: HamLib data suffix</strong> -- A data suffix set through <code>metrics.data_suffix</code> was overwritten by the empty default when no environment variable was set; it now takes precedence, then the command-line argument and environment variable.</li>
+<li><strong>Notebook fix</strong> -- Corrected the BlueQubit executor class reference in <code>benchmarks-qiskit.ipynb</code>.</li>
+</ul>
 <h3 id="release-208-19-july-2026">Release 2.0.8 - 19 July 2026</h3>
 <ul>
 <li><strong>Hybrid parallel GPU execution (CUDA-Q)</strong> -- Added support for combining statevector expansion across multiple GPUs with parallel circuit execution. For example, with 32 GPUs and <code>gpus_per_circuit=4</code>, 8 circuits execute in parallel where each circuit uses 4 GPUs to expand the available state space by 2 qubits. Enabled by running with MPI, setting <code>parallel=True</code>, and <code>gpus_per_circuit</code> to an even divisor of total available GPUs. Currently supported in the Hamlib benchmark via the <code>-gpc</code> CLI flag.</li>
