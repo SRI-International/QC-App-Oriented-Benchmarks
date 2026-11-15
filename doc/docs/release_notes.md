@@ -7,6 +7,13 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.9 - 15 November 2026
+
+- **New benchmark: QUOPS (preview)** -- Added `qedcbench/quops`, an implementation of the QUOPS benchmark from *Benchmarking the computational power of quantum computers* (arXiv:2609.12146), following the PRAQTICE reference code. QUOPS scans random circuit shapes (width and size) in increasing size, estimates each shape's process polarization with mirror circuit fidelity estimation (BR, RR and REF ensembles), and reports Q, the size of the largest passing shape, and the rate Omega. Runs on Qiskit (Aer) and CUDA-Q (CPU or GPU) from the command line, from `quops_benchmark.run()`, or from its notebook; results are saved to `__data/<backend_id>/QUOPS-results.json` and plots to `__images/<backend_id>/`. This preview runs on simulators only; execution on hardware is planned. QUOPS is not part of the suite notebooks or `run_all.py`. See the [QUOPS README](https://github.com/SRI-International/QC-App-Oriented-Benchmarks/blob/master/qedcbench/quops/README.md).
+- **QUOPS requires pandas** -- pandas is not added to the base install; QUOPS reports `pip install pandas` if it is missing.
+- **Bug fix: HamLib data suffix** -- A data suffix set through `metrics.data_suffix` was overwritten by the empty default when no environment variable was set; it now takes precedence, then the command-line argument and environment variable.
+- **Notebook fix** -- Corrected the BlueQubit executor class reference in `benchmarks-qiskit.ipynb`.
+
 ### Release 2.0.8 - 19 July 2026
 
 - **Hybrid parallel GPU execution (CUDA-Q)** -- Added support for combining statevector expansion across multiple GPUs with parallel circuit execution. For example, with 32 GPUs and `gpus_per_circuit=4`, 8 circuits execute in parallel where each circuit uses 4 GPUs to expand the available state space by 2 qubits. Enabled by running with MPI, setting `parallel=True`, and `gpus_per_circuit` to an even divisor of total available GPUs. Currently supported in the Hamlib benchmark via the `-gpc` CLI flag.
