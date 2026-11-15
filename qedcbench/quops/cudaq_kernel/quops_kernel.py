@@ -1,8 +1,10 @@
-"""CUDA-Q-specific QUOPS kernel: kernel building, MCFE caps, randomized
-compilation, noise models, and execution via cudaq.sample.
+"""CUDA-Q-specific QUOPS kernel: builds BR / RR / REF mirror kernels from gate
+arrays, runs them with cudaq.sample, and provides the noise models.
 
-Mirrors the API of the Qiskit quops_kernel.py so that notebooks for both frameworks
-are nearly identical. Extracted from the Qperf CUDAQ src.py (2259 lines).
+Mirrors the API of the Qiskit quops_kernel.py. Extracted from the Qperf CUDAQ src.py.
+Imports nothing from _common: the gate codes are defined below and must match
+_common/quops_fctns.py. Circuit-level helpers for the tutorial are in quops_helpers.py
+(QPerf-work only).
 """
 
 from __future__ import annotations
@@ -15,20 +17,11 @@ from typing import Callable, ClassVar
 
 import numpy as np
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_common"))
-
-from quops_fctns import (
-    RX, RY, RZ, X, Y, Z, CX, U3,
-    ROTATION_GATES, TWO_QUBIT_GATES,
-    adjoint_arrays, rc_rewrite_arrays, RC_STYLES,
-    effective_polarization_from_counts,
-    clifford_layer_arrays, sample_mcfe_cap_indices,
-    final_cap_clifford_indices, target_bitstring_from_paulis,
-    SINGLE_QUBIT_CLIFFORD_EULER, NUM_ONE_QUBIT_CLIFFORDS,
-)
-
 import cudaq
+
+
+# Gate codes used in the gate arrays (same values as in _common/quops_fctns.py)
+RX, RY, RZ, X, Y, Z, CX, U3 = range(8)
 
 
 # ===========================================================================
@@ -120,90 +113,6 @@ def require_kernel_arrays(kernel):
     )
 
 
-def adjoint_kernel(kernel):
-    """Return the adjoint kernel: reversed gate order with inverted rotations."""
-    gates, q0s, q1s, angles, phis, lams, width = require_kernel_arrays(kernel)
-    out = adjoint_arrays(gates, q0s, q1s, angles, phis, lams)
-    return build_kernel(out[0], out[1], out[2], out[3], width, out[4], out[5])
-
-
-# Keep the name used in the CUDAQ src.py for compatibility
-adjoint_C = adjoint_kernel
-
-
-def randomized_compilation(kernel, seed=None, style: str = "pauli_frame"):
-    """Apply randomized compilation to a kernel.
-
-    ``"pauli_frame"`` (default): Paulis are folded into adjacent rotations as
-    U3 gates, matching the paper's reference compiler specification.
-
-    ``"explicit_paulis"``: Explicit Pauli gates around every CNOT.
-    """
-    gates, q0s, q1s, angles, phis, lams, width = require_kernel_arrays(kernel)
-    out = rc_rewrite_arrays(gates, q0s, q1s, angles, width, phis, lams,
-                            seed=seed, style=style)
-    return build_kernel(out[0], out[1], out[2], out[3], width, out[4], out[5])
-
-
-# ===========================================================================
-# MCFE caps
-# ===========================================================================
-
-
-def build_clifford_layer(clifford_indices):
-    """Build a tensor product of indexed one-qubit Cliffords as a CUDA-Q kernel."""
-    arrays = clifford_layer_arrays(clifford_indices)
-    # clifford_layer_arrays returns (gates, q0s, q1s, thetas, phis, lams, width)
-    kernel = build_kernel(arrays[0], arrays[1], arrays[2], arrays[3],
-                          arrays[6], arrays[4], arrays[5])
-    kernel.clifford_indices = tuple(int(i) for i in clifford_indices)
-    return kernel
-
-
-@dataclass(frozen=True)
-class MCFECaps:
-    """Compiled MCFE caps and the definite outcome they induce."""
-
-    initial: Callable[[cudaq.qview], None]    # L
-    final: Callable[[cudaq.qview], None]      # L' = P L^dag
-    target: str                                # expected measurement bitstring
-    clifford_indices: tuple[int, ...]
-    final_clifford_indices: tuple[int, ...]
-    pauli_indices: tuple[int, ...]
-
-    @property
-    def width(self) -> int:
-        return len(self.clifford_indices)
-
-
-def build_mcfe_caps(clifford_indices, pauli_indices) -> MCFECaps:
-    """Build L, L' = P L^dag, and the resulting target bit string."""
-    clifford_indices = tuple(int(i) for i in clifford_indices)
-    pauli_indices = tuple(int(i) for i in pauli_indices)
-    if len(clifford_indices) != len(pauli_indices):
-        raise ValueError("Clifford and Pauli layers must have the same width")
-
-    final_indices = final_cap_clifford_indices(clifford_indices, pauli_indices)
-    initial = build_clifford_layer(clifford_indices)
-    final = build_clifford_layer(final_indices)
-    target = target_bitstring_from_paulis(pauli_indices)
-
-    return MCFECaps(
-        initial=initial,
-        final=final,
-        target=target,
-        clifford_indices=clifford_indices,
-        final_clifford_indices=final_indices,
-        pauli_indices=pauli_indices,
-    )
-
-
-def sample_mcfe_caps(width: int, seed=None) -> MCFECaps:
-    """Sample independent uniform one-qubit Cliffords and Paulis for MCFE."""
-    cliffords, paulis, final, target = sample_mcfe_cap_indices(width, seed)
-    return build_mcfe_caps(cliffords, paulis)
-
-
 # ===========================================================================
 # Composite kernels (BR / RR / REF) with MCFE caps
 # ===========================================================================
@@ -275,7 +184,7 @@ def mirror_kernel(
 
     Compiled once per process. The gates are runtime data, so the compiler
     cannot cancel C against C^dag (the role of atomic_quantum_region in PRAQTICE).
-    Gate ids are literals (RX, RY, RZ, X, Y, Z, CX, U3 = range(8) in quops_fctns)
+    Gate ids are literals (RX, RY, RZ, X, Y, Z, CX, U3 = range(8), at the top of this file)
     because CUDA-Q 0.13 kernels can't read module globals.
     """
     q = cudaq.qvector(width)
@@ -321,17 +230,6 @@ def sample_result_to_counter(result) -> Counter:
     if hasattr(result, "to_dict"):
         return Counter({str(k).replace(" ", ""): int(v) for k, v in result.to_dict().items()})
     return Counter(dict(result))
-
-
-def polarization_from_result(result, width: int, target: str | None = None) -> float:
-    """Return the effective polarization from a CUDA-Q sample result.
-
-    CUDA-Q returns big-endian bit strings (qubit 0 = leftmost), which matches
-    the convention used by quops_fctns. No reversal needed (unlike Qiskit).
-    """
-    return effective_polarization_from_counts(
-        dict(sample_result_to_counter(result)), width, target=target
-    )
 
 
 # ===========================================================================

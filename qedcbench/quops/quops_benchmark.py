@@ -227,7 +227,7 @@ class MCFECapArrays:
 
 
 def sample_mcfe_cap_arrays(width: int, seed=None) -> MCFECapArrays:
-    """Array version of the kernels' ``sample_mcfe_caps`` (same seed gives the same caps)."""
+    """Array version of PRAQTICE's ``sample_mcfe_caps`` (same seed gives the same caps)."""
     cliffords, paulis, final, target = sample_mcfe_cap_indices(width, seed)
     initial_arrays = clifford_layer_arrays(cliffords)
     final_arrays = clifford_layer_arrays(final)
@@ -239,7 +239,7 @@ def sample_mcfe_cap_arrays(width: int, seed=None) -> MCFECapArrays:
 
 
 def _rc_arrays(arrays, width, seed, style):
-    """Randomized compilation of a gate-array circuit (the kernels' ``randomized_compilation``)."""
+    """Randomized compilation of a gate-array circuit (PRAQTICE's ``randomized_compilation``)."""
     gates, q0s, q1s, angles, phis, lams = arrays
     return _frozen_arrays(*rc_rewrite_arrays(gates, q0s, q1s, angles, width, phis, lams,
                                              seed=seed, style=style))

@@ -1,8 +1,9 @@
-"""Qiskit-specific QUOPS kernel: circuit building, MCFE caps, randomized
-compilation, noise models, and execution via AerSimulator.
+"""Qiskit-specific QUOPS kernel: builds BR / RR / REF mirror circuits from gate
+arrays, runs them on AerSimulator, and provides the noise models.
 
-Updated to match the PRAQTICE/Qperf CUDAQ implementation: supports U3 gates,
-pauli-frame randomized compilation, and MCFE Clifford caps (L, L').
+Imports nothing from _common: the gate codes are defined below and must match
+_common/quops_fctns.py. Circuit-level helpers for the tutorial are in quops_helpers.py
+(QPerf-work only).
 """
 
 from __future__ import annotations
@@ -14,17 +15,9 @@ from qiskit import QuantumCircuit
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, depolarizing_error, ReadoutError
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "_common"))
 
-from quops_fctns import (
-    RX, RY, RZ, X, Y, Z, CX, U3,
-    adjoint_arrays, rc_rewrite_arrays, RC_STYLES,
-    effective_polarization_from_counts,
-    clifford_layer_arrays, sample_mcfe_cap_indices,
-    final_cap_clifford_indices, target_bitstring_from_paulis,
-    SINGLE_QUBIT_CLIFFORD_EULER, NUM_ONE_QUBIT_CLIFFORDS,
-)
+# Gate codes used in the gate arrays (same values as in _common/quops_fctns.py)
+RX, RY, RZ, X, Y, Z, CX, U3 = range(8)
 
 
 # ===========================================================================
@@ -98,88 +91,6 @@ def require_circuit_arrays(circuit: QuantumCircuit):
     )
 
 
-def adjoint_circuit(circuit: QuantumCircuit) -> QuantumCircuit:
-    """Return the adjoint circuit (reverse gate order, inverted rotations)."""
-    gates, q0s, q1s, angles, phis, lams, width = require_circuit_arrays(circuit)
-    out = adjoint_arrays(gates, q0s, q1s, angles, phis, lams)
-    return build_circuit(out[0], out[1], out[2], out[3], width, out[4], out[5])
-
-
-def randomized_compilation(circuit: QuantumCircuit, seed=None,
-                           style: str = "pauli_frame") -> QuantumCircuit:
-    """Apply randomized compilation to a circuit.
-
-    ``"pauli_frame"`` (default): Paulis are folded into adjacent rotations as
-    U3 gates, matching the paper's reference compiler specification.
-
-    ``"explicit_paulis"``: Explicit Pauli gates around every CNOT.
-    """
-    gates, q0s, q1s, angles, phis, lams, width = require_circuit_arrays(circuit)
-    out = rc_rewrite_arrays(gates, q0s, q1s, angles, width, phis, lams,
-                            seed=seed, style=style)
-    return build_circuit(out[0], out[1], out[2], out[3], width, out[4], out[5])
-
-
-# ===========================================================================
-# MCFE caps: Clifford L, L' = P L^dag as Qiskit circuits
-# ===========================================================================
-
-
-def build_clifford_layer_circuit(clifford_indices) -> QuantumCircuit:
-    """Build a tensor product of indexed one-qubit Cliffords as a Qiskit circuit.
-
-    Each Clifford is emitted as a single U3 gate.
-    """
-    gates, q0s, q1s, thetas, phis, lams, width = clifford_layer_arrays(clifford_indices)
-    circuit = build_circuit(gates, q0s, q1s, thetas, width, phis, lams)
-    circuit.metadata["clifford_indices"] = tuple(int(i) for i in clifford_indices)
-    return circuit
-
-
-@dataclass(frozen=True)
-class MCFECaps:
-    """Compiled MCFE caps and the definite outcome they induce."""
-
-    initial: QuantumCircuit       # L
-    final: QuantumCircuit         # L' = P L^dag
-    target: str                   # expected measurement bitstring
-    clifford_indices: tuple[int, ...]
-    final_clifford_indices: tuple[int, ...]
-    pauli_indices: tuple[int, ...]
-
-    @property
-    def width(self) -> int:
-        return len(self.clifford_indices)
-
-
-def build_mcfe_caps(clifford_indices, pauli_indices) -> MCFECaps:
-    """Build L, L' = P L^dag, and the resulting target bit string."""
-    clifford_indices = tuple(int(i) for i in clifford_indices)
-    pauli_indices = tuple(int(i) for i in pauli_indices)
-    if len(clifford_indices) != len(pauli_indices):
-        raise ValueError("Clifford and Pauli layers must have the same width")
-
-    final_indices = final_cap_clifford_indices(clifford_indices, pauli_indices)
-    initial = build_clifford_layer_circuit(clifford_indices)
-    final = build_clifford_layer_circuit(final_indices)
-    target = target_bitstring_from_paulis(pauli_indices)
-
-    return MCFECaps(
-        initial=initial,
-        final=final,
-        target=target,
-        clifford_indices=clifford_indices,
-        final_clifford_indices=final_indices,
-        pauli_indices=pauli_indices,
-    )
-
-
-def sample_mcfe_caps(width: int, seed=None) -> MCFECaps:
-    """Sample independent uniform one-qubit Cliffords and Paulis for MCFE."""
-    cliffords, paulis, final, target = sample_mcfe_cap_indices(width, seed)
-    return build_mcfe_caps(cliffords, paulis)
-
-
 # ===========================================================================
 # Composite circuits (BR / RR / REF) with MCFE caps
 # ===========================================================================
@@ -229,17 +140,6 @@ def run_circuit(circuit: QuantumCircuit, shots: int = 1000,
     backend = AerSimulator(noise_model=noise_model) if noise_model else AerSimulator()
     result = backend.run(circuit, shots=shots).result()
     return result
-
-
-def polarization_from_result(result, width: int, target: str | None = None) -> float:
-    """Return the effective polarization from a Qiskit result.
-
-    Qiskit returns bit strings in little-endian order (qubit 0 is the rightmost
-    bit). We reverse each key so qubit ordering matches the CUDAQ convention.
-    """
-    counts = result.get_counts()
-    counts = {k[::-1]: v for k, v in counts.items()}
-    return effective_polarization_from_counts(counts, width, target=target)
 
 
 # ===========================================================================
