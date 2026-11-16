@@ -82,7 +82,11 @@ def load_kernel(api, backend_id):
     if api == "qiskit":
         kernel = import_kernel("qiskit")
         import qiskit, qiskit_aer
-        backend_label = f"Qiskit Aer {qiskit_aer.__version__} (Qiskit {qiskit.__version__})"
+        if str(backend_id).endswith("simulator"):
+            backend_label = f"Qiskit Aer {qiskit_aer.__version__} (Qiskit {qiskit.__version__})"
+        else:
+            # a device or an IBM fake backend: name it (fake backends simulate on Aer)
+            backend_label = f"{backend_id} (Qiskit {qiskit.__version__})"
 
     elif api == "cudaq":
         import cudaq
@@ -852,6 +856,8 @@ def run(
     noise_label = {"none": "noiseless", "quops": f"QUOPS noise model (depolarizing p1={P_1Q} p2={P_2Q})",
                    "default": ("noise model from exec_options" if "noise_model" in (exec_options or {})
                                else "QED-C default noise model")}[noise]
+    if not is_simulator(api, backend_id):
+        noise_label = "device noise"  # noise models apply to the simulators only
     settings_label = (f"{noise_label} | "
                       f"K={max_circuits}, M={num_mirrors}, {num_shots} shots | "
                       f"familywise alpha=0.05"
