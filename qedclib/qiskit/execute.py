@@ -1188,7 +1188,10 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, 
             # don't pass backend alongside basis_gates (Qiskit 2.x warning)
             ts_transpile = time.time()
             trans_qcs = transpile(circuits,
-                basis_gates=this_noise.basis_gates)
+                basis_gates=this_noise.basis_gates,
+                optimization_level=optimization_level,
+                layout_method=layout_method,
+                routing_method=routing_method)
             last_transpile_time = time.time() - ts_transpile
 
             # Copy noise model QV to metrics if available
