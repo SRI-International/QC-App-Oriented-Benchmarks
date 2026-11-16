@@ -1,10 +1,12 @@
 """QUOPS Benchmark - command-line driver for the Qiskit and CUDA-Q kernels.
 
-    python quops/quops_benchmark.py                    # Qiskit Aer, depolarizing noise (Q = 36)
-    python quops/quops_benchmark.py -a cudaq           # CUDA-Q on the GPU (nvidia), depolarizing noise
-    python quops/quops_benchmark.py --noise none       # noiseless (every shape passes)
-    python quops/quops_benchmark.py -a cudaq -b density-matrix-cpu   # CUDA-Q, exact noise on the CPU
-    python quops/quops_benchmark.py -a cudaq -n 30 -d 15 -c 2 --num_mirrors 1 --noise none   # one 30-qubit shape
+    python quops/quops_benchmark.py                    # Qiskit Aer, qedclib's default noise model (QV 2048)
+    python quops/quops_benchmark.py --noise quops      # QUOPS depolarizing model (p1=0.002, p2=0.05; Q = 36, as in PRAQTICE)
+    python quops/quops_benchmark.py -a cudaq --noise quops   # CUDA-Q on the GPU (nvidia), QUOPS model
+    python quops/quops_benchmark.py --nonoise          # noiseless (every shape passes)
+    python quops/quops_benchmark.py -a cudaq -b density-matrix-cpu --noise quops   # CUDA-Q, exact noise on the CPU
+    python quops/quops_benchmark.py -a cudaq -n 30 -d 15 -c 2 --num_mirrors 1 --nonoise   # one 30-qubit shape
+    python quops/quops_benchmark.py --probe -min 6 -max 12   # probe: 3 shapes per width, 6 circuits each; estimates the boundary
 
 The run is saved to __data/<backend_id>/QUOPS-results.json and the plots to
 __images/<backend_id>/QUOPS-*.jpg and .pdf, in the current directory. To remake the
@@ -34,6 +36,9 @@ try:
 except ImportError:
     raise ImportError("QUOPS needs pandas, which is not part of the base install: pip install pandas") from None
 
+import qedclib
+from qedclib import metrics
+
 QUOPS_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(QUOPS_DIR, "_common"))  # quops_fctns.py
 
@@ -47,11 +52,11 @@ from quops_fctns import (
     QUOPS_THRESHOLD, DEFAULT_FAMILYWISE_ALPHA,
 )
 
-# Depolarizing noise used by the benchmark notebooks (validated at Q = 36)
+# QUOPS depolarizing noise (noise="quops"), as in the PRAQTICE notebooks (validated at Q = 36)
 P_1Q, P_2Q = 0.002, 0.05
 
-# Default backend: Qiskit always runs Aer (the id only names the image folder); CUDA-Q uses the
-# GPU (with noise it simulates trajectories; -b density-matrix-cpu gives exact noise on the CPU)
+# Default backend (a qedclib backend id): Qiskit runs Aer; CUDA-Q uses the GPU (with noise it
+# simulates trajectories; -b density-matrix-cpu gives exact noise on the CPU)
 DEFAULT_BACKEND = {"qiskit": "qasm_simulator", "cudaq": "nvidia"}
 
 
@@ -252,8 +257,9 @@ def _rc_arrays(arrays, width, seed, style):
 # entries 9-10. The functions take ``api`` and load that kernel module, which supplies only:
 #   build_mirror(kind, width, parts, compile_once) -> a runnable BR/RR/REF circuit, where
 #       parts are gate-array tuples (gates, q0s, q1s, angles, phis, lams) in execution order
-#   sample_counts(circuit, shots, noise_model) -> counts dict keyed q0-first
 #   make_depolarizing_noise(p_1q, p_2q) and the device noise models
+# The circuits run through qedclib's execute module (run_circuits, ALIGNMENT-LOG entry 15).
+# The kernels' sample_counts is still used by collect_reference_ensemble and the tutorials.
 
 
 def collect_reference_ensemble(
@@ -375,27 +381,84 @@ def get_circuits(
 
 ############### Run Circuits
 
-def run_circuits(all_qcs, num_shots: int = 1000, noise_model=None, api: str = "qiskit"):
-    """Execute the circuits from ``get_circuits``, in order, with the kernel's ``sample_counts``.
+def is_simulator(api, backend_id):
+    """True for local simulators (Qiskit *simulator ids, every CUDA-Q target QUOPS runs);
+    False for hardware and IBM fake backends."""
+    return api == "cudaq" or str(backend_id).endswith("simulator")
+
+
+def check_transpiled_two_qubit_gates(all_qcs):
+    """On a Qiskit device backend (not a simulator), transpile the shape's first BR circuit the
+    way qedclib will and compare its two-qubit gate count with the circuit's own. Routing can only
+    add gates; fewer means the transpiler cancelled part of the mirror, so warn."""
+    ex = qedclib.execute
+    backend = getattr(ex, "backend", None)
+    name = str(getattr(backend, "name", ""))
+    if backend is None or name.endswith("simulator"):
+        return
+    from qiskit import transpile
+    qc = next(qc for circuits in all_qcs.values() for circuit_id, qc in circuits.items()
+              if circuit_id.endswith("_br"))
+    options = getattr(ex, "backend_exec_options", None) or {}
+    transpiled = transpile(qc, backend, optimization_level=options.get("optimization_level"),
+                           layout_method=options.get("layout_method"),
+                           routing_method=options.get("routing_method"), seed_transpiler=0)
+
+    def two_qubit_count(circuit):
+        return sum(1 for item in circuit.data
+                   if item.operation.num_qubits == 2 and item.operation.name not in ("barrier", "measure"))
+
+    logical, physical = two_qubit_count(qc), two_qubit_count(transpiled)
+    note = "" if physical >= logical else "  WARNING: fewer than the circuit has; the transpiler cancelled gates"
+    print(f"  {qc.name or 'BR circuit'}: two-qubit gates {logical} -> {physical} after transpiling "
+          f"for {name} (routing adds {max(0, physical - logical)}){note}")
+
+
+def run_circuits(all_qcs, num_shots: int = 1000, api: str = "qiskit"):
+    """Execute the circuits from ``get_circuits`` through qedclib, in one ``submit_circuits`` call.
+
+    The backend and noise model are set once per run by ``run()`` (``ex.set_execution_target``).
+    qedclib transpiles the circuits for the backend and records each circuit's execution time
+    and job id in its metrics.
 
     Args:
         all_qcs: circuit dict from get_circuits()
         num_shots: shots per circuit (default 1000)
-        noise_model: the API's noise model object, or None for noiseless (default None)
         api: "qiskit" (default) or "cudaq"
 
-    Returns ``(counts, tau_wall)``: counts by circuit id, and the time spent on the
-    BR and RR circuits (REF is excluded from tau_wall, as in PRAQTICE).
+    Returns ``(counts, tau_wall)``: counts by circuit id, keyed q0-first, and the execution
+    time qedclib records for the BR and RR circuits (REF is excluded from tau_wall, as in PRAQTICE).
+    Returns ``(None, 0.0)`` if the run was stopped (``ex.request_cancel()``) before every
+    circuit returned counts.
     """
-    kernel = import_kernel(api)
+    ex = qedclib.execute
     counts = {}
+    if api == "qiskit":
+        check_transpiled_two_qubit_gates(all_qcs)
+
+    # result handler, called by qedclib for each circuit
+    def collect_counts(qc, result, group, circuit_id, shots):
+        circuit_counts = result.get_counts()
+        if api == "qiskit":
+            # Qiskit keys are little-endian (q0 rightmost); reverse to q0-first, as CUDA-Q returns them
+            counts[circuit_id] = {key[::-1]: value for key, value in circuit_counts.items()}
+        else:
+            counts[circuit_id] = {key: value for key, value in circuit_counts.items()}
+
+    ex.init_execution(collect_counts)
+    ex.submit_circuits(all_qcs, num_shots=num_shots)
+
+    num_circuits = sum(len(circuits) for circuits in all_qcs.values())
+    if len(counts) != num_circuits and getattr(ex, "cancel_requested", False):
+        return None, 0.0
+    if len(counts) != num_circuits:
+        raise RuntimeError(f"QUOPS: only {len(counts)} of {num_circuits} circuits returned counts")
+
     tau_wall = 0.0
-    for circuits in all_qcs.values():
-        for circuit_id, circuit in circuits.items():
-            start = time.perf_counter()
-            counts[circuit_id] = kernel.sample_counts(circuit, shots=num_shots, noise_model=noise_model)
+    for group, circuits in all_qcs.items():
+        for circuit_id in circuits:
             if not circuit_id.endswith("_ref"):
-                tau_wall += time.perf_counter() - start
+                tau_wall += metrics.get_metric(str(group), circuit_id, "exec_time") or 0.0
     return counts, tau_wall
 
 
@@ -408,7 +471,6 @@ def estimate_shape_polarization(
     num_circuits: int = 10,
     num_mirrors: int = 4,
     shots: int = 1000,
-    noise_model=None,
     rc_style: str = "pauli_frame",
     seed=None,
     reference: Sequence[float] | None = None,
@@ -420,13 +482,16 @@ def estimate_shape_polarization(
     Creates the shape's circuits (``get_circuits``), runs them (``run_circuits``),
     and turns the counts into polarizations.
     A supplied ``reference`` is used instead of the per-mirror REF measurements.
+    Returns None if the run was stopped before the shape finished.
     """
     all_qcs, shape_info = get_circuits(
         width, depth, zeta,
         max_circuits=num_circuits, num_mirrors=num_mirrors, rc_style=rc_style,
         seed=seed, reference=reference, compile_once=compile_once, api=api,
     )
-    counts, tau_wall = run_circuits(all_qcs, num_shots=shots, noise_model=noise_model, api=api)
+    counts, tau_wall = run_circuits(all_qcs, num_shots=shots, api=api)
+    if counts is None:
+        return None  # run stopped
 
     targets = shape_info["targets"]
     polarization = {
@@ -474,7 +539,6 @@ def run_quops_benchmark(
     num_circuits: int = 10,
     num_mirrors: int = 4,
     shots: int = 1000,
-    noise_model=None,
     rc_style: str = "pauli_frame",
     estimator: str = "eq45",
     threshold: float = QUOPS_THRESHOLD,
@@ -487,6 +551,7 @@ def run_quops_benchmark(
     seed=None,
     progress: Callable[[str], None] | None = print,
     compile_once: bool = True,
+    should_stop: Callable[[], bool] | None = None,
 ) -> BenchmarkResult:
     """Run the formal QUOPS benchmark of Supplementary Section V.
 
@@ -503,6 +568,8 @@ def run_quops_benchmark(
 
     ``api`` is "qiskit" or "cudaq" (the kernel is loaded with ``import_kernel``).
     ``compile_once`` is passed to ``estimate_shape_polarization`` (ALIGNMENT-LOG entry 2).
+    ``should_stop`` is checked before each shape; when it returns True, or a shape is stopped
+    part-way, the scan ends with the shapes finished so far (ALIGNMENT-LOG entry 18).
     """
     if conditional_threshold is not None and conditional_threshold >= threshold:
         raise ValueError("conditional_threshold must be below the main threshold")
@@ -520,6 +587,8 @@ def run_quops_benchmark(
     beta = 0.0
 
     for shape in schedule:
+        if should_stop is not None and should_stop():
+            break
         alpha = min(alpha_per_test, familywise_alpha - beta)
         if alpha <= 1e-12:  # budget spent (tolerance for alpha_per_test = familywise_alpha / N)
             break
@@ -539,11 +608,12 @@ def run_quops_benchmark(
             num_circuits=num_circuits,
             num_mirrors=num_mirrors,
             shots=shots,
-            noise_model=noise_model,
             rc_style=rc_style,
             seed=int(rng.integers(0, 2**31 - 1)),
             compile_once=compile_once,
         )
+        if data is None:  # stopped part-way through the shape
+            break
         collected.append(data)
 
         statistics = pass_statistics(
@@ -666,12 +736,30 @@ def get_shapes(min_qubits, max_qubits, skip_qubits=1, max_depth=None):
     return shapes
 
 
+def set_target(api, kernel, backend_id, noise, provider_backend=None, hub=None, group=None,
+               project=None, exec_options=None):
+    """Set the qedclib backend once per run. noise="quops" or "none" sets "noise_model";
+    "default" leaves it to qedclib (or to exec_options). optimization_level is 1 unless given."""
+    qedclib.initialize(api)
+    options = dict(exec_options or {})
+    if noise == "quops":
+        options["noise_model"] = kernel.make_depolarizing_noise(p_1q=P_1Q, p_2q=P_2Q)
+    elif noise == "none":
+        options["noise_model"] = None
+    options.setdefault("optimization_level", 1)
+    qedclib.execute.set_execution_target(backend_id, provider_backend=provider_backend,
+            hub=hub, group=group, project=project, exec_options=options,
+            context="QUOPS Benchmark")
+    qedclib.execute.cancel_requested = False  # a Stop from an earlier run must not end this one
+
+
 def run(
     # App args: the shape sweep and sampling
     min_qubits=2, max_qubits=6, skip_qubits=1, max_depth=None,
-    max_circuits=10, num_mirrors=4, seed=2026, noise="depolarizing", max_failures=1,
+    max_circuits=10, num_mirrors=4, seed=2026, noise="default", max_failures=1,
     # Exec args: API, backend and shots
     api="qiskit", backend_id=None, num_shots=1000,
+    provider_backend=None, hub=None, group=None, project=None, exec_options=None,
     # Benchmark args
     compile_once=True, plot_results=True,
     **kwargs,
@@ -686,15 +774,21 @@ def run(
         max_circuits: random circuits per shape (default 10)
         num_mirrors: mirror samples per circuit (default 4)
         seed: random seed (default 2026)
-        noise: "depolarizing" (default; p1=0.002, p2=0.05) or "none" (noiseless)
+        noise: "default" (qedclib decides, as for every other benchmark: its default noise
+            model on the simulator, or the "noise_model" given in exec_options), "quops" (the
+            QUOPS depolarizing model, p1=0.002, p2=0.05, which gives Q = 36 as in PRAQTICE),
+            or "none" (noiseless)
         max_failures: failed shapes before the scan stops (default 1, the paper's method);
             each test then uses alpha = 0.05 / max_failures, so the total stays at 5%
 
     Exec args:
         api: "qiskit" (default) or "cudaq"
-        backend_id: CUDA-Q target (default nvidia; density-matrix-cpu for exact noise);
-            for Qiskit only the image folder name (default qasm_simulator)
+        backend_id: qedclib backend id (default qasm_simulator for Qiskit; nvidia for
+            CUDA-Q, density-matrix-cpu for exact noise)
         num_shots: shots per circuit (default 1000)
+        provider_backend, hub, group, project: passed to qedclib's set_execution_target
+        exec_options: qedclib execution options (default None). noise="quops" or "none"
+            sets "noise_model"; "optimization_level" is 1 unless given here.
 
     Benchmark args:
         compile_once: CUDA-Q only; True (default) runs every mirror through one kernel
@@ -707,16 +801,18 @@ def run(
     Other keyword arguments are ignored, so the same app/exec dicts can be passed to
     several benchmarks.
     """
-    if noise not in ("none", "depolarizing"):
-        raise ValueError(f"noise must be 'none' or 'depolarizing', got {noise!r}")
+    if noise not in ("default", "quops", "none"):
+        raise ValueError(f"noise must be 'default', 'quops' or 'none', got {noise!r}")
     if int(max_failures) < 1:
         raise ValueError("max_failures must be at least one")
     if backend_id is None:
         backend_id = DEFAULT_BACKEND.get(api, "")
 
     kernel, backend_label = load_kernel(api, backend_id)
-    noise_model = kernel.make_depolarizing_noise(p_1q=P_1Q, p_2q=P_2Q) if noise == "depolarizing" else None
     print(f"QUOPS Benchmark - {backend_label}")
+
+    # circuits run through qedclib: set the backend and noise model once for the whole run
+    set_target(api, kernel, backend_id, noise, provider_backend, hub, group, project, exec_options)
 
     # shapes in the utility cone for the width sweep, capped at max_depth
     shapes = get_shapes(min_qubits, max_qubits, skip_qubits, max_depth)
@@ -736,18 +832,27 @@ def run(
         num_circuits=max_circuits,
         num_mirrors=num_mirrors,
         shots=num_shots,
-        noise_model=noise_model,
         rc_style="pauli_frame",
         alpha_per_test=DEFAULT_FAMILYWISE_ALPHA / int(max_failures),
         seed=seed,
         compile_once=compile_once,
+        should_stop=lambda: getattr(qedclib.execute, "cancel_requested", False),
     )
     end_time = datetime.datetime.now()
+    stopped = bool(getattr(qedclib.execute, "cancel_requested", False))
+    if not is_simulator(api, backend_id):
+        # on hardware (and IBM fake backends) the timing isn't a gate-execution rate
+        result.omega, result.omega_note = float("nan"), "not available on hardware"
     print()
+    if stopped:
+        print(f"... stopped by user after {len(result.summary)} shapes; results so far:")
     print(result)
     print(f"Capability region: {result.capability_region()}")
 
-    settings_label = (f"{'noiseless' if noise_model is None else f'depolarizing p1={P_1Q} p2={P_2Q}'} | "
+    noise_label = {"none": "noiseless", "quops": f"QUOPS noise model (depolarizing p1={P_1Q} p2={P_2Q})",
+                   "default": ("noise model from exec_options" if "noise_model" in (exec_options or {})
+                               else "QED-C default noise model")}[noise]
+    settings_label = (f"{noise_label} | "
                       f"K={max_circuits}, M={num_mirrors}, {num_shots} shots | "
                       f"familywise alpha=0.05"
                       + (f", max {max_failures} failures" if max_failures > 1 else ""))
@@ -761,11 +866,12 @@ def run(
         "settings": {
             "min_qubits": min_qubits, "max_qubits": max_qubits, "skip_qubits": skip_qubits,
             "max_depth": max_depth, "max_circuits": max_circuits, "num_mirrors": num_mirrors,
-            "seed": seed, "noise": noise, "p_1q": P_1Q if noise_model is not None else 0.0,
-            "p_2q": P_2Q if noise_model is not None else 0.0, "max_failures": max_failures,
+            "seed": seed, "noise": noise, "p_1q": P_1Q if noise == "quops" else 0.0,
+            "p_2q": P_2Q if noise == "quops" else 0.0, "max_failures": max_failures,
             "num_shots": num_shots, "compile_once": compile_once,
         },
         "settings_label": settings_label,
+        "stopped": stopped,
     })
 
     if plot_results:
@@ -775,6 +881,101 @@ def run(
     return result
 
 
+############### Probe
+
+def run_probe(
+    # App args: the widths to probe and the sampling per shape
+    min_qubits=6, max_qubits=12, skip_qubits=1, max_depth=None, points_per_width=3,
+    max_circuits=2, num_mirrors=1, seed=2026, noise="default",
+    # Exec args: API, backend and shots
+    api="qiskit", backend_id=None, num_shots=1000,
+    provider_backend=None, hub=None, group=None, project=None, exec_options=None,
+    # Benchmark args
+    compile_once=True,
+    **kwargs,
+):
+    """Estimate where the QUOPS boundary lies, cheaply, before a full scan. Not a Q.
+
+    For each width it runs a few shapes (points_per_width, spread from the smallest to the
+    largest size get_shapes allows) with few circuits each (default 2 circuits x 1 mirror =
+    6 circuits per shape). It never stops at a failure and makes no pass/fail claim. For each
+    width it fits ln(lambda) against size and prints the size where lambda reaches the
+    threshold (1/sqrt(e)). A full scan (run()) over the suggested widths gives the real Q.
+
+    Takes the same app/exec arguments as run(), plus points_per_width. Returns a DataFrame
+    with one row per shape probed (width, depth, size, lambda, lower bound).
+    """
+    if noise not in ("default", "quops", "none"):
+        raise ValueError(f"noise must be 'default', 'quops' or 'none', got {noise!r}")
+    if backend_id is None:
+        backend_id = DEFAULT_BACKEND.get(api, "")
+
+    kernel, backend_label = load_kernel(api, backend_id)
+    print(f"QUOPS Probe - {backend_label}")
+    set_target(api, kernel, backend_id, noise, provider_backend, hub, group, project, exec_options)
+
+    # a few shapes per width, spread over the sizes the scan would visit
+    shapes = []
+    for width in range(min_qubits, max_qubits + 1, max(1, skip_qubits)):
+        width_shapes = default_shape_schedule(get_shapes(width, width, 1, max_depth))
+        if not width_shapes:
+            continue
+        picks = np.unique(np.round(np.linspace(0, len(width_shapes) - 1, max(1, points_per_width))).astype(int))
+        shapes.extend(width_shapes[i] for i in picks)
+    if not shapes:
+        raise ValueError(f"No shapes in the utility cone for widths {min_qubits}-{max_qubits}")
+    print(f"Probing {len(shapes)} shapes, {max_circuits * num_mirrors * 3} circuits each "
+          f"({len(shapes) * max_circuits * num_mirrors * 3} circuits); an estimate, not a Q")
+
+    rng = np.random.default_rng(seed)
+    rows = []
+    for shape in shapes:
+        if getattr(qedclib.execute, "cancel_requested", False):
+            print("... stopped by user")
+            break
+        width, depth = int(shape["width"]), int(shape["depth"])
+        data = estimate_shape_polarization(
+            api, width, depth, float(shape.get("zeta", 1.0)),
+            num_circuits=max_circuits, num_mirrors=num_mirrors, shots=num_shots,
+            seed=int(rng.integers(0, 2**31 - 1)), compile_once=compile_once,
+        )
+        if data is None:
+            print("... stopped by user")
+            break
+        statistics = pass_statistics(data, threshold=QUOPS_THRESHOLD, alpha=DEFAULT_FAMILYWISE_ALPHA,
+                                     seed=int(rng.integers(0, 2**31 - 1)))
+        rows.append({"width": width, "depth": depth, "size": data.size,
+                     "lambda": statistics["mean_polarization"], "lower": statistics["bootstrap_lower"]})
+        print(f"w={width:2d} s={data.size:5d}  lambda={rows[-1]['lambda']:.4f} lower={rows[-1]['lower']:.4f}")
+    probe = pd.DataFrame(rows, columns=["width", "depth", "size", "lambda", "lower"])
+
+    # per width: fit ln(lambda) = a + b * size and solve for lambda = threshold
+    print(f"\nEstimated size where lambda = {QUOPS_THRESHOLD:.4f}, per width:")
+    best = None
+    for width, group_rows in probe.groupby("width"):
+        points = group_rows[group_rows["lambda"] > 0]
+        sizes = list(group_rows["size"])
+        if len(points) < 2:
+            print(f"w={width:2d}  not enough points to fit")
+            continue
+        slope, intercept = np.polyfit(points["size"], np.log(points["lambda"]), 1)
+        if slope >= 0:
+            print(f"w={width:2d}  lambda does not fall with size here (sizes {sizes[0]}-{sizes[-1]})")
+            continue
+        crossing = (np.log(QUOPS_THRESHOLD) - intercept) / slope
+        where = "beyond the largest size probed" if crossing > sizes[-1] else (
+                "below the smallest size probed" if crossing < sizes[0] else "inside the sizes probed")
+        print(f"w={width:2d}  s ~ {crossing:7.0f}  ({where}: {sizes[0]}-{sizes[-1]})")
+        if sizes[0] <= crossing <= sizes[-1] and (best is None or crossing > best[1]):
+            best = (int(width), float(crossing))
+    if best is not None:
+        print(f"\nLargest crossing inside a width's sizes: w={best[0]}, s ~ {best[1]:.0f}. "
+              f"A full scan over widths near {best[0]} gives Q.")
+    else:
+        print("\nNo width crosses the threshold inside its sizes; probe other widths.")
+    return probe
+
+
 #######################
 # MAIN
 
@@ -782,7 +983,7 @@ def get_args():
     parser = argparse.ArgumentParser(description="QUOPS Benchmark")
     parser.add_argument("--api", "-a", default="qiskit", help="Programming API: qiskit or cudaq", type=str)
     parser.add_argument("--backend_id", "-b", default=None,
-                        help="CUDA-Q target (default nvidia; density-matrix-cpu for exact noise); for Qiskit only the image folder name (default qasm_simulator)", type=str)
+                        help="qedclib backend id (default qasm_simulator for Qiskit; nvidia for CUDA-Q, density-matrix-cpu for exact noise)", type=str)
     parser.add_argument("--num_shots", "-s", default=1000, help="Number of shots", type=int)
     parser.add_argument("--num_qubits", "-n", default=0, help="Number of qubits (min = max = N)", type=int)
     parser.add_argument("--min_qubits", "-min", default=2, help="Minimum number of qubits (circuit width)", type=int)
@@ -791,14 +992,18 @@ def get_args():
     parser.add_argument("--max_depth", "-d", default=None,
                         help="Largest depth (layer pairs) to scan at each width; default 3 x width, 0 = no cap", type=int)
     parser.add_argument("--max_failures", default=1, help="Failed shapes before the scan stops (default 1)", type=int)
-    parser.add_argument("--max_circuits", "-c", default=10, help="Random circuits per shape", type=int)
-    parser.add_argument("--num_mirrors", default=4, help="Mirror samples per circuit", type=int)
+    parser.add_argument("--max_circuits", "-c", default=None, help="Random circuits per shape (default 10; probe 2)", type=int)
+    parser.add_argument("--num_mirrors", default=None, help="Mirror samples per circuit (default 4; probe 1)", type=int)
     parser.add_argument("--seed", default=2026, help="Random seed", type=int)
-    parser.add_argument("--noise", default="depolarizing", choices=["none", "depolarizing"],
-                        help=f"Noise model: depolarizing (default; p1={P_1Q}, p2={P_2Q}) or none", type=str)
+    parser.add_argument("--noise", default="default", choices=["default", "quops"],
+                        help=f"Noise model: default (qedclib's default model) or quops (depolarizing p1={P_1Q}, p2={P_2Q}; Q = 36 as in PRAQTICE)", type=str)
+    parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--no_compile_once", action="store_true",
                         help="CUDA-Q: build and compile a new kernel per circuit (as in PRAQTICE; same results, ~100x slower)")
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
+    parser.add_argument("--probe", action="store_true",
+                        help="Probe mode: a few shapes per width, few circuits, no stopping; estimates where the boundary lies (not a Q)")
+    parser.add_argument("--points_per_width", default=3, help="Probe mode: shapes per width (default 3)", type=int)
     return parser.parse_args()
 
 
@@ -810,10 +1015,18 @@ if __name__ == '__main__':
     import matplotlib
     matplotlib.use("Agg")
 
+    noise = "none" if args.nonoise else args.noise
     try:
+        if args.probe:
+            run_probe(min_qubits=args.min_qubits, max_qubits=args.max_qubits, skip_qubits=args.skip_qubits,
+                max_depth=args.max_depth, points_per_width=args.points_per_width,
+                max_circuits=args.max_circuits or 2, num_mirrors=args.num_mirrors or 1,
+                seed=args.seed, noise=noise, api=args.api, backend_id=args.backend_id, num_shots=args.num_shots,
+                compile_once=not args.no_compile_once)
+            sys.exit(0)
         run(min_qubits=args.min_qubits, max_qubits=args.max_qubits, skip_qubits=args.skip_qubits,
-            max_depth=args.max_depth, max_circuits=args.max_circuits, num_mirrors=args.num_mirrors,
-            seed=args.seed, noise=args.noise, max_failures=args.max_failures, api=args.api, backend_id=args.backend_id, num_shots=args.num_shots,
+            max_depth=args.max_depth, max_circuits=args.max_circuits or 10, num_mirrors=args.num_mirrors or 4,
+            seed=args.seed, noise=noise, max_failures=args.max_failures, api=args.api, backend_id=args.backend_id, num_shots=args.num_shots,
             compile_once=not args.no_compile_once, plot_results=not args.noplot)
     except ValueError as error:
         sys.exit(str(error))
