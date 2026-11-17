@@ -1186,9 +1186,14 @@ def execute_circuits(circuits, num_shots=100, wait=True, gpus_per_circuit=None, 
         elif this_noise is not None and not sampler and backend_name.endswith("qasm_simulator"):
             # Noisy simulator path — transpile to noise model's basis gates only;
             # don't pass backend alongside basis_gates (Qiskit 2.x warning)
+            # Default to level 1: Qiskit's default level 2 can produce non-equivalent
+            # circuits with the default noise model's basis (seen in Grover's, AE, QUOPS)
             ts_transpile = time.time()
             trans_qcs = transpile(circuits,
-                basis_gates=this_noise.basis_gates)
+                basis_gates=this_noise.basis_gates,
+                optimization_level=optimization_level if optimization_level is not None else 1,
+                layout_method=layout_method,
+                routing_method=routing_method)
             last_transpile_time = time.time() - ts_transpile
 
             # Copy noise model QV to metrics if available

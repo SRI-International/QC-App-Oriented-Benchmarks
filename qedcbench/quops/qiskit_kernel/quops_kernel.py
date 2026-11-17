@@ -98,11 +98,17 @@ def require_circuit_arrays(circuit: QuantumCircuit):
 
 def build_br_circuit(width: int, L: QuantumCircuit, C: QuantumCircuit,
                      RC_C_inv: QuantumCircuit, L_prime: QuantumCircuit) -> QuantumCircuit:
-    """M1 mirror: L' g_ref(C^dag) C L, then measure (Supp. Eq. 30)."""
+    """M1 mirror: L' g_ref(C^dag) C L, then measure (Supp. Eq. 30).
+
+    Barriers between the parts keep a transpiler from cancelling gates across them.
+    """
     qc = QuantumCircuit(width, width)
     qc.compose(L, inplace=True)
+    qc.barrier()
     qc.compose(C, inplace=True)
+    qc.barrier()
     qc.compose(RC_C_inv, inplace=True)
+    qc.barrier()
     qc.compose(L_prime, inplace=True)
     qc.measure(range(width), range(width))
     return qc
@@ -110,20 +116,30 @@ def build_br_circuit(width: int, L: QuantumCircuit, C: QuantumCircuit,
 
 def build_rr_circuit(width: int, L: QuantumCircuit, RC_C: QuantumCircuit,
                      RC_C_inv: QuantumCircuit, L_prime: QuantumCircuit) -> QuantumCircuit:
-    """M2 mirror: L' g_ref(C^dag) g_ref(C) L, then measure (Supp. Eq. 31)."""
+    """M2 mirror: L' g_ref(C^dag) g_ref(C) L, then measure (Supp. Eq. 31).
+
+    Barriers between the parts keep a transpiler from cancelling gates across them.
+    """
     qc = QuantumCircuit(width, width)
     qc.compose(L, inplace=True)
+    qc.barrier()
     qc.compose(RC_C, inplace=True)
+    qc.barrier()
     qc.compose(RC_C_inv, inplace=True)
+    qc.barrier()
     qc.compose(L_prime, inplace=True)
     qc.measure(range(width), range(width))
     return qc
 
 
 def build_ref_circuit(width: int, L: QuantumCircuit, L_prime: QuantumCircuit) -> QuantumCircuit:
-    """M3 SPAM reference: L' L, then measure (Supp. Eq. 32)."""
+    """M3 SPAM reference: L' L, then measure (Supp. Eq. 32).
+
+    A barrier between the parts keeps a transpiler from cancelling gates across them.
+    """
     qc = QuantumCircuit(width, width)
     qc.compose(L, inplace=True)
+    qc.barrier()
     qc.compose(L_prime, inplace=True)
     qc.measure(range(width), range(width))
     return qc
