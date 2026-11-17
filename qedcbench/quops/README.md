@@ -5,8 +5,9 @@ useful operations at that size. It is described in *Benchmarking the computation
 computers* [[1]](#references), and this implementation follows the reference code maintained in the
 PRAQTICE repository [[2]](#references).
 
-> **Status: preview.** This version runs on simulators only (Qiskit Aer, and CUDA-Q on CPU or GPU).
-> Running on real hardware through the QED-C execution library is planned.
+> **Status: preview.** Runs on simulators (Qiskit Aer, and CUDA-Q on CPU or GPU) and, through the
+> QED-C execution library, on Qiskit hardware backends; tested on IBM `ibm_fez`. Omega is not yet
+> reported on hardware.
 
 ## Problem outline
 
