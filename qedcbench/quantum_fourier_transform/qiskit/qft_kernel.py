@@ -82,7 +82,8 @@ def QuantumFourierTransform(num_qubits, secret_int,  bitset = None, method=1, us
 
         for i_q in range(0, num_qubits):
             divisor = 2 ** (i_q)
-            qc.rz(secret_int * math.pi / divisor, qr[i_q])
+            phase = (secret_int % (2 ** (i_q + 1))) * math.pi / divisor
+            qc.rz(phase, qr[i_q])
             num_gates += 1
         
         qc.barrier()

@@ -207,6 +207,7 @@ def get_args():
     parser.add_argument("--tau", "-tau", default=0.95, help="Discount factor tau", type=float)
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
     parser.add_argument("--data_reupload", "-r", action="store_true", help="Enable data reupload")
     parser.add_argument("--max_batch_size", "-mbs", default=0, help="Max batch size for circuit execution (0=no limit)", type=int)
     return parser.parse_args()
@@ -730,7 +731,7 @@ def run(**kwargs):
     print(f"{benchmark_name} ({method}) Benchmark Program")
 
     if method in (1, 3):
-        metrics.init_metrics()
+        metrics.init_metrics(kwargs.get("warmup", False))
         all_qcs, circuit_metrics = get_circuits(**_for(get_circuits))
         run_circuits(all_qcs, **_for(run_circuits))
         metrics.end_metrics()
@@ -773,6 +774,7 @@ if __name__ == '__main__':
         backend_id=args.backend_id,
         exec_options={"noise_model": None} if args.nonoise else {},
         api=args.api,
+        warmup=args.warmup,
         data_reupload=args.data_reupload,
         num_qubits=args.num_qubits,
         learning_start = args.learning_start,

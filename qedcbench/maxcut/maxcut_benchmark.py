@@ -11,17 +11,32 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 from qedclib import initialize
+from qedclib.backend_utils import (resolve_exec_options)
 
 # Benchmark Name
 benchmark_name = "MaxCut"
 
 
-def run(**kwargs):
-    """Create circuits, execute, and plot. Delegates to API-specific implementation.
-    See maxcut/qiskit/maxcut_benchmark.py for detailed parameter documentation."""
+def run(min_qubits=3, max_qubits=6, skip_qubits=2,
+        max_circuits=1, num_shots=100,
+        method=1, rounds=1, degree=3, alpha=0.1, thetas_array=None,
+        parameterized=False, do_fidelities=True,
+        max_iter=30, score_metric='fidelity', x_metric='cumulative_exec_time', y_metric='num_qubits',
+        fixed_metrics={}, num_x_bins=15, y_size=None, x_size=None, use_fixed_angles=False,
+        objective_func_type='approx_ratio', plot_results=True,
+        save_res_to_file=False, save_final_counts=False, detailed_save_names=False, comfort=False,
+        backend_id=None, provider_backend=None, eta=0.5,
+        hub="ibm-q", group="open", project="main", exec_options=None,
+        context=None,
+        min_annealing_time=1, max_annealing_time=200,
+        api=None,
+        warmup=False,
+        _instances=None,
+        get_circuits=False,
+        draw_circuits=True, max_batch_size=None, parallel=False):
 
     # Determine which API to use
-    selected_api = kwargs.pop('api', None) or "qiskit"
+    selected_api = api or "qiskit"
 
     # Configure the QED-C Benchmark package for use with the given API
     initialize(selected_api, "maxcut", ["maxcut_benchmark"])
@@ -29,9 +44,51 @@ def run(**kwargs):
     # Import the actual benchmark module (now available after qedc_init)
     import maxcut_benchmark as maxcut_impl
 
-    # Use default backend_id if None passed
-    if kwargs.get('backend_id') is None:
-        kwargs['backend_id'] = "qasm_simulator"
+    # qasm_simulator is qiskit-Aer-specific; cudaq uses its own default target.
+    if backend_id is None and selected_api == "qiskit":
+        backend_id = "qasm_simulator"
+
+    # Build common parameters
+    kwargs = dict(
+        min_qubits=min_qubits, max_qubits=max_qubits,
+        max_circuits=max_circuits, num_shots=num_shots,
+        method=method, degree=degree, alpha=alpha, thetas_array=thetas_array,
+        parameterized=parameterized, do_fidelities=do_fidelities,
+        max_iter=max_iter, score_metric=score_metric, x_metric=x_metric, y_metric=y_metric,
+        fixed_metrics=fixed_metrics, num_x_bins=num_x_bins, y_size=y_size, x_size=x_size,
+        objective_func_type=objective_func_type, plot_results=plot_results,
+        save_res_to_file=save_res_to_file, save_final_counts=save_final_counts,
+        detailed_save_names=detailed_save_names, comfort=comfort,
+        backend_id=backend_id, provider_backend=provider_backend, eta=eta,
+        hub=hub, group=group, project=project, exec_options=exec_options,
+        _instances=_instances,
+        get_circuits=get_circuits,
+        draw_circuits=draw_circuits,
+    )
+
+    # Add API-specific parameters
+    if selected_api == "qiskit":
+        kwargs.update(
+            skip_qubits=skip_qubits,
+            rounds=rounds,
+            use_fixed_angles=use_fixed_angles,
+            context=context,
+            max_batch_size=max_batch_size,
+            parallel=parallel,
+        )
+    elif selected_api == "cudaq":
+        kwargs.update(
+            skip_qubits=skip_qubits,
+            rounds=rounds,
+            use_fixed_angles=use_fixed_angles,
+            context=context,
+            warmup=warmup,
+        )
+    elif selected_api == "ocean":
+        kwargs.update(
+            min_annealing_time=min_annealing_time,
+            max_annealing_time=max_annealing_time,
+        )
 
     # Delegate to the implementation
     return maxcut_impl.run(**kwargs)
@@ -67,8 +124,12 @@ def get_args():
     parser.add_argument("--method", "-m", default=1, help="Algorithm Method", type=int)
     parser.add_argument("--rounds", "-r", default=1, help="Number of QAOA rounds", type=int)
     parser.add_argument("--degree", "-d", default=3, help="Degree of graph", type=int)
+    parser.add_argument("--parameterized", action="store_true", help="Use parameterized circuit path")
+    parser.add_argument("--skip_fidelity", action="store_true", help="Skip fidelity calculation")
     parser.add_argument("--nonoise", "-non", action="store_true", help="Use Noiseless Simulator")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose")
+    parser.add_argument("--warmup", "-w", action="store_true", help="Exclude first circuit from timing stats as warmup")
+    parser.add_argument("--exec_options", "-e", default=None, help="Additional execution options to be passed to the backend", type=str)
     parser.add_argument("--noplot", "-nop", action="store_true", help="Do not plot results")
     parser.add_argument("--nodraw", "-nod", action="store_true", help="Do not draw circuit diagram")
     parser.add_argument("--max_batch_size", "-mbs", default=0, help="Max batch size for circuit execution (0=no limit)", type=int)
@@ -87,9 +148,12 @@ if __name__ == "__main__":
         method=args.method,
         rounds=args.rounds,
         degree=args.degree,
+        parameterized=args.parameterized,
+        do_fidelities=not args.skip_fidelity,
         backend_id=args.backend_id,
-        exec_options={"noise_model": None} if args.nonoise else {},
+        exec_options = resolve_exec_options(args),
         api=args.api,
+        warmup=args.warmup,
         draw_circuits=not args.nodraw, plot_results=not args.noplot,
         max_batch_size=args.max_batch_size,
         parallel=args.parallel

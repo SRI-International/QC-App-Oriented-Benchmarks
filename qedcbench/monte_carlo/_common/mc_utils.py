@@ -102,13 +102,13 @@ def binary_expansion(num_state_qubits, poly):
             two_exp, denom, t = 0, 1, 0
             for power in pow_list:
                 two_exp += t*power
-                denom *= np.math.factorial(power)
+                denom *= math.factorial(power)
                 t+=1
             nz = np.nonzero(pow_list)[0]
             key = tuple(nz)
             if key not in out_front.keys():
                 out_front[key] = 0
-            out_front[key] += poly_c[k]*((np.math.factorial(k) / denom) * (2**(two_exp)))
+            out_front[key] += poly_c[k]*((math.factorial(k) / denom) * (2**(two_exp)))
     return out_front
 
 

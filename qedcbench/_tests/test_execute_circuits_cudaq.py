@@ -28,6 +28,13 @@ def bell_kernel(num_qubits: int):
     mz(qubits)
 
 
+@cudaq.kernel
+def return_bit_kernel() -> bool:
+    qubit = cudaq.qubit()
+    x(qubit)
+    return mz(qubit)
+
+
 def create_circuit(num_qubits=2):
     """Create a cudaq circuit tuple [kernel, [args]]."""
     return [bell_kernel, [num_qubits]]
@@ -158,11 +165,14 @@ def test_process_circuit_results_timing():
 
     ex.process_circuit_results(circuits_info, results, job_id=job_id, elapsed_time=2.5)
 
-    for ci in circuits_info:
+    per_circuit_times = results._per_circuit_times
+    for index, ci in enumerate(circuits_info):
         g, c = ci["group"], ci["circuit"]
         cm = metrics.circuit_metrics.get(g, {}).get(c, {})
         assert "elapsed_time" in cm, f"elapsed_time not stored for {g}/{c}"
-        assert cm["elapsed_time"] == 2.5, f"Expected elapsed_time 2.5, got {cm['elapsed_time']}"
+        assert cm["elapsed_time"] == round(per_circuit_times[index], 4), (
+            f"Expected elapsed_time {per_circuit_times[index]}, got {cm['elapsed_time']}"
+        )
         assert "job_id" in cm, f"job_id not stored for {g}/{c}"
         assert cm["job_id"] == job_id, f"Expected job_id {job_id}, got {cm['job_id']}"
 
@@ -239,6 +249,131 @@ def test_submit_circuits_batch_by_group():
     print(f"  PASS: batch_by_group=True, groups processed separately")
 
 
+def test_default_noise_model_channels():
+    """Test: default model matches Qiskit rates and covers arbitrary qubits."""
+    print("\n=== test_default_noise_model_channels ===")
+
+    noise_model = ex.default_noise_model()
+
+    for gate in ("x", "y", "z", "h", "s", "t", "rx", "ry", "rz", "r1"):
+        channels = noise_model.get_channels(gate, [47])
+        assert len(channels) == 1, f"Expected one 1Q channel for {gate}"
+        assert channels[0].parameters == [0.0005], (
+            f"Wrong 1Q error rate for {gate}: {channels[0].parameters}"
+        )
+
+    for gate in ("x", "y", "z", "h", "rx", "ry", "rz", "r1"):
+        channels = noise_model.get_channels(gate, [47], [46])
+        assert len(channels) == 1, f"Expected one controlled channel for {gate}"
+        assert channels[0].parameters == [0.005], (
+            f"Wrong 2Q error rate for controlled {gate}: {channels[0].parameters}"
+        )
+
+    assert metrics.QV == 2048, f"Expected QV 2048, got {metrics.QV}"
+    print("  PASS: Qiskit-matched 1Q/2Q rates registered on all qubits")
+
+
+def test_noise_exec_options():
+    """Test: dict/JSON overrides resolve without leaking across targets."""
+    print("\n=== test_noise_exec_options ===")
+
+    ex.set_noise_model("default")
+    ex.set_execution_target(
+        "density-matrix-cpu",
+        exec_options='{"option": "fp64", "noise_model": "default"}',
+    )
+    assert isinstance(ex._resolve_noise_model(), cudaq.NoiseModel)
+    assert ex._resolved_target_options["option"] == "fp64"
+
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": None}
+    )
+    assert ex._resolve_noise_model() is None
+
+    custom_noise = cudaq.NoiseModel()
+    custom_noise.add_all_qubit_channel("x", cudaq.BitFlipChannel(1.0))
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": custom_noise}
+    )
+    assert ex._resolve_noise_model() is custom_noise
+
+    ex.set_execution_target("density-matrix-cpu")
+    assert ex._resolve_noise_model() is ex.noise
+    assert ex._resolve_noise_model() is not custom_noise
+    print("  PASS: default, disabled, custom, and JSON noise options resolve correctly")
+
+
+def test_default_noise_behavior():
+    """Test: matched default noise produces Bell-state leakage."""
+    print("\n=== test_default_noise_behavior ===")
+
+    cudaq.set_random_seed(1234)
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": None}
+    )
+    _, ideal_result = ex.execute_circuits([create_circuit()], num_shots=5000)
+    ideal_counts = ideal_result.get_counts()
+    assert set(ideal_counts).issubset({"00", "11"}), ideal_counts
+
+    cudaq.set_random_seed(1234)
+    ex.set_execution_target("density-matrix-cpu")
+    _, noisy_result = ex.execute_circuits([create_circuit()], num_shots=5000)
+    noisy_counts = noisy_result.get_counts()
+    leakage = noisy_counts.get("01", 0) + noisy_counts.get("10", 0)
+    assert leakage > 0, f"Default 2Q noise produced no Bell-state leakage: {noisy_counts}"
+    print(f"  PASS: default model produced {leakage}/5000 leakage shots")
+
+
+def test_run_path_noise():
+    """Test: cudaq.run receives custom noise for typed-return kernels."""
+    print("\n=== test_run_path_noise ===")
+
+    circuit = [return_bit_kernel, [], {"result_width": 1}]
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": None}
+    )
+    _, ideal_result = ex.execute_circuits([circuit], num_shots=100)
+    assert ideal_result.get_counts() == {"1": 100}
+
+    bit_flip = cudaq.NoiseModel()
+    bit_flip.add_all_qubit_channel("x", cudaq.BitFlipChannel(1.0))
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": bit_flip}
+    )
+    _, noisy_result = ex.execute_circuits([circuit], num_shots=100)
+    assert noisy_result.get_counts() == {"0": 100}
+    print("  PASS: typed-return run path applied the configured noise model")
+
+
+def test_hamlib_observe_noise():
+    """Test: HamLib SpinOperator execution uses the central observe wrapper."""
+    print("\n=== test_hamlib_observe_noise ===")
+
+    from qedcbench.hamlib.cudaq import hamlib_simulation_kernel as hamlib_kernel
+
+    circuit = [hamlib_kernel.get_initial_state, [1]]
+    pauli_terms = [({0: "Z"}, 1.0)]
+
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": None}
+    )
+    ideal = hamlib_kernel.get_expectation(
+        circuit, 1, pauli_terms, observe_fn=ex.observe
+    )
+
+    bit_flip = cudaq.NoiseModel()
+    bit_flip.add_all_qubit_channel("x", cudaq.BitFlipChannel(1.0))
+    ex.set_execution_target(
+        "density-matrix-cpu", exec_options={"noise_model": bit_flip}
+    )
+    noisy = hamlib_kernel.get_expectation(
+        circuit, 1, pauli_terms, observe_fn=ex.observe
+    )
+
+    assert ideal != noisy, f"Expected observe noise to change energy, got {ideal}"
+    print(f"  PASS: HamLib expectation changed from {ideal} to {noisy}")
+
+
 ###########################################################################
 
 if __name__ == '__main__':
@@ -254,6 +389,11 @@ if __name__ == '__main__':
         test_submit_circuits_end_to_end,
         test_submit_circuits_max_batch_size,
         test_submit_circuits_batch_by_group,
+        test_default_noise_model_channels,
+        test_noise_exec_options,
+        test_default_noise_behavior,
+        test_run_path_noise,
+        test_hamlib_observe_noise,
     ]
 
     passed = 0

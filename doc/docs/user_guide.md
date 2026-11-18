@@ -180,11 +180,31 @@ Additional execution options can be passed via `exec_options` dict in notebooks 
 ```python
 exec_options = {
     "noise_model": "default",      # Built-in depolarization noise
-    "optimization_level": 1,       # Qiskit transpiler optimization (0-3)
+    "option": "fp32",               # CUDA-Q target option
 }
 
-benchmark.run(**app_args, **exec_options)
+benchmark.run(**app_args, exec_options=exec_options)
 ```
+
+For Qiskit Aer `qasm_simulator` and CUDA-Q simulators that support noise, the
+built-in noise model is enabled by default. Disable it with `--nonoise` (`-non`)
+on the command line or `{"noise_model": None}` programmatically. The value
+`"default"` selects the built-in model, and a framework-native noise model
+object selects a custom model.
+
+CUDA-Q accepts `exec_options` as either a dictionary or a JSON object string,
+so target and noise settings can be combined:
+
+```python
+exec_options = '{"option": "fp64", "noise_model": "default"}'
+```
+
+The matched default model uses 0.0005 one-qubit and 0.005 two-qubit
+depolarizing error rates. CUDA-Q applies these rates to its native one-qubit
+and single-controlled gate forms because CUDA-Q kernels are not transpiled to
+Qiskit's `rx/ry/rz/cx` basis. Noise is supported here for `nvidia`, `tensornet`,
+`tensornet-mps`, and `density-matrix-cpu`; `qpp-cpu` and hardware targets run
+without a simulator noise model.
 
 ### Running on Hardware
 

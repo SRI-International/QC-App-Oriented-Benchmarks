@@ -15,7 +15,10 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 
 import qedclib
 from qedclib import metrics
-from shors._common.shors_utils import getAngles, getAngle, modinv, generate_base
+from shors._common.shors_utils import (
+    getAngles, getAngle, modinv, generate_base, multiplicative_order,
+)
+from shors._common.shors_helpers import expected_shor_dist as _expected_shor_dist
 
 # Benchmark Name
 benchmark_name = "Shor's Order Finding"
@@ -314,32 +317,7 @@ def ShorsAlgorithm(number, base, method, verbose=verbose):
 ############### Circuit end
 
 def expected_shor_dist(num_bits, order, num_shots):
-    # num_bits represent the number of bits to represent the number N in question
-
-    # Qubits measureed always 2 * num_bits for the three methods implemented in this benchmark
-    qubits_measured = 2 * num_bits
-    dist = {}
-
-    #Conver float to int
-    r = int(order)
-
-    #Generate expected distribution
-    q = int(2 ** (qubits_measured))
-
-    for i in range(r):
-        key = bin(int(q*(i/r)))[2:].zfill(qubits_measured)
-        dist[key] = num_shots/r
-
-        '''
-            for c in range(2 ** qubits_measured):
-                key = bin(c)[2:].zfill(qubits_measured)
-                amp = 0
-                for i in range(int(q/r) - 1):
-                    amp += np.exp(2*math.pi* 1j * i * (r * c % q)/q )
-                amp = amp * np.sqrt(r) / q
-                dist[key] = abs(amp) ** 2
-        '''
-    return dist
+    return _expected_shor_dist(num_bits, order, num_shots)
 
 # Print analyzed results
 # Analyze and print measured results
@@ -438,9 +416,7 @@ def get_circuits(
                 order = np.random.randint(2, number)
                 base = generate_base(number, order)
 
-            # reduce order to smallest prime factor
-            if order % 2 == 0: order = 2
-            if order % 3 == 0: order = 3
+            order = multiplicative_order(base, number)
 
             number_order = (number, order)
             circuit_id = number_order

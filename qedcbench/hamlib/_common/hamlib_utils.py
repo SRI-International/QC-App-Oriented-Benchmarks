@@ -86,7 +86,10 @@ def load_hamlib_file(filename: str):
     hdf5_file_path = os.path.join(download_dir, os.path.basename(pathname)) + ".hdf5"
     
     # if HamLib hdf5 is already downloaded, just use this cached version
-    if os.path.exists(hdf5_file_path):
+    cached = os.path.exists(hdf5_file_path) if mpi.leader() else False
+    cached = mpi.bcast(cached)
+
+    if cached:
         if verbose:
             print(f"... loading cached HamLib file: {hdf5_file_path}")
     
@@ -109,6 +112,7 @@ def load_hamlib_file(filename: str):
             downloaded = False
 
         downloaded = mpi.bcast(downloaded)
+        mpi.barrier()
         if not downloaded:
             extracted_path = None
             print(f"ERROR: can not download the requested HamLib file from: {fullname}")

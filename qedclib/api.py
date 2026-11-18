@@ -293,7 +293,7 @@ def reset_module_caches(api: str, benchmark_name: str, module_names: list[str] =
     """
     # 1) Normalize sys.path so top-level package import works like `-m`
     repo_root = str(Path(__file__).resolve().parents[1])      # repo root
-    pkg_dir = str(Path(repo_root) / benchmark_name)           # e.g. .../bernstein_vazirani
+    pkg_dir = str(Path(repo_root) / "qedcbench" / benchmark_name)
     sys.path = [repo_root] + [p for p in sys.path if p not in (repo_root, pkg_dir)]
 
     # 2) Remove poisoned/partial module entries (this fixes __spec__ is None)

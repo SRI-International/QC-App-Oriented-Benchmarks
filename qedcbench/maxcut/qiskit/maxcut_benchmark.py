@@ -902,7 +902,7 @@ def get_width_restart_tuple_from_filename(fileName):
 
 #%% Run method: Benchmarking loop
 
-MAX_QUBITS = 24
+MAX_QUBITS = 40
 iter_dist = {'cuts' : [], 'counts' : [], 'sizes' : []} # (list of measured bitstrings, list of corresponding counts, list of corresponding cut sizes)
 iter_size_dist = {'unique_sizes' : [], 'unique_counts' : [], 'cumul_counts' : []} # for the iteration being executed, stores the distribution for cut sizes
 saved_result = {  }
@@ -1411,16 +1411,16 @@ def run(**kwargs):
     """Create circuits, execute, and plot. Accepts any arg from
     get_circuits(), run_circuits(), plot_results_fn(), or run_method2()."""
 
+    method = kwargs.get('method', 1)
+
     # If max_batch_size set, use batched create-execute loop to limit memory
-    if kwargs.get('max_batch_size') is not None:
+    if method == 1 and kwargs.get('max_batch_size'):
         from qedclib.batched import batched_run
         return batched_run(get_circuits, run_circuits, plot_results_fn, **kwargs)
 
     # Partition incoming arguments to the function that accepts them
     def _for(func):
         return {k: kwargs[k] for k in kwargs if k in inspect.signature(func).parameters}
-
-    method = kwargs.get('method', 1)
 
     print(f"{benchmark_name} ({method}) Benchmark Program - Qiskit")
 
