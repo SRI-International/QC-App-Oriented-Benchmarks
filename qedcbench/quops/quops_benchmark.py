@@ -116,13 +116,15 @@ def _json_value(value):
     raise TypeError(f"Cannot save {type(value).__name__} as JSON")
 
 
-def save_data(result, run_info):
+def save_data(result, run_info, quiet=False):
     """Save a QUOPS run to __data/<backend_id>/QUOPS-results.json.
 
     The file holds ``run_info`` (backend, API, settings, start and end time), the score
     (Q, its shape, Omega, significance used), the summary table (one row per shape tested)
     and the raw BR/RR/REF polarizations per shape. ``plot_results`` draws the plots from it,
     so they can be remade later without running the benchmark again.
+    ``run()`` also saves after each shape (``"finished": false``, ``quiet=True``), so a run that
+    hangs or dies keeps the shapes it finished.
     """
     data = dict(run_info)
     data.update(
@@ -141,7 +143,30 @@ def save_data(result, run_info):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(data, f, indent=2, default=_json_value)
-    print(f"... saved {path}")
+    if not quiet:
+        print(f"... saved {path}")
+
+
+def probe_file(backend_id):
+    """Path of the saved QUOPS probe for a backend: __data/<backend_id>/QUOPS-probe.json."""
+    return os.path.join(os.getcwd(), "__data", backend_id.replace("/", "_"), "QUOPS-probe.json")
+
+
+def save_probe(rows, estimates, best, run_info, quiet=False):
+    """Save a probe to __data/<backend_id>/QUOPS-probe.json.
+
+    The file holds ``run_info`` (backend, API, settings, start and end time), the shapes probed
+    (width, depth, size, lambda, lower bound), the estimate per width and the best one.
+    ``run_probe()`` also saves after each shape (``"finished": false``, no estimates yet).
+    """
+    data = dict(run_info)
+    data.update(shapes=list(rows), estimates=list(estimates), best=best)
+    path = probe_file(run_info["backend_id"])
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2, default=_json_value)
+    if not quiet:
+        print(f"... saved {path}")
 
 
 def load_data(backend_id):
@@ -556,6 +581,7 @@ def run_quops_benchmark(
     progress: Callable[[str], None] | None = print,
     compile_once: bool = True,
     should_stop: Callable[[], bool] | None = None,
+    on_shape: Callable[[list, list, float], None] | None = None,
 ) -> BenchmarkResult:
     """Run the formal QUOPS benchmark of Supplementary Section V.
 
@@ -574,6 +600,8 @@ def run_quops_benchmark(
     ``compile_once`` is passed to ``estimate_shape_polarization`` (ALIGNMENT-LOG entry 2).
     ``should_stop`` is checked before each shape; when it returns True, or a shape is stopped
     part-way, the scan ends with the shapes finished so far (ALIGNMENT-LOG entry 18).
+    ``on_shape(rows, shape_data, consumed_significance)`` is called after each shape, so the
+    caller can save the shapes finished so far (ALIGNMENT-LOG entry 21).
     """
     if conditional_threshold is not None and conditional_threshold >= threshold:
         raise ValueError("conditional_threshold must be below the main threshold")
@@ -662,12 +690,16 @@ def run_quops_benchmark(
         rows.append(statistics)
 
         if progress is not None:
+            # Q over the shapes finished so far, so a run that hangs or is stopped still shows it
+            quops_so_far, _ = quops_score_from_summary(pd.DataFrame(rows), pass_column="passes")
             progress(
                 f"w={width:2d} s={data.size:4d} zeta={shape_zeta:.2f}  "
                 f"lambda={statistics['mean_polarization']:.4f} "
                 f"lower={statistics['bootstrap_lower']:.4f}  "
-                f"{'PASS' if statistics['passes'] else 'FAIL'}"
+                f"{'PASS' if statistics['passes'] else 'FAIL'}  Q so far = {quops_so_far}"
             )
+        if on_shape is not None:
+            on_shape(rows, collected, beta)
 
     summary = pd.DataFrame(rows)
     if not summary.empty:
@@ -827,7 +859,48 @@ def run(
     print(f"Scanning up to {len(shapes)} shapes (depth <= {depth_note}), "
           f"stopping after {max_failures} failure{'s' if max_failures > 1 else ''}")
 
+    noise_label = {"none": "noiseless", "quops": f"QUOPS noise model (depolarizing p1={P_1Q} p2={P_2Q})",
+                   "default": ("noise model from exec_options" if "noise_model" in (exec_options or {})
+                               else "QED-C default noise model")}[noise]
+    if not is_simulator(api, backend_id):
+        noise_label = "device noise"  # noise models apply to the simulators only
+    settings_label = (f"{noise_label} | "
+                      f"K={max_circuits}, M={num_mirrors}, {num_shots} shots | "
+                      f"familywise alpha=0.05"
+                      + (f", max {max_failures} failures" if max_failures > 1 else ""))
+
     start_time = datetime.datetime.now()
+    run_info = {
+        "benchmark": "QUOPS",
+        "api": api,
+        "backend_id": backend_id,
+        "backend_label": backend_label,
+        "start_time": start_time.isoformat(timespec="seconds"),
+        "end_time": None,
+        "settings": {
+            "min_qubits": min_qubits, "max_qubits": max_qubits, "skip_qubits": skip_qubits,
+            "max_depth": max_depth, "max_circuits": max_circuits, "num_mirrors": num_mirrors,
+            "seed": seed, "noise": noise, "p_1q": P_1Q if noise == "quops" else 0.0,
+            "p_2q": P_2Q if noise == "quops" else 0.0, "max_failures": max_failures,
+            "num_shots": num_shots, "compile_once": compile_once,
+        },
+        "settings_label": settings_label,
+        "stopped": False,
+    }
+
+    def save_unfinished(rows, shape_data, consumed_significance):
+        """Save the shapes finished so far, so a run that hangs or dies keeps them."""
+        summary = pd.DataFrame(rows).sort_values(["width", "size"]).reset_index(drop=True)
+        quops, shape_at_q = quops_score_from_summary(summary, pass_column="passes")
+        partial = BenchmarkResult(
+            summary=summary, quops=quops, shape=shape_at_q, omega=float("nan"),
+            omega_note=f"run not finished ({len(rows)} shapes saved)",
+            conditional_quops=0, conditional_shape=None, conditional_overhead=float("nan"),
+            consumed_significance=consumed_significance, shape_data=list(shape_data),
+        )
+        save_data(partial, dict(run_info, end_time=datetime.datetime.now().isoformat(timespec="seconds"),
+                                finished=False), quiet=True)
+
     result = run_quops_benchmark(
         api,
         shapes,
@@ -841,6 +914,7 @@ def run(
         seed=seed,
         compile_once=compile_once,
         should_stop=lambda: getattr(qedclib.execute, "cancel_requested", False),
+        on_shape=save_unfinished,
     )
     end_time = datetime.datetime.now()
     stopped = bool(getattr(qedclib.execute, "cancel_requested", False))
@@ -853,32 +927,8 @@ def run(
     print(result)
     print(f"Capability region: {result.capability_region()}")
 
-    noise_label = {"none": "noiseless", "quops": f"QUOPS noise model (depolarizing p1={P_1Q} p2={P_2Q})",
-                   "default": ("noise model from exec_options" if "noise_model" in (exec_options or {})
-                               else "QED-C default noise model")}[noise]
-    if not is_simulator(api, backend_id):
-        noise_label = "device noise"  # noise models apply to the simulators only
-    settings_label = (f"{noise_label} | "
-                      f"K={max_circuits}, M={num_mirrors}, {num_shots} shots | "
-                      f"familywise alpha=0.05"
-                      + (f", max {max_failures} failures" if max_failures > 1 else ""))
-    save_data(result, {
-        "benchmark": "QUOPS",
-        "api": api,
-        "backend_id": backend_id,
-        "backend_label": backend_label,
-        "start_time": start_time.isoformat(timespec="seconds"),
-        "end_time": end_time.isoformat(timespec="seconds"),
-        "settings": {
-            "min_qubits": min_qubits, "max_qubits": max_qubits, "skip_qubits": skip_qubits,
-            "max_depth": max_depth, "max_circuits": max_circuits, "num_mirrors": num_mirrors,
-            "seed": seed, "noise": noise, "p_1q": P_1Q if noise == "quops" else 0.0,
-            "p_2q": P_2Q if noise == "quops" else 0.0, "max_failures": max_failures,
-            "num_shots": num_shots, "compile_once": compile_once,
-        },
-        "settings_label": settings_label,
-        "stopped": stopped,
-    })
+    save_data(result, dict(run_info, end_time=end_time.isoformat(timespec="seconds"),
+                           stopped=stopped, finished=True))
 
     if plot_results:
         # plot_results (the argument) hides the function of the same name
@@ -909,7 +959,9 @@ def run_probe(
     threshold (1/sqrt(e)). A full scan (run()) over the suggested widths gives the real Q.
 
     Takes the same app/exec arguments as run(), plus points_per_width. Returns a DataFrame
-    with one row per shape probed (width, depth, size, lambda, lower bound).
+    with one row per shape probed (width, depth, size, lambda, lower bound). The shapes and
+    estimates are saved to __data/<backend_id>/QUOPS-probe.json, after each shape and at the
+    end (ALIGNMENT-LOG entry 22).
     """
     if noise not in ("default", "quops", "none"):
         raise ValueError(f"noise must be 'default', 'quops' or 'none', got {noise!r}")
@@ -933,6 +985,24 @@ def run_probe(
     print(f"Probing {len(shapes)} shapes, {max_circuits * num_mirrors * 3} circuits each "
           f"({len(shapes) * max_circuits * num_mirrors * 3} circuits); an estimate, not a Q")
 
+    run_info = {
+        "benchmark": "QUOPS probe",
+        "api": api,
+        "backend_id": backend_id,
+        "backend_label": backend_label,
+        "start_time": datetime.datetime.now().isoformat(timespec="seconds"),
+        "end_time": None,
+        "settings": {
+            "min_qubits": min_qubits, "max_qubits": max_qubits, "skip_qubits": skip_qubits,
+            "max_depth": max_depth, "points_per_width": points_per_width,
+            "max_circuits": max_circuits, "num_mirrors": num_mirrors, "seed": seed,
+            "noise": noise, "num_shots": num_shots, "compile_once": compile_once,
+        },
+        "threshold": QUOPS_THRESHOLD,
+        "num_shapes": len(shapes),
+        "stopped": False,
+    }
+
     rng = np.random.default_rng(seed)
     rows = []
     for shape in shapes:
@@ -953,24 +1023,34 @@ def run_probe(
         rows.append({"width": width, "depth": depth, "size": data.size,
                      "lambda": statistics["mean_polarization"], "lower": statistics["bootstrap_lower"]})
         print(f"w={width:2d} s={data.size:5d}  lambda={rows[-1]['lambda']:.4f} lower={rows[-1]['lower']:.4f}")
+        save_probe(rows, [], None, dict(run_info, end_time=datetime.datetime.now().isoformat(timespec="seconds"),
+                                        finished=False), quiet=True)
+    stopped = bool(getattr(qedclib.execute, "cancel_requested", False))
     probe = pd.DataFrame(rows, columns=["width", "depth", "size", "lambda", "lower"])
 
     # per width: fit ln(lambda) = a + b * size and solve for lambda = threshold
     print(f"\nEstimated size where lambda = {QUOPS_THRESHOLD:.4f}, per width:")
     best = None
+    estimates = []   # one per width, saved with the probe
     for width, group_rows in probe.groupby("width"):
         points = group_rows[group_rows["lambda"] > 0]
         sizes = list(group_rows["size"])
+        estimate = {"width": int(width), "size_min": int(sizes[0]), "size_max": int(sizes[-1]),
+                    "size_estimate": None}
+        estimates.append(estimate)
         if len(points) < 2:
+            estimate["note"] = "not enough points to fit"
             print(f"w={width:2d}  not enough points to fit")
             continue
         slope, intercept = np.polyfit(points["size"], np.log(points["lambda"]), 1)
         if slope >= 0:
+            estimate["note"] = "lambda does not fall with size here"
             print(f"w={width:2d}  lambda does not fall with size here (sizes {sizes[0]}-{sizes[-1]})")
             continue
         crossing = (np.log(QUOPS_THRESHOLD) - intercept) / slope
         where = "beyond the largest size probed" if crossing > sizes[-1] else (
                 "below the smallest size probed" if crossing < sizes[0] else "inside the sizes probed")
+        estimate.update(size_estimate=float(crossing), note=where)
         print(f"w={width:2d}  s ~ {crossing:7.0f}  ({where}: {sizes[0]}-{sizes[-1]})")
         if sizes[0] <= crossing <= sizes[-1] and (best is None or crossing > best[1]):
             best = (int(width), float(crossing))
@@ -979,6 +1059,10 @@ def run_probe(
               f"A full scan over widths near {best[0]} gives Q.")
     else:
         print("\nNo width crosses the threshold inside its sizes; probe other widths.")
+
+    save_probe(rows, estimates, None if best is None else {"width": best[0], "size_estimate": best[1]},
+               dict(run_info, end_time=datetime.datetime.now().isoformat(timespec="seconds"),
+                    stopped=stopped, finished=True))
     return probe
 
 

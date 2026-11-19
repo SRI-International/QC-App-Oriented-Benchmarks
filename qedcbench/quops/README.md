@@ -89,6 +89,8 @@ the other benchmarks (with `noise = "default"`, a `noise_model` given there is u
 boundary lies before a full scan, for example on hardware. It runs a few shapes per width
 (`--points_per_width`, default 3), 2 circuits × 1 mirror each unless `-c` / `--num_mirrors` are given,
 never stops at a failure, and prints for each width the size where λ reaches 1/√e. It doesn't report a Q.
+The shapes and estimates are saved to `__data/<backend_id>/QUOPS-probe.json` (after each shape and at
+the end); a probe doesn't replace `QUOPS-results.json`.
 
 **Hardware:** circuits run through qedclib, one batch per shape, so any qedclib backend can be used.
 Each circuit has barriers between its four parts and is transpiled at optimization level 1, so the
