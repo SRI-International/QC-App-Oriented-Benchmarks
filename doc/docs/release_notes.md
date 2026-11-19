@@ -7,6 +7,11 @@ This section presents a brief record of relevant changes made to each version th
 
 This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch **master-260411-v1.2.2**.
 
+### Release 2.0.11 - 18 November 2026
+
+- **QUOPS progress shows Q** -- Each shape's progress line now ends with the Q over the shapes finished so far, so a run that is stopped or doesn't finish still shows it.
+- **QUOPS saves after each shape** -- `QUOPS-results.json` is now written after every shape, not only at the end. A file saved before the run ends has `"finished": false`, and its Q comes from the shapes saved so far (Omega is not computed for it). The final save sets `"finished": true`. `load_data` and `plot_results` work on either.
+
 ### Release 2.0.10 - 17 November 2026
 
 - **QUOPS on hardware** -- QUOPS now runs its circuits through the qedclib execution engine, one batch (one job) per shape, so it runs on any backend qedclib supports; tested on IBM `fake_fez` and on the IBM device `ibm_fez`. Each mirror circuit has barriers between its four parts and is transpiled at optimization level 1, so the transpiler can't cancel the mirror; on a device backend QUOPS prints each shape's two-qubit gate count before and after transpiling. Omega is not reported on hardware. A run can be stopped between shapes (`request_cancel()`), and the shapes finished so far are saved.

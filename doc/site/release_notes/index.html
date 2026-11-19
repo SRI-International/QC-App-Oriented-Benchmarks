@@ -151,6 +151,11 @@
 This section presents a brief record of relevant changes made to each version that has been released. Latest version is at the top.</p>
 <h2 id="version-20-release-notes">Version 2.0 Release Notes</h2>
 <p>This version constitutes a major refactor of the entire benchmark repository. For the previous repository structure, use branch <strong>master-260411-v1.2.2</strong>.</p>
+<h3 id="release-2011-18-november-2026">Release 2.0.11 - 18 November 2026</h3>
+<ul>
+<li><strong>QUOPS progress shows Q</strong> -- Each shape's progress line now ends with the Q over the shapes finished so far, so a run that is stopped or doesn't finish still shows it.</li>
+<li><strong>QUOPS saves after each shape</strong> -- <code>QUOPS-results.json</code> is now written after every shape, not only at the end. A file saved before the run ends has <code>"finished": false</code>, and its Q comes from the shapes saved so far (Omega is not computed for it). The final save sets <code>"finished": true</code>. <code>load_data</code> and <code>plot_results</code> work on either.</li>
+</ul>
 <h3 id="release-2010-17-november-2026">Release 2.0.10 - 17 November 2026</h3>
 <ul>
 <li><strong>QUOPS on hardware</strong> -- QUOPS now runs its circuits through the qedclib execution engine, one batch (one job) per shape, so it runs on any backend qedclib supports; tested on IBM <code>fake_fez</code> and on the IBM device <code>ibm_fez</code>. Each mirror circuit has barriers between its four parts and is transpiled at optimization level 1, so the transpiler can't cancel the mirror; on a device backend QUOPS prints each shape's two-qubit gate count before and after transpiling. Omega is not reported on hardware. A run can be stopped between shapes (<code>request_cancel()</code>), and the shapes finished so far are saved.</li>
