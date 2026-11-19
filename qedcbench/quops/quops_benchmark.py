@@ -147,6 +147,28 @@ def save_data(result, run_info, quiet=False):
         print(f"... saved {path}")
 
 
+def probe_file(backend_id):
+    """Path of the saved QUOPS probe for a backend: __data/<backend_id>/QUOPS-probe.json."""
+    return os.path.join(os.getcwd(), "__data", backend_id.replace("/", "_"), "QUOPS-probe.json")
+
+
+def save_probe(rows, estimates, best, run_info, quiet=False):
+    """Save a probe to __data/<backend_id>/QUOPS-probe.json.
+
+    The file holds ``run_info`` (backend, API, settings, start and end time), the shapes probed
+    (width, depth, size, lambda, lower bound), the estimate per width and the best one.
+    ``run_probe()`` also saves after each shape (``"finished": false``, no estimates yet).
+    """
+    data = dict(run_info)
+    data.update(shapes=list(rows), estimates=list(estimates), best=best)
+    path = probe_file(run_info["backend_id"])
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2, default=_json_value)
+    if not quiet:
+        print(f"... saved {path}")
+
+
 def load_data(backend_id):
     """Load a run saved by ``save_data``. Returns ``(result, run_info)``: the BenchmarkResult
     and a dict with everything else in the file (backend, API, settings, times)."""
@@ -937,7 +959,9 @@ def run_probe(
     threshold (1/sqrt(e)). A full scan (run()) over the suggested widths gives the real Q.
 
     Takes the same app/exec arguments as run(), plus points_per_width. Returns a DataFrame
-    with one row per shape probed (width, depth, size, lambda, lower bound).
+    with one row per shape probed (width, depth, size, lambda, lower bound). The shapes and
+    estimates are saved to __data/<backend_id>/QUOPS-probe.json, after each shape and at the
+    end (ALIGNMENT-LOG entry 22).
     """
     if noise not in ("default", "quops", "none"):
         raise ValueError(f"noise must be 'default', 'quops' or 'none', got {noise!r}")
@@ -961,6 +985,24 @@ def run_probe(
     print(f"Probing {len(shapes)} shapes, {max_circuits * num_mirrors * 3} circuits each "
           f"({len(shapes) * max_circuits * num_mirrors * 3} circuits); an estimate, not a Q")
 
+    run_info = {
+        "benchmark": "QUOPS probe",
+        "api": api,
+        "backend_id": backend_id,
+        "backend_label": backend_label,
+        "start_time": datetime.datetime.now().isoformat(timespec="seconds"),
+        "end_time": None,
+        "settings": {
+            "min_qubits": min_qubits, "max_qubits": max_qubits, "skip_qubits": skip_qubits,
+            "max_depth": max_depth, "points_per_width": points_per_width,
+            "max_circuits": max_circuits, "num_mirrors": num_mirrors, "seed": seed,
+            "noise": noise, "num_shots": num_shots, "compile_once": compile_once,
+        },
+        "threshold": QUOPS_THRESHOLD,
+        "num_shapes": len(shapes),
+        "stopped": False,
+    }
+
     rng = np.random.default_rng(seed)
     rows = []
     for shape in shapes:
@@ -981,24 +1023,34 @@ def run_probe(
         rows.append({"width": width, "depth": depth, "size": data.size,
                      "lambda": statistics["mean_polarization"], "lower": statistics["bootstrap_lower"]})
         print(f"w={width:2d} s={data.size:5d}  lambda={rows[-1]['lambda']:.4f} lower={rows[-1]['lower']:.4f}")
+        save_probe(rows, [], None, dict(run_info, end_time=datetime.datetime.now().isoformat(timespec="seconds"),
+                                        finished=False), quiet=True)
+    stopped = bool(getattr(qedclib.execute, "cancel_requested", False))
     probe = pd.DataFrame(rows, columns=["width", "depth", "size", "lambda", "lower"])
 
     # per width: fit ln(lambda) = a + b * size and solve for lambda = threshold
     print(f"\nEstimated size where lambda = {QUOPS_THRESHOLD:.4f}, per width:")
     best = None
+    estimates = []   # one per width, saved with the probe
     for width, group_rows in probe.groupby("width"):
         points = group_rows[group_rows["lambda"] > 0]
         sizes = list(group_rows["size"])
+        estimate = {"width": int(width), "size_min": int(sizes[0]), "size_max": int(sizes[-1]),
+                    "size_estimate": None}
+        estimates.append(estimate)
         if len(points) < 2:
+            estimate["note"] = "not enough points to fit"
             print(f"w={width:2d}  not enough points to fit")
             continue
         slope, intercept = np.polyfit(points["size"], np.log(points["lambda"]), 1)
         if slope >= 0:
+            estimate["note"] = "lambda does not fall with size here"
             print(f"w={width:2d}  lambda does not fall with size here (sizes {sizes[0]}-{sizes[-1]})")
             continue
         crossing = (np.log(QUOPS_THRESHOLD) - intercept) / slope
         where = "beyond the largest size probed" if crossing > sizes[-1] else (
                 "below the smallest size probed" if crossing < sizes[0] else "inside the sizes probed")
+        estimate.update(size_estimate=float(crossing), note=where)
         print(f"w={width:2d}  s ~ {crossing:7.0f}  ({where}: {sizes[0]}-{sizes[-1]})")
         if sizes[0] <= crossing <= sizes[-1] and (best is None or crossing > best[1]):
             best = (int(width), float(crossing))
@@ -1007,6 +1059,10 @@ def run_probe(
               f"A full scan over widths near {best[0]} gives Q.")
     else:
         print("\nNo width crosses the threshold inside its sizes; probe other widths.")
+
+    save_probe(rows, estimates, None if best is None else {"width": best[0], "size_estimate": best[1]},
+               dict(run_info, end_time=datetime.datetime.now().isoformat(timespec="seconds"),
+                    stopped=stopped, finished=True))
     return probe
 
 

@@ -155,6 +155,7 @@ This section presents a brief record of relevant changes made to each version th
 <ul>
 <li><strong>QUOPS progress shows Q</strong> -- Each shape's progress line now ends with the Q over the shapes finished so far, so a run that is stopped or doesn't finish still shows it.</li>
 <li><strong>QUOPS saves after each shape</strong> -- <code>QUOPS-results.json</code> is now written after every shape, not only at the end. A file saved before the run ends has <code>"finished": false</code>, and its Q comes from the shapes saved so far (Omega is not computed for it). The final save sets <code>"finished": true</code>. <code>load_data</code> and <code>plot_results</code> work on either.</li>
+<li><strong>QUOPS probe saves its results</strong> -- <code>--probe</code> (<code>run_probe()</code>) now writes <code>__data/&lt;backend_id&gt;/QUOPS-probe.json</code>: the shapes probed, the estimated size per width where lambda reaches the threshold, and the best estimate. It is saved after each shape too. A probe never replaces <code>QUOPS-results.json</code>.</li>
 </ul>
 <h3 id="release-2010-17-november-2026">Release 2.0.10 - 17 November 2026</h3>
 <ul>

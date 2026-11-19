@@ -11,6 +11,7 @@ This version constitutes a major refactor of the entire benchmark repository. Fo
 
 - **QUOPS progress shows Q** -- Each shape's progress line now ends with the Q over the shapes finished so far, so a run that is stopped or doesn't finish still shows it.
 - **QUOPS saves after each shape** -- `QUOPS-results.json` is now written after every shape, not only at the end. A file saved before the run ends has `"finished": false`, and its Q comes from the shapes saved so far (Omega is not computed for it). The final save sets `"finished": true`. `load_data` and `plot_results` work on either.
+- **QUOPS probe saves its results** -- `--probe` (`run_probe()`) now writes `__data/<backend_id>/QUOPS-probe.json`: the shapes probed, the estimated size per width where lambda reaches the threshold, and the best estimate. It is saved after each shape too. A probe never replaces `QUOPS-results.json`.
 
 ### Release 2.0.10 - 17 November 2026
 
