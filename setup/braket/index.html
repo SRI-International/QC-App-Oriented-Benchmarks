@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Braket - QED-C Application-Oriented Benchmarks</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <link href="../../css/custom.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">QED-C Application-Oriented Benchmarks</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../quick_start/" class="nav-link">Quick Start</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../user_guide/" class="nav-link">User Guide</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../benchmarks/" class="nav-link">Benchmarks</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Setup</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../" class="dropdown-item">Overview</a>
+</li>
+                                    
+<li>
+    <a href="../qiskit/" class="dropdown-item">Qiskit</a>
+</li>
+                                    
+<li>
+    <a href="../cudaq/" class="dropdown-item">CUDA-Q</a>
+</li>
+                                    
+<li>
+    <a href="../cirq/" class="dropdown-item">Cirq</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Braket</a>
+</li>
+                                    
+<li>
+    <a href="../ocean/" class="dropdown-item">Ocean</a>
+</li>
+                                    
+<li>
+    <a href="../qbraid/" class="dropdown-item">QBraid</a>
+</li>
+                                    
+<li>
+    <a href="../qiskit-azure-quantum/" class="dropdown-item">Azure Quantum</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../release_notes/" class="nav-link">Releases</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../known_issues/" class="nav-link">PAL</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../about/" class="nav-link">About</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../cirq/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../ocean/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#setup-braket" class="nav-link">Setup: Braket</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            
+            <li class="nav-item" data-bs-level="1"><a href="#amazon-braket-version" class="nav-link">Amazon Braket Version</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#configure-a-braket-environment" class="nav-link">Configure a Braket Environment</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#install-braket" class="nav-link">Install Braket</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#run-the-benchmark-programs-in-a-jupyter-notebook" class="nav-link">Run the benchmark programs in a Jupyter Notebook</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#run-the-benchmark-programs-in-an-anaconda-command-window" class="nav-link">Run the benchmark programs in an Anaconda command window.</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#troubleshooting-tips" class="nav-link">Troubleshooting Tips</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#tested-versions" class="nav-link">Tested Versions</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="setup-braket">Setup: Braket</h1>
+<blockquote>
+<p><strong>Note:</strong> The Braket backend is not actively maintained. The setup instructions below may be outdated. Community contributions are welcome.</p>
+</blockquote>
+<h1 id="amazon-braket-version">Amazon Braket Version</h1>
+<p>This directory describes the requirements and operational conventions for using Braket as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
+In particular, this document explains how to set up the tools needed to run the Braket implementation of these benchmarks.</p>
+<h2 id="configure-a-braket-environment">Configure a Braket Environment</h2>
+<p>Create an environment named "braket" and then "activate" it using the following commands:</p>
+<pre><code>conda create -n braket python=3
+
+conda activate braket
+</code></pre>
+<p>The conda environment is now ready for you to install the Braket package.</p>
+<h2 id="install-braket">Install Braket</h2>
+<p>After activating the conda environment, to ensure you are using the correct installation of <code>pip</code>, run the following command:</p>
+<pre><code>pip show pip
+</code></pre>
+<p>If everything is working correctly, the <code>Location</code> field should have your newly created environment's name present. For example:</p>
+<pre><code>Location: c:\users\[user]\miniconda\envs\braket\lib\site-packages
+</code></pre>
+<p>Enter the following commands to install the latest version of Amazon Braket SDK and the other required packages.</p>
+<pre><code>pip install matplotlib boto3 amazon-braket-sdk notebook
+</code></pre>
+<p>You are now ready to run the benchmark programs.
+By default, all benchmark programs are configured to run on a simulator that is provided within the target environment.
+Follow the instructions below to run the benchmarks using the built-in Local Quantum Simulator.</p>
+<p>To run on any of the quantum hardware devices or the managed simulators provided by Amazon Braket, you must have an Amazon Braket account.
+You can go to the following link to create an account or to login to an existing account:</p>
+<pre><code>https://aws.amazon.com/braket/
+</code></pre>
+<p>Once you have an account, you will need to set the following environment variables to run a program that accesses Amazon Braket services.
+The values for the first two of the variables below can be found in the "Your Security Credentials page of your Braket account.
+The region is shown in the dropdown at the top to the right of your name.
+The remaining 2 were selected by you during account setup and may be found in your S3 management console.</p>
+<pre><code>AWS_ACCESS_KEY_ID = "YOUR_AWS_ACCESS_KEY_ID"
+AWS_SECRET_ACCESS_KEY = "YOUR_AWS_SECRET_ACCESS_KEY"
+AWS_DEFAULT_REGION = "YOUR_AWS_DEFAULT_REGION"
+AWS_BRAKET_S3_BUCKET = "YOUR_AWS_BRAKET_S3_BUCKET"
+AWS_BRAKET_S3_PREFIX = "YOUR_AWS_BRAKET_S3_PREFIX"
+</code></pre>
+<p>Once these variables are set, you may proceed to execution the benchmark programs in either a Jupyter Notebook or in a command shell window.</p>
+<h2 id="run-the-benchmark-programs-in-a-jupyter-notebook">Run the benchmark programs in a Jupyter Notebook</h2>
+<p>The easiest way to configure and run the Application Benchmark programs is to use a Jupyter Notebook that is provided at the top level of the App-Oriented-Benchmarks repository.
+Support for Jupyter notebooks is automatically available with your Anaconda installation.</p>
+<p>First, prepare the Amazon Braket notebook by copying the delivered 'template' file with the following command:</p>
+<pre><code>copy benchmarks-braket.ipynb.template benchmarks-braket.ipynb
+</code></pre>
+<p>To run the Amazon Braket notebook, simply execute the following command to launch the Jupyter Notebooks server.</p>
+<pre><code>jupyter-notebook
+</code></pre>
+<p>This will invoke the Jupyter notebook in a new browser tab.
+There you can select the <strong>benchmarks-braket.ipynb</strong> notebook file to open it in a new browser tab.</p>
+<p>Once opened, you will see a number of notebook cells.
+The first cell is used for configuring various parameters to the benchmark programs and is typically run each time you would like to modify parameters.</p>
+<p>The remaining cells contain the benchmark programs, one per cell.
+You may run one or all the benchmark programs by simply executing the desired cell(s).
+Parameters applied in the first cell apply to the execution of any one of the cells.</p>
+<p>Note that in the first section, several lines are commented out by default. 
+These lines are used to select and configure execution parameters when running on quantum hardware devices.
+Choose the lines to uncomment and modify as desired.</p>
+<p>Important Note:</p>
+<pre><code>The examples shown configure a smaller number of qubits, circuits, and shots for execution on quantum hardware.
+This is to avoid accidental execution of large or lengthy quantum circuits on hardware 
+that could result in high billing charges.
+It is best to begin your exploration with smaller numbers as you become familiar with the available systems.
+</code></pre>
+<h2 id="run-the-benchmark-programs-in-an-anaconda-command-window">Run the benchmark programs in an Anaconda command window.</h2>
+<p>Each of the benchmark programs may be run directly from within a command shell window. 
+The code for each of the application benchmarks is largely self-contained, using the shared <strong>qedclib</strong> library for execution and metrics.</p>
+<p>For example, in an Anaconda command window, you can enter the following commands to change directory to the Braket Bernstein-Vazirani directory and run the benchmark program:</p>
+<pre><code>cd [your github home directory]/QC-App-Oriented-Benchmarks/qedcbench/bernstein_vazirani
+
+python bv_benchmark.py
+</code></pre>
+<p>This will execute the benchmark program, report the benchmark metrics to the console, and invoke a set of bar charts showing the results in visual form.
+All other benchmarks follow a similar pattern and structure and are executed in the same way (using the appropriate benchmark program filename).</p>
+<p>Important Note:</p>
+<pre><code>The application benchmarks are executed from the command line and invoke the main method in the program.
+Values of parameters to the programs are hardcoded within the application and default to larger 
+values that can run on the Local Simulator with no issue.
+
+To modify the parameters or to switch to execution on quantum hardware, it is necessary to modify
+the values of the parameters within the program code (currently).
+If you modify the code to execute on quantum hardware, be sure to use smaller values for max_qubits,
+max_circuits, and num_shots parameters to avoid incurring high billing charges.
+</code></pre>
+<h2 id="troubleshooting-tips">Troubleshooting Tips</h2>
+<p>In some environments, you may encounter problems running a Jupyter Notebook.</p>
+<p>1) In some Windows environments, when running Miniconda, it is necessary to install an additional package (if running a Jupyter notebook results in a Windows "kernel error").
+Once the following package is installed, you should be able to successfully start your Jupyter notebook.</p>
+<pre><code>conda install pywin32
+</code></pre>
+<p>2) Additionally, after the amazon-braket-sdk package is installed, it may not be recognized within your Jupyter notebook.
+Often, executing the following lines will address this problem:</p>
+<pre><code>conda install notebook ipykernel
+ipython kernel install --user
+</code></pre>
+<h2 id="tested-versions">Tested Versions</h2>
+<p>The repository has been validated on Linux using the following versions as minimums:</p>
+<pre><code>Miniconda Version: 4.10.3
+Python Versions: 3.8.5 and 3.9.7
+Braket-SDK Version: 1.9.5
+</code></pre>
+<p>Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

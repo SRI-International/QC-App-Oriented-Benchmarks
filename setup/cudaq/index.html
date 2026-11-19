@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>CUDA-Q - QED-C Application-Oriented Benchmarks</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <link href="../../css/custom.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">QED-C Application-Oriented Benchmarks</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../quick_start/" class="nav-link">Quick Start</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../user_guide/" class="nav-link">User Guide</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../benchmarks/" class="nav-link">Benchmarks</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Setup</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../" class="dropdown-item">Overview</a>
+</li>
+                                    
+<li>
+    <a href="../qiskit/" class="dropdown-item">Qiskit</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">CUDA-Q</a>
+</li>
+                                    
+<li>
+    <a href="../cirq/" class="dropdown-item">Cirq</a>
+</li>
+                                    
+<li>
+    <a href="../braket/" class="dropdown-item">Braket</a>
+</li>
+                                    
+<li>
+    <a href="../ocean/" class="dropdown-item">Ocean</a>
+</li>
+                                    
+<li>
+    <a href="../qbraid/" class="dropdown-item">QBraid</a>
+</li>
+                                    
+<li>
+    <a href="../qiskit-azure-quantum/" class="dropdown-item">Azure Quantum</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../release_notes/" class="nav-link">Releases</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../known_issues/" class="nav-link">PAL</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../../about/" class="nav-link">About</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../qiskit/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../cirq/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#setup-cuda-q" class="nav-link">Setup: CUDA-Q</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            
+            <li class="nav-item" data-bs-level="1"><a href="#cuda-quantum-version" class="nav-link">CUDA Quantum Version</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#important-note-about-benchmark-directory-structure-for-cuda-quantum" class="nav-link">IMPORTANT Note about Benchmark Directory Structure for CUDA Quantum</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#configure-a-cuda-quantum-environment" class="nav-link">Configure a CUDA Quantum Environment</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#run-the-benchmark-programs-in-a-command-window" class="nav-link">Run the benchmark programs in a command window.</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#run-the-benchmark-programs-in-a-jupyter-notebook" class="nav-link">Run the benchmark programs in a Jupyter Notebook</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#tested-versions" class="nav-link">Tested Versions</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="setup-cuda-q">Setup: CUDA-Q</h1>
+<h1 id="cuda-quantum-version">CUDA Quantum Version</h1>
+<p>This directory describes the requirements and operational conventions for using CUDA Quantum as the programming environment for running the benchmark programs contained in the QC-App-Oriented-Benchmarks repository.
+In particular, this document explains how to set up the tools needed to run the CUDA Quantum implementation of these benchmarks.</p>
+<p>IMPORTANT: The CUDA Quantum version of the QED-C benchmarks is an evolving work-in-progress. Recent updates to CUDA Quantum have required changes to the QED-C code such that some of the benchmarks currently require later versions of CUDA Quantum. As of 19 Aug 2025, most will work with version <strong>0.10</strong>. The <strong>HamLib</strong> benchmark now requires <strong>0.12</strong> at a minimum.  The <strong>Phase Estimation</strong> benchmark requires the <strong>nightly</strong> build of CUDA Quantum.</p>
+<h2 id="important-note-about-benchmark-directory-structure-for-cuda-quantum">IMPORTANT Note about Benchmark Directory Structure for CUDA Quantum</h2>
+<p>Integrating CUDA Quantum into the QED-C benchmarking suite prompted a restructuring of all the benchmark source code in the repository to consolidate common code in a reusable fashion, shareable across API implementations. This effort is a WORK-IN-PROGRESS and has been only partially completed across the suite of benchmarks. In particular, the restructuring defines a shared module for each problem definition and its benchmark looping logic, while isolating code that is specific to each API into a unique quantum "kernel" for that problem definition.</p>
+<p>With this structure, used by the CUDA Quantum version of the benchmarks, the main routine for each benchmark resides at the top level of the benchmark directory, while the kernels are situated one level deeper in a directory identified by the API name.  For example, the Bernstein-Vazirani benchmark main program is contained in:</p>
+<pre><code>bernstein_vazirani/bv_benchmark.py
+</code></pre>
+<p>While the CUDA Quantum implementation of the quantum kernel for this benchmark is in:</p>
+<pre><code>bernstein_vazirani/cudaq/bv_kernel.py
+</code></pre>
+<p>As of now, 4 of the benchmarks have been implemented for CUDA Quantum, with kernels contained within the <strong>cudaq</strong> sub-directory for each: <strong>bernstein_vazirani, hidden_shift, quantum_fourier_transform, and phase_estimation</strong>. More coming soon. Instructions for running benchmarks on CUDA Quantum are presented below.</p>
+<p>Note that for the Qiskit version of the benchmarks, we retained a version of the benchmark main program in the <strong>qiskit</strong> sub-directory, in order to provide backwards compatibility for users, during this transition period and until the change has been implemented across the entire suite. </p>
+<h2 id="configure-a-cuda-quantum-environment">Configure a CUDA Quantum Environment</h2>
+<p>There are two ways in which the QED-C benchmarks can be executed using CUDA Quantum.  These are described in this section. (Note: more detail could be added here, but this info is provided to get users started)</p>
+<h3 id="run-within-the-cuda-quantum-docker-container">Run within the CUDA Quantum Docker Container</h3>
+<p>This is the easiest way to execute the benchmarks with CUDA Quantum.  After cloning the QED-C repository into a directory within your container, simply change directory to the top level of the QED-C repository. You then can bring up a Jupyter Notebook to enable execution of all the benchmarks there or you can change directory to any of the available benchmark directories and execute that benchmark on the command line.  </p>
+<p>Alternatively, you may want to clone the QED-C repository outside the CUDA Quantum container, and map the directory to a shared volume within the container.  This method will provide persistence of the data generated by the benchmarks if the container is stopped and removed (to update to a newer version of CUDA Quantum, for example).</p>
+<p>To start a Jupyter notebook within the CUDA Quantum container and make the port available outside, it is recommended that you start Jupyter with a command similar to the following:</p>
+<pre><code>jupyter notebook --ip 0.0.0.0 --no-browser --allow-root
+</code></pre>
+<p>When starting the container, you will also need to map the port used by the Jupyter notebook, using a Docker option like this, where 8888 is the default Jupyter port:</p>
+<pre><code>-p 8888:8888
+</code></pre>
+<h3 id="install-cuda-quantum-using-pip">Install CUDA Quantum using Pip</h3>
+<p>Many users will install the CUDA Quantum package directly onto their system and skip the container entirely. After cloning the QED-C repository to a location on your system, simply change directory to the top level of the QED-C repository. You then can bring up a Jupyter Notebook to enable execution of all the benchmarks there or you can change directory to any of the available benchmark directories and execute that benchmark on the command line.</p>
+<p>In addition to the CUDA Quantum package, the benchmarks require two other Python packages and, optionally, the Jupyter notebook package.</p>
+<pre><code>pip install numpy matplotlib notebook
+</code></pre>
+<p>Once installed, you are ready to run the benchmark programs.</p>
+<p>In the section below, we provide some instructions for executing the benchmarks in either of these modes.</p>
+<h2 id="run-the-benchmark-programs-in-a-command-window">Run the benchmark programs in a command window.</h2>
+<p>To execute the benchmarks in a command or shell window, you simply change directory to the desired benchmark directory and execute the benchmark program as follows:</p>
+<pre><code>cd [your github home directory]/QC-App-Oriented-Benchmarks/qedcbench/bernstein_vazirani
+
+
+python bv_benchmark.py -a cudaq
+</code></pre>
+<p>This command instructs the benchmark program to exeucte using the CUDA Quantum kernel.  By default, the benchmark will sweep over qubits widths from 2 to 24 qubits.  As it executes, the benchmark program will report the benchmark metrics to the console, save them to a data file, and also generate a set of plots depicting the results. </p>
+<p>A variety of execution options are available and can be obtained using the -h option for help information:</p>
+<pre><code>python bv_benchmark.py -h
+</code></pre>
+<p>The other benchmarks follow a similar format and structure and are executed in the same way (using the appropriate benchmark program filename).</p>
+<h2 id="run-the-benchmark-programs-in-a-jupyter-notebook">Run the benchmark programs in a Jupyter Notebook</h2>
+<p>Many Python users prefer to execute their Python programs in a Jupyter notebook, which is available in installed in your environment.
+Execute the following commands to change directory to one that contains a Jupyter notebook and execute and invoke Jupyter notebook server.
+    cd [your github home directory]/QC-App-Oriented-Benchmarks
+    cd [your github home directory]\QC-App-Oriented-Benchmarks
+    jupyter-notebook</p>
+<p>You can then select the <strong>benchmarks-cudaq.ipynb</strong> notebook in a new browser tab. The first cell of the notebook contains the execution options available for configuration.  Subsequent cells contain the run command for each of the benchmarks and can be executed one at a time. To run all the benchmarks simply use the Jupyter Notebook's Run All menu option. </p>
+<h2 id="tested-versions">Tested Versions</h2>
+<pre><code>Python Versions: 3.10 through 3.12
+</code></pre>
+<p>Earlier (or later) versions of the software might work without issues, but the benchmark has been specifically validated on these versions. If you have any issues installing, please raise an bug report in the issues tab of the repository.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
